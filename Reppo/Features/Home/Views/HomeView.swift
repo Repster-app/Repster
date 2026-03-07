@@ -1,0 +1,153 @@
+// HomeView.swift
+// Main Home screen assembling all sub-views in NavigationStack + ScrollView.
+// Spec: 013-home-screen, WP04 T017
+
+import SwiftUI
+
+struct HomeView: View {
+    @State private var viewModel: HomeViewModel
+    @Environment(ServiceContainer.self) private var services
+
+    let refreshTrigger: UUID
+    let onStartWorkout: () -> Void
+    let onShowStartWorkoutSheet: () -> Void
+    let onShowExerciseList: () -> Void
+
+    init(
+        workoutService: any WorkoutServiceProtocol,
+        setService: any SetServiceProtocol,
+        exerciseService: any ExerciseServiceProtocol,
+        refreshTrigger: UUID,
+        onStartWorkout: @escaping () -> Void,
+        onShowStartWorkoutSheet: @escaping () -> Void,
+        onShowExerciseList: @escaping () -> Void
+    ) {
+        _viewModel = State(initialValue: HomeViewModel(
+            workoutService: workoutService,
+            setService: setService,
+            exerciseService: exerciseService
+        ))
+        self.refreshTrigger = refreshTrigger
+        self.onStartWorkout = onStartWorkout
+        self.onShowStartWorkoutSheet = onShowStartWorkoutSheet
+        self.onShowExerciseList = onShowExerciseList
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    headerSection
+                    WeekStripView(weekDays: viewModel.weekDays)
+                    startWorkoutSection
+                    recentWorkoutsSection
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 100)
+            }
+            .background(Color.bg)
+            .onAppear {
+                // Reload when navigating back (e.g. after deleting a workout)
+                viewModel.lastLoadTime = nil
+                Task { await viewModel.loadData() }
+            }
+            .navigationDestination(for: UUID.self) { workoutId in
+                WorkoutDetailFromHomeView(
+                    workoutId: workoutId,
+                    workoutService: services.workoutService,
+                    setService: services.setService,
+                    exerciseService: services.exerciseService,
+                    statsService: services.statsService
+                )
+            }
+        }
+        .task(id: refreshTrigger) {
+            // Reload when refreshTrigger changes (e.g. after workout dismiss)
+            viewModel.lastLoadTime = nil
+            await viewModel.loadData()
+        }
+        .onAppear {
+            // Reload when navigating back (e.g. after deleting a workout)
+            viewModel.lastLoadTime = nil
+            Task { await viewModel.loadData() }
+        }
+    }
+
+    // MARK: - Header
+
+    @ViewBuilder
+    private var headerSection: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(formattedDate)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.textSecondary)
+                Text("Workout")
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(Color.textPrimary)
+            }
+
+            Spacer()
+
+            Circle()
+                .fill(Color.bgSubtle)
+                .frame(width: 36, height: 36)
+        }
+    }
+
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMM d"
+        return formatter.string(from: Date())
+    }
+
+    // MARK: - Start Workout
+
+    @ViewBuilder
+    private var startWorkoutSection: some View {
+        StartWorkoutCardView(
+            hasActiveWorkout: viewModel.hasActiveWorkout,
+            activeWorkoutStartTime: viewModel.activeWorkoutStartTime,
+            activeExerciseCount: viewModel.activeWorkoutExerciseCount,
+            activeSetCount: viewModel.activeWorkoutSetCount,
+            onCardTapped: {
+                if viewModel.hasActiveWorkout {
+                    onStartWorkout()
+                } else {
+                    onShowStartWorkoutSheet()
+                }
+            },
+            onPlusTapped: {
+                onShowStartWorkoutSheet()
+            }
+        )
+    }
+
+    // MARK: - Recent Workouts
+
+    @ViewBuilder
+    private var recentWorkoutsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("RECENT")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Color.textTertiary)
+                .kerning(0.8)
+
+            if viewModel.recentWorkouts.isEmpty {
+                Text("Complete your first workout to see it here")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color.textTertiary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
+            } else {
+                ForEach(viewModel.recentWorkouts) { summary in
+                    NavigationLink(value: summary.id) {
+                        RecentWorkoutCardView(summary: summary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+}

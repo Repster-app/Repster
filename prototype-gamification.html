@@ -1,0 +1,1704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gamification — Prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #111113;
+    --bg-card: #1B1B1F;
+    --bg-hover: #222228;
+    --bg-subtle: #262630;
+    --bg-input: #1F1F25;
+    --text: #EAEAEF;
+    --text-mid: #9999A8;
+    --text-dim: #5C5C6E;
+    --accent: #5B8DEF;
+    --accent-soft: rgba(91, 141, 239, 0.10);
+    --success: #5EC269;
+    --success-soft: rgba(94, 194, 105, 0.08);
+    --gold: #D4A23A;
+    --gold-soft: rgba(212, 162, 58, 0.10);
+    --red: #E05555;
+    --red-soft: rgba(224, 85, 85, 0.08);
+    --orange: #E89B3E;
+    --orange-soft: rgba(232, 155, 62, 0.10);
+    --purple: #A87EE6;
+    --purple-soft: rgba(168, 126, 230, 0.10);
+    --teal: #4ECDC4;
+    --teal-soft: rgba(78, 205, 196, 0.10);
+    --border: rgba(255,255,255,0.06);
+    --r: 14px;
+    --r-sm: 10px;
+    --r-chip: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: #060608;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  /* ===== PAGE TITLE & TABS ===== */
+  .page-label {
+    font-size: 13px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  .variant-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .variant-tab {
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid var(--border);
+    color: var(--text-mid);
+    background: transparent;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .variant-tab.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .variant-tab:hover:not(.active) {
+    background: var(--bg-hover);
+    color: var(--text);
+  }
+
+  /* ===== PHONE FRAME ===== */
+  .phone {
+    width: 393px;
+    height: 852px;
+    background: var(--bg);
+    border-radius: 44px;
+    border: 2.5px solid #232328;
+    overflow: hidden;
+    position: relative;
+    display: none;
+    flex-direction: column;
+  }
+  .phone.active { display: flex; }
+
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 28px 6px;
+    font-size: 15px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .status-r { display: flex; gap: 6px; align-items: center; }
+  .status-r svg { width: 16px; height: 16px; fill: var(--text); }
+
+  .scroll-content {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .scroll-content::-webkit-scrollbar { display: none; }
+
+  /* ===== BOTTOM NAV ===== */
+  .bottom-nav {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 84px;
+    background: linear-gradient(to top, var(--bg) 65%, transparent);
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    padding: 0 16px 28px;
+    z-index: 10;
+  }
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    min-width: 48px;
+  }
+  .nav-item svg {
+    width: 21px;
+    height: 21px;
+    stroke: var(--text-dim);
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .nav-item span {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-dim);
+  }
+  .nav-item.active svg { stroke: var(--accent); }
+  .nav-item.active span { color: var(--accent); }
+  .nav-fab {
+    width: 46px;
+    height: 46px;
+    background: var(--accent);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(91, 141, 239, 0.3);
+  }
+  .nav-fab svg {
+    width: 22px;
+    height: 22px;
+    stroke: white;
+    fill: none;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* ===== SHARED STYLES ===== */
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 10px;
+  }
+
+  .card {
+    background: var(--bg-card);
+    border-radius: var(--r);
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+
+  /* Fade in */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fi { animation: fadeIn 0.4s ease forwards; opacity: 0; }
+  .fi1 { animation-delay: 0.02s; }
+  .fi2 { animation-delay: 0.06s; }
+  .fi3 { animation-delay: 0.10s; }
+  .fi4 { animation-delay: 0.14s; }
+  .fi5 { animation-delay: 0.18s; }
+  .fi6 { animation-delay: 0.22s; }
+  .fi7 { animation-delay: 0.26s; }
+
+  /* ====================================================
+     SCREEN 1: XP / LEVEL SYSTEM
+     ==================================================== */
+
+  .xp-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 20px 4px;
+  }
+  .xp-header-text { flex: 1; }
+  .xp-header-date {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-mid);
+  }
+  .xp-header-title {
+    font-size: 26px;
+    font-weight: 700;
+  }
+
+  /* Level Ring */
+  .level-ring-wrap {
+    width: 52px;
+    height: 52px;
+    position: relative;
+  }
+  .level-ring-wrap svg {
+    width: 52px;
+    height: 52px;
+    transform: rotate(-90deg);
+  }
+  .level-ring-bg {
+    fill: none;
+    stroke: var(--bg-subtle);
+    stroke-width: 4;
+  }
+  .level-ring-fill {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-dasharray: 138.23;
+    stroke-dashoffset: 42;
+    transition: stroke-dashoffset 1s ease;
+  }
+  .level-num {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  /* XP Bar Card */
+  .xp-bar-card {
+    background: var(--bg-card);
+    border-radius: var(--r);
+    padding: 16px;
+    margin: 12px 20px;
+  }
+  .xp-bar-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .xp-level-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .xp-values {
+    font-size: 12px;
+    color: var(--text-mid);
+    font-weight: 500;
+  }
+  .xp-values b { color: var(--text); font-weight: 700; }
+  .xp-bar-track {
+    width: 100%;
+    height: 8px;
+    background: var(--bg-subtle);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  .xp-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--accent), #7BA4F7);
+    width: 0%;
+    transition: width 1.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  }
+  .xp-bar-sub {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+
+  /* XP Earnings */
+  .xp-earnings {
+    margin: 0 20px;
+  }
+  .xp-earning-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .xp-earning-item:last-child { border-bottom: none; }
+  .xp-earning-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .xp-earning-text { flex: 1; }
+  .xp-earning-label {
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .xp-earning-time {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 1px;
+  }
+  .xp-earning-amount {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--success);
+  }
+
+  /* Level Roadmap */
+  .level-roadmap {
+    margin: 0 20px;
+  }
+  .roadmap-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+  }
+  .roadmap-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .roadmap-dot.reached { background: var(--accent); }
+  .roadmap-dot.current { background: var(--gold); box-shadow: 0 0 8px rgba(212, 162, 58, 0.4); }
+  .roadmap-dot.locked { background: var(--bg-subtle); }
+  .roadmap-name {
+    font-size: 14px;
+    font-weight: 500;
+    flex: 1;
+  }
+  .roadmap-name.dim { color: var(--text-dim); }
+  .roadmap-lvl {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+
+  /* Week strip (Home) */
+  .week-strip {
+    display: flex;
+    gap: 6px;
+    padding: 0 20px;
+    margin-bottom: 4px;
+  }
+  .day-card {
+    flex: 1;
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 8px 4px;
+    text-align: center;
+  }
+  .day-card .abbr {
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+  }
+  .day-card .num {
+    font-size: 16px;
+    font-weight: 700;
+    margin-top: 3px;
+  }
+  .day-card.today {
+    background: var(--accent);
+  }
+  .day-card.today .abbr { color: rgba(255,255,255,0.7); }
+  .day-card.has-workout { border: 1px solid rgba(94, 194, 105, 0.3); }
+  .day-card.has-workout .num { color: var(--success); }
+  .day-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--success);
+    margin: 4px auto 0;
+  }
+
+  /* ====================================================
+     SCREEN 2: CHALLENGES / GOALS
+     ==================================================== */
+
+  .challenge-card {
+    background: var(--bg-card);
+    border-radius: var(--r);
+    padding: 16px;
+    margin-bottom: 10px;
+    border: 1px solid var(--border);
+    transition: border-color 0.2s;
+  }
+  .challenge-card:hover { border-color: rgba(255,255,255,0.1); }
+  .challenge-card.completed {
+    border-color: rgba(94, 194, 105, 0.3);
+    background: var(--success-soft);
+  }
+  .challenge-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .challenge-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .challenge-info { flex: 1; }
+  .challenge-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .challenge-desc {
+    font-size: 12px;
+    color: var(--text-mid);
+  }
+  .challenge-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .challenge-badge.time { background: var(--orange-soft); color: var(--orange); }
+  .challenge-badge.done { background: var(--success-soft); color: var(--success); }
+  .challenge-badge.weekly { background: var(--purple-soft); color: var(--purple); }
+
+  .challenge-progress-wrap {
+    margin-top: 4px;
+  }
+  .challenge-progress-top {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .challenge-progress-label {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+  .challenge-progress-pct {
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .challenge-bar-track {
+    width: 100%;
+    height: 6px;
+    background: var(--bg-subtle);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .challenge-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 1s cubic-bezier(0.25, 0.8, 0.25, 1);
+    width: 0%;
+  }
+
+  .add-challenge-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px;
+    border-radius: var(--r);
+    border: 1.5px dashed rgba(255,255,255,0.12);
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: none;
+    font-family: 'DM Sans', sans-serif;
+    width: 100%;
+  }
+  .add-challenge-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  /* ====================================================
+     SCREEN 3: BADGES / ACHIEVEMENTS
+     ==================================================== */
+
+  .badge-page-header {
+    padding: 8px 20px 4px;
+  }
+  .badge-page-title {
+    font-size: 26px;
+    font-weight: 700;
+  }
+  .badge-page-sub {
+    font-size: 13px;
+    color: var(--text-mid);
+    margin-top: 2px;
+  }
+
+  /* Stats summary */
+  .badge-stats {
+    display: flex;
+    gap: 1px;
+    background: var(--border);
+    border-radius: var(--r);
+    overflow: hidden;
+    margin: 16px 20px;
+  }
+  .badge-stat {
+    flex: 1;
+    background: var(--bg-card);
+    padding: 14px 8px;
+    text-align: center;
+  }
+  .badge-stat-value {
+    font-size: 22px;
+    font-weight: 700;
+  }
+  .badge-stat-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+  }
+
+  /* Badge category */
+  .badge-category {
+    padding: 0 20px;
+    margin-bottom: 20px;
+  }
+  .badge-category-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .badge-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .badge-item {
+    background: var(--bg-card);
+    border-radius: var(--r);
+    padding: 14px 8px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    position: relative;
+    border: 1px solid var(--border);
+    transition: all 0.2s;
+  }
+  .badge-item.unlocked {
+    border-color: rgba(212, 162, 58, 0.25);
+  }
+  .badge-item.locked {
+    opacity: 0.4;
+  }
+  .badge-item.new::after {
+    content: 'NEW';
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    font-size: 8px;
+    font-weight: 700;
+    background: var(--accent);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+  }
+  .badge-icon-wrap {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+  }
+  .badge-icon-wrap.gold-bg { background: var(--gold-soft); }
+  .badge-icon-wrap.accent-bg { background: var(--accent-soft); }
+  .badge-icon-wrap.success-bg { background: var(--success-soft); }
+  .badge-icon-wrap.purple-bg { background: var(--purple-soft); }
+  .badge-icon-wrap.teal-bg { background: var(--teal-soft); }
+  .badge-icon-wrap.locked-bg { background: var(--bg-subtle); }
+  .badge-name {
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .badge-date {
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  /* Progress badge */
+  .badge-progress {
+    width: 100%;
+    margin-top: 2px;
+  }
+  .badge-progress-track {
+    width: 100%;
+    height: 3px;
+    background: var(--bg-subtle);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .badge-progress-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--accent);
+  }
+  .badge-progress-text {
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  /* ====================================================
+     SCREEN 4: WEEKLY RECAP
+     ==================================================== */
+
+  .recap-card {
+    background: var(--bg-card);
+    border-radius: var(--r);
+    margin: 0 20px 12px;
+    overflow: hidden;
+    border: 1px solid rgba(91, 141, 239, 0.15);
+  }
+  .recap-card-header {
+    padding: 14px 16px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .recap-card-title {
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .recap-card-period {
+    font-size: 12px;
+    color: var(--text-mid);
+    font-weight: 500;
+  }
+  .recap-card-body {
+    padding: 14px 16px 16px;
+  }
+
+  /* Recap stat grid */
+  .recap-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .recap-stat {
+    background: var(--bg);
+    border-radius: var(--r-sm);
+    padding: 12px;
+  }
+  .recap-stat-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .recap-stat-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+  .recap-stat-trend {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .recap-stat-trend.up { background: var(--success-soft); color: var(--success); }
+  .recap-stat-trend.down { background: var(--red-soft); color: var(--red); }
+  .recap-stat-trend.same { background: rgba(255,255,255,0.05); color: var(--text-dim); }
+  .recap-stat-value {
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .recap-stat-compare {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  /* Mini bar chart */
+  .mini-bars {
+    display: flex;
+    gap: 4px;
+    align-items: flex-end;
+    height: 48px;
+    padding: 0 2px;
+  }
+  .mini-bar-day {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .mini-bar {
+    width: 100%;
+    border-radius: 3px;
+    min-height: 2px;
+    transition: height 0.8s cubic-bezier(0.25, 0.8, 0.25, 1);
+  }
+  .mini-bar-label {
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--text-dim);
+  }
+
+  /* Highlights row */
+  .recap-highlights {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .recap-highlight {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--bg);
+    border-radius: var(--r-sm);
+  }
+  .recap-highlight-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .recap-highlight-text {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-mid);
+  }
+  .recap-highlight-text b {
+    color: var(--text);
+    font-weight: 700;
+  }
+
+  /* Monthly recap */
+  .monthly-recap-card {
+    background: var(--bg-card);
+    border-radius: var(--r);
+    margin: 0 20px 12px;
+    padding: 16px;
+    border: 1px solid rgba(212, 162, 58, 0.15);
+  }
+  .monthly-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .monthly-title {
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .monthly-period {
+    font-size: 12px;
+    color: var(--text-mid);
+    font-weight: 500;
+  }
+  .monthly-stats {
+    display: flex;
+    gap: 1px;
+    background: var(--border);
+    border-radius: var(--r-sm);
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .monthly-stat {
+    flex: 1;
+    background: var(--bg);
+    padding: 10px 6px;
+    text-align: center;
+  }
+  .monthly-stat-val {
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .monthly-stat-label {
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-top: 2px;
+  }
+
+  .monthly-compare {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .monthly-compare-pill {
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-label">Gamification Features — Prototype Sketches</div>
+
+<div class="variant-tabs">
+  <button class="variant-tab active" onclick="showScreen('xp')">XP & Levels</button>
+  <button class="variant-tab" onclick="showScreen('challenges')">Challenges</button>
+  <button class="variant-tab" onclick="showScreen('badges')">Achievements</button>
+  <button class="variant-tab" onclick="showScreen('recap')">Weekly Recap</button>
+</div>
+
+<!-- ====================================================
+     SCREEN 1: XP / LEVEL SYSTEM
+     ==================================================== -->
+<div class="phone active" id="screen-xp">
+  <div class="status-bar">
+    <span>14:02</span>
+    <div class="status-r">
+      <svg viewBox="0 0 16 16"><circle cx="2" cy="8" r="1.5"/><circle cx="6" cy="8" r="1.5"/><circle cx="10" cy="8" r="1.5"/><circle cx="14" cy="8" r="1.5"/></svg>
+      <svg viewBox="0 0 16 16"><path d="M1 11.5c2-4 4.5-6.5 7-8.5M4 12c1.5-3 3.5-5 5.5-6.5M7 12.5c1-2 2.5-3.5 4-4.5M10.5 12.5c.5-.8 1.2-1.5 2-2" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <svg viewBox="0 0 24 14"><rect x="0" y="1" width="20" height="12" rx="2.5" stroke="currentColor" fill="none" stroke-width="1.5"/><rect x="2" y="3" width="14" height="8" rx="1" fill="currentColor"/><path d="M22 5v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </div>
+  </div>
+
+  <div class="scroll-content">
+    <!-- Header with level ring -->
+    <div class="xp-header fi fi1">
+      <div class="xp-header-text">
+        <div class="xp-header-date">Wednesday, Mar 5</div>
+        <div class="xp-header-title">Workout</div>
+      </div>
+      <div class="level-ring-wrap" title="Level 14 — 78% to next level">
+        <svg viewBox="0 0 52 52">
+          <circle class="level-ring-bg" cx="26" cy="26" r="22"/>
+          <circle class="level-ring-fill" cx="26" cy="26" r="22" id="xp-ring"/>
+        </svg>
+        <div class="level-num">14</div>
+      </div>
+    </div>
+
+    <!-- XP Bar -->
+    <div class="xp-bar-card fi fi2">
+      <div class="xp-bar-top">
+        <div class="xp-level-name">⚡ Iron Warrior</div>
+        <div class="xp-values"><b>2,340</b> / 3,000 XP</div>
+      </div>
+      <div class="xp-bar-track">
+        <div class="xp-bar-fill" id="xp-bar-fill"></div>
+      </div>
+      <div class="xp-bar-sub">
+        <span>Level 14</span>
+        <span>660 XP to Level 15</span>
+      </div>
+    </div>
+
+    <!-- Week strip -->
+    <div class="week-strip fi fi3">
+      <div class="day-card has-workout"><div class="abbr">MON</div><div class="num">3</div><div class="day-dot"></div></div>
+      <div class="day-card has-workout"><div class="abbr">TUE</div><div class="num">4</div><div class="day-dot"></div></div>
+      <div class="day-card today"><div class="abbr">WED</div><div class="num">5</div></div>
+      <div class="day-card"><div class="abbr">THU</div><div class="num">6</div></div>
+      <div class="day-card"><div class="abbr">FRI</div><div class="num">7</div></div>
+      <div class="day-card"><div class="abbr">SAT</div><div class="num">8</div></div>
+      <div class="day-card"><div class="abbr">SUN</div><div class="num">9</div></div>
+    </div>
+
+    <!-- Recent XP Earnings -->
+    <div style="padding: 20px 20px 6px;">
+      <div class="section-label fi fi4">Recent XP</div>
+    </div>
+
+    <div class="xp-earnings fi fi4">
+      <div class="xp-earning-item">
+        <div class="xp-earning-icon" style="background: var(--success-soft);">💪</div>
+        <div class="xp-earning-text">
+          <div class="xp-earning-label">Workout Completed</div>
+          <div class="xp-earning-time">Today, 12:34 PM</div>
+        </div>
+        <div class="xp-earning-amount">+100</div>
+      </div>
+      <div class="xp-earning-item">
+        <div class="xp-earning-icon" style="background: var(--gold-soft);">🏆</div>
+        <div class="xp-earning-text">
+          <div class="xp-earning-label">New PR — Bench Press 8RM</div>
+          <div class="xp-earning-time">Today, 12:28 PM</div>
+        </div>
+        <div class="xp-earning-amount">+50</div>
+      </div>
+      <div class="xp-earning-item">
+        <div class="xp-earning-icon" style="background: var(--accent-soft);">🎯</div>
+        <div class="xp-earning-text">
+          <div class="xp-earning-label">All Targets Hit</div>
+          <div class="xp-earning-time">Today, 12:34 PM</div>
+        </div>
+        <div class="xp-earning-amount">+25</div>
+      </div>
+      <div class="xp-earning-item">
+        <div class="xp-earning-icon" style="background: var(--purple-soft);">⚖️</div>
+        <div class="xp-earning-text">
+          <div class="xp-earning-label">Bodyweight Logged</div>
+          <div class="xp-earning-time">Today, 08:15 AM</div>
+        </div>
+        <div class="xp-earning-amount">+10</div>
+      </div>
+      <div class="xp-earning-item">
+        <div class="xp-earning-icon" style="background: var(--success-soft);">💪</div>
+        <div class="xp-earning-text">
+          <div class="xp-earning-label">Workout Completed</div>
+          <div class="xp-earning-time">Yesterday, 5:12 PM</div>
+        </div>
+        <div class="xp-earning-amount">+100</div>
+      </div>
+    </div>
+
+    <!-- Level Roadmap -->
+    <div style="padding: 20px 20px 6px;">
+      <div class="section-label fi fi5">Level Roadmap</div>
+    </div>
+
+    <div class="level-roadmap fi fi6" style="padding-bottom: 120px;">
+      <div class="roadmap-item">
+        <div class="roadmap-dot reached"></div>
+        <div class="roadmap-name" style="color: var(--text-dim);">Novice Lifter</div>
+        <div class="roadmap-lvl">Lvl 1–4</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-dot reached"></div>
+        <div class="roadmap-name" style="color: var(--text-dim);">Consistent</div>
+        <div class="roadmap-lvl">Lvl 5–8</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-dot reached"></div>
+        <div class="roadmap-name" style="color: var(--text-dim);">Intermediate</div>
+        <div class="roadmap-lvl">Lvl 9–12</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-dot current"></div>
+        <div class="roadmap-name" style="color: var(--gold); font-weight: 700;">Iron Warrior</div>
+        <div class="roadmap-lvl" style="color: var(--gold);">Lvl 13–16</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-dot locked"></div>
+        <div class="roadmap-name dim">PR Machine</div>
+        <div class="roadmap-lvl">Lvl 17–20</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-dot locked"></div>
+        <div class="roadmap-name dim">Elite</div>
+        <div class="roadmap-lvl">Lvl 21–25</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-dot locked"></div>
+        <div class="roadmap-name dim">Legend</div>
+        <div class="roadmap-lvl">Lvl 25+</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <div class="bottom-nav">
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>Home</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>Calendar</span>
+    </div>
+    <div class="nav-item">
+      <div class="nav-fab">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </div>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>Charts</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <span>Settings</span>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================
+     SCREEN 2: CHALLENGES / GOALS
+     ==================================================== -->
+<div class="phone" id="screen-challenges">
+  <div class="status-bar">
+    <span>14:02</span>
+    <div class="status-r">
+      <svg viewBox="0 0 16 16"><circle cx="2" cy="8" r="1.5"/><circle cx="6" cy="8" r="1.5"/><circle cx="10" cy="8" r="1.5"/><circle cx="14" cy="8" r="1.5"/></svg>
+      <svg viewBox="0 0 16 16"><path d="M1 11.5c2-4 4.5-6.5 7-8.5M4 12c1.5-3 3.5-5 5.5-6.5M7 12.5c1-2 2.5-3.5 4-4.5M10.5 12.5c.5-.8 1.2-1.5 2-2" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <svg viewBox="0 0 24 14"><rect x="0" y="1" width="20" height="12" rx="2.5" stroke="currentColor" fill="none" stroke-width="1.5"/><rect x="2" y="3" width="14" height="8" rx="1" fill="currentColor"/><path d="M22 5v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </div>
+  </div>
+
+  <div class="scroll-content" style="padding: 0 20px;">
+    <!-- Header -->
+    <div style="padding: 8px 0 4px;" class="fi fi1">
+      <div style="font-size: 13px; font-weight: 500; color: var(--text-mid);">Wednesday, Mar 5</div>
+      <div style="font-size: 26px; font-weight: 700;">Challenges</div>
+    </div>
+
+    <!-- Active Challenges -->
+    <div style="padding: 16px 0 6px;">
+      <div class="section-label fi fi2">Active</div>
+    </div>
+
+    <!-- Challenge 1: Strength goal -->
+    <div class="challenge-card fi fi2">
+      <div class="challenge-top">
+        <div class="challenge-icon" style="background: var(--gold-soft);">🏋️</div>
+        <div class="challenge-info">
+          <div class="challenge-title">Bench Press 100kg × 1</div>
+          <div class="challenge-desc">Hit a 100kg single on Bench Press</div>
+        </div>
+        <div class="challenge-badge time">12d left</div>
+      </div>
+      <div class="challenge-progress-wrap">
+        <div class="challenge-progress-top">
+          <div class="challenge-progress-label">Current best: 92.5 kg</div>
+          <div class="challenge-progress-pct" style="color: var(--gold);">92%</div>
+        </div>
+        <div class="challenge-bar-track">
+          <div class="challenge-bar-fill" style="background: var(--gold);" data-width="92"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Challenge 2: Consistency -->
+    <div class="challenge-card fi fi3">
+      <div class="challenge-top">
+        <div class="challenge-icon" style="background: var(--purple-soft);">📅</div>
+        <div class="challenge-info">
+          <div class="challenge-title">Train 4× this week</div>
+          <div class="challenge-desc">Complete 4 workouts Mon–Sun</div>
+        </div>
+        <div class="challenge-badge weekly">Weekly</div>
+      </div>
+      <div class="challenge-progress-wrap">
+        <div class="challenge-progress-top">
+          <div class="challenge-progress-label">3 of 4 workouts done</div>
+          <div class="challenge-progress-pct" style="color: var(--purple);">75%</div>
+        </div>
+        <div class="challenge-bar-track">
+          <div class="challenge-bar-fill" style="background: var(--purple);" data-width="75"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Challenge 3: Volume -->
+    <div class="challenge-card fi fi4">
+      <div class="challenge-top">
+        <div class="challenge-icon" style="background: var(--accent-soft);">📊</div>
+        <div class="challenge-info">
+          <div class="challenge-title">50,000 kg Weekly Volume</div>
+          <div class="challenge-desc">Total volume target for this week</div>
+        </div>
+        <div class="challenge-badge time">4d left</div>
+      </div>
+      <div class="challenge-progress-wrap">
+        <div class="challenge-progress-top">
+          <div class="challenge-progress-label">38,200 / 50,000 kg</div>
+          <div class="challenge-progress-pct" style="color: var(--accent);">76%</div>
+        </div>
+        <div class="challenge-bar-track">
+          <div class="challenge-bar-fill" style="background: var(--accent);" data-width="76"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Completed -->
+    <div style="padding: 16px 0 6px;">
+      <div class="section-label fi fi5">Completed</div>
+    </div>
+
+    <!-- Challenge 4: Completed -->
+    <div class="challenge-card completed fi fi5">
+      <div class="challenge-top">
+        <div class="challenge-icon" style="background: var(--success-soft);">🔥</div>
+        <div class="challenge-info">
+          <div class="challenge-title">5 Workouts in a Week</div>
+          <div class="challenge-desc">Completed Feb 24 — Feb 28</div>
+        </div>
+        <div class="challenge-badge done">✓ Done</div>
+      </div>
+      <div class="challenge-progress-wrap">
+        <div class="challenge-progress-top">
+          <div class="challenge-progress-label">5 of 5 workouts</div>
+          <div class="challenge-progress-pct" style="color: var(--success);">100%</div>
+        </div>
+        <div class="challenge-bar-track">
+          <div class="challenge-bar-fill" style="background: var(--success); width: 100%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Challenge 5: Completed -->
+    <div class="challenge-card completed fi fi6">
+      <div class="challenge-top">
+        <div class="challenge-icon" style="background: var(--success-soft);">🏆</div>
+        <div class="challenge-info">
+          <div class="challenge-title">3 PRs in February</div>
+          <div class="challenge-desc">Hit 3 personal records last month</div>
+        </div>
+        <div class="challenge-badge done">✓ Done</div>
+      </div>
+      <div class="challenge-progress-wrap">
+        <div class="challenge-progress-top">
+          <div class="challenge-progress-label">5 of 3 PRs (exceeded!)</div>
+          <div class="challenge-progress-pct" style="color: var(--success);">167%</div>
+        </div>
+        <div class="challenge-bar-track">
+          <div class="challenge-bar-fill" style="background: var(--success); width: 100%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add challenge -->
+    <div class="fi fi7" style="padding-bottom: 120px;">
+      <button class="add-challenge-btn">
+        + New Challenge
+      </button>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <div class="bottom-nav">
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>Home</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>Calendar</span>
+    </div>
+    <div class="nav-item">
+      <div class="nav-fab">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </div>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>Charts</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <span>Settings</span>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================
+     SCREEN 3: BADGES / ACHIEVEMENTS
+     ==================================================== -->
+<div class="phone" id="screen-badges">
+  <div class="status-bar">
+    <span>14:02</span>
+    <div class="status-r">
+      <svg viewBox="0 0 16 16"><circle cx="2" cy="8" r="1.5"/><circle cx="6" cy="8" r="1.5"/><circle cx="10" cy="8" r="1.5"/><circle cx="14" cy="8" r="1.5"/></svg>
+      <svg viewBox="0 0 16 16"><path d="M1 11.5c2-4 4.5-6.5 7-8.5M4 12c1.5-3 3.5-5 5.5-6.5M7 12.5c1-2 2.5-3.5 4-4.5M10.5 12.5c.5-.8 1.2-1.5 2-2" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <svg viewBox="0 0 24 14"><rect x="0" y="1" width="20" height="12" rx="2.5" stroke="currentColor" fill="none" stroke-width="1.5"/><rect x="2" y="3" width="14" height="8" rx="1" fill="currentColor"/><path d="M22 5v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </div>
+  </div>
+
+  <div class="scroll-content">
+    <!-- Header -->
+    <div class="badge-page-header fi fi1">
+      <div class="badge-page-title">Achievements</div>
+      <div class="badge-page-sub">12 of 28 unlocked</div>
+    </div>
+
+    <!-- Stats summary -->
+    <div class="badge-stats fi fi2">
+      <div class="badge-stat">
+        <div class="badge-stat-value" style="color: var(--gold);">12</div>
+        <div class="badge-stat-label">Unlocked</div>
+      </div>
+      <div class="badge-stat">
+        <div class="badge-stat-value">16</div>
+        <div class="badge-stat-label">Locked</div>
+      </div>
+      <div class="badge-stat">
+        <div class="badge-stat-value" style="color: var(--accent);">43%</div>
+        <div class="badge-stat-label">Complete</div>
+      </div>
+    </div>
+
+    <!-- CONSISTENCY -->
+    <div class="badge-category fi fi3">
+      <div class="badge-category-title">🔥 Consistency</div>
+      <div class="badge-grid">
+        <div class="badge-item unlocked">
+          <div class="badge-icon-wrap gold-bg">🔥</div>
+          <div class="badge-name">First Spark</div>
+          <div class="badge-date">1 workout</div>
+        </div>
+        <div class="badge-item unlocked">
+          <div class="badge-icon-wrap gold-bg">⚡</div>
+          <div class="badge-name">Week Warrior</div>
+          <div class="badge-date">4-wk streak</div>
+        </div>
+        <div class="badge-item unlocked new">
+          <div class="badge-icon-wrap gold-bg">🔥</div>
+          <div class="badge-name">On Fire</div>
+          <div class="badge-date">8-wk streak</div>
+        </div>
+        <div class="badge-item">
+          <div class="badge-icon-wrap accent-bg" style="opacity: 0.5;">❓</div>
+          <div class="badge-name" style="color: var(--text-dim);">12-wk streak</div>
+          <div class="badge-progress">
+            <div class="badge-progress-track">
+              <div class="badge-progress-fill" style="width: 67%;"></div>
+            </div>
+            <div class="badge-progress-text">8 / 12 weeks</div>
+          </div>
+        </div>
+        <div class="badge-item locked">
+          <div class="badge-icon-wrap locked-bg">🔒</div>
+          <div class="badge-name">Unstoppable</div>
+          <div class="badge-date">26-wk streak</div>
+        </div>
+        <div class="badge-item locked">
+          <div class="badge-icon-wrap locked-bg">🔒</div>
+          <div class="badge-name">365 Club</div>
+          <div class="badge-date">52-wk streak</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VOLUME -->
+    <div class="badge-category fi fi4">
+      <div class="badge-category-title">🏋️ Volume</div>
+      <div class="badge-grid">
+        <div class="badge-item unlocked">
+          <div class="badge-icon-wrap success-bg">💪</div>
+          <div class="badge-name">First Ton</div>
+          <div class="badge-date">1,000 kg</div>
+        </div>
+        <div class="badge-item unlocked">
+          <div class="badge-icon-wrap success-bg">🏗️</div>
+          <div class="badge-name">10 Tons</div>
+          <div class="badge-date">10,000 kg</div>
+        </div>
+        <div class="badge-item unlocked">
+          <div class="badge-icon-wrap success-bg">🏔️</div>
+          <div class="badge-name">100 Tons</div>
+          <div class="badge-date">100,000 kg</div>
+        </div>
+        <div class="badge-item unlocked">
+          <div class="badge-icon-wrap success-bg">🌋</div>
+          <div class="badge-name">500 Tons</div>
+          <div class="badge-date">500,000 kg</div>
+        </div>
+        <div class="badge-item">
+          <div class="badge-icon-wrap accent-bg" style="opacity: 0.5;">🗻</div>
+          <div class="badge-name" style="color: var(--text-dim);">Million Club</div>
+          <div class="badge-progress">
+            <div class="badge-progress-track">
+              <div class="badge-progress-fill" style="width: 85%;"></div>
+            </div>
+            <div class="badge-progress-text">847k / 1M kg</div>
+          </div>
+        </div>
+        <div class="badge-item locked">
+          <div class="badge-icon-wrap locked-bg">🔒</div>
+          <div class="badge-name">5M Club</div>
+          <div class="badge-date">5,000,000 kg</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PR HUNTER -->
+    <div class="badge-category fi fi5">
+      <div class="badge-category-title">🏆 PR Hunter</div>
+      <div class="badge-grid">
+        <div class="badge-item unlocked">
+          <div class="badge-icon-wrap purple-bg">⭐</div>
+          <div class="badge-name">First PR</div>
+          <div class="badge-date">1 PR</div>
+        </div>
+        <div class="badge-item unlocked">
+          <div class="badge-icon-wrap purple-bg">🌟</div>
+          <div class="badge-name">PR Collector</div>
+          <div class="badge-date">25 PRs</div>
+        </div>
+        <div class="badge-item unlocked">
+          <div class="badge-icon-wrap purple-bg">💫</div>
+          <div class="badge-name">Record Breaker</div>
+          <div class="badge-date">50 PRs</div>
+        </div>
+        <div class="badge-item">
+          <div class="badge-icon-wrap accent-bg" style="opacity: 0.5;">✨</div>
+          <div class="badge-name" style="color: var(--text-dim);">PR Machine</div>
+          <div class="badge-progress">
+            <div class="badge-progress-track">
+              <div class="badge-progress-fill" style="width: 72%;"></div>
+            </div>
+            <div class="badge-progress-text">72 / 100 PRs</div>
+          </div>
+        </div>
+        <div class="badge-item locked">
+          <div class="badge-icon-wrap locked-bg">🔒</div>
+          <div class="badge-name">PR Legend</div>
+          <div class="badge-date">250 PRs</div>
+        </div>
+        <div class="badge-item locked">
+          <div class="badge-icon-wrap locked-bg">🔒</div>
+          <div class="badge-name">Untouchable</div>
+          <div class="badge-date">500 PRs</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MASTERY -->
+    <div class="badge-category fi fi6" style="padding-bottom: 120px;">
+      <div class="badge-category-title">🎯 Exercise Mastery</div>
+      <div class="badge-grid">
+        <div class="badge-item unlocked">
+          <div class="badge-icon-wrap teal-bg">🔰</div>
+          <div class="badge-name">Bench Novice</div>
+          <div class="badge-date">50 sets</div>
+        </div>
+        <div class="badge-item unlocked">
+          <div class="badge-icon-wrap teal-bg">🏅</div>
+          <div class="badge-name">Bench Expert</div>
+          <div class="badge-date">200 sets</div>
+        </div>
+        <div class="badge-item">
+          <div class="badge-icon-wrap accent-bg" style="opacity: 0.5;">🥇</div>
+          <div class="badge-name" style="color: var(--text-dim);">Bench Master</div>
+          <div class="badge-progress">
+            <div class="badge-progress-track">
+              <div class="badge-progress-fill" style="width: 62%;"></div>
+            </div>
+            <div class="badge-progress-text">312 / 500 sets</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <div class="bottom-nav">
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>Home</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>Calendar</span>
+    </div>
+    <div class="nav-item">
+      <div class="nav-fab">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </div>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>Charts</span>
+    </div>
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <span>Settings</span>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================
+     SCREEN 4: WEEKLY / MONTHLY RECAP
+     ==================================================== -->
+<div class="phone" id="screen-recap">
+  <div class="status-bar">
+    <span>14:02</span>
+    <div class="status-r">
+      <svg viewBox="0 0 16 16"><circle cx="2" cy="8" r="1.5"/><circle cx="6" cy="8" r="1.5"/><circle cx="10" cy="8" r="1.5"/><circle cx="14" cy="8" r="1.5"/></svg>
+      <svg viewBox="0 0 16 16"><path d="M1 11.5c2-4 4.5-6.5 7-8.5M4 12c1.5-3 3.5-5 5.5-6.5M7 12.5c1-2 2.5-3.5 4-4.5M10.5 12.5c.5-.8 1.2-1.5 2-2" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <svg viewBox="0 0 24 14"><rect x="0" y="1" width="20" height="12" rx="2.5" stroke="currentColor" fill="none" stroke-width="1.5"/><rect x="2" y="3" width="14" height="8" rx="1" fill="currentColor"/><path d="M22 5v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </div>
+  </div>
+
+  <div class="scroll-content">
+    <!-- Home header -->
+    <div style="padding: 8px 20px 4px;" class="fi fi1">
+      <div style="font-size: 13px; font-weight: 500; color: var(--text-mid);">Wednesday, Mar 5</div>
+      <div style="font-size: 26px; font-weight: 700;">Workout</div>
+    </div>
+
+    <!-- Week strip -->
+    <div class="week-strip fi fi2" style="margin-bottom: 16px;">
+      <div class="day-card has-workout"><div class="abbr">MON</div><div class="num">3</div><div class="day-dot"></div></div>
+      <div class="day-card has-workout"><div class="abbr">TUE</div><div class="num">4</div><div class="day-dot"></div></div>
+      <div class="day-card today"><div class="abbr">WED</div><div class="num">5</div></div>
+      <div class="day-card"><div class="abbr">THU</div><div class="num">6</div></div>
+      <div class="day-card has-workout"><div class="abbr">FRI</div><div class="num">7</div><div class="day-dot" style="opacity:0.3;"></div></div>
+      <div class="day-card"><div class="abbr">SAT</div><div class="num">8</div></div>
+      <div class="day-card"><div class="abbr">SUN</div><div class="num">9</div></div>
+    </div>
+
+    <!-- WEEKLY RECAP CARD -->
+    <div class="recap-card fi fi3">
+      <div class="recap-card-header">
+        <div class="recap-card-title">📊 This Week</div>
+        <div class="recap-card-period">Mar 3 – Mar 9</div>
+      </div>
+      <div class="recap-card-body">
+        <!-- Stats grid -->
+        <div class="recap-stats">
+          <div class="recap-stat">
+            <div class="recap-stat-top">
+              <div class="recap-stat-label">Workouts</div>
+              <div class="recap-stat-trend same">= same</div>
+            </div>
+            <div class="recap-stat-value">4</div>
+            <div class="recap-stat-compare">Same as last week</div>
+          </div>
+          <div class="recap-stat">
+            <div class="recap-stat-top">
+              <div class="recap-stat-label">Volume</div>
+              <div class="recap-stat-trend up">↑ 12%</div>
+            </div>
+            <div class="recap-stat-value">32.4k</div>
+            <div class="recap-stat-compare">vs 28.9k last week</div>
+          </div>
+          <div class="recap-stat">
+            <div class="recap-stat-top">
+              <div class="recap-stat-label">PRs Hit</div>
+              <div class="recap-stat-trend up">↑ +2</div>
+            </div>
+            <div class="recap-stat-value" style="color: var(--gold);">3</div>
+            <div class="recap-stat-compare">vs 1 last week</div>
+          </div>
+          <div class="recap-stat">
+            <div class="recap-stat-top">
+              <div class="recap-stat-label">Total Time</div>
+              <div class="recap-stat-trend down">↓ 8%</div>
+            </div>
+            <div class="recap-stat-value">5h 23m</div>
+            <div class="recap-stat-compare">vs 5h 52m last week</div>
+          </div>
+        </div>
+
+        <!-- Mini daily activity bars -->
+        <div style="font-size: 11px; color: var(--text-dim); font-weight: 500; margin-bottom: 8px;">Daily Volume</div>
+        <div class="mini-bars" id="weekly-bars">
+          <div class="mini-bar-day">
+            <div class="mini-bar" style="background: var(--accent); height: 36px;"></div>
+            <div class="mini-bar-label">M</div>
+          </div>
+          <div class="mini-bar-day">
+            <div class="mini-bar" style="background: var(--accent); height: 42px;"></div>
+            <div class="mini-bar-label">T</div>
+          </div>
+          <div class="mini-bar-day">
+            <div class="mini-bar" style="background: var(--success); height: 48px;"></div>
+            <div class="mini-bar-label" style="color: var(--success);">W</div>
+          </div>
+          <div class="mini-bar-day">
+            <div class="mini-bar" style="background: var(--bg-subtle); height: 2px;"></div>
+            <div class="mini-bar-label">T</div>
+          </div>
+          <div class="mini-bar-day">
+            <div class="mini-bar" style="background: var(--accent); opacity: 0.3; height: 30px;"></div>
+            <div class="mini-bar-label">F</div>
+          </div>
+          <div class="mini-bar-day">
+            <div class="mini-bar" style="background: var(--bg-subtle); height: 2px;"></div>
+            <div class="mini-bar-label">S</div>
+          </div>
+          <div class="mini-bar-day">
+            <div class="mini-bar" style="background: var(--bg-subtle); height: 2px;"></div>
+            <div class="mini-bar-label">S</div>
+          </div>
+        </div>
+
+        <!-- Highlights -->
+        <div class="recap-highlights">
+          <div class="recap-highlight">
+            <div class="recap-highlight-icon">🏆</div>
+            <div class="recap-highlight-text"><b>3 PRs</b> this week</div>
+          </div>
+          <div class="recap-highlight">
+            <div class="recap-highlight-icon">🔥</div>
+            <div class="recap-highlight-text"><b>8 wk</b> streak</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MONTHLY RECAP CARD -->
+    <div class="monthly-recap-card fi fi4">
+      <div class="monthly-header">
+        <div class="monthly-title">📅 February Recap</div>
+        <div class="monthly-period">Feb 1 – Feb 28</div>
+      </div>
+
+      <div class="monthly-stats">
+        <div class="monthly-stat">
+          <div class="monthly-stat-val">17</div>
+          <div class="monthly-stat-label">Workouts</div>
+        </div>
+        <div class="monthly-stat">
+          <div class="monthly-stat-val">142k</div>
+          <div class="monthly-stat-label">Volume</div>
+        </div>
+        <div class="monthly-stat">
+          <div class="monthly-stat-val" style="color: var(--gold);">5</div>
+          <div class="monthly-stat-label">PRs</div>
+        </div>
+        <div class="monthly-stat">
+          <div class="monthly-stat-val">23h</div>
+          <div class="monthly-stat-label">Time</div>
+        </div>
+      </div>
+
+      <div class="monthly-compare">
+        <div class="monthly-compare-pill" style="background: var(--success-soft); color: var(--success);">
+          ↑ +14% volume vs Jan
+        </div>
+        <div class="monthly-compare-pill" style="background: var(--success-soft); color: var(--success);">
+          ↑ +3 workouts vs Jan
+        </div>
+        <div class="monthly-compare-pill" style="background: var(--gold-soft); color: var(--gold);">
+          🏆 Best month for PRs
+        </div>
+      </div>
+    </div>
+
+    <!-- Start workout card placeholder -->
+    <div style="padding: 0 20px;" class="fi fi5">
+      <div class="section-label">Start Workout</div>
+      <div style="background: var(--bg-card); border-radius: var(--r); padding: 20px; text-align: center; border: 1.5px dashed rgba(91,141,239,0.3); margin-bottom: 12px;">
+        <div style="font-size: 32px; margin-bottom: 8px;">🏋️</div>
+        <div style="font-size: 15px; font-weight: 600; color: var(--accent);">Start Workout</div>
+        <div style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">Tap to begin your next session</div>
+      </div>
+    </div>
+
+    <!-- Recent workouts placeholder -->
+    <div style="padding: 0 20px;" class="fi fi6">
+      <div class="section-label">Recent</div>
+      <div style="background: var(--bg-card); border-radius: var(--r); padding: 14px 16px; margin-bottom: 8px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div>
+            <div style="font-size: 14px; font-weight: 600;">Upper Body Push</div>
+            <div style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">Tuesday — 5 exercises, 18 sets</div>
+          </div>
+          <div style="font-size: 12px; color: var(--text-mid);">›</div>
+        </div>
+      </div>
+      <div style="background: var(--bg-card); border-radius: var(--r); padding: 14px 16px; margin-bottom: 120px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div>
+            <div style="font-size: 14px; font-weight: 600;">Pull Day</div>
+            <div style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">Monday — 6 exercises, 22 sets</div>
+          </div>
+          <div style="font-size: 12px; color: var(--text-mid);">›</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <div class="bottom-nav">
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>Home</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>Calendar</span>
+    </div>
+    <div class="nav-item">
+      <div class="nav-fab">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </div>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>Charts</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <span>Settings</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ===== SCREEN SWITCHING =====
+  function showScreen(name) {
+    document.querySelectorAll('.phone').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('screen-' + name).classList.add('active');
+    event.target.classList.add('active');
+
+    // Animate progress bars for relevant screens
+    if (name === 'xp') animateXP();
+    if (name === 'challenges') animateChallenges();
+  }
+
+  // ===== XP ANIMATIONS =====
+  function animateXP() {
+    setTimeout(() => {
+      document.getElementById('xp-bar-fill').style.width = '78%';
+    }, 300);
+  }
+
+  // ===== CHALLENGE ANIMATIONS =====
+  function animateChallenges() {
+    setTimeout(() => {
+      document.querySelectorAll('.challenge-bar-fill[data-width]').forEach(bar => {
+        bar.style.width = bar.getAttribute('data-width') + '%';
+      });
+    }, 300);
+  }
+
+  // ===== INITIAL ANIMATIONS =====
+  window.addEventListener('load', () => {
+    // Animate XP bar on load (since XP screen is default)
+    animateXP();
+  });
+</script>
+
+</body>
+</html>

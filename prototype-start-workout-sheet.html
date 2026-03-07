@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=414, user-scalable=no">
+<title>Start Workout Sheet — Prototype</title>
+<style>
+  :root {
+    --bg: #111113;
+    --bg-card: #1B1B1F;
+    --bg-hover: #222228;
+    --bg-subtle: #262630;
+    --text-primary: #EAEAEF;
+    --text-secondary: #9999A8;
+    --text-tertiary: #5C5C6E;
+    --accent: #5B8DEF;
+    --accent-soft: rgba(91, 141, 239, 0.10);
+    --success: #5EC269;
+    --border: rgba(255,255,255,0.06);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Helvetica Neue', sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .phone-frame {
+    width: 393px;
+    min-height: 852px;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  /* Dimmed background content */
+  .home-bg {
+    padding: 60px 20px 20px;
+    opacity: 0.3;
+  }
+  .home-bg .date { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+  .home-bg .title { font-size: 26px; font-weight: 700; margin-top: 2px; }
+
+  /* Calendar strip placeholder */
+  .cal-strip {
+    display: flex; gap: 6px; margin-top: 16px;
+  }
+  .cal-strip .day-card {
+    flex: 1; background: var(--bg-card); border-radius: 12px;
+    padding: 10px 4px; text-align: center;
+  }
+  .cal-strip .day-card .abbr { font-size: 9px; font-weight: 600; color: var(--text-tertiary); letter-spacing: 0.5px; }
+  .cal-strip .day-card .num { font-size: 18px; font-weight: 700; margin-top: 4px; }
+
+  /* Overlay backdrop */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: flex-end;
+    z-index: 10;
+  }
+
+  /* Bottom sheet */
+  .sheet {
+    width: 100%;
+    background: var(--bg-card);
+    border-radius: 20px 20px 0 0;
+    padding: 12px 20px 40px;
+    animation: slideUp 0.3s ease-out;
+  }
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .sheet-handle {
+    width: 36px; height: 5px;
+    background: var(--bg-subtle);
+    border-radius: 3px;
+    margin: 0 auto 20px;
+  }
+
+  .sheet-title {
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .sheet-subtitle {
+    font-size: 14px;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  /* Option cards */
+  .option-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    background: var(--bg);
+    border-radius: 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border: 1px solid var(--border);
+  }
+  .option-card:hover {
+    background: var(--bg-hover);
+  }
+  .option-card.primary {
+    border: 1px solid rgba(91, 141, 239, 0.3);
+    background: var(--accent-soft);
+  }
+  .option-card.primary:hover {
+    background: rgba(91, 141, 239, 0.15);
+  }
+  .option-card.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .option-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .option-icon.accent { background: var(--accent); color: white; }
+  .option-icon.subtle { background: var(--bg-subtle); color: var(--text-secondary); }
+
+  .option-text { flex: 1; }
+  .option-text .name {
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .option-text .desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+
+  .option-arrow {
+    color: var(--text-tertiary);
+    font-size: 16px;
+  }
+
+  .coming-soon-badge {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    background: var(--bg-subtle);
+    padding: 3px 8px;
+    border-radius: 6px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  /* Divider with "or" */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 6px 0;
+  }
+  .divider-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  .divider-text {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* Section label */
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    margin-top: 8px;
+  }
+
+  /* Cancel button */
+  .cancel-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    color: var(--text-secondary);
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    margin-top: 8px;
+    text-align: center;
+    transition: background 0.15s;
+  }
+  .cancel-btn:hover { background: var(--bg-hover); }
+
+  /* Variant labels */
+  .variant-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    justify-content: center;
+  }
+  .variant-tab {
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    background: transparent;
+  }
+  .variant-tab.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+
+  /* Page title */
+  .page-title {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-tertiary);
+    padding: 16px 20px 8px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-title">Start Workout Sheet — Prototype Variants</div>
+
+<div class="variant-tabs">
+  <button class="variant-tab active" onclick="showVariant('a')">Variant A — Card Style</button>
+  <button class="variant-tab" onclick="showVariant('b')">Variant B — Compact</button>
+</div>
+
+<!-- VARIANT A: Card Style with icons -->
+<div class="phone-frame" id="variant-a">
+  <div class="home-bg">
+    <div class="date">Wednesday, Mar 4</div>
+    <div class="title">Workout</div>
+    <div class="cal-strip">
+      <div class="day-card"><div class="abbr">MON</div><div class="num">10</div></div>
+      <div class="day-card"><div class="abbr">TUE</div><div class="num">11</div></div>
+      <div class="day-card"><div class="abbr">WED</div><div class="num">12</div></div>
+      <div class="day-card"><div class="abbr">THU</div><div class="num">13</div></div>
+      <div class="day-card"><div class="abbr">FRI</div><div class="num">14</div></div>
+      <div class="day-card"><div class="abbr">SAT</div><div class="num">15</div></div>
+      <div class="day-card"><div class="abbr">SUN</div><div class="num">16</div></div>
+    </div>
+  </div>
+
+  <div class="overlay">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Start Workout</div>
+      <div class="sheet-subtitle">How do you want to begin?</div>
+
+      <!-- Primary option -->
+      <div class="option-card primary">
+        <div class="option-icon accent">＋</div>
+        <div class="option-text">
+          <div class="name">Empty Workout</div>
+          <div class="desc">Start fresh and add exercises as you go</div>
+        </div>
+        <div class="option-arrow">›</div>
+      </div>
+
+      <div class="divider">
+        <div class="divider-line"></div>
+        <div class="divider-text">or pre-fill from</div>
+        <div class="divider-line"></div>
+      </div>
+
+      <div style="height: 10px;"></div>
+
+      <!-- Copy Previous -->
+      <div class="option-card">
+        <div class="option-icon subtle">⟲</div>
+        <div class="option-text">
+          <div class="name">Copy Previous</div>
+          <div class="desc">Repeat a past workout with the same exercises</div>
+        </div>
+        <div class="option-arrow">›</div>
+      </div>
+
+      <!-- Templates -->
+      <div class="option-card disabled">
+        <div class="option-icon subtle">☰</div>
+        <div class="option-text">
+          <div class="name">Use Template</div>
+          <div class="desc">Start from a saved workout routine</div>
+        </div>
+        <span class="coming-soon-badge">Coming Soon</span>
+      </div>
+
+      <div class="cancel-btn">Cancel</div>
+    </div>
+  </div>
+</div>
+
+<div style="height: 40px;"></div>
+
+<!-- VARIANT B: Compact / simpler -->
+<div class="phone-frame" id="variant-b" style="display: none;">
+  <div class="home-bg">
+    <div class="date">Wednesday, Mar 4</div>
+    <div class="title">Workout</div>
+    <div class="cal-strip">
+      <div class="day-card"><div class="abbr">MON</div><div class="num">10</div></div>
+      <div class="day-card"><div class="abbr">TUE</div><div class="num">11</div></div>
+      <div class="day-card"><div class="abbr">WED</div><div class="num">12</div></div>
+      <div class="day-card"><div class="abbr">THU</div><div class="num">13</div></div>
+      <div class="day-card"><div class="abbr">FRI</div><div class="num">14</div></div>
+      <div class="day-card"><div class="abbr">SAT</div><div class="num">15</div></div>
+      <div class="day-card"><div class="abbr">SUN</div><div class="num">16</div></div>
+    </div>
+  </div>
+
+  <div class="overlay">
+    <div class="sheet" style="padding-bottom: 36px;">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Start Workout</div>
+      <div class="sheet-subtitle">Choose how to begin your session</div>
+
+      <!-- Big accent button for empty workout -->
+      <div style="
+        width: 100%;
+        padding: 16px;
+        background: var(--accent);
+        border-radius: 14px;
+        text-align: center;
+        cursor: pointer;
+        margin-bottom: 20px;
+      ">
+        <div style="font-size: 16px; font-weight: 700; color: white;">Start Empty Workout</div>
+        <div style="font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 2px;">Add exercises as you go</div>
+      </div>
+
+      <div class="section-label">Or start from…</div>
+
+      <!-- Copy Previous -->
+      <div class="option-card" style="margin-bottom: 8px;">
+        <div class="option-icon subtle" style="width: 36px; height: 36px; border-radius: 10px; font-size: 16px;">⟲</div>
+        <div class="option-text">
+          <div class="name" style="font-size: 15px;">Copy Previous Workout</div>
+          <div class="desc" style="font-size: 12px;">Repeat exercises from a past session</div>
+        </div>
+        <div class="option-arrow">›</div>
+      </div>
+
+      <!-- Template -->
+      <div class="option-card disabled" style="margin-bottom: 8px;">
+        <div class="option-icon subtle" style="width: 36px; height: 36px; border-radius: 10px; font-size: 16px;">☰</div>
+        <div class="option-text">
+          <div class="name" style="font-size: 15px;">Use Template</div>
+          <div class="desc" style="font-size: 12px;">Start from a saved routine</div>
+        </div>
+        <span class="coming-soon-badge">Soon</span>
+      </div>
+
+      <div class="cancel-btn" style="margin-top: 16px;">Cancel</div>
+    </div>
+  </div>
+</div>
+
+<div style="height: 60px;"></div>
+
+<script>
+function showVariant(v) {
+  document.getElementById('variant-a').style.display = v === 'a' ? 'block' : 'none';
+  document.getElementById('variant-b').style.display = v === 'b' ? 'block' : 'none';
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>

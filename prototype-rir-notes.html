@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workout — RIR + Notes Prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #111113;
+    --bg-card: #1b1b1f;
+    --bg-hover: #222228;
+    --bg-subtle: #262630;
+    --bg-input: #1f1f25;
+    --blue: #5B8DEF;
+    --blue-soft: rgba(91, 141, 239, 0.1);
+    --green: #5EC269;
+    --green-soft: rgba(94, 194, 105, 0.06);
+    --gold: #D4A23A;
+    --gold-soft: rgba(212, 162, 58, 0.1);
+    --red: #E05555;
+    --orange: #E89B3E;
+    --orange-soft: rgba(232, 155, 62, 0.10);
+    --text: #EAEAEF;
+    --text-mid: #9999A8;
+    --text-dim: #5C5C6E;
+    --border: rgba(255,255,255,0.06);
+    --r: 14px;
+    --r-sm: 10px;
+
+    /* RIR intensity colors — red (hard) → green (easy) */
+    --rir-0: #E05555;
+    --rir-1: #E07040;
+    --rir-2: #E89B3E;
+    --rir-3: #D4A23A;
+    --rir-4: #A0B83C;
+    --rir-5: #5EC269;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: #060608;
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  .phone {
+    width: 393px;
+    height: 852px;
+    background: var(--bg);
+    border-radius: 44px;
+    border: 2.5px solid #232328;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 28px 6px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .status-r { display: flex; gap: 6px; align-items: center; }
+  .status-r svg { width: 16px; height: 16px; fill: var(--text); }
+
+  .scroll {
+    height: calc(100% - 42px);
+    overflow-y: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    transition: height 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .scroll::-webkit-scrollbar { display: none; }
+  .scroll.kb-open {
+    height: calc(100% - 42px - 288px);
+  }
+
+  /* Top bar */
+  .topbar {
+    display: flex;
+    align-items: center;
+    padding: 8px 20px 12px;
+    gap: 10px;
+  }
+  .btn-back {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 14px; font-weight: 500; color: var(--blue);
+    cursor: pointer; background: none; border: none;
+    font-family: inherit; padding: 6px 0;
+  }
+  .btn-back svg { width: 18px; height: 18px; stroke: var(--blue); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .topbar-spacer { flex: 1; }
+  .btn-done {
+    font-size: 14px; font-weight: 600; color: var(--blue);
+    background: var(--blue-soft); border: none;
+    padding: 7px 16px; border-radius: 8px; cursor: pointer;
+    font-family: inherit;
+  }
+
+  /* Exercise nav */
+  .ex-nav {
+    display: flex;
+    gap: 4px;
+    padding: 0 20px;
+    margin-bottom: 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .ex-nav::-webkit-scrollbar { display: none; }
+  .ex-tab {
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    background: var(--bg-card);
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .ex-tab:hover { color: var(--text-mid); background: var(--bg-hover); }
+  .ex-tab.active { background: var(--blue); color: white; font-weight: 600; }
+
+  /* Title bar */
+  .ex-title-bar {
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    margin-bottom: 16px;
+    gap: 10px;
+  }
+  .ex-title { flex: 1; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+  .ex-actions { display: flex; gap: 6px; }
+  .ex-action-btn {
+    width: 34px; height: 34px;
+    border-radius: var(--r-sm);
+    background: var(--bg-card);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .ex-action-btn:hover { background: var(--bg-hover); }
+  .ex-action-btn svg { width: 16px; height: 16px; stroke: var(--text-mid); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ===== SET TABLE ===== */
+  .set-table {
+    margin: 0 20px;
+    background: var(--bg-card);
+    border-radius: var(--r);
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+
+  .set-table-head {
+    display: grid;
+    grid-template-columns: 36px 1fr 1fr 42px 44px 40px;
+    padding: 10px 8px 8px;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .set-table-head span {
+    font-size: 11px; font-weight: 600; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .set-table-head span:nth-child(2),
+  .set-table-head span:nth-child(3) { text-align: center; }
+  .set-table-head span:nth-child(4) { text-align: center; }
+  .set-table-head span:nth-child(5),
+  .set-table-head span:nth-child(6) { text-align: center; }
+
+  .set-row {
+    display: grid;
+    grid-template-columns: 36px 1fr 1fr 42px 44px 40px;
+    align-items: center;
+    padding: 0 8px;
+    gap: 4px;
+    height: 52px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+  }
+  .set-row:last-child { border-bottom: none; }
+  .set-row.warmup { opacity: 0.5; }
+
+  .set-num-cell { display: flex; align-items: center; justify-content: center; position: relative; }
+  .set-num {
+    width: 26px; height: 26px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600;
+    color: var(--text-dim); background: var(--bg-subtle);
+  }
+  .set-num.warm { font-size: 11px; font-style: italic; background: none; }
+  .set-num.completed { background: var(--green); color: white; }
+
+  /* Note indicator dot */
+  .note-dot {
+    position: absolute;
+    top: -1px;
+    right: 2px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--orange);
+    border: 1.5px solid var(--bg-card);
+  }
+
+  .set-input {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px; font-weight: 600;
+    text-align: center;
+    padding: 6px 4px;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.15s ease;
+    caret-color: transparent;
+    cursor: pointer;
+  }
+  .set-input:focus, .set-input.focused { border-color: var(--blue); background: rgba(91, 141, 239, 0.06); }
+  .set-input.completed { background: var(--green-soft); border-color: rgba(94, 194, 105, 0.15); }
+
+  /* RIR dropdown trigger */
+  .rir-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .rir-btn {
+    width: 36px; height: 32px;
+    border-radius: 7px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px; font-weight: 600;
+    text-align: center;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    position: relative;
+  }
+  .rir-btn:hover { border-color: var(--text-dim); }
+  .rir-btn.completed { background: var(--green-soft); border-color: rgba(94, 194, 105, 0.15); }
+  .rir-btn.active { border-color: var(--blue); background: rgba(91, 141, 239, 0.06); }
+
+  /* RIR color states */
+  .rir-btn[data-rir="0"] { color: var(--rir-0); border-color: rgba(224,85,85,0.3); background: rgba(224,85,85,0.08); }
+  .rir-btn[data-rir="1"] { color: var(--rir-1); border-color: rgba(224,112,64,0.3); background: rgba(224,112,64,0.08); }
+  .rir-btn[data-rir="2"] { color: var(--rir-2); border-color: rgba(232,155,62,0.3); background: rgba(232,155,62,0.08); }
+  .rir-btn[data-rir="3"] { color: var(--rir-3); border-color: rgba(212,162,58,0.3); background: rgba(212,162,58,0.08); }
+  .rir-btn[data-rir="4"] { color: var(--rir-4); border-color: rgba(160,184,60,0.3); background: rgba(160,184,60,0.08); }
+  .rir-btn[data-rir="5+"] { color: var(--rir-5); border-color: rgba(94,194,105,0.3); background: rgba(94,194,105,0.08); }
+
+  /* RIR dropdown menu */
+  .rir-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 4px;
+    background: #2a2a30;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 4px;
+    z-index: 50;
+    display: none;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 48px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+  .rir-dropdown.open { display: flex; }
+  .rir-option {
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-mid);
+    cursor: pointer;
+    text-align: center;
+    background: none;
+    border: none;
+    font-family: 'DM Sans', sans-serif;
+    white-space: nowrap;
+    transition: background 0.1s ease;
+  }
+  .rir-option:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+  .rir-option.selected { background: var(--blue-soft); color: var(--blue); }
+
+  /* RIR option colors in dropdown */
+  .rir-option[data-val="0"] { color: var(--rir-0); }
+  .rir-option[data-val="1"] { color: var(--rir-1); }
+  .rir-option[data-val="2"] { color: var(--rir-2); }
+  .rir-option[data-val="3"] { color: var(--rir-3); }
+  .rir-option[data-val="4"] { color: var(--rir-4); }
+  .rir-option[data-val="5+"] { color: var(--rir-5); }
+  .rir-option.selected[data-val="0"] { background: rgba(224,85,85,0.12); }
+  .rir-option.selected[data-val="1"] { background: rgba(224,112,64,0.12); }
+  .rir-option.selected[data-val="2"] { background: rgba(232,155,62,0.12); }
+  .rir-option.selected[data-val="3"] { background: rgba(212,162,58,0.12); }
+  .rir-option.selected[data-val="4"] { background: rgba(160,184,60,0.12); }
+  .rir-option.selected[data-val="5+"] { background: rgba(94,194,105,0.12); }
+
+  .set-pr-cell { display: flex; align-items: center; justify-content: center; }
+  .pr-badge {
+    font-size: 8px; font-weight: 700; padding: 3px 5px;
+    border-radius: 4px; display: flex; align-items: center; gap: 2px;
+  }
+  .pr-badge.gold { background: var(--gold-soft); color: var(--gold); }
+  .pr-badge svg { width: 8px; height: 8px; fill: currentColor; }
+
+  .set-check-cell { display: flex; align-items: center; justify-content: center; }
+  .set-check {
+    width: 26px; height: 26px; border-radius: 6px;
+    border: 2px solid var(--text-dim);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.15s ease;
+  }
+  .set-check.done { background: var(--blue); border-color: var(--blue); }
+  .set-check svg { width: 13px; height: 13px; stroke: white; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+  .set-check.done svg { opacity: 1; }
+
+  /* Add buttons */
+  .add-btns {
+    display: flex; gap: 8px; padding: 0 20px; margin-bottom: 24px;
+  }
+  .add-btn {
+    flex: 1; padding: 12px; border-radius: var(--r-sm);
+    background: var(--bg-card); border: none;
+    color: var(--text-mid); font-family: 'DM Sans', sans-serif;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .add-btn:hover { background: var(--bg-hover); }
+  .add-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+  .add-btn.warmup { color: var(--gold); }
+
+  /* ===== EXERCISE INFO ===== */
+  .info-section {
+    padding: 0 20px;
+    margin-bottom: 40px;
+  }
+  .info-section-label {
+    font-size: 11px; font-weight: 600; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 12px;
+  }
+
+  .info-hero {
+    background: var(--bg-card);
+    border-radius: var(--r);
+    padding: 18px 20px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .info-hero-main { display: flex; flex-direction: column; gap: 2px; }
+  .info-hero-label { font-size: 12px; color: var(--text-dim); font-weight: 500; }
+  .info-hero-val { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+  .info-hero-unit { font-size: 16px; font-weight: 500; color: var(--text-mid); margin-left: 2px; }
+  .info-hero-divider { width: 1px; height: 40px; background: var(--border); }
+  .info-hero-side { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .info-hero-side-item { display: flex; align-items: center; gap: 6px; }
+  .info-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .info-dot.green { background: var(--green); }
+  .info-dot.red { background: var(--red); }
+  .info-hero-side-text { font-size: 13px; color: var(--text-mid); }
+  .info-hero-side-text b { color: var(--text); font-weight: 600; }
+
+  .info-row { display: flex; gap: 8px; }
+  .info-tile {
+    flex: 1; background: var(--bg-card); border-radius: var(--r-sm);
+    padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .info-tile-top { display: flex; align-items: center; justify-content: space-between; }
+  .info-tile-label { font-size: 11px; color: var(--text-dim); font-weight: 500; }
+  .info-tile-icon {
+    width: 22px; height: 22px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .info-tile-icon svg { width: 12px; height: 12px; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .info-tile-icon.bl { background: var(--blue-soft); }
+  .info-tile-icon.bl svg { stroke: var(--blue); }
+  .info-tile-icon.gl { background: var(--gold-soft); }
+  .info-tile-icon.gl svg { stroke: var(--gold); }
+  .info-tile-val { font-size: 17px; font-weight: 700; }
+  .info-tile-sub { font-size: 11px; color: var(--text-dim); }
+
+  /* ===== CUSTOM KEYBOARD ===== */
+  .keyboard {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #1a1a1e;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    padding: 8px 10px 28px;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    z-index: 100;
+  }
+  .keyboard.open { transform: translateY(0); }
+
+  .kb-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 4px 10px;
+  }
+  .kb-field-label { font-size: 13px; font-weight: 600; color: var(--text-mid); }
+  .kb-field-label span { color: var(--blue); }
+  .kb-toolbar-actions { display: flex; gap: 6px; }
+  .kb-tool-btn {
+    padding: 5px 12px; border-radius: 6px;
+    background: var(--bg-subtle); border: none;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px; font-weight: 600;
+    color: var(--text-mid); cursor: pointer;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .kb-tool-btn:hover { background: var(--bg-hover); }
+  .kb-tool-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .kb-tool-btn.next { color: var(--blue); }
+  .kb-tool-btn.done-kb { color: var(--blue); }
+
+  .kb-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .kb-key {
+    height: 48px; border-radius: 10px;
+    background: #2a2a30; border: none;
+    color: var(--text); font-family: 'DM Sans', sans-serif;
+    font-size: 22px; font-weight: 600;
+    cursor: pointer; display: flex;
+    align-items: center; justify-content: center;
+    transition: background 0.1s ease;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  .kb-key:active { background: #3a3a42; }
+  .kb-key.dot { font-size: 24px; }
+  .kb-key.backspace { background: #222228; }
+  .kb-key.backspace svg { width: 22px; height: 22px; stroke: var(--text-mid); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .kb-key.zero { font-size: 22px; }
+
+  .kb-quick-vals { display: flex; gap: 6px; padding: 0 0 8px; }
+  .kb-quick {
+    flex: 1; padding: 7px; border-radius: 7px;
+    background: var(--bg-subtle); border: none;
+    color: var(--text-mid); font-family: 'DM Sans', sans-serif;
+    font-size: 12px; font-weight: 600;
+    text-align: center; cursor: pointer;
+  }
+  .kb-quick:active { background: #2e2e38; }
+  .kb-quick .micro { font-size: 9px; color: var(--text-dim); display: block; margin-top: 1px; }
+
+  /* Fade in */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fi { animation: fadeIn 0.4s ease forwards; opacity: 0; }
+  .fi1 { animation-delay: 0.02s; }
+  .fi2 { animation-delay: 0.06s; }
+  .fi3 { animation-delay: 0.1s; }
+  .fi4 { animation-delay: 0.14s; }
+  .fi5 { animation-delay: 0.18s; }
+
+  /* Layout */
+  .layout { display: flex; gap: 56px; align-items: flex-start; }
+  .notes-panel { width: 280px; padding-top: 40px; }
+  .notes-panel h2 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .notes-panel .sub { font-size: 13px; color: var(--text-mid); line-height: 1.6; margin-bottom: 28px; }
+  .note-item { margin-bottom: 20px; padding-left: 14px; border-left: 2px solid var(--border); }
+  .note-item:hover { border-left-color: var(--text-dim); }
+  .note-item h4 { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+  .note-item p { font-size: 12px; color: var(--text-mid); line-height: 1.45; }
+  .note-item .tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+  }
+  .note-item .tag.new { background: var(--blue-soft); color: var(--blue); }
+  .note-item .tag.changed { background: var(--gold-soft); color: var(--gold); }
+
+  /* RIR color legend */
+  .rir-legend {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .rir-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--text-mid);
+  }
+  .rir-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 3px;
+  }
+
+  @media (max-width: 780px) {
+    .layout { flex-direction: column-reverse; align-items: center; gap: 24px; }
+    .notes-panel { width: 100%; max-width: 393px; padding-top: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <div class="notes-panel">
+    <h2>RIR + Notes v2</h2>
+    <div class="sub">RIR column with intensity colors. Notes via long-press context menu (shown as orange dot indicator on the set badge).</div>
+
+    <div class="note-item">
+      <span class="tag new">NEW</span>
+      <h4>RIR Color Coding</h4>
+      <p>RIR values are color-coded by intensity. Red = failure (0), through orange/yellow to green = easy (5+). The color appears on both the cell and the dropdown options.</p>
+      <div class="rir-legend">
+        <div class="rir-legend-item"><div class="rir-legend-dot" style="background:var(--rir-0)"></div>0</div>
+        <div class="rir-legend-item"><div class="rir-legend-dot" style="background:var(--rir-1)"></div>1</div>
+        <div class="rir-legend-item"><div class="rir-legend-dot" style="background:var(--rir-2)"></div>2</div>
+        <div class="rir-legend-item"><div class="rir-legend-dot" style="background:var(--rir-3)"></div>3</div>
+        <div class="rir-legend-item"><div class="rir-legend-dot" style="background:var(--rir-4)"></div>4</div>
+        <div class="rir-legend-item"><div class="rir-legend-dot" style="background:var(--rir-5)"></div>5+</div>
+      </div>
+    </div>
+    <div class="note-item">
+      <span class="tag new">NEW</span>
+      <h4>Set Notes (Context Menu)</h4>
+      <p>Long-press a row to access "Add Note" / "Edit Note" in the context menu. An orange dot appears on the set badge when a note exists (see Set 2).</p>
+    </div>
+    <div class="note-item">
+      <span class="tag changed">INDICATOR</span>
+      <h4>Note Dot</h4>
+      <p>Small orange dot on the top-right corner of the set number badge. Visible at a glance — you know which sets have notes without opening anything.</p>
+    </div>
+    <div class="note-item">
+      <h4>Try It</h4>
+      <p>Click any RIR cell to open the dropdown. Pick different values to see the color change. Set 1 = RIR 3, Set 2 = RIR 0, Set 3 = RIR 1.</p>
+    </div>
+  </div>
+
+  <div class="phone">
+    <div class="status-bar">
+      <span>09:24</span>
+      <div class="status-r">
+        <svg viewBox="0 0 16 16"><circle cx="2" cy="8" r="1.5"/><circle cx="6" cy="8" r="1.5"/><circle cx="10" cy="8" r="1.5"/><circle cx="14" cy="8" r="1.5"/></svg>
+        <svg viewBox="0 0 16 16"><path d="M1 11.5c2-4 4.5-6.5 7-8.5M4 12c1.5-3 3.5-5 5.5-6.5M7 12.5c1-2 2.5-3.5 4-4.5M10.5 12.5c.5-.8 1.2-1.5 2-2" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <svg viewBox="0 0 24 14"><rect x="0" y="1" width="20" height="12" rx="2.5" stroke="currentColor" fill="none" stroke-width="1.5"/><rect x="2" y="3" width="14" height="8" rx="1" fill="currentColor"/><path d="M22 5v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+    </div>
+
+    <div class="scroll" id="scroll">
+      <!-- Top bar -->
+      <div class="topbar fi fi1">
+        <button class="btn-back" onclick="closeKeyboard()">
+          <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          Back
+        </button>
+        <div class="topbar-spacer"></div>
+        <button class="btn-done">Done</button>
+      </div>
+
+      <!-- Exercise tabs -->
+      <div class="ex-nav fi fi1">
+        <div class="ex-tab active">Lat Pulldown</div>
+        <div class="ex-tab">Chest Row</div>
+        <div class="ex-tab">Chest Press</div>
+        <div class="ex-tab">Lat Raise</div>
+        <div class="ex-tab">Bicep Curl</div>
+        <div class="ex-tab">Face Pull</div>
+      </div>
+
+      <!-- Title -->
+      <div class="ex-title-bar fi fi2">
+        <div class="ex-title">Neutral Grip Lat Pulldown</div>
+        <div class="ex-actions">
+          <div class="ex-action-btn">
+            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <div class="ex-action-btn">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Set table -->
+      <div class="set-table fi fi3">
+        <div class="set-table-head">
+          <span>Set</span><span>kg</span><span>Reps</span><span>RIR</span><span>PR</span><span></span>
+        </div>
+
+        <!-- Warmup row — no RIR -->
+        <div class="set-row warmup">
+          <div class="set-num-cell"><div class="set-num warm">W</div></div>
+          <input class="set-input completed" value="30" readonly onclick="openKeyboard(this, 'Warmup', 'kg')">
+          <input class="set-input completed" value="10" readonly onclick="openKeyboard(this, 'Warmup', 'reps')">
+          <div class="rir-cell">
+            <button class="rir-btn completed" onclick="toggleRIR(this)">—</button>
+            <div class="rir-dropdown">
+              <button class="rir-option selected" data-val="—" onclick="selectRIR(this, '—')">—</button>
+              <button class="rir-option" data-val="0" onclick="selectRIR(this, '0')">0</button>
+              <button class="rir-option" data-val="1" onclick="selectRIR(this, '1')">1</button>
+              <button class="rir-option" data-val="2" onclick="selectRIR(this, '2')">2</button>
+              <button class="rir-option" data-val="3" onclick="selectRIR(this, '3')">3</button>
+              <button class="rir-option" data-val="4" onclick="selectRIR(this, '4')">4</button>
+              <button class="rir-option" data-val="5+" onclick="selectRIR(this, '5+')">5+</button>
+            </div>
+          </div>
+          <div class="set-pr-cell"></div>
+          <div class="set-check-cell"><div class="set-check done"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+        </div>
+
+        <!-- Set 1 — completed, RIR 3 (yellow) -->
+        <div class="set-row">
+          <div class="set-num-cell"><div class="set-num completed"><svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:white;fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+          <input class="set-input completed" value="45" readonly onclick="openKeyboard(this, 'Set 1', 'kg')">
+          <input class="set-input completed" value="8" readonly onclick="openKeyboard(this, 'Set 1', 'reps')">
+          <div class="rir-cell">
+            <button class="rir-btn" data-rir="3" onclick="toggleRIR(this)">3</button>
+            <div class="rir-dropdown">
+              <button class="rir-option" data-val="—" onclick="selectRIR(this, '—')">—</button>
+              <button class="rir-option" data-val="0" onclick="selectRIR(this, '0')">0</button>
+              <button class="rir-option" data-val="1" onclick="selectRIR(this, '1')">1</button>
+              <button class="rir-option" data-val="2" onclick="selectRIR(this, '2')">2</button>
+              <button class="rir-option selected" data-val="3" onclick="selectRIR(this, '3')">3</button>
+              <button class="rir-option" data-val="4" onclick="selectRIR(this, '4')">4</button>
+              <button class="rir-option" data-val="5+" onclick="selectRIR(this, '5+')">5+</button>
+            </div>
+          </div>
+          <div class="set-pr-cell"></div>
+          <div class="set-check-cell"><div class="set-check done"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+        </div>
+
+        <!-- Set 2 — completed with PR, RIR 0 (red), has note -->
+        <div class="set-row">
+          <div class="set-num-cell">
+            <div class="set-num completed"><svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:white;fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="note-dot" title="Note: Focus on squeeze at top, felt strong"></div>
+          </div>
+          <input class="set-input completed" value="85" readonly onclick="openKeyboard(this, 'Set 2', 'kg')">
+          <input class="set-input completed" value="8" readonly onclick="openKeyboard(this, 'Set 2', 'reps')">
+          <div class="rir-cell">
+            <button class="rir-btn" data-rir="0" onclick="toggleRIR(this)">0</button>
+            <div class="rir-dropdown">
+              <button class="rir-option" data-val="—" onclick="selectRIR(this, '—')">—</button>
+              <button class="rir-option selected" data-val="0" onclick="selectRIR(this, '0')">0</button>
+              <button class="rir-option" data-val="1" onclick="selectRIR(this, '1')">1</button>
+              <button class="rir-option" data-val="2" onclick="selectRIR(this, '2')">2</button>
+              <button class="rir-option" data-val="3" onclick="selectRIR(this, '3')">3</button>
+              <button class="rir-option" data-val="4" onclick="selectRIR(this, '4')">4</button>
+              <button class="rir-option" data-val="5+" onclick="selectRIR(this, '5+')">5+</button>
+            </div>
+          </div>
+          <div class="set-pr-cell">
+            <div class="pr-badge gold"><svg viewBox="0 0 12 12"><polygon points="6 1 7.5 4.5 11 4.8 8.3 7.2 9.2 11 6 9 2.8 11 3.7 7.2 1 4.8 4.5 4.5"/></svg>PR</div>
+          </div>
+          <div class="set-check-cell"><div class="set-check done"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+        </div>
+
+        <!-- Set 3 — completed, RIR 1 (orange-red) -->
+        <div class="set-row">
+          <div class="set-num-cell"><div class="set-num completed"><svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:white;fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+          <input class="set-input completed" value="80" readonly onclick="openKeyboard(this, 'Set 3', 'kg')">
+          <input class="set-input completed" value="8" readonly onclick="openKeyboard(this, 'Set 3', 'reps')">
+          <div class="rir-cell">
+            <button class="rir-btn" data-rir="1" onclick="toggleRIR(this)">1</button>
+            <div class="rir-dropdown">
+              <button class="rir-option" data-val="—" onclick="selectRIR(this, '—')">—</button>
+              <button class="rir-option" data-val="0" onclick="selectRIR(this, '0')">0</button>
+              <button class="rir-option selected" data-val="1" onclick="selectRIR(this, '1')">1</button>
+              <button class="rir-option" data-val="2" onclick="selectRIR(this, '2')">2</button>
+              <button class="rir-option" data-val="3" onclick="selectRIR(this, '3')">3</button>
+              <button class="rir-option" data-val="4" onclick="selectRIR(this, '4')">4</button>
+              <button class="rir-option" data-val="5+" onclick="selectRIR(this, '5+')">5+</button>
+            </div>
+          </div>
+          <div class="set-pr-cell"></div>
+          <div class="set-check-cell"><div class="set-check done"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+        </div>
+
+        <!-- Set 4 — active/current, no RIR yet -->
+        <div class="set-row">
+          <div class="set-num-cell"><div class="set-num">4</div></div>
+          <input class="set-input focused" id="active-input" value="80" readonly onclick="openKeyboard(this, 'Set 4', 'kg')">
+          <input class="set-input" value="" placeholder="–" readonly onclick="openKeyboard(this, 'Set 4', 'reps')">
+          <div class="rir-cell">
+            <button class="rir-btn" onclick="toggleRIR(this)">—</button>
+            <div class="rir-dropdown">
+              <button class="rir-option selected" data-val="—" onclick="selectRIR(this, '—')">—</button>
+              <button class="rir-option" data-val="0" onclick="selectRIR(this, '0')">0</button>
+              <button class="rir-option" data-val="1" onclick="selectRIR(this, '1')">1</button>
+              <button class="rir-option" data-val="2" onclick="selectRIR(this, '2')">2</button>
+              <button class="rir-option" data-val="3" onclick="selectRIR(this, '3')">3</button>
+              <button class="rir-option" data-val="4" onclick="selectRIR(this, '4')">4</button>
+              <button class="rir-option" data-val="5+" onclick="selectRIR(this, '5+')">5+</button>
+            </div>
+          </div>
+          <div class="set-pr-cell"></div>
+          <div class="set-check-cell"><div class="set-check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+        </div>
+      </div>
+
+      <!-- Add buttons -->
+      <div class="add-btns fi fi4">
+        <button class="add-btn">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          Add Set
+        </button>
+        <button class="add-btn warmup">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          Warmup
+        </button>
+      </div>
+
+      <!-- Exercise info -->
+      <div class="info-section fi fi5">
+        <div class="info-section-label">Exercise Info</div>
+
+        <div class="info-hero">
+          <div class="info-hero-main">
+            <div class="info-hero-label">Estimated 1RM</div>
+            <div class="info-hero-val">105.5<span class="info-hero-unit">kg</span></div>
+          </div>
+          <div class="info-hero-divider"></div>
+          <div class="info-hero-side">
+            <div class="info-hero-side-item">
+              <div class="info-dot green"></div>
+              <div class="info-hero-side-text">Best today: <b>85 × 8</b></div>
+            </div>
+            <div class="info-hero-side-item">
+              <div class="info-dot red"></div>
+              <div class="info-hero-side-text">vs 4wk ago: <b>−1.1 kg</b></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-row">
+          <div class="info-tile">
+            <div class="info-tile-top">
+              <div class="info-tile-label">Last Workout</div>
+              <div class="info-tile-icon bl">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+            </div>
+            <div class="info-tile-val">85×8, 45×8</div>
+            <div class="info-tile-sub">9 days ago</div>
+          </div>
+          <div class="info-tile">
+            <div class="info-tile-top">
+              <div class="info-tile-label">Est. for 8 reps</div>
+              <div class="info-tile-icon gl">
+                <svg viewBox="0 0 24 24"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+              </div>
+            </div>
+            <div class="info-tile-val">85 kg</div>
+            <div class="info-tile-sub">Based on recent data</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Custom Keyboard -->
+    <div class="keyboard" id="keyboard">
+      <div class="kb-toolbar">
+        <div class="kb-field-label" id="kb-label"><span>Set 4</span> → kg</div>
+        <div class="kb-toolbar-actions">
+          <button class="kb-tool-btn next" onclick="nextField()">
+            Next
+            <svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
+          </button>
+          <button class="kb-tool-btn done-kb" onclick="closeKeyboard()">Done</button>
+        </div>
+      </div>
+      <div class="kb-quick-vals">
+        <button class="kb-quick" onclick="quickAdd(-5)">−5</button>
+        <button class="kb-quick" onclick="quickAdd(-2.5)">−2.5</button>
+        <button class="kb-quick" onclick="setLast()">Last<span class="micro">85</span></button>
+        <button class="kb-quick" onclick="quickAdd(2.5)">+2.5</button>
+        <button class="kb-quick" onclick="quickAdd(5)">+5</button>
+      </div>
+      <div class="kb-grid">
+        <button class="kb-key" onclick="pressKey('1')">1</button>
+        <button class="kb-key" onclick="pressKey('2')">2</button>
+        <button class="kb-key" onclick="pressKey('3')">3</button>
+        <button class="kb-key" onclick="pressKey('4')">4</button>
+        <button class="kb-key" onclick="pressKey('5')">5</button>
+        <button class="kb-key" onclick="pressKey('6')">6</button>
+        <button class="kb-key" onclick="pressKey('7')">7</button>
+        <button class="kb-key" onclick="pressKey('8')">8</button>
+        <button class="kb-key" onclick="pressKey('9')">9</button>
+        <button class="kb-key dot" onclick="pressKey('.')">.</button>
+        <button class="kb-key zero" onclick="pressKey('0')">0</button>
+        <button class="kb-key backspace" onclick="pressBackspace()">
+          <svg viewBox="0 0 24 24"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let activeInput = null;
+  let activeSet = '';
+  let activeField = '';
+
+  // === RIR DROPDOWN ===
+  function toggleRIR(btn) {
+    const dropdown = btn.nextElementSibling;
+    const isOpen = dropdown.classList.contains('open');
+
+    closeAllDropdowns();
+
+    if (!isOpen) {
+      dropdown.classList.add('open');
+      btn.classList.add('active');
+    }
+  }
+
+  function selectRIR(optionBtn, value) {
+    const dropdown = optionBtn.closest('.rir-dropdown');
+    const triggerBtn = dropdown.previousElementSibling;
+
+    // Update selection styling
+    dropdown.querySelectorAll('.rir-option').forEach(o => o.classList.remove('selected'));
+    optionBtn.classList.add('selected');
+
+    // Update trigger button text and color
+    triggerBtn.textContent = value;
+
+    // Set data-rir attribute for color styling (remove if "—")
+    if (value === '—') {
+      triggerBtn.removeAttribute('data-rir');
+    } else {
+      triggerBtn.setAttribute('data-rir', value);
+    }
+
+    // Close dropdown
+    dropdown.classList.remove('open');
+    triggerBtn.classList.remove('active');
+  }
+
+  function closeAllDropdowns() {
+    document.querySelectorAll('.rir-dropdown.open').forEach(d => {
+      d.classList.remove('open');
+      d.previousElementSibling.classList.remove('active');
+    });
+  }
+
+  // === KEYBOARD ===
+  function openKeyboard(el, setName, field) {
+    document.querySelectorAll('.set-input').forEach(i => i.classList.remove('focused'));
+    el.classList.add('focused');
+
+    activeInput = el;
+    activeSet = setName;
+    activeField = field;
+
+    document.getElementById('kb-label').innerHTML = `<span>${setName}</span> → ${field}`;
+    document.getElementById('keyboard').classList.add('open');
+    document.getElementById('scroll').classList.add('kb-open');
+
+    closeAllDropdowns();
+
+    setTimeout(() => {
+      el.closest('.set-row')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  }
+
+  function closeKeyboard() {
+    document.getElementById('keyboard').classList.remove('open');
+    document.getElementById('scroll').classList.remove('kb-open');
+    document.querySelectorAll('.set-input').forEach(i => i.classList.remove('focused'));
+    activeInput = null;
+  }
+
+  function pressKey(k) {
+    if (!activeInput) return;
+    let val = activeInput.value;
+    if (val === '0' && k !== '.') val = '';
+    activeInput.value = val + k;
+  }
+
+  function pressBackspace() {
+    if (!activeInput) return;
+    activeInput.value = activeInput.value.slice(0, -1);
+  }
+
+  function quickAdd(amount) {
+    if (!activeInput) return;
+    let val = parseFloat(activeInput.value) || 0;
+    val = Math.max(0, val + amount);
+    activeInput.value = val % 1 === 0 ? val.toString() : val.toFixed(1);
+  }
+
+  function setLast() {
+    if (!activeInput) return;
+    activeInput.value = '85';
+  }
+
+  function nextField() {
+    if (!activeInput) return;
+    const row = activeInput.closest('.set-row');
+    const inputs = row.querySelectorAll('.set-input');
+    const idx = Array.from(inputs).indexOf(activeInput);
+    if (idx < inputs.length - 1) {
+      inputs[idx + 1].click();
+    } else {
+      const nextRow = row.nextElementSibling;
+      if (nextRow && nextRow.classList.contains('set-row')) {
+        const next = nextRow.querySelector('.set-input');
+        if (next) next.click();
+      } else {
+        closeKeyboard();
+      }
+    }
+  }
+
+  // Close dropdowns on outside click
+  document.getElementById('scroll').addEventListener('click', function(e) {
+    if (!e.target.closest('.rir-cell')) {
+      closeAllDropdowns();
+    }
+
+    if (!e.target.classList.contains('set-input') &&
+        !e.target.closest('.keyboard') &&
+        !e.target.closest('.add-btn') &&
+        !e.target.closest('.ex-tab') &&
+        !e.target.closest('.ex-action-btn') &&
+        !e.target.closest('.rir-cell')) {
+      closeKeyboard();
+    }
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,122 @@
+import Foundation
+import SwiftData
+
+// iOS 18+: Add the following index macros at module scope when minimum target is raised:
+// #Index<WorkoutSet>([\.exerciseId, \.reps, \.effectiveWeight, \.date])
+// #Index<WorkoutSet>([\.workoutId])
+// #Index<WorkoutSet>([\.exerciseId])
+
+@Model
+final class WorkoutSet {
+    var id: UUID
+    var workoutId: UUID
+    var exerciseId: UUID
+    var date: Date
+    var startedAt: Date?
+    var completedAt: Date?
+    var weight: Double?
+    var effectiveWeight: Double?
+    var reps: Int?
+    var durationSeconds: Int?
+    var distanceMeters: Double?
+    var e1RM: Double?
+    var e1RMFormulaVersion: String?
+    var rpe: Double?
+    var rir: Double?
+    var setType: SetType
+    var pauseDuration: Int?
+    var side: Side?
+    var notes: String?
+    var orderInWorkout: Int
+    var orderInExercise: Int
+    var supersetGroupId: UUID?
+    var completed: Bool
+    var excludeFromPRs: Bool?
+    var cachedPRStatus: CachedPRStatus?
+    var targetWeight: Double?
+    var targetRepMin: Int?
+    var targetRepMax: Int?
+    var targetRPE: Double?
+    var targetRIR: Int?
+    var createdAt: Date
+    var updatedAt: Date
+
+    var hasData: Bool {
+        ((weight ?? 0) > 0 && (reps ?? 0) > 0) ||
+        (durationSeconds ?? 0) > 0 ||
+        (distanceMeters ?? 0) > 0
+    }
+
+    var volume: Double? {
+        guard let ew = effectiveWeight, let r = reps, r > 0 else { return nil }
+        return ew * Double(r)
+    }
+
+    init(
+        id: UUID = UUID(),
+        workoutId: UUID,
+        exerciseId: UUID,
+        date: Date = Date(),
+        startedAt: Date? = nil,
+        completedAt: Date? = nil,
+        weight: Double? = nil,
+        effectiveWeight: Double? = nil,
+        reps: Int? = nil,
+        durationSeconds: Int? = nil,
+        distanceMeters: Double? = nil,
+        e1RM: Double? = nil,
+        e1RMFormulaVersion: String? = nil,
+        rpe: Double? = nil,
+        rir: Double? = nil,
+        setType: SetType = .working,
+        pauseDuration: Int? = nil,
+        side: Side? = nil,
+        notes: String? = nil,
+        orderInWorkout: Int,
+        orderInExercise: Int,
+        supersetGroupId: UUID? = nil,
+        completed: Bool = false,
+        excludeFromPRs: Bool? = nil,
+        cachedPRStatus: CachedPRStatus? = nil,
+        targetWeight: Double? = nil,
+        targetRepMin: Int? = nil,
+        targetRepMax: Int? = nil,
+        targetRPE: Double? = nil,
+        targetRIR: Int? = nil,
+        createdAt: Date = Date(),
+        updatedAt: Date = Date()
+    ) {
+        self.id = id
+        self.workoutId = workoutId
+        self.exerciseId = exerciseId
+        self.date = date
+        self.startedAt = startedAt
+        self.completedAt = completedAt
+        self.weight = weight
+        self.effectiveWeight = effectiveWeight
+        self.reps = reps
+        self.durationSeconds = durationSeconds
+        self.distanceMeters = distanceMeters
+        self.e1RM = e1RM
+        self.e1RMFormulaVersion = e1RMFormulaVersion
+        self.rpe = rpe
+        self.rir = rir
+        self.setType = setType
+        self.pauseDuration = pauseDuration
+        self.side = side
+        self.notes = notes
+        self.orderInWorkout = orderInWorkout
+        self.orderInExercise = orderInExercise
+        self.supersetGroupId = supersetGroupId
+        self.completed = completed
+        self.excludeFromPRs = excludeFromPRs
+        self.cachedPRStatus = cachedPRStatus
+        self.targetWeight = targetWeight
+        self.targetRepMin = targetRepMin
+        self.targetRepMax = targetRepMax
+        self.targetRPE = targetRPE
+        self.targetRIR = targetRIR
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}

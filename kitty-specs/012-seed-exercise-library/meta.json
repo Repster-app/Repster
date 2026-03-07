@@ -1,0 +1,22 @@
+{
+  "accept_commit": null,
+  "acceptance_history": [
+    {
+      "accepted_at": "2026-03-01T16:06:52Z",
+      "accepted_by": "claude",
+      "accepted_from_commit": "39ec1309ccb9c0f9577af18e257d23773ef5ef88",
+      "branch": "master",
+      "mode": "local"
+    }
+  ],
+  "acceptance_mode": "local",
+  "accepted_at": "2026-03-01T16:06:52Z",
+  "accepted_by": "claude",
+  "accepted_from_commit": "39ec1309ccb9c0f9577af18e257d23773ef5ef88",
+  "created_at": "2026-02-19T10:00:00Z",
+  "feature_number": "012",
+  "friendly_name": "Seed Exercise Library",
+  "mission": "software-dev",
+  "slug": "012-seed-exercise-library",
+  "source_description": "Load seed_exercises.json on first launch. 67 exercises with full metadata. Ensure trackingType, bodyweightFactor, primaryMuscle, and equipment are all correctly mapped to the Exercise model."
+}

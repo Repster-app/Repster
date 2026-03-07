@@ -1,0 +1,36 @@
+{
+  "accept_commit": null,
+  "acceptance_history": [
+    {
+      "accepted_at": "2026-02-28T13:47:41Z",
+      "accepted_by": "claude",
+      "accepted_from_commit": "4931858b6d78595f2d3e00131a91201b1f5fef3c",
+      "branch": "master",
+      "mode": "local"
+    },
+    {
+      "accepted_at": "2026-02-28T13:48:39Z",
+      "accepted_by": "claude",
+      "accepted_from_commit": "935394c3d905eb9b9949c19d830231d63d475294",
+      "branch": "master",
+      "mode": "local"
+    },
+    {
+      "accepted_at": "2026-02-28T13:49:41Z",
+      "accepted_by": "claude",
+      "accepted_from_commit": "2bf288668d9c79c37075e35b0e108004a2a49151",
+      "branch": "master",
+      "mode": "local"
+    }
+  ],
+  "acceptance_mode": "local",
+  "accepted_at": "2026-02-28T13:49:41Z",
+  "accepted_by": "claude",
+  "accepted_from_commit": "2bf288668d9c79c37075e35b0e108004a2a49151",
+  "created_at": "2026-02-19T10:00:00Z",
+  "feature_number": "009",
+  "friendly_name": "Charts Tab",
+  "mission": "software-dev",
+  "slug": "009-charts-tab",
+  "source_description": "screen_tree Section 4. Chart performance strategy per specdoc Section 8.10. Time-series aggregation per specdoc Section 11.1."
+}

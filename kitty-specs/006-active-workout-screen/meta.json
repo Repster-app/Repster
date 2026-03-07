@@ -1,0 +1,8 @@
+{
+  "feature_number": "006",
+  "slug": "006-active-workout-screen",
+  "friendly_name": "Active Workout Screen",
+  "mission": "software-dev",
+  "source_description": "screen_tree Section 3 (FAB -> Exercise List -> Active Workout). Set table columns per AGENT_RULES Section 7.5. Design per design-system Section 6.3. Active workout flow per AGENT_RULES Section 7.3. Rest timer per specdoc Section 9. PR badges per AGENT_RULES Section 7.4.",
+  "created_at": "2026-02-19T10:00:00Z"
+}

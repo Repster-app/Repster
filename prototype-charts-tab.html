@@ -1,0 +1,1663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Charts Tab — Prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #111113;
+    --bg-card: #1B1B1F;
+    --bg-hover: #222228;
+    --bg-subtle: #262630;
+    --bg-input: #1F1F25;
+    --text: #EAEAEF;
+    --text-mid: #9999A8;
+    --text-dim: #5C5C6E;
+    --accent: #5B8DEF;
+    --accent-soft: rgba(91, 141, 239, 0.10);
+    --success: #5EC269;
+    --success-soft: rgba(94, 194, 105, 0.08);
+    --gold: #D4A23A;
+    --gold-soft: rgba(212, 162, 58, 0.10);
+    --red: #E05555;
+    --red-soft: rgba(224, 85, 85, 0.08);
+    --border: rgba(255,255,255,0.06);
+    --r: 14px;
+    --r-sm: 10px;
+    --r-chip: 8px;
+
+    /* Chart palette */
+    --chart-1: #5B8DEF;
+    --chart-2: #5EC269;
+    --chart-3: #D4A23A;
+    --chart-4: #E05555;
+    --chart-5: #A87EE6;
+    --chart-6: #E89B3E;
+    --chart-7: #4ECDC4;
+    --chart-8: #FF6B9D;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: #060608;
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  /* ===== PHONE FRAME ===== */
+  .phone {
+    width: 393px;
+    height: 852px;
+    background: var(--bg);
+    border-radius: 44px;
+    border: 2.5px solid #232328;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 28px 6px;
+    font-size: 15px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .status-r { display: flex; gap: 6px; align-items: center; }
+  .status-r svg { width: 16px; height: 16px; fill: var(--text); }
+
+  /* ===== PAGE HEADER ===== */
+  .page-header {
+    padding: 8px 20px 12px;
+    flex-shrink: 0;
+  }
+  .page-title {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  /* ===== SUB-TAB BAR ===== */
+  .sub-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0 20px;
+    margin-bottom: 16px;
+    flex-shrink: 0;
+  }
+  .sub-tab {
+    flex: 1;
+    padding: 9px 8px;
+    border-radius: var(--r-chip);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    background: var(--bg-card);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s ease;
+    border: none;
+    font-family: inherit;
+  }
+  .sub-tab:hover { color: var(--text-mid); background: var(--bg-hover); }
+  .sub-tab.active { background: var(--accent); color: white; font-weight: 600; }
+
+  /* ===== SCROLLABLE CONTENT ===== */
+  .scroll-content {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .scroll-content::-webkit-scrollbar { display: none; }
+
+  .tab-panel { display: none; padding: 0 20px 100px; }
+  .tab-panel.active { display: block; }
+
+  /* ===== DROPDOWNS ===== */
+  .dropdown-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .dropdown-wrapper {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+  }
+  .dropdown-trigger {
+    width: 100%;
+    padding: 10px 32px 10px 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: border-color 0.15s ease;
+    appearance: none;
+    position: relative;
+  }
+  .dropdown-trigger:hover { border-color: rgba(255,255,255,0.12); }
+  .dropdown-trigger:focus { outline: none; border-color: var(--accent); }
+  .dropdown-trigger::after {
+    content: '';
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--text-dim);
+    pointer-events: none;
+  }
+  .dropdown-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #2a2a30;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: var(--r-sm);
+    padding: 4px;
+    z-index: 50;
+    max-height: 240px;
+    overflow-y: auto;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    scrollbar-width: none;
+  }
+  .dropdown-menu::-webkit-scrollbar { display: none; }
+  .dropdown-menu.open { display: block; }
+  .dropdown-option {
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-mid);
+    cursor: pointer;
+    transition: background 0.1s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dropdown-option:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+  .dropdown-option.selected { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+  /* ===== TIME RANGE PILLS ===== */
+  .time-pills {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .time-pill {
+    flex: 1;
+    padding: 8px 4px;
+    border-radius: var(--r-chip);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+    background: var(--bg-card);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s ease;
+    border: none;
+    font-family: inherit;
+  }
+  .time-pill:hover { color: var(--text-mid); background: var(--bg-hover); }
+  .time-pill.active { background: var(--accent); color: white; }
+
+  /* ===== CHART CONTAINER ===== */
+  .chart-card {
+    background: var(--bg-card);
+    border-radius: var(--r);
+    padding: 16px;
+    margin-bottom: 12px;
+    position: relative;
+  }
+  .chart-canvas-wrap {
+    position: relative;
+    width: 100%;
+    height: 220px;
+  }
+  .chart-canvas-wrap canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+  .chart-canvas-wrap.donut {
+    height: 240px;
+  }
+
+  /* ===== DATE RANGE LABEL ===== */
+  .date-range-label {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-dim);
+    font-weight: 500;
+    margin-top: 12px;
+  }
+
+  /* ===== CHART LEGEND (custom for donut) ===== */
+  .chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-mid);
+    font-weight: 500;
+  }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .legend-value {
+    color: var(--text);
+    font-weight: 600;
+    margin-left: 2px;
+  }
+
+  /* ===== TREND / SLOPE INDICATOR ===== */
+  .slope-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 8px;
+  }
+  .slope-badge.negative {
+    background: var(--red-soft);
+    color: var(--red);
+  }
+  .slope-badge.positive {
+    background: var(--success-soft);
+    color: var(--success);
+  }
+  .slope-badge svg {
+    width: 12px;
+    height: 12px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* ===== DATA POINT NAVIGATOR ===== */
+  .data-navigator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .nav-arrow {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--r-sm);
+    background: var(--bg-subtle);
+    border: none;
+    color: var(--text-mid);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s ease;
+  }
+  .nav-arrow:hover { background: var(--bg-hover); color: var(--text); }
+  .nav-arrow svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .nav-detail {
+    flex: 1;
+    text-align: center;
+  }
+  .nav-detail-value {
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .nav-detail-date {
+    font-size: 12px;
+    color: var(--text-mid);
+    font-weight: 500;
+    margin-top: 2px;
+  }
+  .nav-prompt {
+    font-size: 13px;
+    color: var(--text-dim);
+    font-weight: 500;
+    text-align: center;
+    flex: 1;
+  }
+
+  /* ===== SECTION HEADER ===== */
+  .section-header {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+    margin-top: 20px;
+  }
+
+  /* ===== EXERCISE SELECTION MODAL ===== */
+  .modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 100;
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .modal-overlay.open {
+    display: flex;
+  }
+  .modal-sheet {
+    width: 100%;
+    max-height: 80%;
+    background: var(--bg-card);
+    border-radius: 20px 20px 0 0;
+    display: flex;
+    flex-direction: column;
+    animation: slideUp 0.3s ease-out;
+  }
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  .modal-header {
+    padding: 12px 20px 0;
+    flex-shrink: 0;
+  }
+  .modal-handle {
+    width: 36px;
+    height: 5px;
+    background: var(--bg-subtle);
+    border-radius: 3px;
+    margin: 0 auto 16px;
+  }
+  .modal-title {
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .modal-subtitle {
+    font-size: 13px;
+    color: var(--text-mid);
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .modal-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+  }
+  .modal-tab {
+    flex: 1;
+    padding: 8px;
+    border-radius: var(--r-chip);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    background: var(--bg);
+    cursor: pointer;
+    text-align: center;
+    border: none;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .modal-tab.active { background: var(--accent); color: white; font-weight: 600; }
+  .modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 20px;
+    scrollbar-width: none;
+  }
+  .modal-body::-webkit-scrollbar { display: none; }
+
+  /* Exercise list in modal */
+  .exercise-select-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .exercise-select-item:last-child { border-bottom: none; }
+  .exercise-drag {
+    color: var(--text-dim);
+    font-size: 16px;
+    cursor: grab;
+    padding: 4px;
+    flex-shrink: 0;
+  }
+  .exercise-select-name {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 500;
+  }
+  .exercise-select-category {
+    font-size: 11px;
+    color: var(--text-dim);
+    background: var(--bg-subtle);
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-weight: 500;
+  }
+  .exercise-remove-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--red-soft);
+    color: var(--red);
+    border: none;
+    font-size: 18px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .exercise-add-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    cursor: pointer;
+    color: var(--accent);
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .exercise-add-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  /* Modal footer */
+  .modal-footer {
+    padding: 12px 20px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+  }
+  .modal-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: var(--r);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    border: none;
+    transition: all 0.15s;
+  }
+  .modal-btn.primary {
+    background: var(--accent);
+    color: white;
+  }
+  .modal-btn.primary:hover { background: #4a7de0; }
+  .modal-btn.secondary {
+    background: var(--bg);
+    color: var(--text-mid);
+    border: 1px solid var(--border);
+  }
+  .modal-btn.secondary:hover { background: var(--bg-hover); }
+  .modal-btn-row {
+    display: flex;
+    gap: 8px;
+  }
+  .modal-btn-row .modal-btn { flex: 1; }
+
+  /* ===== BOTTOM NAV ===== */
+  .bottom-nav {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 84px;
+    background: linear-gradient(to top, var(--bg) 65%, transparent);
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    padding: 0 16px 28px;
+    z-index: 10;
+  }
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    min-width: 48px;
+  }
+  .nav-item svg {
+    width: 21px;
+    height: 21px;
+    stroke: var(--text-dim);
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .nav-item span {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-dim);
+  }
+  .nav-item.active svg { stroke: var(--accent); }
+  .nav-item.active span { color: var(--accent); }
+  .nav-fab {
+    width: 46px;
+    height: 46px;
+    background: var(--accent);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(91, 141, 239, 0.3);
+  }
+  .nav-fab svg {
+    width: 22px;
+    height: 22px;
+    stroke: white;
+    fill: none;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* ===== CHART INFO CARD ===== */
+  .info-card {
+    background: var(--bg-card);
+    border-radius: var(--r);
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .info-card-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .info-card-label {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+  .info-card-value {
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  /* ===== SUMMARY STATS ROW ===== */
+  .summary-row {
+    display: flex;
+    gap: 1px;
+    background: var(--border);
+    border-radius: var(--r);
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .summary-stat {
+    flex: 1;
+    background: var(--bg-card);
+    padding: 14px 8px;
+    text-align: center;
+  }
+  .summary-stat-value {
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .summary-stat-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+  }
+
+  /* ===== EMPTY STATE ===== */
+  .empty-state {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-dim);
+  }
+  .empty-state-icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+    opacity: 0.4;
+  }
+  .empty-state-text {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.5;
+  }
+
+  /* Fade in */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fi { animation: fadeIn 0.4s ease forwards; opacity: 0; }
+  .fi1 { animation-delay: 0.02s; }
+  .fi2 { animation-delay: 0.06s; }
+  .fi3 { animation-delay: 0.10s; }
+  .fi4 { animation-delay: 0.14s; }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <span>14:02</span>
+    <div class="status-r">
+      <svg viewBox="0 0 16 16"><circle cx="2" cy="8" r="1.5"/><circle cx="6" cy="8" r="1.5"/><circle cx="10" cy="8" r="1.5"/><circle cx="14" cy="8" r="1.5"/></svg>
+      <svg viewBox="0 0 16 16"><path d="M1 11.5c2-4 4.5-6.5 7-8.5M4 12c1.5-3 3.5-5 5.5-6.5M7 12.5c1-2 2.5-3.5 4-4.5M10.5 12.5c.5-.8 1.2-1.5 2-2" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <svg viewBox="0 0 24 14"><rect x="0" y="1" width="20" height="12" rx="2.5" stroke="currentColor" fill="none" stroke-width="1.5"/><rect x="2" y="3" width="14" height="8" rx="1" fill="currentColor"/><path d="M22 5v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </div>
+  </div>
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="page-title">Charts</div>
+  </div>
+
+  <!-- Sub-Tab Bar -->
+  <div class="sub-tabs">
+    <button class="sub-tab active" onclick="switchTab('breakdown')">Breakdown</button>
+    <button class="sub-tab" onclick="switchTab('workouts')">Workouts</button>
+    <button class="sub-tab" onclick="switchTab('exercises')">Exercises</button>
+  </div>
+
+  <!-- Scrollable Content -->
+  <div class="scroll-content">
+
+    <!-- ==================== TAB 1: BREAKDOWN ==================== -->
+    <div class="tab-panel active" id="panel-breakdown">
+
+      <!-- Chart Type Dropdown -->
+      <div class="dropdown-row fi fi1">
+        <div class="dropdown-wrapper">
+          <button class="dropdown-trigger" id="breakdown-type-trigger" onclick="toggleDropdown('breakdown-type')">
+            Volume by Category
+          </button>
+          <div class="dropdown-menu" id="breakdown-type-menu">
+            <div class="dropdown-option selected" onclick="selectBreakdownType(this, 'Volume by Category')">Volume by Category</div>
+            <div class="dropdown-option" onclick="selectBreakdownType(this, 'Sets by Category')">Sets by Category</div>
+            <div class="dropdown-option" onclick="selectBreakdownType(this, 'Reps by Category')">Reps by Category</div>
+            <div class="dropdown-option" onclick="selectBreakdownType(this, 'Workouts by Category')">Workouts by Category</div>
+            <div class="dropdown-option" onclick="selectBreakdownType(this, 'Volume by Exercise')">Volume by Exercise</div>
+            <div class="dropdown-option" onclick="selectBreakdownType(this, 'Sets by Exercise')">Sets by Exercise</div>
+            <div class="dropdown-option" onclick="selectBreakdownType(this, 'Reps by Exercise')">Reps by Exercise</div>
+            <div class="dropdown-option" onclick="selectBreakdownType(this, 'Workouts by Exercise')">Workouts by Exercise</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Time Range Pills -->
+      <div class="time-pills fi fi2" id="breakdown-time-pills">
+        <button class="time-pill active" onclick="selectTimePill(this, 'breakdown')">All</button>
+        <button class="time-pill" onclick="selectTimePill(this, 'breakdown')">Year</button>
+        <button class="time-pill" onclick="selectTimePill(this, 'breakdown')">Month</button>
+        <button class="time-pill" onclick="selectTimePill(this, 'breakdown')">Week</button>
+        <button class="time-pill" onclick="selectTimePill(this, 'breakdown')">Day</button>
+      </div>
+
+      <!-- Donut Chart -->
+      <div class="chart-card fi fi3">
+        <div class="chart-canvas-wrap donut">
+          <canvas id="donutChart"></canvas>
+        </div>
+
+        <!-- Custom Legend -->
+        <div class="chart-legend" id="donut-legend"></div>
+
+        <!-- Date Range -->
+        <div class="date-range-label">May 20, 2021 → Mar 4, 2026</div>
+      </div>
+
+      <!-- Summary Stats -->
+      <div class="summary-row fi fi4">
+        <div class="summary-stat">
+          <div class="summary-stat-value">847k</div>
+          <div class="summary-stat-label">Total Vol</div>
+        </div>
+        <div class="summary-stat">
+          <div class="summary-stat-value">2,431</div>
+          <div class="summary-stat-label">Total Sets</div>
+        </div>
+        <div class="summary-stat">
+          <div class="summary-stat-value">19.2k</div>
+          <div class="summary-stat-label">Total Reps</div>
+        </div>
+        <div class="summary-stat">
+          <div class="summary-stat-value">312</div>
+          <div class="summary-stat-label">Workouts</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 2: WORKOUTS ==================== -->
+    <div class="tab-panel" id="panel-workouts">
+
+      <!-- Dropdowns Row -->
+      <div class="dropdown-row fi fi1">
+        <!-- Metric -->
+        <div class="dropdown-wrapper">
+          <button class="dropdown-trigger" id="workouts-metric-trigger" onclick="toggleDropdown('workouts-metric')">
+            Volume
+          </button>
+          <div class="dropdown-menu" id="workouts-metric-menu">
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-metric')">Reps</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-metric')">Sets</div>
+            <div class="dropdown-option selected" onclick="selectOption(this, 'workouts-metric')">Volume</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-metric')">Workouts</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-metric')">Distance</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-metric')">Time</div>
+          </div>
+        </div>
+
+        <!-- Aggregation -->
+        <div class="dropdown-wrapper">
+          <button class="dropdown-trigger" id="workouts-agg-trigger" onclick="toggleDropdown('workouts-agg')">
+            Per Month
+          </button>
+          <div class="dropdown-menu" id="workouts-agg-menu">
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-agg')">Per Workout</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-agg')">Per Week</div>
+            <div class="dropdown-option selected" onclick="selectOption(this, 'workouts-agg')">Per Month</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-agg')">Per Year</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter Dropdown (full-width) -->
+      <div class="dropdown-row fi fi1">
+        <div class="dropdown-wrapper">
+          <button class="dropdown-trigger" id="workouts-filter-trigger" onclick="toggleDropdown('workouts-filter')">
+            All
+          </button>
+          <div class="dropdown-menu" id="workouts-filter-menu">
+            <div class="dropdown-option selected" onclick="selectOption(this, 'workouts-filter')">All</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-filter')" style="color:var(--text-dim); font-size:11px; text-transform:uppercase; letter-spacing:0.05em; pointer-events:none; padding-top:12px;">── Category ──</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-filter')">  Chest</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-filter')">  Back</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-filter')">  Shoulders</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-filter')">  Arms</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-filter')">  Legs</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-filter')">  Core</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-filter')" style="color:var(--text-dim); font-size:11px; text-transform:uppercase; letter-spacing:0.05em; pointer-events:none; padding-top:12px;">── Exercise ──</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-filter')">  Bench Press</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-filter')">  Squat</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-filter')">  Deadlift</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-filter')">  Overhead Press</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'workouts-filter')">  Lat Pulldown</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Time Range Pills -->
+      <div class="time-pills fi fi2" id="workouts-time-pills">
+        <button class="time-pill active" onclick="selectTimePill(this, 'workouts')">All</button>
+        <button class="time-pill" onclick="selectTimePill(this, 'workouts')">1y</button>
+        <button class="time-pill" onclick="selectTimePill(this, 'workouts')">6mo</button>
+        <button class="time-pill" onclick="selectTimePill(this, 'workouts')">3mo</button>
+        <button class="time-pill" onclick="selectTimePill(this, 'workouts')">1mo</button>
+      </div>
+
+      <!-- Bar Chart -->
+      <div class="chart-card fi fi3">
+        <div class="chart-canvas-wrap">
+          <canvas id="barChart"></canvas>
+        </div>
+
+        <!-- Slope indicator -->
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px;">
+          <div class="slope-badge negative">
+            <svg viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+            Slope: −401.33
+          </div>
+          <div class="date-range-label" style="margin-top:0;">May 2021 → Mar 2026</div>
+        </div>
+
+        <!-- Data point navigator -->
+        <div class="data-navigator" id="workouts-navigator">
+          <button class="nav-arrow" onclick="navigateDataPoint('workouts', -1)">
+            <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div class="nav-detail" id="workouts-nav-detail">
+            <div class="nav-detail-value">14,750 kg</div>
+            <div class="nav-detail-date">Thursday, March 6, 2025</div>
+          </div>
+          <button class="nav-arrow" onclick="navigateDataPoint('workouts', 1)">
+            <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 3: EXERCISES ==================== -->
+    <div class="tab-panel" id="panel-exercises">
+
+      <!-- Dropdowns Row -->
+      <div class="dropdown-row fi fi1">
+        <!-- Metric -->
+        <div class="dropdown-wrapper">
+          <button class="dropdown-trigger" id="exercises-metric-trigger" onclick="toggleDropdown('exercises-metric')">
+            Estimated 1RM
+          </button>
+          <div class="dropdown-menu" id="exercises-metric-menu">
+            <div class="dropdown-option selected" onclick="selectOption(this, 'exercises-metric')">Estimated 1RM</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'exercises-metric')">Max Weight</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'exercises-metric')">Max Reps</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'exercises-metric')">Max Volume</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'exercises-metric')">Max Weight for Reps</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'exercises-metric')">Workout Volume</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'exercises-metric')">Workout Reps</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'exercises-metric')">Personal Records</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'exercises-metric')">Max Distance</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'exercises-metric')">Max Time</div>
+            <div class="dropdown-option" onclick="selectOption(this, 'exercises-metric')">Min Pace</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Exercise Selection Button -->
+      <div class="dropdown-row fi fi1">
+        <div class="dropdown-wrapper">
+          <button class="dropdown-trigger" id="exercises-select-trigger" onclick="openExerciseModal()" style="color: var(--accent);">
+            Bench Press, Squat +1 more
+          </button>
+        </div>
+      </div>
+
+      <!-- Time Range Pills -->
+      <div class="time-pills fi fi2" id="exercises-time-pills">
+        <button class="time-pill active" onclick="selectTimePill(this, 'exercises')">All</button>
+        <button class="time-pill" onclick="selectTimePill(this, 'exercises')">1y</button>
+        <button class="time-pill" onclick="selectTimePill(this, 'exercises')">6mo</button>
+        <button class="time-pill" onclick="selectTimePill(this, 'exercises')">3mo</button>
+        <button class="time-pill" onclick="selectTimePill(this, 'exercises')">1mo</button>
+      </div>
+
+      <!-- Line Chart -->
+      <div class="chart-card fi fi3">
+        <div class="chart-canvas-wrap">
+          <canvas id="lineChart"></canvas>
+        </div>
+
+        <!-- Slope indicator -->
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px;">
+          <div class="slope-badge positive">
+            <svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            Slope: 2.11
+          </div>
+          <div class="date-range-label" style="margin-top:0;">Jan 2023 → Mar 2026</div>
+        </div>
+
+        <!-- Data point navigator -->
+        <div class="data-navigator" id="exercises-navigator">
+          <button class="nav-arrow" onclick="navigateDataPoint('exercises', -1)">
+            <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div class="nav-prompt" id="exercises-nav-prompt">Select a point on the graph</div>
+          <div class="nav-detail" id="exercises-nav-detail" style="display:none;">
+            <div class="nav-detail-value">102.5 kg</div>
+            <div class="nav-detail-date">Bench Press — Feb 14, 2026</div>
+          </div>
+          <button class="nav-arrow" onclick="navigateDataPoint('exercises', 1)">
+            <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Exercise Color Legend -->
+      <div class="info-card fi fi4">
+        <div class="section-header" style="margin-top:0;">Selected Exercises</div>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="width:12px; height:3px; border-radius:2px; background:var(--chart-1);"></div>
+            <span style="font-size:14px; font-weight:500;">Bench Press</span>
+            <span style="font-size:12px; color:var(--text-dim); margin-left:auto;">102.5 kg e1RM</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="width:12px; height:3px; border-radius:2px; background:var(--chart-2);"></div>
+            <span style="font-size:14px; font-weight:500;">Squat</span>
+            <span style="font-size:12px; color:var(--text-dim); margin-left:auto;">140.0 kg e1RM</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="width:12px; height:3px; border-radius:2px; background:var(--chart-3);"></div>
+            <span style="font-size:14px; font-weight:500;">Deadlift</span>
+            <span style="font-size:12px; color:var(--text-dim); margin-left:auto;">180.0 kg e1RM</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== EXERCISE SELECTION MODAL ==================== -->
+  <div class="modal-overlay" id="exercise-modal">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div class="modal-handle"></div>
+        <div class="modal-title">Select Exercises</div>
+        <div class="modal-subtitle">Choose up to 10 exercises</div>
+        <div class="modal-tabs">
+          <button class="modal-tab active" onclick="switchModalTab(this, 'current')">Current</button>
+          <button class="modal-tab" onclick="switchModalTab(this, 'presets')">Presets</button>
+        </div>
+      </div>
+
+      <div class="modal-body" id="modal-body-current">
+        <!-- Selected exercises -->
+        <div class="exercise-select-item">
+          <div class="exercise-drag">≡</div>
+          <div class="exercise-select-name">Bench Press</div>
+          <div class="exercise-select-category">Chest</div>
+          <button class="exercise-remove-btn" onclick="removeExercise(this)">−</button>
+        </div>
+        <div class="exercise-select-item">
+          <div class="exercise-drag">≡</div>
+          <div class="exercise-select-name">Squat</div>
+          <div class="exercise-select-category">Legs</div>
+          <button class="exercise-remove-btn" onclick="removeExercise(this)">−</button>
+        </div>
+        <div class="exercise-select-item">
+          <div class="exercise-drag">≡</div>
+          <div class="exercise-select-name">Deadlift</div>
+          <div class="exercise-select-category">Back</div>
+          <button class="exercise-remove-btn" onclick="removeExercise(this)">−</button>
+        </div>
+
+        <!-- Add Exercise -->
+        <div class="exercise-add-row" onclick="addExercisePrompt()">
+          <div class="exercise-add-icon">+</div>
+          Add Exercise
+        </div>
+      </div>
+
+      <div class="modal-body" id="modal-body-presets" style="display:none;">
+        <!-- Preset list -->
+        <div class="exercise-select-item" style="cursor:pointer;">
+          <div style="flex:1;">
+            <div class="exercise-select-name">Big 3 Lifts</div>
+            <div style="font-size:12px; color:var(--text-dim); margin-top:2px;">Bench, Squat, Deadlift</div>
+          </div>
+          <div style="color:var(--accent); font-size:13px; font-weight:600;">Apply</div>
+        </div>
+        <div class="exercise-select-item" style="cursor:pointer;">
+          <div style="flex:1;">
+            <div class="exercise-select-name">Upper Body Push</div>
+            <div style="font-size:12px; color:var(--text-dim); margin-top:2px;">Bench, OHP, Incline Bench, Dips</div>
+          </div>
+          <div style="color:var(--accent); font-size:13px; font-weight:600;">Apply</div>
+        </div>
+        <div class="exercise-select-item" style="cursor:pointer;">
+          <div style="flex:1;">
+            <div class="exercise-select-name">Pull Exercises</div>
+            <div style="font-size:12px; color:var(--text-dim); margin-top:2px;">Deadlift, Row, Lat Pulldown, Face Pull</div>
+          </div>
+          <div style="color:var(--accent); font-size:13px; font-weight:600;">Apply</div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="modal-btn primary" onclick="closeExerciseModal()">Apply to Graph</button>
+        <div class="modal-btn-row">
+          <button class="modal-btn secondary" onclick="savePreset()">Save as Preset</button>
+          <button class="modal-btn secondary" onclick="clearSelection()">Clear Selection</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== BOTTOM NAV ==================== -->
+  <div class="bottom-nav">
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>Home</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>Calendar</span>
+    </div>
+    <div class="nav-item">
+      <div class="nav-fab">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </div>
+    </div>
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>Charts</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <span>Settings</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== CHART COLORS =====
+const chartColors = [
+  '#5B8DEF', '#5EC269', '#D4A23A', '#E05555',
+  '#A87EE6', '#E89B3E', '#4ECDC4', '#FF6B9D'
+];
+
+// ===== TAB SWITCHING =====
+function switchTab(tabName) {
+  // Update sub-tab buttons
+  document.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+
+  // Show/hide panels
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + tabName).classList.add('active');
+
+  // Close any open dropdowns
+  closeAllDropdowns();
+}
+
+// ===== DROPDOWN MANAGEMENT =====
+function toggleDropdown(id) {
+  const menu = document.getElementById(id + '-menu');
+  const isOpen = menu.classList.contains('open');
+
+  closeAllDropdowns();
+
+  if (!isOpen) {
+    menu.classList.add('open');
+  }
+
+  event.stopPropagation();
+}
+
+function closeAllDropdowns() {
+  document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+}
+
+function selectOption(optEl, dropdownId) {
+  const menu = document.getElementById(dropdownId + '-menu');
+  const trigger = document.getElementById(dropdownId + '-trigger');
+
+  menu.querySelectorAll('.dropdown-option').forEach(o => o.classList.remove('selected'));
+  optEl.classList.add('selected');
+
+  trigger.textContent = optEl.textContent.trim();
+  menu.classList.remove('open');
+}
+
+function selectBreakdownType(optEl, value) {
+  const menu = document.getElementById('breakdown-type-menu');
+  const trigger = document.getElementById('breakdown-type-trigger');
+
+  menu.querySelectorAll('.dropdown-option').forEach(o => o.classList.remove('selected'));
+  optEl.classList.add('selected');
+
+  trigger.textContent = value;
+  menu.classList.remove('open');
+
+  // Update chart based on selection
+  updateDonutChart(value);
+}
+
+// ===== TIME PILL SELECTION =====
+function selectTimePill(pillEl, section) {
+  const container = pillEl.parentElement;
+  container.querySelectorAll('.time-pill').forEach(p => p.classList.remove('active'));
+  pillEl.classList.add('active');
+}
+
+// ===== CLOSE DROPDOWNS ON OUTSIDE CLICK =====
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.dropdown-wrapper')) {
+    closeAllDropdowns();
+  }
+});
+
+// ===== DATA POINT NAVIGATION =====
+const workoutsDataPoints = [
+  { value: '18,200 kg', date: 'Monday, January 6, 2025' },
+  { value: '15,900 kg', date: 'Wednesday, January 22, 2025' },
+  { value: '16,400 kg', date: 'Friday, February 7, 2025' },
+  { value: '14,750 kg', date: 'Thursday, March 6, 2025' },
+  { value: '17,100 kg', date: 'Monday, March 3, 2025' },
+];
+let workoutsDataIndex = 3;
+
+const exercisesDataPoints = [
+  { value: '95.0 kg', date: 'Bench Press — Oct 5, 2025' },
+  { value: '97.5 kg', date: 'Bench Press — Nov 12, 2025' },
+  { value: '100.0 kg', date: 'Bench Press — Dec 20, 2025' },
+  { value: '101.0 kg', date: 'Bench Press — Jan 18, 2026' },
+  { value: '102.5 kg', date: 'Bench Press — Feb 14, 2026' },
+];
+let exercisesDataIndex = -1; // -1 = no selection
+
+function navigateDataPoint(section, direction) {
+  if (section === 'workouts') {
+    workoutsDataIndex = Math.max(0, Math.min(workoutsDataPoints.length - 1, workoutsDataIndex + direction));
+    const dp = workoutsDataPoints[workoutsDataIndex];
+    document.querySelector('#workouts-nav-detail .nav-detail-value').textContent = dp.value;
+    document.querySelector('#workouts-nav-detail .nav-detail-date').textContent = dp.date;
+  } else if (section === 'exercises') {
+    if (exercisesDataIndex === -1) exercisesDataIndex = 0;
+    else exercisesDataIndex = Math.max(0, Math.min(exercisesDataPoints.length - 1, exercisesDataIndex + direction));
+
+    const dp = exercisesDataPoints[exercisesDataIndex];
+
+    // Hide prompt, show detail
+    document.getElementById('exercises-nav-prompt').style.display = 'none';
+    document.getElementById('exercises-nav-detail').style.display = 'block';
+
+    document.querySelector('#exercises-nav-detail .nav-detail-value').textContent = dp.value;
+    document.querySelector('#exercises-nav-detail .nav-detail-date').textContent = dp.date;
+  }
+}
+
+// ===== EXERCISE MODAL =====
+function openExerciseModal() {
+  document.getElementById('exercise-modal').classList.add('open');
+}
+
+function closeExerciseModal() {
+  document.getElementById('exercise-modal').classList.remove('open');
+}
+
+function switchModalTab(tabEl, tabName) {
+  tabEl.parentElement.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+  tabEl.classList.add('active');
+
+  document.getElementById('modal-body-current').style.display = tabName === 'current' ? 'block' : 'none';
+  document.getElementById('modal-body-presets').style.display = tabName === 'presets' ? 'block' : 'none';
+}
+
+function removeExercise(btn) {
+  const item = btn.closest('.exercise-select-item');
+  item.style.opacity = '0';
+  item.style.transform = 'translateX(20px)';
+  item.style.transition = 'all 0.2s ease';
+  setTimeout(() => item.remove(), 200);
+}
+
+function addExercisePrompt() {
+  // Simulate adding an exercise
+  const container = document.getElementById('modal-body-current');
+  const addRow = container.querySelector('.exercise-add-row');
+
+  const newItem = document.createElement('div');
+  newItem.className = 'exercise-select-item';
+  newItem.style.opacity = '0';
+  newItem.style.transform = 'translateY(10px)';
+  newItem.innerHTML = `
+    <div class="exercise-drag">≡</div>
+    <div class="exercise-select-name">Overhead Press</div>
+    <div class="exercise-select-category">Shoulders</div>
+    <button class="exercise-remove-btn" onclick="removeExercise(this)">−</button>
+  `;
+  container.insertBefore(newItem, addRow);
+  requestAnimationFrame(() => {
+    newItem.style.transition = 'all 0.2s ease';
+    newItem.style.opacity = '1';
+    newItem.style.transform = 'translateY(0)';
+  });
+}
+
+function savePreset() {
+  // Visual feedback
+  const btn = event.target;
+  btn.textContent = 'Saved ✓';
+  btn.style.color = 'var(--success)';
+  btn.style.borderColor = 'rgba(94, 194, 105, 0.3)';
+  setTimeout(() => {
+    btn.textContent = 'Save as Preset';
+    btn.style.color = '';
+    btn.style.borderColor = '';
+  }, 1500);
+}
+
+function clearSelection() {
+  const items = document.querySelectorAll('#modal-body-current .exercise-select-item');
+  items.forEach((item, i) => {
+    setTimeout(() => {
+      item.style.opacity = '0';
+      item.style.transform = 'translateX(20px)';
+      item.style.transition = 'all 0.2s ease';
+      setTimeout(() => item.remove(), 200);
+    }, i * 80);
+  });
+}
+
+// Close modal on backdrop click
+document.getElementById('exercise-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeExerciseModal();
+});
+
+// ===== CHART INITIALIZATION =====
+let donutChart, barChart, lineChart;
+
+function initCharts() {
+  // Chart.js global defaults for dark theme
+  Chart.defaults.color = '#9999A8';
+  Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+  Chart.defaults.font.family = "'DM Sans', -apple-system, sans-serif";
+
+  initDonutChart();
+  initBarChart();
+  initLineChart();
+}
+
+// ===== DONUT CHART =====
+function initDonutChart() {
+  const ctx = document.getElementById('donutChart').getContext('2d');
+
+  const data = {
+    labels: ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core'],
+    datasets: [{
+      data: [28, 24, 22, 12, 10, 4],
+      backgroundColor: chartColors.slice(0, 6),
+      borderColor: '#1B1B1F',
+      borderWidth: 3,
+      hoverBorderColor: '#1B1B1F',
+      hoverBorderWidth: 3,
+    }]
+  };
+
+  donutChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: data,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '62%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#2a2a30',
+          titleColor: '#EAEAEF',
+          bodyColor: '#9999A8',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          cornerRadius: 8,
+          padding: 10,
+          titleFont: { weight: '600', size: 13 },
+          bodyFont: { size: 12 },
+          callbacks: {
+            label: function(ctx) {
+              const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+              const pct = ((ctx.parsed / total) * 100).toFixed(1);
+              return `${ctx.label}: ${pct}%`;
+            }
+          }
+        }
+      },
+      animation: {
+        animateRotate: true,
+        duration: 600,
+      }
+    }
+  });
+
+  // Build custom legend
+  buildDonutLegend(data);
+}
+
+function buildDonutLegend(data) {
+  const container = document.getElementById('donut-legend');
+  container.innerHTML = '';
+  const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+
+  data.labels.forEach((label, i) => {
+    const pct = ((data.datasets[0].data[i] / total) * 100).toFixed(0);
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `
+      <div class="legend-dot" style="background:${chartColors[i]}"></div>
+      ${label} <span class="legend-value">${pct}%</span>
+    `;
+    container.appendChild(item);
+  });
+}
+
+function updateDonutChart(type) {
+  // Mock different data for different types
+  const datasets = {
+    'Volume by Category': { labels: ['Chest','Back','Legs','Shoulders','Arms','Core'], data: [28,24,22,12,10,4] },
+    'Sets by Category': { labels: ['Chest','Back','Legs','Shoulders','Arms','Core'], data: [22,20,25,14,12,7] },
+    'Reps by Category': { labels: ['Chest','Back','Legs','Shoulders','Arms','Core'], data: [20,22,28,12,13,5] },
+    'Workouts by Category': { labels: ['Chest','Back','Legs','Shoulders','Arms','Core'], data: [30,28,20,10,8,4] },
+    'Volume by Exercise': { labels: ['Bench','Squat','Deadlift','OHP','Row','Curl','Lat PD','Leg Press'], data: [18,16,14,8,12,6,10,8] },
+    'Sets by Exercise': { labels: ['Bench','Squat','Deadlift','OHP','Row','Curl','Lat PD','Leg Press'], data: [15,14,10,8,12,8,10,9] },
+    'Reps by Exercise': { labels: ['Bench','Squat','Deadlift','OHP','Row','Curl','Lat PD','Leg Press'], data: [14,12,8,10,15,12,11,10] },
+    'Workouts by Exercise': { labels: ['Bench','Squat','Deadlift','OHP','Row','Curl','Lat PD','Leg Press'], data: [20,18,15,12,16,10,14,12] },
+  };
+
+  const d = datasets[type] || datasets['Volume by Category'];
+
+  donutChart.data.labels = d.labels;
+  donutChart.data.datasets[0].data = d.data;
+  donutChart.data.datasets[0].backgroundColor = chartColors.slice(0, d.labels.length);
+  donutChart.update('active');
+
+  buildDonutLegend({ labels: d.labels, datasets: [{ data: d.data }] });
+}
+
+// ===== BAR CHART =====
+function initBarChart() {
+  const ctx = document.getElementById('barChart').getContext('2d');
+
+  const months = ['May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
+  const values = [14200, 15800, 16100, 14900, 17200, 16500, 15100, 14800, 18200, 15900, 16400, 14750, 17100, 16800, 15200, 14400, 16900, 15600, 14100, 15500, 17400, 16200, 14900];
+
+  // Trend line calculation
+  const n = values.length;
+  const xMean = (n - 1) / 2;
+  const yMean = values.reduce((a, b) => a + b, 0) / n;
+  let num = 0, den = 0;
+  values.forEach((y, x) => {
+    num += (x - xMean) * (y - yMean);
+    den += (x - xMean) * (x - xMean);
+  });
+  const slope = num / den;
+  const intercept = yMean - slope * xMean;
+  const trendData = values.map((_, i) => slope * i + intercept);
+
+  barChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [
+        {
+          label: 'Volume',
+          data: values,
+          backgroundColor: 'rgba(91, 141, 239, 0.6)',
+          hoverBackgroundColor: 'rgba(91, 141, 239, 0.85)',
+          borderRadius: 4,
+          borderSkipped: false,
+          barPercentage: 0.7,
+        },
+        {
+          label: 'Trend',
+          data: trendData,
+          type: 'line',
+          borderColor: '#E05555',
+          borderWidth: 2,
+          borderDash: [6, 4],
+          pointRadius: 0,
+          fill: false,
+          tension: 0,
+          order: 0,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        intersect: false,
+        mode: 'index',
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#2a2a30',
+          titleColor: '#EAEAEF',
+          bodyColor: '#9999A8',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          cornerRadius: 8,
+          padding: 10,
+          titleFont: { weight: '600', size: 13 },
+          bodyFont: { size: 12 },
+          filter: function(tooltipItem) {
+            return tooltipItem.datasetIndex === 0;
+          },
+          callbacks: {
+            label: function(ctx) {
+              return `${ctx.parsed.y.toLocaleString()} kg`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            font: { size: 10 },
+            maxRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: 8,
+          },
+          grid: { display: false },
+        },
+        y: {
+          ticks: {
+            font: { size: 10 },
+            callback: function(val) {
+              return (val / 1000).toFixed(0) + 'k kg';
+            }
+          },
+          grid: {
+            color: 'rgba(255,255,255,0.04)',
+          },
+          border: { display: false },
+        }
+      },
+      animation: {
+        duration: 600,
+      }
+    }
+  });
+}
+
+// ===== LINE CHART (EXERCISES) =====
+function initLineChart() {
+  const ctx = document.getElementById('lineChart').getContext('2d');
+
+  const dates = ['Jan 23','Apr','Jul','Oct','Jan 24','Apr','Jul','Oct','Jan 25','Apr','Jul','Oct','Jan 26','Mar'];
+
+  // Bench Press data
+  const benchData = [80, 82, 85, 86, 88, 90, 91, 93, 95, 97.5, 98, 100, 101, 102.5];
+  // Squat data
+  const squatData = [100, 105, 108, 112, 115, 118, 122, 125, 128, 130, 133, 136, 138, 140];
+  // Deadlift data
+  const deadliftData = [120, 125, 130, 135, 140, 145, 150, 155, 160, 165, 168, 172, 176, 180];
+
+  // Trend line for bench
+  const n = benchData.length;
+  const xMean = (n - 1) / 2;
+  const yMean = benchData.reduce((a, b) => a + b, 0) / n;
+  let num = 0, den = 0;
+  benchData.forEach((y, x) => {
+    num += (x - xMean) * (y - yMean);
+    den += (x - xMean) * (x - xMean);
+  });
+  const slope = num / den;
+  const intercept = yMean - slope * xMean;
+  const trendData = benchData.map((_, i) => slope * i + intercept);
+
+  lineChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: dates,
+      datasets: [
+        {
+          label: 'Bench Press',
+          data: benchData,
+          borderColor: chartColors[0],
+          backgroundColor: 'rgba(91, 141, 239, 0.1)',
+          borderWidth: 2.5,
+          pointRadius: 3,
+          pointBackgroundColor: chartColors[0],
+          pointBorderColor: '#1B1B1F',
+          pointBorderWidth: 2,
+          pointHoverRadius: 6,
+          fill: false,
+          tension: 0.3,
+        },
+        {
+          label: 'Squat',
+          data: squatData,
+          borderColor: chartColors[1],
+          backgroundColor: 'rgba(94, 194, 105, 0.1)',
+          borderWidth: 2.5,
+          pointRadius: 3,
+          pointBackgroundColor: chartColors[1],
+          pointBorderColor: '#1B1B1F',
+          pointBorderWidth: 2,
+          pointHoverRadius: 6,
+          fill: false,
+          tension: 0.3,
+        },
+        {
+          label: 'Deadlift',
+          data: deadliftData,
+          borderColor: chartColors[2],
+          backgroundColor: 'rgba(212, 162, 58, 0.1)',
+          borderWidth: 2.5,
+          pointRadius: 3,
+          pointBackgroundColor: chartColors[2],
+          pointBorderColor: '#1B1B1F',
+          pointBorderWidth: 2,
+          pointHoverRadius: 6,
+          fill: false,
+          tension: 0.3,
+        },
+        {
+          label: 'Trend (Bench)',
+          data: trendData,
+          borderColor: 'rgba(91, 141, 239, 0.4)',
+          borderWidth: 1.5,
+          borderDash: [6, 4],
+          pointRadius: 0,
+          fill: false,
+          tension: 0,
+          order: 10,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        intersect: false,
+        mode: 'index',
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#2a2a30',
+          titleColor: '#EAEAEF',
+          bodyColor: '#9999A8',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          cornerRadius: 8,
+          padding: 10,
+          titleFont: { weight: '600', size: 13 },
+          bodyFont: { size: 12 },
+          filter: function(tooltipItem) {
+            return tooltipItem.datasetIndex < 3;
+          },
+          callbacks: {
+            label: function(ctx) {
+              return `${ctx.dataset.label}: ${ctx.parsed.y} kg`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            font: { size: 10 },
+            maxRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: 7,
+          },
+          grid: { display: false },
+        },
+        y: {
+          ticks: {
+            font: { size: 10 },
+            callback: function(val) {
+              return val + ' kg';
+            }
+          },
+          grid: {
+            color: 'rgba(255,255,255,0.04)',
+          },
+          border: { display: false },
+        }
+      },
+      animation: {
+        duration: 600,
+      }
+    }
+  });
+}
+
+// Initialize charts when page loads
+window.addEventListener('load', initCharts);
+</script>
+
+</body>
+</html>

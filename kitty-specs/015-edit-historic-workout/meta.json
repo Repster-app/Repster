@@ -1,0 +1,14 @@
+{
+  "feature_number": "015",
+  "slug": "015-edit-historic-workout",
+  "friendly_name": "Edit Historic Workout",
+  "mission": "software-dev",
+  "source_description": "Allow users to edit completed workouts from the workout detail screen. When tapping Edit Workout from the toolbar menu, a full-screen cover opens with the same set entry components used in the active workout. Users can edit set values (weight/reps), add/delete sets, add/remove exercises, and edit workout notes. Changes persist immediately.",
+  "created_at": "2026-03-02T12:00:00Z",
+  "accepted_at": "2026-03-02T20:42:00Z",
+  "accepted_by": "claude",
+  "acceptance_mode": "local",
+  "merge_commit": "e72f3c4",
+  "validation": ["xcodebuild: BUILD SUCCEEDED"],
+  "status": "accepted"
+}

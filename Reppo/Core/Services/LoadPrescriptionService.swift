@@ -1,0 +1,356 @@
+// LoadPrescriptionService.swift
+// Fatigue-aware weight prescription engine.
+// Based on: RIR_Fatigue_Aware_1RM_Model.pdf
+// Feature: Weight Prescription (magic wand)
+//
+// Algorithm summary:
+// 1. Estimate base e1RM from recent hard sets (RIR ≤ 1), recency-weighted
+// 2. Accumulate session fatigue from completed sets
+// 3. Apply rest-time fatigue decay between sets
+// 4. Compute effective e1RM = base × fatigue_discount
+// 5. Compute intensity_factor = 1 − 0.025 × reps − 0.02 × RIR
+// 6. target_weight = effective_e1RM × intensity_factor, rounded to increment
+//
+// Architecture: Actor — accesses SwiftData only through repository protocols.
+
+import Foundation
+
+actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
+
+    // MARK: - Dependencies
+
+    private let setRepo: SetRepositoryProtocol
+    private let exerciseRepo: ExerciseRepositoryProtocol
+    private let performanceRecordRepo: PerformanceRecordRepositoryProtocol
+    private let healthProfileRepo: HealthProfileRepositoryProtocol
+
+    // MARK: - Constants (defaults when no per-exercise override)
+
+    /// Default fatigue rate when exercise has no override.
+    private static let defaultFatigueRate: Double = 0.05
+
+    /// Default recovery constant (seconds) when exercise has no override.
+    private static let defaultRecoveryConstant: Double = 180.0
+
+    /// Default weight increment (kg) when exercise has no override.
+    private static let defaultWeightIncrement: Double = 2.5
+
+    /// Maximum RIR to consider a set "hard" for e1RM estimation.
+    private static let hardSetMaxRIR: Double = 1.0
+
+    /// Exponential decay half-life in days for recency weighting.
+    /// Sets from `halfLifeDays` ago get 50% weight.
+    private static let recencyHalfLifeDays: Double = 21.0
+
+    init(
+        setRepository: SetRepositoryProtocol,
+        exerciseRepository: ExerciseRepositoryProtocol,
+        performanceRecordRepository: PerformanceRecordRepositoryProtocol,
+        healthProfileRepository: HealthProfileRepositoryProtocol
+    ) {
+        self.setRepo = setRepository
+        self.exerciseRepo = exerciseRepository
+        self.performanceRecordRepo = performanceRecordRepository
+        self.healthProfileRepo = healthProfileRepository
+    }
+
+    // MARK: - LoadPrescriptionServiceProtocol
+
+    func prescribe(_ request: PrescriptionRequest) async throws -> PrescriptionResult? {
+        let results = try await prescribeBatch(
+            exerciseId: request.exerciseId,
+            sets: [(targetReps: request.targetReps, targetRIR: request.targetRIR, setIndex: request.setIndex)],
+            completedSessionSets: request.completedSessionSets
+        )
+        return results.first ?? nil
+    }
+
+    func prescribeBatch(
+        exerciseId: UUID,
+        sets: [(targetReps: Int, targetRIR: Double, setIndex: Int)],
+        completedSessionSets: [SessionSetContext]
+    ) async throws -> [PrescriptionResult?] {
+
+        // 1. Fetch settings + exercise data
+        let profile = try await healthProfileRepo.fetchOrCreate()
+
+        guard profile.prescriptionEnabled ?? true else {
+            return Array(repeating: nil, count: sets.count)
+        }
+
+        guard let exercise = try await exerciseRepo.fetch(byId: exerciseId) else {
+            return Array(repeating: nil, count: sets.count)
+        }
+
+        // 2. Resolve per-exercise vs global parameters
+        let fatigueRate = exercise.fatigueRate ?? Self.defaultFatigueRate
+        let recoveryConstant = exercise.recoveryConstant ?? profile.prescriptionDefaultRecoveryConstant ?? Self.defaultRecoveryConstant
+        let weightIncrement = exercise.weightIncrement ?? profile.prescriptionDefaultIncrement ?? Self.defaultWeightIncrement
+        let fatigueEnabled = profile.prescriptionFatigueModelingEnabled ?? true
+        let freshnessEnabled = profile.prescriptionFreshnessBonus ?? false
+        let freshnessPercent = profile.prescriptionFreshnessBonusPercent ?? 0.03
+        let formula = E1RMFormula(rawValue: profile.e1RMFormula) ?? .epley
+
+        // 3. Estimate base e1RM — in-session performance overrides history
+        var baseE1RM: Double?
+        var source: E1RMSource = .noData
+
+        // 3a. In-session override: if completed sets exist, compute e1RM from the best one
+        let completedWithData = completedSessionSets.filter { $0.completed && $0.reps > 0 && $0.weight > 0 }
+        if !completedWithData.isEmpty {
+            var bestSessionE1RM: Double = 0
+            for s in completedWithData {
+                let e1RM = computeE1RMFromSet(weight: s.weight, reps: s.reps, rir: s.rir, formula: formula)
+                if e1RM > bestSessionE1RM {
+                    bestSessionE1RM = e1RM
+                    print("[Prescription] In-session e1RM from: \(String(format: "%.1f", s.weight)) kg × \(s.reps) reps" +
+                          " @ RIR \(s.rir.map { String(format: "%.0f", $0) } ?? "unknown→0")" +
+                          " → e1RM = \(String(format: "%.1f", e1RM)) kg")
+                }
+            }
+            if bestSessionE1RM > 0 {
+                baseE1RM = bestSessionE1RM
+                source = .recentPerformance
+                print("[Prescription] Using IN-SESSION e1RM: \(String(format: "%.1f", bestSessionE1RM)) kg (overrides history)")
+            }
+        }
+
+        // 3b. Fallback: historical e1RM from most recent workout (only if no session data)
+        if baseE1RM == nil {
+            let (histE1RM, histSource) = try await estimateBaseE1RM(
+                exerciseId: exerciseId,
+                recencyWeeks: profile.prescriptionRecencyWeeks ?? 6,
+                formula: formula
+            )
+            baseE1RM = histE1RM
+            source = histSource
+        }
+
+        guard let baseE1RM, source != .noData else {
+            return Array(repeating: nil, count: sets.count)
+        }
+
+        // 4. Compute session fatigue from completed sets
+        let sessionFatigue: Double
+        if fatigueEnabled {
+            sessionFatigue = computeSessionFatigue(
+                completedSets: completedSessionSets,
+                fatigueRate: fatigueRate,
+                recoveryConstant: recoveryConstant
+            )
+        } else {
+            sessionFatigue = 0.0
+        }
+
+        // 5. Prescribe each set
+        return sets.map { setSpec in
+            let isFirstSet = setSpec.setIndex == 0 && completedSessionSets.isEmpty
+
+            // Fatigue discount: exp(-session_fatigue)
+            let fatigueDiscount = exp(-sessionFatigue)
+
+            // Effective e1RM
+            var effectiveE1RM = baseE1RM * fatigueDiscount
+
+            // Freshness bonus on first set (PDF section 8)
+            var freshnessApplied = false
+            if isFirstSet && freshnessEnabled {
+                effectiveE1RM *= (1.0 + freshnessPercent)
+                freshnessApplied = true
+            }
+
+            // Intensity factor (PDF section 4):
+            // intensity_factor = 1 − 0.025 × reps − 0.02 × RIR
+            let intensityFactor = max(0.3, 1.0 - 0.025 * Double(setSpec.targetReps) - 0.02 * setSpec.targetRIR)
+
+            // Target weight
+            let rawWeight = effectiveE1RM * intensityFactor
+
+            // Round to nearest weight increment
+            let prescribedWeight = roundToIncrement(rawWeight, increment: weightIncrement)
+
+            return PrescriptionResult(
+                prescribedWeight: max(0, prescribedWeight),
+                baseE1RM: baseE1RM,
+                effectiveE1RM: effectiveE1RM,
+                intensityFactor: intensityFactor,
+                fatigueDiscount: fatigueDiscount,
+                freshnessApplied: freshnessApplied,
+                e1RMSource: source
+            )
+        }
+    }
+
+    // MARK: - Base e1RM Estimation
+
+    /// Estimate the user's current base e1RM for an exercise.
+    ///
+    /// Strategy (simplified):
+    /// 1. Find the single heaviest non-warmup set from the most recent workout
+    /// 2. Compute e1RM using Brzycki with RIR adjustment (assume RIR 0 if unknown)
+    /// 3. Fallback: use PerformanceRecord (PR table) if no recent sets
+    private func estimateBaseE1RM(
+        exerciseId: UUID,
+        recencyWeeks: Int,
+        formula: E1RMFormula
+    ) async throws -> (Double?, E1RMSource) {
+
+        let now = Date()
+        let windowStart = Calendar.current.date(byAdding: .weekOfYear, value: -recencyWeeks, to: now)!
+
+        // Fetch recent sets within the recency window
+        let recentSets = try await setRepo.fetchSets(
+            exerciseId: exerciseId,
+            from: windowStart,
+            to: now
+        )
+
+        // Filter to completed non-warmup sets with actual weight + reps data
+        let eligibleSets = recentSets.filter { set in
+            set.completed &&
+            set.hasData &&
+            set.setType != .warmup &&
+            set.setType != .partial &&
+            (set.effectiveWeight ?? 0) > 0 &&
+            (set.reps ?? 0) > 0
+        }
+
+        if !eligibleSets.isEmpty {
+            // Group by workoutId, find the most recent workout
+            let grouped = Dictionary(grouping: eligibleSets, by: \.workoutId)
+            let mostRecentWorkoutId = grouped.keys
+                .compactMap { wid -> (UUID, Date)? in
+                    guard let maxDate = grouped[wid]?.map(\.date).max() else { return nil }
+                    return (wid, maxDate)
+                }
+                .sorted { $0.1 > $1.1 }
+                .first?.0
+
+            if let workoutId = mostRecentWorkoutId, let workoutSets = grouped[workoutId] {
+                // Find the set that yields the highest computed e1RM (not just heaviest weight)
+                var bestE1RM: Double = 0
+                var bestSetForLog: (weight: Double, reps: Int, rir: Double?, e1RM: Double)?
+
+                for set in workoutSets {
+                    guard let ew = set.effectiveWeight, let reps = set.reps, ew > 0, reps > 0 else { continue }
+                    let e1RM = computeE1RMFromSet(weight: ew, reps: reps, rir: set.rir, formula: formula)
+                    if e1RM > bestE1RM {
+                        bestE1RM = e1RM
+                        bestSetForLog = (weight: ew, reps: reps, rir: set.rir, e1RM: e1RM)
+                    }
+                }
+
+                if let best = bestSetForLog {
+                    print("[Prescription] Historical e1RM from best set: \(String(format: "%.1f", best.weight)) kg × \(best.reps) reps" +
+                          " @ RIR \(best.rir.map { String(format: "%.0f", $0) } ?? "unknown→0")" +
+                          " → e1RM = \(String(format: "%.1f", best.e1RM)) kg" +
+                          (best.rir != nil ? "" : " ⚠️ No RIR (assumed 0, conservative)"))
+
+                    return (bestE1RM, .recentPerformance)
+                }
+            }
+        }
+
+        // Final fallback: use the PR table
+        let prE1RM = try await estimateFromPRTable(exerciseId: exerciseId, formula: formula)
+        if let prE1RM, prE1RM > 0 {
+            print("[Prescription] Using PR table fallback: e1RM = \(String(format: "%.1f", prE1RM)) kg")
+            return (prE1RM, .historicalPR)
+        }
+
+        return (nil, .noData)
+    }
+
+    /// Compute e1RM from a single set using the user's selected formula with RIR adjustment.
+    /// When RIR is nil, assumes RIR 0 (conservative — treats reps as max).
+    private func computeE1RMFromSet(weight: Double, reps: Int, rir: Double?, formula: E1RMFormula) -> Double {
+        // Total reps = actual reps + RIR (assumed 0 if unknown)
+        let totalReps = Int(Double(reps) + (rir ?? 0))
+        guard totalReps > 0 else { return weight }
+        return formula.calculate(weight: weight, reps: totalReps)
+    }
+
+    /// Estimate e1RM from the PR table (PerformanceRecord) as a fallback.
+    ///
+    /// Uses the highest-weight PR and applies the user's selected formula to estimate 1RM.
+    private func estimateFromPRTable(exerciseId: UUID, formula: E1RMFormula) async throws -> Double? {
+        let records = try await performanceRecordRepo.fetchAll(
+            for: exerciseId,
+            recordType: .repMax
+        )
+
+        guard !records.isEmpty else { return nil }
+
+        // Find the PR that gives the highest e1RM estimate
+        var bestE1RM: Double = 0
+
+        for record in records {
+            let reps = record.reps ?? 1
+            let weight = record.value
+
+            guard weight > 0, reps > 0 else { continue }
+
+            let e1RM = formula.calculate(weight: weight, reps: reps)
+            bestE1RM = max(bestE1RM, e1RM)
+        }
+
+        return bestE1RM > 0 ? bestE1RM : nil
+    }
+
+    // MARK: - Session Fatigue Modeling
+
+    /// Compute accumulated session fatigue from completed sets.
+    ///
+    /// PDF sections 5, 6, 7:
+    /// - set_stress = (reps / 10) × max(0, 1 + (1 − RIR))
+    /// - session_fatigue += fatigue_rate × set_stress
+    /// - Between sets: session_fatigue *= exp(−rest_seconds / recovery_constant)
+    private func computeSessionFatigue(
+        completedSets: [SessionSetContext],
+        fatigueRate: Double,
+        recoveryConstant: Double
+    ) -> Double {
+        var sessionFatigue: Double = 0.0
+
+        // Sort completed sets by completedAt for proper rest time calculation
+        let sortedSets = completedSets
+            .filter { $0.completed }
+            .sorted { ($0.completedAt ?? .distantPast) < ($1.completedAt ?? .distantPast) }
+
+        for (index, set) in sortedSets.enumerated() {
+            // Rest time decay from previous set (PDF section 7)
+            if index > 0, let prevCompletedAt = sortedSets[index - 1].completedAt,
+               let currentCompletedAt = set.completedAt {
+                let restSeconds = currentCompletedAt.timeIntervalSince(prevCompletedAt)
+                if restSeconds > 0 {
+                    sessionFatigue *= exp(-restSeconds / recoveryConstant)
+                }
+            }
+
+            // Set stress (PDF section 5)
+            // set_stress = (reps / 10) × max(0, 1 + (1 − RIR))
+            let reps = Double(set.reps)
+            let rir = set.rir ?? 2.0 // Default to RIR 2 if unknown
+            let stressFactor = max(0.0, 1.0 + (1.0 - rir))
+            let setStress = (reps / 10.0) * stressFactor
+
+            // Accumulate fatigue (PDF section 5)
+            sessionFatigue += fatigueRate * setStress
+        }
+
+        return sessionFatigue
+    }
+
+    // MARK: - Helpers
+
+    /// Round a weight value to the nearest increment.
+    ///
+    /// Examples with 2.5kg increment:
+    /// - 81.3 → 82.5
+    /// - 80.0 → 80.0
+    /// - 79.1 → 80.0
+    private func roundToIncrement(_ value: Double, increment: Double) -> Double {
+        guard increment > 0 else { return value }
+        return (value / increment).rounded() * increment
+    }
+}

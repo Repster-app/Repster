@@ -1,0 +1,144 @@
+// ServiceContainer.swift
+// DI container for service layer
+// Spec: FR-011 (PRService wiring), FR-007/008/009 (StatsService), FR-001-006 (SetService)
+// Source: AGENT_RULES S6
+
+import Foundation
+
+/// Lightweight container holding all service actors.
+/// Created once at app launch after RepositoryContainer, passed to views via SwiftUI environment.
+/// Services compose repositories — ServiceContainer takes RepositoryContainer in init.
+///
+/// Initialization order: StatsService → PRService → SetService → BodyweightService → WorkoutService → ExerciseService
+/// (SetService depends on PRService + StatsService; WorkoutService and ExerciseService depend on PRService + StatsService)
+@Observable
+final class ServiceContainer {
+    let prService: any PRServiceProtocol
+    let statsService: any StatsServiceProtocol
+    let setService: any SetServiceProtocol
+    let workoutService: any WorkoutServiceProtocol
+    let exerciseService: any ExerciseServiceProtocol
+    let bodyweightService: any BodyweightServiceProtocol
+    let chartDataService: any ChartDataServiceProtocol
+    let settingsService: any SettingsServiceProtocol
+    let importService: any ImportServiceProtocol
+    let exportService: any ExportServiceProtocol
+    let templateService: any TemplateServiceProtocol
+    let loadPrescriptionService: any LoadPrescriptionServiceProtocol
+    let healthProfileRepo: any HealthProfileRepositoryProtocol
+
+    init(repositoryContainer: RepositoryContainer) {
+        // 1. StatsService — depends on repos only
+        let statsService = StatsService(
+            exerciseStatsRepository: repositoryContainer.exerciseStatsRepository,
+            setRepository: repositoryContainer.setRepository,
+            exerciseRepository: repositoryContainer.exerciseRepository,
+            healthProfileRepository: repositoryContainer.healthProfileRepository
+        )
+
+        // 2. PRService — depends on repos only
+        let prService = PRService(
+            performanceRecordRepository: repositoryContainer.performanceRecordRepository,
+            setRepository: repositoryContainer.setRepository,
+            healthProfileRepository: repositoryContainer.healthProfileRepository,
+            exerciseRepository: repositoryContainer.exerciseRepository
+        )
+
+        // 3. SetService — depends on repos + PRService + StatsService
+        let setService = SetService(
+            setRepository: repositoryContainer.setRepository,
+            exerciseRepository: repositoryContainer.exerciseRepository,
+            bodyweightEntryRepository: repositoryContainer.bodyweightEntryRepository,
+            healthProfileRepository: repositoryContainer.healthProfileRepository,
+            prService: prService,
+            statsService: statsService
+        )
+
+        // 4. ChartDataService — depends on repos only
+        let chartDataService = ChartDataService(
+            setRepository: repositoryContainer.setRepository,
+            workoutRepository: repositoryContainer.workoutRepository,
+            exerciseRepository: repositoryContainer.exerciseRepository,
+            exerciseStatsRepository: repositoryContainer.exerciseStatsRepository,
+            performanceRecordRepository: repositoryContainer.performanceRecordRepository
+        )
+
+        // 5. BodyweightService — depends on repos only
+        let bodyweightService = BodyweightService(
+            bodyweightEntryRepository: repositoryContainer.bodyweightEntryRepository,
+            healthProfileRepository: repositoryContainer.healthProfileRepository
+        )
+
+        // 6. WorkoutService — depends on repos + PRService + StatsService
+        let workoutService = WorkoutService(
+            workoutRepository: repositoryContainer.workoutRepository,
+            setRepository: repositoryContainer.setRepository,
+            prService: prService,
+            statsService: statsService
+        )
+
+        // 7. SettingsService — depends on HealthProfileRepository + PRService + StatsService
+        let settingsService = SettingsService(
+            healthProfileRepository: repositoryContainer.healthProfileRepository,
+            prService: prService,
+            statsService: statsService
+        )
+
+        // 8. ExerciseService — depends on repos + PRService + StatsService
+        let exerciseService = ExerciseService(
+            exerciseRepository: repositoryContainer.exerciseRepository,
+            setRepository: repositoryContainer.setRepository,
+            exerciseStatsRepository: repositoryContainer.exerciseStatsRepository,
+            performanceRecordRepository: repositoryContainer.performanceRecordRepository,
+            prService: prService,
+            statsService: statsService
+        )
+
+        // 9. ImportService — depends on repos + PRService + StatsService + ModelContainer
+        let importService = ImportService(
+            exerciseRepo: repositoryContainer.exerciseRepository,
+            workoutRepo: repositoryContainer.workoutRepository,
+            bodyweightRepo: repositoryContainer.bodyweightEntryRepository,
+            healthProfileRepo: repositoryContainer.healthProfileRepository,
+            prService: prService,
+            statsService: statsService,
+            modelContainer: repositoryContainer.modelContainer
+        )
+
+        // 10. ExportService — depends on repos only
+        let exportService = ExportService(
+            exerciseRepo: repositoryContainer.exerciseRepository,
+            setRepo: repositoryContainer.setRepository
+        )
+
+        // 11. TemplateService — depends on repos only
+        let templateService = TemplateService(
+            templateRepository: repositoryContainer.templateRepository,
+            workoutRepository: repositoryContainer.workoutRepository,
+            setRepository: repositoryContainer.setRepository,
+            exerciseRepository: repositoryContainer.exerciseRepository
+        )
+
+        // 12. LoadPrescriptionService — depends on repos only
+        let loadPrescriptionService = LoadPrescriptionService(
+            setRepository: repositoryContainer.setRepository,
+            exerciseRepository: repositoryContainer.exerciseRepository,
+            performanceRecordRepository: repositoryContainer.performanceRecordRepository,
+            healthProfileRepository: repositoryContainer.healthProfileRepository
+        )
+
+        self.prService = prService
+        self.statsService = statsService
+        self.setService = setService
+        self.workoutService = workoutService
+        self.exerciseService = exerciseService
+        self.bodyweightService = bodyweightService
+        self.chartDataService = chartDataService
+        self.settingsService = settingsService
+        self.importService = importService
+        self.exportService = exportService
+        self.templateService = templateService
+        self.loadPrescriptionService = loadPrescriptionService
+        self.healthProfileRepo = repositoryContainer.healthProfileRepository
+    }
+}

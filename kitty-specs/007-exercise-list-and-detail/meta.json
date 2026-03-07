@@ -1,0 +1,43 @@
+{
+  "accept_commit": null,
+  "acceptance_history": [
+    {
+      "accepted_at": "2026-02-26T20:40:07Z",
+      "accepted_by": "claude",
+      "accepted_from_commit": "d0132da874702aba80e0041c75fdb57ef99ae1c6",
+      "branch": "master",
+      "mode": "local"
+    },
+    {
+      "accepted_at": "2026-02-26T20:40:24Z",
+      "accepted_by": "claude",
+      "accepted_from_commit": "65d51afaf971a2d6a0b418ce648c64a58bd937fa",
+      "branch": "master",
+      "mode": "local"
+    },
+    {
+      "accepted_at": "2026-02-26T20:40:51Z",
+      "accepted_by": "claude",
+      "accepted_from_commit": "4dcaa8cb70042d48fc488789220d8f6e5bd849ac",
+      "branch": "master",
+      "mode": "local"
+    },
+    {
+      "accepted_at": "2026-02-26T20:41:24Z",
+      "accepted_by": "claude",
+      "accepted_from_commit": "3b8b556b2adac761a2245e615777511b7da3e54e",
+      "branch": "master",
+      "mode": "local"
+    }
+  ],
+  "acceptance_mode": "local",
+  "accepted_at": "2026-02-26T20:41:24Z",
+  "accepted_by": "claude",
+  "accepted_from_commit": "3b8b556b2adac761a2245e615777511b7da3e54e",
+  "created_at": "2026-02-19T10:00:00Z",
+  "feature_number": "007",
+  "friendly_name": "Exercise List + Detail",
+  "mission": "software-dev",
+  "slug": "007-exercise-list-and-detail",
+  "source_description": "Exercise list from screen_tree Section 3 (search, filter, sort, browse vs selection mode). Exercise detail from screen_tree Section 2 (History/PRs/Charts tabs - reused component). Create/edit exercise sheet from screen_tree Section 3."
+}

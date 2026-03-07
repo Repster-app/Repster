@@ -1,0 +1,8 @@
+{
+  "feature_number": "005",
+  "slug": "005-workout-exercise-bodyweight-services",
+  "friendly_name": "Workout + Exercise + Bodyweight Services",
+  "mission": "software-dev",
+  "source_description": "Workout lifecycle (status field) per specdoc Sections 3 and 6.2. Exercise CRUD and trackingType immutability per specdoc Section 5. Service responsibilities per AGENT_RULES Section 6.",
+  "created_at": "2026-02-19T10:00:00Z"
+}

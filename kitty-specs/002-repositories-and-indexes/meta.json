@@ -1,0 +1,22 @@
+{
+  "accept_commit": null,
+  "acceptance_history": [
+    {
+      "accepted_at": "2026-02-22T20:18:52Z",
+      "accepted_by": "claude",
+      "accepted_from_commit": "25c6ec241eebb584f6f5d634e9635ff7e3c94f17",
+      "branch": "master",
+      "mode": "local"
+    }
+  ],
+  "acceptance_mode": "local",
+  "accepted_at": "2026-02-22T20:18:52Z",
+  "accepted_by": "claude",
+  "accepted_from_commit": "25c6ec241eebb584f6f5d634e9635ff7e3c94f17",
+  "created_at": "2026-02-19T10:00:00Z",
+  "feature_number": "002",
+  "friendly_name": "Repositories + Indexes",
+  "mission": "software-dev",
+  "slug": "002-repositories-and-indexes",
+  "source_description": "Repository protocols and implementations per tech_stack Section 4.3. Required indexes per AGENT_RULES Section 5.4. Layer rules per AGENT_RULES Section 2."
+}
