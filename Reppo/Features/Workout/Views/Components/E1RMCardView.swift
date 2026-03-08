@@ -50,11 +50,11 @@ struct E1RMCardView: View {
         HStack(spacing: 8) {
             // Producing set info
             if info.bestSetReps > 0 {
-                Text("Best today: \(formatWeight(info.bestSetWeight)) × \(info.bestSetReps)")
+                Text("Best today: \(formatSetPerformance(weightKg: info.bestSetWeight, reps: info.bestSetReps))")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color.textSecondary)
             } else if info.bestSetWeight > 0 {
-                Text("All-time best · \(formatWeight(info.bestSetWeight)) kg top weight")
+                Text("All-time best · \(formatWeight(info.bestSetWeight)) \(unitLabel) top weight")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color.textSecondary)
             } else {
@@ -102,6 +102,14 @@ struct E1RMCardView: View {
             return "\(Int(value))"
         }
         return String(format: "%.1f", value)
+    }
+
+    private func formatSetPerformance(weightKg: Double, reps: Int) -> String {
+        "\(formatWeight(weightKg)) \(unitLabel) x \(reps) reps"
+    }
+
+    private var unitLabel: String {
+        unitPreference == .imperial ? "lbs" : "kg"
     }
 
     private func formatDelta(_ delta: Double, trend: Trend) -> String {

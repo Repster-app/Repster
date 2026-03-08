@@ -66,9 +66,17 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $viewModel.showRestTimeSheet) {
                 RestTimePickerSheet(
-                    currentSeconds: viewModel.profile?.defaultRestTimeSeconds
+                    currentSeconds: viewModel.profile?.defaultRestTimeSeconds ?? 150
                 ) { seconds in
                     Task { await viewModel.updateDefaultRestTime(seconds) }
+                }
+            }
+            .sheet(isPresented: $viewModel.showWarmupRestTimeSheet) {
+                RestTimePickerSheet(
+                    currentSeconds: viewModel.profile?.defaultWarmupRestTimeSeconds,
+                    title: "Warmup Rest Time"
+                ) { seconds in
+                    Task { await viewModel.updateDefaultWarmupRestTime(seconds) }
                 }
             }
             // Alerts
@@ -160,6 +168,21 @@ struct SettingsView: View {
                         .foregroundStyle(Color.textPrimary)
                     Spacer()
                     Text(viewModel.restTimeDisplayName)
+                        .foregroundStyle(Color.textSecondary)
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(Color.textTertiary)
+                }
+            }
+
+            Button {
+                viewModel.showWarmupRestTimeSheet = true
+            } label: {
+                HStack {
+                    Label("Warmup Rest Time", systemImage: "timer")
+                        .foregroundStyle(Color.textPrimary)
+                    Spacer()
+                    Text(viewModel.warmupRestTimeDisplayName)
                         .foregroundStyle(Color.textSecondary)
                     Image(systemName: "chevron.right")
                         .font(.caption)

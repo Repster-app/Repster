@@ -6,6 +6,7 @@
 // Contract: kitty-specs/006-active-workout-screen/contracts/ActiveWorkoutViewModelContract.swift
 // Spec: specdoc S3, S4, S6.2, S8.8; AGENT_RULES S6, S7.3
 
+import ActivityKit
 import Combine
 import Foundation
 import SwiftUI
@@ -61,6 +62,9 @@ final class ActiveWorkoutViewModel {
     private let settingsService: any SettingsServiceProtocol
     private let loadPrescriptionService: any LoadPrescriptionServiceProtocol
 
+    /// Live Activity manager for Lock Screen / Dynamic Island updates.
+    private let liveActivityManager = LiveActivityManager()
+
     // MARK: - Workout State
 
     /// The current active workout (nil if none).
@@ -74,6 +78,9 @@ final class ActiveWorkoutViewModel {
 
     /// Global default rest time from HealthProfile (fallback when exercise has none).
     private var globalDefaultRestTime: Int?
+
+    /// Global default warmup rest time from HealthProfile. When nil, falls back to globalDefaultRestTime.
+    private var globalDefaultWarmupRestTime: Int?
 
     /// Sets grouped by exerciseId.
     var setsByExercise: [UUID: [WorkoutSet]] = [:]
@@ -229,9 +236,25 @@ final class ActiveWorkoutViewModel {
             }
             self.exercises = loadedExercises
 
-            // 6. Fetch global default rest time for fallback
+            // 6. Start Live Activity for Lock Screen / Dynamic Island
+            if let startTime = active.startTime {
+                let firstExercise = loadedExercises.first
+                let firstSets = firstExercise.flatMap { setsByExercise[$0.id] } ?? []
+                let completedCount = firstSets.filter(\.completed).count
+                liveActivityManager.startActivity(
+                    workoutTitle: active.displayTitle,
+                    startTime: startTime,
+                    exerciseName: firstExercise?.name ?? "No exercise",
+                    currentSetNumber: completedCount + 1,
+                    totalSets: firstSets.count,
+                    setTypeLabel: firstSets.first(where: { !$0.completed })?.setType.displayName ?? "Working"
+                )
+            }
+
+            // 7. Fetch global default rest time for fallback
             if let profile = try? await settingsService.fetchSettings() {
-                self.globalDefaultRestTime = profile.defaultRestTimeSeconds
+                self.globalDefaultRestTime = profile.defaultRestTimeSeconds ?? 150
+                self.globalDefaultWarmupRestTime = profile.defaultWarmupRestTimeSeconds
             }
 
         } catch {
@@ -277,10 +300,19 @@ final class ActiveWorkoutViewModel {
                 setsByExercise[set.exerciseId] = sets
             }
 
-            // 5. Start rest timer: exercise-specific → global default fallback
-            let restTime = currentExercise?.defaultRestTime ?? globalDefaultRestTime
+            // 5. Start rest timer: warmup sets use warmup rest time, working sets use default.
+            // Note: startRestTimer() already calls updateLiveActivityState(),
+            // so we only push a separate update if NO timer starts.
+            let restTime: Int?
+            if set.setType == .warmup {
+                restTime = globalDefaultWarmupRestTime ?? currentExercise?.defaultRestTime ?? globalDefaultRestTime
+            } else {
+                restTime = currentExercise?.defaultRestTime ?? globalDefaultRestTime
+            }
             if let restTime, restTime > 0 {
                 startRestTimer(duration: restTime)
+            } else {
+                updateLiveActivityState()
             }
 
             // 6. Invalidate exercise info, PR, history, and suggestion caches, then reload
@@ -314,6 +346,9 @@ final class ActiveWorkoutViewModel {
             if let sets = setsByExercise[exerciseId] {
                 setsByExercise[exerciseId] = sets
             }
+
+            // Update Live Activity (set progress changed)
+            updateLiveActivityState()
 
             // Invalidate exercise info, PR, history, and suggestion caches, then reload
             exerciseInfoLoadedForExerciseId = nil
@@ -359,6 +394,15 @@ final class ActiveWorkoutViewModel {
             sets.append(newSet)
             setsByExercise[exerciseId] = sets
 
+            // Update Live Activity (total sets changed)
+            updateLiveActivityState()
+
+            // Invalidate and refresh suggestions for the currently visible exercise
+            suggestionsLoadedForKey = nil
+            if currentExercise?.id == exerciseId {
+                await loadWeightSuggestions()
+            }
+
         } catch {
             print("[ActiveWorkoutViewModel] Failed to add set: \(error)")
         }
@@ -394,6 +438,12 @@ final class ActiveWorkoutViewModel {
             reindexOrderInExercise(&exerciseSets)
             setsByExercise[exerciseId] = exerciseSets
 
+            // Invalidate and refresh suggestions for the currently visible exercise
+            suggestionsLoadedForKey = nil
+            if currentExercise?.id == exerciseId {
+                await loadWeightSuggestions()
+            }
+
         } catch {
             print("[ActiveWorkoutViewModel] Failed to add warmup set: \(error)")
         }
@@ -414,10 +464,19 @@ final class ActiveWorkoutViewModel {
             reindexOrderInExercise(&sets)
             setsByExercise[exerciseId] = sets
 
+            // Update Live Activity (total sets changed)
+            updateLiveActivityState()
+
             // Invalidate exercise info and PR caches, then reload
             exerciseInfoLoadedForExerciseId = nil
             prsLoadedForExerciseId = nil
             await loadExerciseInfo()
+
+            // Deletion can change fatigue context and first-working-set freshness logic
+            suggestionsLoadedForKey = nil
+            if currentExercise?.id == exerciseId {
+                await loadWeightSuggestions()
+            }
 
         } catch {
             print("[ActiveWorkoutViewModel] Failed to delete set: \(error)")
@@ -441,6 +500,12 @@ final class ActiveWorkoutViewModel {
             exerciseInfoLoadedForExerciseId = nil
             prsLoadedForExerciseId = nil
             await loadExerciseInfo()
+
+            // Type changes can add/remove a set from suggestion inputs
+            suggestionsLoadedForKey = nil
+            if currentExercise?.id == set.exerciseId {
+                await loadWeightSuggestions()
+            }
 
         } catch {
             print("[ActiveWorkoutViewModel] Failed to change set type: \(error)")
@@ -476,6 +541,9 @@ final class ActiveWorkoutViewModel {
         if !exercises.isEmpty {
             selectedExerciseIndex = exercises.count - 1
         }
+
+        // Update Live Activity (exercise and set counts changed)
+        updateLiveActivityState()
     }
 
     /// Remove an exercise and all its sets from the workout.
@@ -504,6 +572,9 @@ final class ActiveWorkoutViewModel {
         } else if selectedExerciseIndex >= exercises.count {
             selectedExerciseIndex = exercises.count - 1
         }
+
+        // Update Live Activity (exercise changed)
+        updateLiveActivityState()
     }
 
     /// Reorder exercises via drag gesture on tab strip.
@@ -555,6 +626,9 @@ final class ActiveWorkoutViewModel {
                     self?.timerTick()
                 }
             }
+
+        // Update Live Activity (timer started with new end date)
+        updateLiveActivityState()
     }
 
     /// Add seconds to the running timer (+30s button).
@@ -564,6 +638,9 @@ final class ActiveWorkoutViewModel {
         let newRemaining = remaining + seconds
         timerTotalDuration = newTotal
         restTimer = .running(remaining: newRemaining, total: newTotal)
+
+        // Update Live Activity (timer end date changed)
+        updateLiveActivityState()
     }
 
     /// Subtract seconds from the running timer (-15s, -30s buttons). Clamps to 1 second minimum.
@@ -573,6 +650,9 @@ final class ActiveWorkoutViewModel {
         let newTotal = max(1, total - seconds)
         timerTotalDuration = newTotal
         restTimer = .running(remaining: newRemaining, total: newTotal)
+
+        // Update Live Activity (timer end date changed)
+        updateLiveActivityState()
     }
 
     /// Set the timer to an exact duration in seconds.
@@ -587,6 +667,9 @@ final class ActiveWorkoutViewModel {
         timerSubscription = nil
         timerStartDate = nil
         restTimer = .idle
+
+        // Update Live Activity (timer dismissed)
+        updateLiveActivityState()
     }
 
     /// Recalculate timer remaining time after returning from background.
@@ -607,6 +690,9 @@ final class ActiveWorkoutViewModel {
         } else {
             restTimer = .running(remaining: remaining, total: timerTotalDuration)
         }
+
+        // Update Live Activity with corrected timer state after background return
+        updateLiveActivityState()
     }
 
     /// Decrement the timer by one second. Called by the Combine subscription.
@@ -616,9 +702,61 @@ final class ActiveWorkoutViewModel {
             restTimer = .finished
             timerSubscription?.cancel()
             timerSubscription = nil
+            // Update Live Activity only on state transition to .finished
+            // (NOT every tick — countdown is rendered by ActivityKit's timer text style)
+            updateLiveActivityState()
         } else {
             restTimer = .running(remaining: remaining - 1, total: total)
         }
+    }
+
+    // MARK: - Live Activity Updates
+
+    /// Push the current workout state to the Live Activity.
+    ///
+    /// Called after any meaningful state change (set complete/uncomplete, exercise
+    /// switch, timer start/stop/finish, set/exercise add/remove). NOT called on
+    /// every timer tick — ActivityKit's `Text(timerInterval:)` handles countdown
+    /// rendering natively.
+    private func updateLiveActivityState() {
+        let exerciseName = currentExercise?.name ?? "No exercise"
+        let sets = currentSets
+        let completedCount = sets.filter(\.completed).count
+        let currentSetNumber = min(completedCount + 1, max(sets.count, 1))
+        let totalSets = sets.count
+        let nextIncompleteSet = sets.first { !$0.completed }
+        let setTypeLabel = nextIncompleteSet?.setType.displayName ?? "Working"
+
+        var isRestTimerRunning = false
+        var restTimerEndDate: Date? = nil
+        var restTimerTotalSeconds = 0
+        var isRestTimerFinished = false
+
+        switch restTimer {
+        case .idle:
+            break
+        case .running(_, let total):
+            isRestTimerRunning = true
+            // Use the fixed start time + total duration for a stable end date.
+            // This avoids flicker — each push won't shift the countdown.
+            if let startDate = timerStartDate {
+                restTimerEndDate = startDate.addingTimeInterval(TimeInterval(timerTotalDuration))
+            }
+            restTimerTotalSeconds = total
+        case .finished:
+            isRestTimerFinished = true
+        }
+
+        liveActivityManager.updateActivity(
+            exerciseName: exerciseName,
+            currentSetNumber: currentSetNumber,
+            totalSets: totalSets,
+            setTypeLabel: setTypeLabel,
+            isRestTimerRunning: isRestTimerRunning,
+            restTimerEndDate: restTimerEndDate,
+            restTimerTotalSeconds: restTimerTotalSeconds,
+            isRestTimerFinished: isRestTimerFinished
+        )
     }
 
     // MARK: - Sub-Tab Data Loading (WP06 T026/T027)
@@ -677,6 +815,9 @@ final class ActiveWorkoutViewModel {
         exerciseInfoLoadedForExerciseId = nil
         weightSuggestionData = nil
         suggestionsLoadedForKey = nil
+
+        // Update Live Activity (exercise switched — new name, set counts)
+        updateLiveActivityState()
     }
 
     // MARK: - Exercise Info Loading (014 WP03 T009)
@@ -747,6 +888,16 @@ final class ActiveWorkoutViewModel {
             return
         }
 
+        // Refresh setting-dependent inputs so cache keys and gating stay accurate.
+        var resolvedProfile: HealthProfile? = try? await settingsService.fetchSettings()
+        if resolvedProfile == nil {
+            resolvedProfile = try? await healthProfileRepo.fetchOrCreate()
+        }
+        if let resolvedProfile {
+            unitPreference = resolvedProfile.unitPreference
+            prescriptionEnabled = resolvedProfile.prescriptionEnabled ?? true
+        }
+
         // Check global toggle
         guard prescriptionEnabled else {
             weightSuggestionData = nil
@@ -755,13 +906,6 @@ final class ActiveWorkoutViewModel {
 
         let sets = currentSets
         let completedWorking = sets.filter { $0.completed && $0.setType != .warmup }
-        let cacheKey = "\(exercise.id)_\(completedWorking.count)"
-
-        // Cache check — skip if already computed for this state
-        guard suggestionsLoadedForKey != cacheKey else { return }
-
-        isLoadingWeightSuggestions = true
-        defer { isLoadingWeightSuggestions = false }
 
         // Build session context from completed sets
         let completedSessionSets: [SessionSetContext] = completedWorking.map { set in
@@ -814,6 +958,19 @@ final class ActiveWorkoutViewModel {
                 targetRIR: targetRIR
             ))
         }
+
+        let cacheKey = buildSuggestionsCacheKey(
+            exercise: exercise,
+            completedWorking: completedWorking,
+            setsToSuggest: setsToSuggest,
+            profile: resolvedProfile
+        )
+
+        // Cache check — skip if already computed for this exact input state
+        guard suggestionsLoadedForKey != cacheKey else { return }
+
+        isLoadingWeightSuggestions = true
+        defer { isLoadingWeightSuggestions = false }
 
         guard !setsToSuggest.isEmpty else {
             weightSuggestionData = nil
@@ -870,6 +1027,82 @@ final class ActiveWorkoutViewModel {
             weightSuggestionData = nil
             suggestionsLoadedForKey = cacheKey
         }
+    }
+
+    /// Build a stable cache key from all meaningful inputs to suggestion computation.
+    private func buildSuggestionsCacheKey(
+        exercise: Exercise,
+        completedWorking: [WorkoutSet],
+        setsToSuggest: [(setIndex: Int, setNumber: Int, targetReps: Int, targetRIR: Double)],
+        profile: HealthProfile?
+    ) -> String {
+        let completedSignature = completedWorking
+            .sorted { $0.orderInExercise < $1.orderInExercise }
+            .map { set in
+                let weight = set.effectiveWeight ?? set.weight ?? 0
+                let reps = set.reps ?? 0
+                let rir = set.rir ?? -1
+                let completedAt = Int(set.completedAt?.timeIntervalSince1970 ?? 0)
+                return [
+                    set.id.uuidString,
+                    "w\(signatureNumber(weight))",
+                    "r\(reps)",
+                    "rir\(signatureNumber(rir))",
+                    "t\(completedAt)"
+                ].joined(separator: ":")
+            }
+            .joined(separator: "|")
+
+        let pendingSignature = setsToSuggest
+            .map { spec in
+                [
+                    "i\(spec.setIndex)",
+                    "n\(spec.setNumber)",
+                    "r\(spec.targetReps)",
+                    "rir\(signatureNumber(spec.targetRIR))"
+                ].joined(separator: ":")
+            }
+            .joined(separator: "|")
+
+        let profileSignature: String
+        if let profile {
+            profileSignature = [
+                "enabled\(profile.prescriptionEnabled ?? true)",
+                "weeks\(profile.prescriptionRecencyWeeks ?? 6)",
+                "inc\(signatureOptionalNumber(profile.prescriptionDefaultIncrement))",
+                "fresh\(profile.prescriptionFreshnessBonus ?? false)",
+                "freshPct\(signatureOptionalNumber(profile.prescriptionFreshnessBonusPercent))",
+                "fatigue\(profile.prescriptionFatigueModelingEnabled ?? true)",
+                "recovery\(signatureOptionalNumber(profile.prescriptionDefaultRecoveryConstant))",
+                "formula\(profile.e1RMFormula)",
+                "updated\(Int(profile.updatedAt.timeIntervalSince1970))"
+            ].joined(separator: ":")
+        } else {
+            profileSignature = "profile:unknown"
+        }
+
+        let exerciseSignature = [
+            "inc\(signatureOptionalNumber(exercise.weightIncrement))",
+            "fatigueRate\(signatureOptionalNumber(exercise.fatigueRate))",
+            "recovery\(signatureOptionalNumber(exercise.recoveryConstant))"
+        ].joined(separator: ":")
+
+        return [
+            exercise.id.uuidString,
+            exerciseSignature,
+            profileSignature,
+            completedSignature,
+            pendingSignature
+        ].joined(separator: "||")
+    }
+
+    private func signatureNumber(_ value: Double) -> String {
+        String(format: "%.4f", value)
+    }
+
+    private func signatureOptionalNumber(_ value: Double?) -> String {
+        guard let value else { return "nil" }
+        return signatureNumber(value)
     }
 
     /// Build a brief context label for a single suggestion.
@@ -966,6 +1199,9 @@ final class ActiveWorkoutViewModel {
             self.setsByExercise = [:]
             dismissTimer()
 
+            // End Live Activity (workout completed)
+            liveActivityManager.endActivity()
+
             // Signal the View layer to dismiss (T035)
             self.isWorkoutFinished = true
 
@@ -990,6 +1226,9 @@ final class ActiveWorkoutViewModel {
             self.exercises = []
             self.setsByExercise = [:]
             dismissTimer()
+
+            // End Live Activity (workout discarded)
+            liveActivityManager.endActivity()
 
             // Signal the View layer to dismiss
             self.isWorkoutFinished = true
@@ -1067,6 +1306,10 @@ final class ActiveWorkoutViewModel {
 // MARK: - SetTableDataSource Conformance
 
 extension ActiveWorkoutViewModel: SetTableDataSource {
+    var currentSuggestedWeight: Double? {
+        weightSuggestionData?.suggestions.first?.suggestedWeight
+    }
+
     /// No-op in active workout — sets are saved when the checkbox is tapped.
     func markSetDirty(_ set: WorkoutSet) { }
 

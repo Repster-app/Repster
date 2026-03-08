@@ -190,6 +190,18 @@ struct ExerciseProgressPoint: Identifiable {
     let date: Date
     let value: Double
     let workoutId: UUID?
+    /// Top weight from the best set (for display under chart data point).
+    let topWeight: Double?
+    /// Reps from the best set (for display under chart data point).
+    let topReps: Int?
+
+    init(date: Date, value: Double, workoutId: UUID?, topWeight: Double? = nil, topReps: Int? = nil) {
+        self.date = date
+        self.value = value
+        self.workoutId = workoutId
+        self.topWeight = topWeight
+        self.topReps = topReps
+    }
 }
 
 struct TrendLineData {

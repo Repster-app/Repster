@@ -143,8 +143,11 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         }
 
         // 5. Prescribe each set
+        // Freshness bonus should apply to the first suggested working set,
+        // not strictly the absolute set index 0 (warmups may come first).
+        let firstSuggestedSetIndex = sets.map(\.setIndex).min()
         return sets.map { setSpec in
-            let isFirstSet = setSpec.setIndex == 0 && completedSessionSets.isEmpty
+            let isFirstSet = completedSessionSets.isEmpty && setSpec.setIndex == firstSuggestedSetIndex
 
             // Fatigue discount: exp(-session_fatigue)
             let fatigueDiscount = exp(-sessionFatigue)

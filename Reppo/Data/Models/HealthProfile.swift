@@ -10,6 +10,10 @@ final class HealthProfile {
     var e1RMFormula: String
     var defaultRestTimeSeconds: Int?
 
+    /// Default rest time after warmup sets. Typically shorter than working set rest.
+    /// When nil, falls back to defaultRestTimeSeconds.
+    var defaultWarmupRestTimeSeconds: Int?
+
     // MARK: - Weight Prescription Settings (optional for migration compatibility)
 
     /// Whether smart weight suggestions are enabled globally. Default: true.
@@ -42,7 +46,7 @@ final class HealthProfile {
         includeWarmupsInVolume: Bool = false,
         includeWarmupsInPRs: Bool = false,
         e1RMFormula: String = "epley",
-        defaultRestTimeSeconds: Int? = nil,
+        defaultRestTimeSeconds: Int? = 150,
         prescriptionEnabled: Bool = true,
         prescriptionRecencyWeeks: Int = 6,
         prescriptionDefaultIncrement: Double = 2.5,

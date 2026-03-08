@@ -336,7 +336,15 @@ actor ChartDataService: ChartDataServiceProtocol {
                         guard let date = workoutSets.first?.date else { continue }
                         let value = self.computeExerciseMetric(metric, for: workoutSets)
                         if let value, value > 0 {
-                            points.append(ExerciseProgressPoint(date: date, value: value, workoutId: workoutId))
+                            // Extract top weight x reps from the best set for display
+                            let bestSet = self.bestSetForDisplay(metric: metric, sets: workoutSets)
+                            points.append(ExerciseProgressPoint(
+                                date: date,
+                                value: value,
+                                workoutId: workoutId,
+                                topWeight: bestSet?.effectiveWeight,
+                                topReps: bestSet?.reps
+                            ))
                         }
                     }
 
@@ -392,6 +400,30 @@ actor ChartDataService: ChartDataServiceProtocol {
                 return dist / Double(dur)
             }
             return paces.min()
+        }
+    }
+
+    /// Find the "best" set for a given metric to extract display-friendly weight x reps.
+    /// Returns the set that most likely contributed the metric value.
+    private nonisolated func bestSetForDisplay(metric: ExerciseMetric, sets: [WorkoutSet]) -> WorkoutSet? {
+        switch metric {
+        case .estimatedOneRM:
+            return sets.max(by: { ($0.e1RM ?? 0) < ($1.e1RM ?? 0) })
+        case .maxWeight, .maxWeightForReps, .personalRecords:
+            return sets.max(by: { ($0.effectiveWeight ?? 0) < ($1.effectiveWeight ?? 0) })
+        case .maxReps:
+            return sets.max(by: { ($0.reps ?? 0) < ($1.reps ?? 0) })
+        case .maxVolume:
+            return sets.max(by: {
+                (($0.effectiveWeight ?? 0) * Double($0.reps ?? 0)) <
+                (($1.effectiveWeight ?? 0) * Double($1.reps ?? 0))
+            })
+        case .workoutVolume, .workoutReps:
+            // Aggregate metrics — show the heaviest set as representative
+            return sets.max(by: { ($0.effectiveWeight ?? 0) < ($1.effectiveWeight ?? 0) })
+        case .maxDistance, .maxTime, .minPace:
+            // Non-weight metrics — no weight x reps to show
+            return nil
         }
     }
 }

@@ -1,5 +1,5 @@
 // SetNumberBadge.swift
-// Displays the set number or warmup indicator ("W")
+// Displays the set number or warmup indicator ("W1", "W2", etc.)
 // in the leftmost column of the set table.
 // Spec: design-system.md Section 6.3 (Set Number Badge)
 //
@@ -7,11 +7,11 @@
 
 import SwiftUI
 
-/// Badge showing set number or warmup "W".
+/// Badge showing set number or warmup "W1", "W2", etc.
 ///
 /// Appears in the "Set" column (42pt wide) of the set table grid.
 /// - Default: numbered badge with `bgSubtle` background
-/// - Warmup: italic "W" with no background
+/// - Warmup: italic "W1", "W2" with no background
 /// - Completed: numbered badge with green background
 struct SetNumberBadge: View {
 
@@ -55,10 +55,10 @@ struct SetNumberBadge: View {
 
     // MARK: - Badge Variants
 
-    /// Italic "W" with no background for warmup sets.
+    /// Italic "W1", "W2", etc. with no background for warmup sets.
     private var warmupBadge: some View {
-        Text("W")
-            .font(.system(size: 13, weight: .semibold))
+        Text("W\(number)")
+            .font(.system(size: 11, weight: .semibold))
             .italic()
             .foregroundColor(.textTertiary)
     }

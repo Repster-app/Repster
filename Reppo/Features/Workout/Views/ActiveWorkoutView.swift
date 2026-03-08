@@ -32,8 +32,8 @@ struct ActiveWorkoutView: View {
     /// Controls the exercise settings sheet presentation.
     @State private var showExerciseSettingsSheet: Bool = false
 
-    /// Tracks whether any input field has keyboard focus (for Done button toolbar).
-    @FocusState private var isAnyFieldFocused: Bool
+    /// Shared custom keyboard state for set input.
+    @StateObject private var setKeyboardManager = SetEntryKeyboardManager()
 
     // MARK: - Dependencies
 
@@ -95,6 +95,11 @@ struct ActiveWorkoutView: View {
             }
         }
         .background(Color.bg.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if selectedSubTab == .sets {
+                SetEntryKeyboardOverlay(manager: setKeyboardManager)
+            }
+        }
         .task {
             await viewModel.loadActiveWorkout()
         }
@@ -108,6 +113,12 @@ struct ActiveWorkoutView: View {
         .onChange(of: viewModel.selectedExerciseIndex) { _, _ in
             selectedSubTab = .sets
             viewModel.clearSubTabCache()
+            setKeyboardManager.hide()
+        }
+        .onChange(of: selectedSubTab) { _, newTab in
+            if newTab != .sets {
+                setKeyboardManager.hide()
+            }
         }
         // Exercise picker sheet — replaced with ExerciseListView (T029)
         .sheet(isPresented: $viewModel.showAddExerciseSheet) {
@@ -121,21 +132,6 @@ struct ActiveWorkoutView: View {
         .onChange(of: viewModel.isWorkoutFinished) { _, finished in
             if finished {
                 dismiss()
-            }
-        }
-        // Keyboard toolbar with Done button for easy dismissal
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") {
-                    isAnyFieldFocused = false
-                    // Also trigger suggestion refresh when dismissing keyboard
-                    viewModel.invalidateSuggestions()
-                    Task {
-                        await viewModel.loadWeightSuggestions()
-                    }
-                }
-                .fontWeight(.semibold)
             }
         }
     }
@@ -183,7 +179,10 @@ struct ActiveWorkoutView: View {
         switch selectedSubTab {
         case .sets:
             ScrollView {
-                SetTableView(dataSource: viewModel)
+                SetTableView(
+                    dataSource: viewModel,
+                    keyboardManager: setKeyboardManager
+                )
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
 

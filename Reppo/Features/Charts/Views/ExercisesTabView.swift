@@ -92,6 +92,7 @@ struct ExercisesTabView: View {
                     DataPointNavigator(
                         value: viewModel.selectedValueFormatted,
                         subtitle: viewModel.selectedDateFormatted,
+                        detail: viewModel.selectedDetailFormatted,
                         promptText: "Browse data points",
                         hasPrevious: viewModel.hasPreviousDataPoint,
                         hasNext: viewModel.hasNextDataPoint,

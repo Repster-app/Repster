@@ -176,8 +176,7 @@ struct ExerciseListView: View {
     private var actionButton: some View {
         if viewModel.hasSelection {
             Button {
-                let ids = Array(viewModel.selectedExerciseIds)
-                onExercisesSelected?(ids)
+                onExercisesSelected?(viewModel.selectedExerciseIds)
             } label: {
                 Text("Add (\(viewModel.selectedCount))")
                     .font(.system(size: 16, weight: .semibold))

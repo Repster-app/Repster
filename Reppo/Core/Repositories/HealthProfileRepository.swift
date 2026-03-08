@@ -27,7 +27,8 @@ actor HealthProfileRepository: HealthProfileRepositoryProtocol {
             unitPreference: .metric,
             includeWarmupsInVolume: false,
             includeWarmupsInPRs: false,
-            e1RMFormula: "epley"
+            e1RMFormula: "epley",
+            defaultRestTimeSeconds: 150
         )
         modelContext.insert(profile)
         try modelContext.save()

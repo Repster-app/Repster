@@ -60,6 +60,13 @@ actor SettingsService: SettingsServiceProtocol {
         try await healthProfileRepository.save(profile)
     }
 
+    func updateDefaultWarmupRestTime(_ seconds: Int?) async throws {
+        let profile = try await healthProfileRepository.fetchOrCreate()
+        profile.defaultWarmupRestTimeSeconds = seconds
+        profile.updatedAt = Date()
+        try await healthProfileRepository.save(profile)
+    }
+
     // MARK: - Weight Prescription Settings
 
     func updatePrescriptionEnabled(_ enabled: Bool) async throws {

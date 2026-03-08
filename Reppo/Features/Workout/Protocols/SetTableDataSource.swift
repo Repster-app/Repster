@@ -75,4 +75,12 @@ protocol SetTableDataSource: AnyObject, Observable {
 
     /// Sets grouped by exercise ID for checking completion status.
     var setsByExercise: [UUID: [WorkoutSet]] { get }
+
+    /// Optional suggested weight for the currently selected exercise/set context.
+    /// Returns nil when suggestions are unavailable (for example in edit mode).
+    var currentSuggestedWeight: Double? { get }
+}
+
+extension SetTableDataSource {
+    var currentSuggestedWeight: Double? { nil }
 }

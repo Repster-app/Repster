@@ -7,10 +7,11 @@ import SwiftUI
 
 struct RestTimePickerSheet: View {
     let currentSeconds: Int?
+    var title: String = "Default Rest Time"
     let onSelect: (Int?) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    private let options: [Int?] = [nil, 30, 60, 90, 120, 150, 180, 240, 300]
+    private let options: [Int] = [30, 60, 90, 120, 150, 180, 240, 300]
 
     var body: some View {
         NavigationStack {
@@ -24,7 +25,7 @@ struct RestTimePickerSheet: View {
                             Text(displayName(for: seconds))
                                 .foregroundStyle(Color.textPrimary)
                             Spacer()
-                            if seconds == currentSeconds {
+                            if seconds == (currentSeconds ?? 150) {
                                 Image(systemName: "checkmark")
                                     .foregroundStyle(Color.accent)
                             }
@@ -34,7 +35,7 @@ struct RestTimePickerSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background(Color.bg)
-            .navigationTitle("Default Rest Time")
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -45,8 +46,7 @@ struct RestTimePickerSheet: View {
         .presentationDetents([.medium])
     }
 
-    private func displayName(for seconds: Int?) -> String {
-        guard let seconds else { return "Not Set" }
+    private func displayName(for seconds: Int) -> String {
         return UnitConversion.formatDuration(seconds)
     }
 }

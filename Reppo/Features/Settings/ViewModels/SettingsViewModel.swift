@@ -21,6 +21,7 @@ final class SettingsViewModel {
     var showUnitsSheet = false
     var showFormulaSheet = false
     var showRestTimeSheet = false
+    var showWarmupRestTimeSheet = false
     var showRebuildVolumeConfirmation = false
     var showRebuildPRsConfirmation = false
 
@@ -43,8 +44,14 @@ final class SettingsViewModel {
     }
 
     var restTimeDisplayName: String {
-        guard let seconds = profile?.defaultRestTimeSeconds else { return "Not Set" }
-        return UnitConversion.formatDuration(seconds)
+        UnitConversion.formatDuration(profile?.defaultRestTimeSeconds ?? 150)
+    }
+
+    var warmupRestTimeDisplayName: String {
+        if let seconds = profile?.defaultWarmupRestTimeSeconds {
+            return UnitConversion.formatDuration(seconds)
+        }
+        return "Same as working"
     }
 
     // MARK: - Prescription Computed Helpers
@@ -104,6 +111,16 @@ final class SettingsViewModel {
     func updateDefaultRestTime(_ seconds: Int?) async {
         do {
             try await settingsService.updateDefaultRestTime(seconds)
+            profile = try await settingsService.fetchSettings()
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+    }
+
+    func updateDefaultWarmupRestTime(_ seconds: Int?) async {
+        do {
+            try await settingsService.updateDefaultWarmupRestTime(seconds)
             profile = try await settingsService.fetchSettings()
         } catch {
             errorMessage = error.localizedDescription

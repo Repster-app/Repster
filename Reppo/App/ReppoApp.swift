@@ -1,5 +1,6 @@
-import SwiftUI
+import ActivityKit
 import SwiftData
+import SwiftUI
 
 @main
 struct ReppoApp: App {
@@ -21,6 +22,10 @@ struct ReppoApp: App {
             let repoContainer = RepositoryContainer(modelContainer: container)
             self.repositories = repoContainer
             self.services = ServiceContainer(repositoryContainer: repoContainer)
+
+            // Clean up any stale Live Activities from a previous app session
+            // (e.g., user force-quit the app while a workout was active)
+            LiveActivityManager().cleanupStaleActivities()
         } catch {
             fatalError("Failed to initialize ModelContainer: \(error)")
         }

@@ -172,9 +172,6 @@ final class EditWorkoutViewModel {
             if let sets = setsByExercise[exerciseId] {
                 setsByExercise[exerciseId] = sets
             }
-
-            // Already persisted — no longer dirty
-            dirtySetIds.remove(set.id)
         } catch {
             // Revert on failure
             set.completed = oldCompleted
@@ -411,9 +408,10 @@ final class EditWorkoutViewModel {
         return exercises[selectedExerciseIndex]
     }
 
+    /// Sets for the current exercise, sorted by orderInExercise to maintain warmup-first ordering.
     var currentSets: [WorkoutSet] {
         guard let exercise = currentExercise else { return [] }
-        return setsByExercise[exercise.id] ?? []
+        return (setsByExercise[exercise.id] ?? []).sorted { $0.orderInExercise < $1.orderInExercise }
     }
 
     // MARK: - Private Helpers

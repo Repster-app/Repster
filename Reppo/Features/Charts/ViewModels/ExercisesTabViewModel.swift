@@ -176,6 +176,19 @@ final class ExercisesTabViewModel {
         return formatter.string(from: firstSeries.points[index].date)
     }
 
+    /// Weight x reps detail for the selected data point (e.g. "85 kg x 8 reps").
+    var selectedDetailFormatted: String? {
+        guard let data = chartData, let firstSeries = data.first,
+              let index = selectedDataIndex,
+              index >= 0, index < firstSeries.points.count else { return nil }
+        let point = firstSeries.points[index]
+        guard let weight = point.topWeight, let reps = point.topReps else { return nil }
+        if weight == weight.rounded() && weight == Double(Int(weight)) {
+            return "\(Int(weight)) kg \u{00D7} \(reps) reps"
+        }
+        return String(format: "%.1f kg \u{00D7} %d reps", weight, reps)
+    }
+
     /// The workoutId of the currently selected data point, if available.
     var selectedWorkoutId: UUID? {
         guard let data = chartData, let firstSeries = data.first,

@@ -8,6 +8,8 @@ import SwiftUI
 struct DataPointNavigator: View {
     let value: String?
     let subtitle: String?
+    /// Optional detail line (e.g. "85 kg x 8 reps") shown between value and subtitle.
+    var detail: String? = nil
     let promptText: String
     let hasPrevious: Bool
     let hasNext: Bool
@@ -35,6 +37,11 @@ struct DataPointNavigator: View {
                     Text(value)
                         .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(Color.textPrimary)
+                    if let detail {
+                        Text(detail)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Color.textTertiary)
+                    }
                     if let subtitle {
                         Text(subtitle)
                             .font(.system(size: 12, weight: .medium))

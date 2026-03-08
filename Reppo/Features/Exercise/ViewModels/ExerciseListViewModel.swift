@@ -37,7 +37,9 @@ final class ExerciseListViewModel {
         didSet { applyFiltersAndSort() }
     }
 
-    var selectedExerciseIds: Set<UUID> = []
+    /// Ordered array preserving the user's selection order.
+    /// Used instead of Set<UUID> so that template exercises respect the pick order.
+    var selectedExerciseIds: [UUID] = []
 
     // MARK: - Mode
 
@@ -81,10 +83,10 @@ final class ExerciseListViewModel {
     }
 
     func toggleSelection(_ exerciseId: UUID) {
-        if selectedExerciseIds.contains(exerciseId) {
-            selectedExerciseIds.remove(exerciseId)
+        if let index = selectedExerciseIds.firstIndex(of: exerciseId) {
+            selectedExerciseIds.remove(at: index)
         } else {
-            selectedExerciseIds.insert(exerciseId)
+            selectedExerciseIds.append(exerciseId)
         }
     }
 
@@ -97,7 +99,7 @@ final class ExerciseListViewModel {
             try await exerciseService.deleteExercise(exerciseId)
             allExercises.removeAll { $0.id == exerciseId }
             allExerciseStats.removeValue(forKey: exerciseId)
-            selectedExerciseIds.remove(exerciseId)
+            selectedExerciseIds.removeAll { $0 == exerciseId }
             applyFiltersAndSort()
         } catch {
             // Deletion failed — state unchanged

@@ -20,6 +20,7 @@ protocol SettingsServiceProtocol: Sendable {
     func updateIncludeWarmupsInVolume(_ include: Bool) async throws
     func updateIncludeWarmupsInPRs(_ include: Bool) async throws
     func updateDefaultRestTime(_ seconds: Int?) async throws
+    func updateDefaultWarmupRestTime(_ seconds: Int?) async throws
 
     // MARK: - Weight Prescription Settings
 
