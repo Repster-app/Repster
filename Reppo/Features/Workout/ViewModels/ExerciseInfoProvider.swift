@@ -207,8 +207,12 @@ enum ExerciseInfoProvider {
     }
 
     private static func formatWeight(_ kg: Double) -> String {
-        kg.truncatingRemainder(dividingBy: 1) == 0
-            ? String(format: "%.0f", kg)
-            : String(format: "%.1f", kg)
+        if kg.truncatingRemainder(dividingBy: 1) == 0 {
+            return String(format: "%.0f", kg)
+        }
+        let formatter = NumberFormatter()
+        formatter.minimumFractionDigits = 1
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: kg)) ?? String(format: "%.2f", kg)
     }
 }

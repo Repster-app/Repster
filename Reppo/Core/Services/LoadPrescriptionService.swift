@@ -1,15 +1,17 @@
 // LoadPrescriptionService.swift
 // Fatigue-aware weight prescription engine.
-// Based on: RIR_Fatigue_Aware_1RM_Model.pdf
 // Feature: Weight Prescription (magic wand)
 //
 // Algorithm summary:
-// 1. Estimate base e1RM from recent hard sets (RIR ≤ 1), recency-weighted
-// 2. Accumulate session fatigue from completed sets
-// 3. Apply rest-time fatigue decay between sets
-// 4. Compute effective e1RM = base × fatigue_discount
-// 5. Compute intensity_factor = 1 − 0.025 × reps − 0.02 × RIR
+// 1. Estimate base e1RM from recent sets, using user's selected formula (Epley/Brzycki/Lombardi)
+// 2. Accumulate session fatigue: each set adds 3% base + up to 4% RIR bonus, scaled by reps
+// 3. Between sets: fatigue decays via exp(-restTimerSeconds / τ), where τ = 300s
+// 4. Compute effective e1RM = base × (1 − sessionFatigue), capped at 20%
+// 5. Compute intensity_factor from selected formula: reverseCalculate(1.0, targetReps + targetRIR)
 // 6. target_weight = effective_e1RM × intensity_factor, rounded to increment
+//
+// Fatigue model calibrated against: Willardson load-reduction studies,
+// Nuzzo/SBS rep drop-off meta-analysis, RTS fatigue percents, PCr resynthesis research.
 //
 // Architecture: Actor — accesses SwiftData only through repository protocols.
 
@@ -26,11 +28,15 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
 
     // MARK: - Constants (defaults when no per-exercise override)
 
-    /// Default fatigue rate when exercise has no override.
-    private static let defaultFatigueRate: Double = 0.05
+    /// Recovery time constant (τ) in seconds for exponential fatigue decay.
+    /// After τ seconds of rest, 63% of accumulated fatigue is recovered.
+    /// Calibrated against PCr resynthesis research (slow component τ > 170s)
+    /// and load-reduction studies (~5% per set at 2 min rest).
+    private static let recoveryConstant: Double = 300.0
 
-    /// Default recovery constant (seconds) when exercise has no override.
-    private static let defaultRecoveryConstant: Double = 180.0
+    /// Maximum session fatigue (cap). Research shows even extreme protocols
+    /// (to failure, short rest) rarely cause >25% performance decline.
+    private static let maxFatigue: Double = 0.20
 
     /// Default weight increment (kg) when exercise has no override.
     private static let defaultWeightIncrement: Double = 2.5
@@ -83,8 +89,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         }
 
         // 2. Resolve per-exercise vs global parameters
-        let fatigueRate = exercise.fatigueRate ?? Self.defaultFatigueRate
-        let recoveryConstant = exercise.recoveryConstant ?? profile.prescriptionDefaultRecoveryConstant ?? Self.defaultRecoveryConstant
+        let restTimerSeconds = Double(exercise.defaultRestTime ?? profile.defaultRestTimeSeconds ?? 150)
         let weightIncrement = exercise.weightIncrement ?? profile.prescriptionDefaultIncrement ?? Self.defaultWeightIncrement
         let fatigueEnabled = profile.prescriptionFatigueModelingEnabled ?? true
         let freshnessEnabled = profile.prescriptionFreshnessBonus ?? false
@@ -135,8 +140,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         if fatigueEnabled {
             sessionFatigue = computeSessionFatigue(
                 completedSets: completedSessionSets,
-                fatigueRate: fatigueRate,
-                recoveryConstant: recoveryConstant
+                restTimerSeconds: restTimerSeconds
             )
         } else {
             sessionFatigue = 0.0
@@ -149,8 +153,8 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         return sets.map { setSpec in
             let isFirstSet = completedSessionSets.isEmpty && setSpec.setIndex == firstSuggestedSetIndex
 
-            // Fatigue discount: exp(-session_fatigue)
-            let fatigueDiscount = exp(-sessionFatigue)
+            // Fatigue discount: linear (interpretable — "8% fatigue" = exactly 8% load reduction)
+            let fatigueDiscount = 1.0 - sessionFatigue
 
             // Effective e1RM
             var effectiveE1RM = baseE1RM * fatigueDiscount
@@ -162,9 +166,10 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
                 freshnessApplied = true
             }
 
-            // Intensity factor (PDF section 4):
-            // intensity_factor = 1 − 0.025 × reps − 0.02 × RIR
-            let intensityFactor = max(0.3, 1.0 - 0.025 * Double(setSpec.targetReps) - 0.02 * setSpec.targetRIR)
+            // Intensity factor: use same formula as e1RM estimation for consistency.
+            // reverseCalculate(1.0, totalReps) gives %1RM for that rep count.
+            let totalReps = max(1, setSpec.targetReps + Int(setSpec.targetRIR))
+            let intensityFactor = max(0.3, formula.reverseCalculate(e1RM: 1.0, reps: totalReps))
 
             // Target weight
             let rawWeight = effectiveE1RM * intensityFactor
@@ -304,44 +309,43 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
 
     /// Compute accumulated session fatigue from completed sets.
     ///
-    /// PDF sections 5, 6, 7:
-    /// - set_stress = (reps / 10) × max(0, 1 + (1 − RIR))
-    /// - session_fatigue += fatigue_rate × set_stress
-    /// - Between sets: session_fatigue *= exp(−rest_seconds / recovery_constant)
+    /// Every completed set adds fatigue (3% base + up to 4% RIR bonus, scaled by reps).
+    /// Between sets, fatigue decays exponentially using the rest timer duration
+    /// and a fixed recovery constant (τ = 300s).
+    ///
+    /// Calibrated against research:
+    /// - Willardson load-reduction studies: ~5% per set at 2 min rest
+    /// - Nuzzo/SBS rep drop-off meta-analysis: set-to-set performance decline
+    /// - RTS fatigue percents: 5-10% typical session fatigue
+    /// - PCr resynthesis: biphasic recovery, slow component τ > 170s
     private func computeSessionFatigue(
         completedSets: [SessionSetContext],
-        fatigueRate: Double,
-        recoveryConstant: Double
+        restTimerSeconds: Double
     ) -> Double {
         var sessionFatigue: Double = 0.0
 
-        // Sort completed sets by completedAt for proper rest time calculation
-        let sortedSets = completedSets
-            .filter { $0.completed }
-            .sorted { ($0.completedAt ?? .distantPast) < ($1.completedAt ?? .distantPast) }
+        let sortedSets = completedSets.filter { $0.completed }
 
         for (index, set) in sortedSets.enumerated() {
-            // Rest time decay from previous set (PDF section 7)
-            if index > 0, let prevCompletedAt = sortedSets[index - 1].completedAt,
-               let currentCompletedAt = set.completedAt {
-                let restSeconds = currentCompletedAt.timeIntervalSince(prevCompletedAt)
-                if restSeconds > 0 {
-                    sessionFatigue *= exp(-restSeconds / recoveryConstant)
-                }
+            // Rest decay: use rest timer setting as assumed rest duration
+            if index > 0 {
+                sessionFatigue *= exp(-restTimerSeconds / Self.recoveryConstant)
             }
 
-            // Set stress (PDF section 5)
-            // set_stress = (reps / 10) × max(0, 1 + (1 − RIR))
-            let reps = Double(set.reps)
-            let rir = set.rir ?? 2.0 // Default to RIR 2 if unknown
-            let stressFactor = max(0.0, 1.0 + (1.0 - rir))
-            let setStress = (reps / 10.0) * stressFactor
+            // Per-set fatigue contribution:
+            // - Base: 3% per set (every set causes some fatigue)
+            // - RIR bonus: up to 4% extra for hard sets (RIR 0 = +4%, RIR 1 = +2%, RIR 2+ = +0%)
+            // - Rep scale: normalized to 8 reps, capped at 1.5× to prevent extreme values
+            let rir = set.rir ?? 2.0
+            let baseFatigue: Double = 0.03
+            let rirBonus = max(0.0, 2.0 - rir) * 0.02
+            let repScale = min(Double(set.reps) / 8.0, 1.5)
+            let setFatigue = (baseFatigue + rirBonus) * repScale
 
-            // Accumulate fatigue (PDF section 5)
-            sessionFatigue += fatigueRate * setStress
+            sessionFatigue += setFatigue
         }
 
-        return sessionFatigue
+        return min(sessionFatigue, Self.maxFatigue)
     }
 
     // MARK: - Helpers

@@ -19,7 +19,6 @@ struct PrescriptionAdvancedSettingsView: View {
     @State private var freshnessEnabled: Bool
     @State private var freshnessPercent: Double
     @State private var fatigueEnabled: Bool
-    @State private var recoveryConstant: Double
     @State private var recencyWeeks: Int
 
     private let settingsService: any SettingsServiceProtocol
@@ -29,7 +28,6 @@ struct PrescriptionAdvancedSettingsView: View {
     // MARK: - Options
 
     private static let recencyOptions = [2, 4, 6, 8, 10, 12]
-    private static let recoveryOptions: [Double] = [60, 90, 120, 150, 180, 210, 240, 300, 360]
 
     // MARK: - Init
 
@@ -37,7 +35,6 @@ struct PrescriptionAdvancedSettingsView: View {
         _freshnessEnabled = State(initialValue: profile.prescriptionFreshnessBonus ?? false)
         _freshnessPercent = State(initialValue: (profile.prescriptionFreshnessBonusPercent ?? 0.03) * 100)
         _fatigueEnabled = State(initialValue: profile.prescriptionFatigueModelingEnabled ?? true)
-        _recoveryConstant = State(initialValue: profile.prescriptionDefaultRecoveryConstant ?? 180)
         _recencyWeeks = State(initialValue: profile.prescriptionRecencyWeeks ?? 6)
         self.settingsService = settingsService
     }
@@ -70,19 +67,8 @@ struct PrescriptionAdvancedSettingsView: View {
                         Task { try? await settingsService.updatePrescriptionFatigueModelingEnabled(newValue) }
                     }
 
-                if fatigueEnabled {
-                    Picker("Recovery Time", selection: $recoveryConstant) {
-                        ForEach(Self.recoveryOptions, id: \.self) { seconds in
-                            Text(formatRecovery(seconds)).tag(seconds)
-                        }
-                    }
-                    .foregroundColor(.textPrimary)
-                    .onChange(of: recoveryConstant) { _, newValue in
-                        Task { try? await settingsService.updatePrescriptionDefaultRecoveryConstant(newValue) }
-                    }
-                }
             } footer: {
-                Text("When enabled, suggested weights decrease across sets to account for accumulated fatigue. Recovery time controls how quickly fatigue dissipates during rest.")
+                Text("When enabled, suggested weights decrease across sets to account for accumulated fatigue. Uses your rest timer duration to model recovery between sets.")
                     .foregroundColor(.textTertiary)
             }
 
@@ -131,14 +117,4 @@ struct PrescriptionAdvancedSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    // MARK: - Formatters
-
-    private func formatRecovery(_ seconds: Double) -> String {
-        let mins = Int(seconds) / 60
-        let secs = Int(seconds) % 60
-        if secs == 0 {
-            return "\(mins) min"
-        }
-        return "\(mins)m \(secs)s"
-    }
 }

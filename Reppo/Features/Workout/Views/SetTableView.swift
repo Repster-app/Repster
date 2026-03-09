@@ -380,6 +380,9 @@ private struct SetRowWrapper: View {
 final class SetEntryKeyboardContext {
     let ownerSetID: UUID
     let trackingType: TrackingType
+    /// Tracked focused field — updated directly by the keyboard overlay on Prev/Next.
+    /// Use this instead of getFocusedField() for rendering decisions.
+    var trackedField: SetRowInputField?
     let getFocusedField: () -> SetRowInputField?
     let setFocusedField: (SetRowInputField?) -> Void
     let getFieldValue: (SetRowInputField) -> String
@@ -387,6 +390,8 @@ final class SetEntryKeyboardContext {
     let getRIRValue: () -> Double?
     let setRIRValue: (Double?) -> Void
     let getSuggestedWeight: () -> Double?
+    let getWeightIncrement: () -> Double
+    let onCompleteSet: (() -> Void)?
     let canMovePrevious: () -> Bool
     let canMoveNext: () -> Bool
     let movePrevious: () -> Void
@@ -403,6 +408,8 @@ final class SetEntryKeyboardContext {
         getRIRValue: @escaping () -> Double?,
         setRIRValue: @escaping (Double?) -> Void,
         getSuggestedWeight: @escaping () -> Double?,
+        getWeightIncrement: @escaping () -> Double = { 2.5 },
+        onCompleteSet: (() -> Void)? = nil,
         canMovePrevious: @escaping () -> Bool,
         canMoveNext: @escaping () -> Bool,
         movePrevious: @escaping () -> Void,
@@ -418,11 +425,14 @@ final class SetEntryKeyboardContext {
         self.getRIRValue = getRIRValue
         self.setRIRValue = setRIRValue
         self.getSuggestedWeight = getSuggestedWeight
+        self.getWeightIncrement = getWeightIncrement
+        self.onCompleteSet = onCompleteSet
         self.canMovePrevious = canMovePrevious
         self.canMoveNext = canMoveNext
         self.movePrevious = movePrevious
         self.moveNext = moveNext
         self.dismiss = dismiss
+        self.trackedField = getFocusedField()
     }
 }
 
@@ -431,6 +441,10 @@ final class SetEntryKeyboardManager: ObservableObject {
     @Published var context: SetEntryKeyboardContext?
 
     func show(_ context: SetEntryKeyboardContext) {
+        // Clear focus on the previous set's row so it doesn't stay highlighted
+        if let old = self.context, old.ownerSetID != context.ownerSetID {
+            old.setFocusedField(nil)
+        }
         self.context = context
     }
 
@@ -456,7 +470,7 @@ struct SetEntryKeyboardOverlay: View {
 
     var body: some View {
         Group {
-            if let context = manager.context, context.getFocusedField() != nil {
+            if let context = manager.context, context.trackedField != nil {
                 VStack(spacing: 0) {
                     topStrip(for: context)
                     Divider().background(Color.border)
@@ -466,6 +480,7 @@ struct SetEntryKeyboardOverlay: View {
                     }
                     .padding(10)
                 }
+                .id(refreshTick)
                 .background(Color.bgCard)
                 .overlay(
                     RoundedRectangle(cornerRadius: 18)
@@ -474,6 +489,7 @@ struct SetEntryKeyboardOverlay: View {
                 .clipShape(RoundedRectangle(cornerRadius: 18))
                 .padding(.horizontal, 6)
                 .padding(.bottom, 4)
+                .background(Color.bgCard.ignoresSafeArea(.all, edges: .bottom))
                 .onChange(of: manager.context?.ownerSetID) { _, _ in
                     rirMode = false
                     repMode = "F"
@@ -491,7 +507,7 @@ struct SetEntryKeyboardOverlay: View {
                 Text("Set")
                     .foregroundColor(.accent)
                     .font(.system(size: 14, weight: .semibold))
-                Text("· \(fieldTitle(context.getFocusedField()))")
+                Text("· \(fieldTitle(context.trackedField))")
                     .foregroundColor(.textSecondary)
                     .font(.system(size: 14, weight: .semibold))
                 Spacer()
@@ -544,14 +560,19 @@ struct SetEntryKeyboardOverlay: View {
 
     private func numberPad(for context: SetEntryKeyboardContext) -> some View {
         let keys: [String] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"]
-        let decimalAllowed = allowsDecimal(context.getFocusedField())
+        let focusedField = context.trackedField
+        let decimalAllowed = allowsDecimal(focusedField)
+        let isRepsField = focusedField == .reps
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
             ForEach(keys, id: \.self) { key in
                 let isDecimalKey = key == "."
-                let keyDisabled = isDecimalKey && !decimalAllowed
-                let keyLabel = keyDisabled ? "•" : key
+                // D6: Show dash key on reps field instead of disabled decimal
+                let showDash = isDecimalKey && isRepsField
+                let keyDisabled = isDecimalKey && !decimalAllowed && !isRepsField
+                let keyLabel = showDash ? "-" : (keyDisabled ? "•" : key)
+                let effectiveKey = showDash ? "-" : key
                 Button {
-                    handleKey(key, context: context)
+                    handleKey(effectiveKey, context: context)
                 } label: {
                     Text(keyLabel)
                         .font(.system(size: key == "⌫" ? 20 : 22, weight: .semibold))
@@ -571,43 +592,72 @@ struct SetEntryKeyboardOverlay: View {
     }
 
     private func actionRail(for context: SetEntryKeyboardContext) -> some View {
-        let focusedField = context.getFocusedField()
+        let focusedField = context.trackedField
         let onWeightField = focusedField == .weight
         let canGoPrev = canMovePreviousInOverlay(context)
         let canGoNext = canMoveNextInOverlay(context)
         let suggestedWeight = context.getSuggestedWeight()
 
+        let increment = context.getWeightIncrement()
+
         return VStack(spacing: 6) {
-            capsuleRailButton(title: "Hide") {
+            // D1: Keyboard-dismiss icon instead of "Hide" text
+            Button {
                 rirMode = false
                 context.dismiss()
                 manager.hide(ownerSetID: context.ownerSetID)
+            } label: {
+                Image(systemName: "keyboard.chevron.compact.down")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.textPrimary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(Color.bgHover)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.border, lineWidth: 1)
+                    )
             }
+            .buttonStyle(.plain)
 
+            // D2: Wand icon + weight value in blue for smart suggestion
             if onWeightField {
-                capsuleRailButton(
-                    title: suggestedWeight.map { "Use \(UnitConversion.formatWeight($0))" } ?? "Use Suggested",
-                    disabled: suggestedWeight == nil
-                ) {
+                Button {
                     applySuggestedWeight(context)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "wand.and.stars")
+                            .font(.system(size: 13, weight: .semibold))
+                        if let weight = suggestedWeight {
+                            Text(UnitConversion.formatWeight(weight))
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                    }
+                    .foregroundColor(suggestedWeight == nil ? .textTertiary : .white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(suggestedWeight == nil ? Color.bgInput : Color.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
+                .buttonStyle(.plain)
+                .disabled(suggestedWeight == nil)
             }
 
+            // D3: +/- with exercise increment; D5: +1/-1 for reps (replaces F/P)
             HStack(spacing: 8) {
-                railOptionButton(title: onWeightField ? "−" : "F", selected: !onWeightField && repMode == "F") {
+                railOptionButton(title: "−", selected: false) {
                     if onWeightField {
-                        nudgeWeight(context, delta: -2.5)
+                        nudgeWeight(context, delta: -increment)
                     } else {
-                        repMode = "F"
-                        refreshTick += 1
+                        nudgeReps(context, delta: -1)
                     }
                 }
-                railOptionButton(title: onWeightField ? "+" : "P", selected: !onWeightField && repMode == "P") {
+                railOptionButton(title: "+", selected: false) {
                     if onWeightField {
-                        nudgeWeight(context, delta: 2.5)
+                        nudgeWeight(context, delta: increment)
                     } else {
-                        repMode = "P"
-                        refreshTick += 1
+                        nudgeReps(context, delta: 1)
                     }
                 }
             }
@@ -616,25 +666,29 @@ struct SetEntryKeyboardOverlay: View {
                 railNavButton(title: "Prev", disabled: !canGoPrev) {
                     if rirMode {
                         rirMode = false
-                    } else if canMoveToPreviousField(context) {
-                        context.movePrevious()
+                    } else {
+                        moveToPreviousField(context)
                     }
                     refreshTick += 1
-                    manager.refresh()
+                    manager.show(context)
                 }
                 railNavButton(title: "Next", disabled: !canGoNext) {
                     if canMoveToNextField(context) {
-                        context.moveNext()
-                        rirMode = false
-                    } else if canEnterRIRMode(context) {
-                        rirMode = true
+                        moveToNextField(context)
                     }
                     refreshTick += 1
-                    manager.refresh()
+                    manager.show(context)
                 }
             }
 
+            // D5: Done marks set complete when weight + reps + RIR are filled
             Button {
+                let weightFilled = !context.getFieldValue(.weight).isEmpty
+                let repsFilled = !context.getFieldValue(.reps).isEmpty
+                let rirFilled = context.getRIRValue() != nil
+                if weightFilled && repsFilled && rirFilled {
+                    context.onCompleteSet?()
+                }
                 rirMode = false
                 context.dismiss()
                 manager.hide(ownerSetID: context.ownerSetID)
@@ -707,7 +761,7 @@ struct SetEntryKeyboardOverlay: View {
     }
 
     private func handleKey(_ key: String, context: SetEntryKeyboardContext) {
-        guard !rirMode, let field = context.getFocusedField() else { return }
+        guard !rirMode, let field = context.trackedField else { return }
         var value = context.getFieldValue(field)
 
         if key == "⌫" {
@@ -721,6 +775,15 @@ struct SetEntryKeyboardOverlay: View {
         if key == "." {
             guard allowsDecimal(field), !value.contains(".") else { return }
             context.setFieldValue(field, value.isEmpty ? "0." : value + ".")
+            refreshTick += 1
+            manager.refresh()
+            return
+        }
+
+        // D6: Dash key for rep ranges (e.g. "8-12"), only one dash allowed
+        if key == "-" {
+            guard field == .reps, !value.contains("-"), !value.isEmpty else { return }
+            context.setFieldValue(field, value + "-")
             refreshTick += 1
             manager.refresh()
             return
@@ -749,7 +812,7 @@ struct SetEntryKeyboardOverlay: View {
     }
 
     private func canEnterRIRMode(_ context: SetEntryKeyboardContext) -> Bool {
-        guard let field = context.getFocusedField() else { return false }
+        guard let field = context.trackedField else { return false }
         guard field == .reps else { return false }
         switch context.trackingType {
         case .weightReps, .weightRepsDuration, .custom:
@@ -763,7 +826,7 @@ struct SetEntryKeyboardOverlay: View {
         if rirMode {
             return true
         }
-        return context.getFocusedField() == .reps
+        return context.trackedField == .reps
     }
 
     private func orderedInputs(for trackingType: TrackingType) -> [SetRowInputField] {
@@ -780,27 +843,45 @@ struct SetEntryKeyboardOverlay: View {
     }
 
     private func canMoveToPreviousField(_ context: SetEntryKeyboardContext) -> Bool {
-        if context.canMovePrevious() { return true }
-        guard let focused = context.getFocusedField() else { return false }
+        guard let focused = context.trackedField else { return false }
         guard let index = orderedInputs(for: context.trackingType).firstIndex(of: focused) else { return false }
         return index > 0
     }
 
     private func canMoveToNextField(_ context: SetEntryKeyboardContext) -> Bool {
-        if context.canMoveNext() { return true }
-        guard let focused = context.getFocusedField() else { return false }
+        guard let focused = context.trackedField else { return false }
         guard let index = orderedInputs(for: context.trackingType).firstIndex(of: focused) else { return false }
         return index < orderedInputs(for: context.trackingType).count - 1
     }
 
+    /// Move to previous field, updating trackedField and syncing with SetRowView.
+    private func moveToPreviousField(_ context: SetEntryKeyboardContext) {
+        let ordered = orderedInputs(for: context.trackingType)
+        guard let current = context.trackedField,
+              let idx = ordered.firstIndex(of: current),
+              idx - 1 >= 0 else { return }
+        let prevField = ordered[idx - 1]
+        context.trackedField = prevField
+        context.setFocusedField(prevField)
+    }
+
+    /// Move to next field, updating trackedField and syncing with SetRowView.
+    private func moveToNextField(_ context: SetEntryKeyboardContext) {
+        let ordered = orderedInputs(for: context.trackingType)
+        guard let current = context.trackedField,
+              let idx = ordered.firstIndex(of: current),
+              idx + 1 < ordered.count else { return }
+        let nextField = ordered[idx + 1]
+        context.trackedField = nextField
+        context.setFocusedField(nextField)
+    }
+
     private func canMovePreviousInOverlay(_ context: SetEntryKeyboardContext) -> Bool {
-        if rirMode { return true }
         return canMoveToPreviousField(context)
     }
 
     private func canMoveNextInOverlay(_ context: SetEntryKeyboardContext) -> Bool {
-        if rirMode { return false }
-        return canMoveToNextField(context) || canEnterRIRMode(context)
+        return canMoveToNextField(context)
     }
 
     private func applySuggestedWeight(_ context: SetEntryKeyboardContext) {
@@ -817,6 +898,17 @@ struct SetEntryKeyboardOverlay: View {
         let next = max(0, ((current + delta) * 10).rounded() / 10)
         let formatted = next.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(next)) : String(next)
         context.setFieldValue(.weight, formatted)
+        refreshTick += 1
+        manager.refresh()
+    }
+
+    private func nudgeReps(_ context: SetEntryKeyboardContext, delta: Int) {
+        let raw = context.getFieldValue(.reps)
+        // If reps contains a dash (rep range like "8-12"), don't nudge
+        guard !raw.contains("-") else { return }
+        let current = Int(raw) ?? 0
+        let next = max(0, current + delta)
+        context.setFieldValue(.reps, next == 0 ? "" : String(next))
         refreshTick += 1
         manager.refresh()
     }

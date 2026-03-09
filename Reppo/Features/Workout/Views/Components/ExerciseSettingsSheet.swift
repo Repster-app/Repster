@@ -145,6 +145,10 @@ struct ExerciseSettingsSheet: View {
         if value.truncatingRemainder(dividingBy: 1) == 0 {
             return String(format: "%.0f kg", value)
         }
-        return String(format: "%.1f kg", value)
+        let formatter = NumberFormatter()
+        formatter.minimumFractionDigits = 1
+        formatter.maximumFractionDigits = 2
+        let formatted = formatter.string(from: NSNumber(value: value)) ?? String(format: "%.2f", value)
+        return "\(formatted) kg"
     }
 }

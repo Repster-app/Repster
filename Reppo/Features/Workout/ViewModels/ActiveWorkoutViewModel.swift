@@ -1110,13 +1110,19 @@ final class ActiveWorkoutViewModel {
         let e1RMStr = String(format: "%.0f", result.baseE1RM)
         let fatiguePercent = Int((1.0 - result.fatigueDiscount) * 100)
 
-        if fatiguePercent > 0 {
-            return "Based on \(e1RMStr) kg e1RM, -\(fatiguePercent)% fatigue"
-        } else if result.freshnessApplied {
-            return "Based on \(e1RMStr) kg e1RM, +freshness"
-        } else {
-            return "Based on \(e1RMStr) kg e1RM"
+        let sourceStr: String
+        switch result.e1RMSource {
+        case .recentPerformance: sourceStr = "recent workout"
+        case .historicalPR: sourceStr = "PR history"
+        case .noData: sourceStr = "no data"
         }
+
+        var parts = ["\(e1RMStr) kg e1RM from \(sourceStr)"]
+        if result.freshnessApplied {
+            parts.append("+freshness")
+        }
+        parts.append("-\(fatiguePercent)% fatigue")
+        return parts.joined(separator: ", ")
     }
 
     // MARK: - Summary Computation (T031)

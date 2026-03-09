@@ -79,6 +79,10 @@ struct WeightSuggestionCardView: View {
         if value == value.rounded() && value == Double(Int(value)) {
             return "\(Int(value)) \(unit)"
         }
-        return String(format: "%.1f %@", value, unit)
+        let formatter = NumberFormatter()
+        formatter.minimumFractionDigits = 1
+        formatter.maximumFractionDigits = 2
+        let formatted = formatter.string(from: NSNumber(value: value)) ?? String(format: "%.2f", value)
+        return "\(formatted) \(unit)"
     }
 }

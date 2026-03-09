@@ -27,7 +27,7 @@ struct MuscleFilterStrip: View {
         if selectedFilters.contains(muscle) {
             selectedFilters.remove(muscle)
         } else {
-            selectedFilters.insert(muscle)
+            selectedFilters = [muscle]
         }
     }
 }

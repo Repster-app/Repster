@@ -540,6 +540,8 @@ struct SetRowView: View {
             getRIRValue: { rirBinding.wrappedValue },
             setRIRValue: { rirBinding.wrappedValue = $0 },
             getSuggestedWeight: { suggestedWeight },
+            getWeightIncrement: { exercise.weightIncrement ?? 2.5 },
+            onCompleteSet: onComplete,
             canMovePrevious: { canMoveToPreviousInput },
             canMoveNext: { canMoveToNextInput },
             movePrevious: { focusPreviousInput() },

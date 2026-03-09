@@ -65,7 +65,11 @@ final class SettingsViewModel {
         if increment.truncatingRemainder(dividingBy: 1) == 0 {
             return String(format: "%.0f kg", increment)
         }
-        return String(format: "%.1f kg", increment)
+        let formatter = NumberFormatter()
+        formatter.minimumFractionDigits = 1
+        formatter.maximumFractionDigits = 2
+        let formatted = formatter.string(from: NSNumber(value: increment)) ?? String(format: "%.2f", increment)
+        return "\(formatted) kg"
     }
 
     var appVersion: String {

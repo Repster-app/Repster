@@ -119,6 +119,7 @@ struct WorkoutLiveActivityWidget: Widget {
         .padding(16)
         .activityBackgroundTint(.black.opacity(0.75))
         .activitySystemActionForegroundColor(.white)
+        .legacyDarkScheme()
     }
 
     // MARK: - Rest Timer Section
@@ -201,4 +202,25 @@ struct WorkoutLiveActivityWidget: Widget {
         }
     }
 
+}
+
+// MARK: - Legacy Dark Scheme Modifier
+
+/// Forces dark color scheme on pre-iOS 26 so semantic colors (.primary, .secondary)
+/// resolve to white/light against the dark Live Activity background.
+/// On iOS 26+, liquid glass handles text legibility automatically.
+private struct LegacyDarkSchemeModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26, *) {
+            content
+        } else {
+            content.environment(\.colorScheme, .dark)
+        }
+    }
+}
+
+extension View {
+    func legacyDarkScheme() -> some View {
+        modifier(LegacyDarkSchemeModifier())
+    }
 }
