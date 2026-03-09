@@ -74,3 +74,5 @@ final class HealthProfile {
         self.updatedAt = updatedAt
     }
 }
+
+extension HealthProfile: @unchecked Sendable {}

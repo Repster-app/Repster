@@ -120,3 +120,5 @@ final class WorkoutSet {
         self.updatedAt = updatedAt
     }
 }
+
+extension WorkoutSet: @unchecked Sendable {}

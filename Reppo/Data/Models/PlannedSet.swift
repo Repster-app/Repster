@@ -35,3 +35,5 @@ final class PlannedSet {
         self.updatedAt = updatedAt
     }
 }
+
+extension PlannedSet: @unchecked Sendable {}

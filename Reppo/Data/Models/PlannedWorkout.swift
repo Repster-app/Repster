@@ -26,3 +26,5 @@ final class PlannedWorkout {
         self.updatedAt = updatedAt
     }
 }
+
+extension PlannedWorkout: @unchecked Sendable {}

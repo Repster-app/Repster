@@ -53,3 +53,5 @@ final class ExerciseStats {
         self.updatedAt = updatedAt
     }
 }
+
+extension ExerciseStats: @unchecked Sendable {}

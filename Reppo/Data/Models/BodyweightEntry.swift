@@ -26,3 +26,5 @@ final class BodyweightEntry {
         self.updatedAt = updatedAt
     }
 }
+
+extension BodyweightEntry: @unchecked Sendable {}

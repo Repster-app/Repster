@@ -29,3 +29,5 @@ final class Program {
         self.updatedAt = updatedAt
     }
 }
+
+extension Program: @unchecked Sendable {}

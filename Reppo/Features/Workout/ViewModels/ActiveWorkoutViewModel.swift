@@ -1256,7 +1256,7 @@ final class ActiveWorkoutViewModel {
         guard !affectedSetIds.isEmpty else { return }
 
         for (exerciseId, sets) in setsByExercise {
-            var updatedSets = sets
+            let updatedSets = sets
             var changed = false
             for (index, set) in updatedSets.enumerated() {
                 if let newStatus = affectedSetIds[set.id] {

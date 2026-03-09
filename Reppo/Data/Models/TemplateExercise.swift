@@ -35,3 +35,5 @@ final class TemplateExercise {
         self.updatedAt = updatedAt
     }
 }
+
+extension TemplateExercise: @unchecked Sendable {}

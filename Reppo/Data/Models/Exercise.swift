@@ -65,3 +65,5 @@ final class Exercise {
         self.updatedAt = updatedAt
     }
 }
+
+extension Exercise: @unchecked Sendable {}

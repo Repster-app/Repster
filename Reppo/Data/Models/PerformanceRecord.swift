@@ -38,3 +38,5 @@ final class PerformanceRecord {
         self.updatedAt = updatedAt
     }
 }
+
+extension PerformanceRecord: @unchecked Sendable {}

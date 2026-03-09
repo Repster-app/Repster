@@ -35,3 +35,5 @@ final class TemplateSet {
         self.updatedAt = updatedAt
     }
 }
+
+extension TemplateSet: @unchecked Sendable {}

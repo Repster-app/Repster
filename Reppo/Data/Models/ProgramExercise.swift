@@ -35,3 +35,5 @@ final class ProgramExercise {
         self.updatedAt = updatedAt
     }
 }
+
+extension ProgramExercise: @unchecked Sendable {}

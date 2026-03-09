@@ -26,3 +26,5 @@ final class WorkoutTemplate {
         self.updatedAt = updatedAt
     }
 }
+
+extension WorkoutTemplate: @unchecked Sendable {}
