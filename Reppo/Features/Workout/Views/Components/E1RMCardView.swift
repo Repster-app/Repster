@@ -18,7 +18,7 @@ struct E1RMCardView: View {
                 .font(.system(size: 32, weight: .bold))
                 .foregroundStyle(Color.textPrimary)
 
-            // Bottom row: best today + historical comparison
+            // Bottom row: neutral reference set + historical comparison
             bottomRow
         }
         .padding(14)
@@ -48,17 +48,17 @@ struct E1RMCardView: View {
 
     private var bottomRow: some View {
         HStack(spacing: 8) {
-            // Producing set info
+            // Reference set info
             if info.bestSetReps > 0 {
-                Text("Best today: \(formatSetPerformance(weightKg: info.bestSetWeight, reps: info.bestSetReps))")
+                Text("Reference set: \(formatSetPerformance(weightKg: info.bestSetWeight, reps: info.bestSetReps))")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color.textSecondary)
             } else if info.bestSetWeight > 0 {
-                Text("All-time best · \(formatWeight(info.bestSetWeight)) \(unitLabel) top weight")
+                Text("Reference load · \(formatWeight(info.bestSetWeight)) \(unitLabel) top weight")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color.textSecondary)
             } else {
-                Text("All-time best")
+                Text("Based on recent top workouts")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color.textSecondary)
             }

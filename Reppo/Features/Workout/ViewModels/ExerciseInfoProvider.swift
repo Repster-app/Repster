@@ -13,7 +13,7 @@ enum ExerciseInfoProvider {
         trackingType: TrackingType,
         weightIncrement: Double?,
         setService: any SetServiceProtocol,
-        statsService: any StatsServiceProtocol,
+        loadPrescriptionService: any LoadPrescriptionServiceProtocol,
         healthProfileRepo: any HealthProfileRepositoryProtocol
     ) async throws -> ExerciseInfoData {
 
@@ -32,7 +32,7 @@ enum ExerciseInfoProvider {
                 currentSets: currentSets,
                 historicalSets: historicalSets,
                 exerciseId: exerciseId,
-                statsService: statsService
+                loadPrescriptionService: loadPrescriptionService
             )
             : (nil, nil)
 
@@ -51,7 +51,7 @@ enum ExerciseInfoProvider {
             estimatedRepsInfo = EstimatedRepsInfo(
                 targetReps: targetReps,
                 estimatedWeight: snapped,
-                sourceLabel: "Based on recent data"
+                sourceLabel: "Based on capacity baseline"
             )
         } else {
             estimatedRepsInfo = nil
@@ -72,26 +72,40 @@ enum ExerciseInfoProvider {
         currentSets: [WorkoutSet],
         historicalSets: [WorkoutSet],
         exerciseId: UUID,
-        statsService: any StatsServiceProtocol
+        loadPrescriptionService: any LoadPrescriptionServiceProtocol
     ) async throws -> (E1RMInfo?, Double?) {
+        let completedWorking = currentSets.filter { $0.completed && $0.setType != .warmup }
+        let sessionContext: [SessionSetContext] = completedWorking.map { set in
+            SessionSetContext(
+                weight: set.effectiveWeight ?? set.weight ?? 0,
+                reps: set.reps ?? 0,
+                rir: set.rir,
+                completedAt: set.completedAt,
+                completed: true
+            )
+        }
+
+        let baseEstimate = try await loadPrescriptionService.estimateBaseE1RM(
+            exerciseId: exerciseId,
+            completedSessionSets: sessionContext
+        )
+
         // Find best e1RM from current session working sets
         let currentWorkingSets = currentSets.filter {
             $0.setType == .working && $0.hasData && $0.e1RM != nil
         }
         let bestToday = currentWorkingSets.max(by: { ($0.e1RM ?? 0) < ($1.e1RM ?? 0) })
 
-        var currentE1RM = bestToday?.e1RM
+        let currentE1RM = baseEstimate.value
         var bestSetWeight = bestToday?.effectiveWeight ?? 0
         var bestSetReps = bestToday?.reps ?? 0
 
-        // Fallback to ExerciseStats
-        if currentE1RM == nil {
-            let stats = try await statsService.fetchStats(for: exerciseId)
-            if let statsE1RM = stats?.bestE1RM, statsE1RM > 0 {
-                currentE1RM = statsE1RM
-                bestSetWeight = stats?.maxWeight ?? 0
-                bestSetReps = 0
-            }
+        if bestToday == nil {
+            let bestHistoricalSet = historicalSets
+                .filter { $0.setType == .working && $0.hasData && $0.e1RM != nil }
+                .max(by: { ($0.e1RM ?? 0) < ($1.e1RM ?? 0) })
+            bestSetWeight = bestHistoricalSet?.effectiveWeight ?? 0
+            bestSetReps = bestHistoricalSet?.reps ?? 0
         }
 
         guard let currentE1RM else { return (nil, nil) }

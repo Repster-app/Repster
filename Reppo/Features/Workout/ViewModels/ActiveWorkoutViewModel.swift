@@ -851,7 +851,7 @@ final class ActiveWorkoutViewModel {
                 trackingType: exercise.trackingType,
                 weightIncrement: exercise.weightIncrement,
                 setService: setService,
-                statsService: statsService,
+                loadPrescriptionService: loadPrescriptionService,
                 healthProfileRepo: healthProfileRepo
             )
             exerciseInfoData = data
@@ -919,11 +919,13 @@ final class ActiveWorkoutViewModel {
         }
 
         // Find unfilled working sets that need suggestions
-        var setsToSuggest: [(setIndex: Int, setNumber: Int, targetReps: Int, targetRIR: Double)] = []
+        var setsToSuggest: [(setIndex: Int, setNumber: Int, targetReps: Int, targetRIR: Double, repRange: ClosedRange<Int>?)] = []
+        var workingSetNumber = 0
 
         for (index, set) in sets.enumerated() {
-            guard !set.completed else { continue }
             guard set.setType != .warmup else { continue }
+            workingSetNumber += 1
+            guard !set.completed else { continue }
 
             // Determine target reps
             let targetReps: Int?
@@ -951,11 +953,20 @@ final class ActiveWorkoutViewModel {
 
             guard let reps = targetReps, reps > 0 else { continue }
 
+            // Build rep range if both bounds exist
+            let repRange: ClosedRange<Int>?
+            if let min = set.targetRepMin, let max = set.targetRepMax, min < max {
+                repRange = min...max
+            } else {
+                repRange = nil
+            }
+
             setsToSuggest.append((
                 setIndex: index,
-                setNumber: index + 1,
+                setNumber: workingSetNumber,
                 targetReps: reps,
-                targetRIR: targetRIR
+                targetRIR: targetRIR,
+                repRange: repRange
             ))
         }
 
@@ -980,7 +991,7 @@ final class ActiveWorkoutViewModel {
 
         do {
             let batchInput = setsToSuggest.map {
-                (targetReps: $0.targetReps, targetRIR: $0.targetRIR, setIndex: $0.setIndex)
+                (targetReps: $0.targetReps, targetRIR: $0.targetRIR, setIndex: $0.setIndex, repRange: $0.repRange)
             }
 
             let results = try await loadPrescriptionService.prescribeBatch(
@@ -1001,12 +1012,18 @@ final class ActiveWorkoutViewModel {
                     source = prescription.e1RMSource
                 }
 
+                let repRange = setsToSuggest[i].repRange
+                let displayReps = prescription.bestReps ?? setsToSuggest[i].targetReps
+
                 suggestions.append(SetSuggestion(
                     setNumber: setsToSuggest[i].setNumber,
                     suggestedWeight: prescription.prescribedWeight,
-                    targetReps: setsToSuggest[i].targetReps,
+                    targetReps: displayReps,
                     targetRIR: setsToSuggest[i].targetRIR,
-                    contextLabel: buildSuggestionContextLabel(prescription)
+                    targetRepMin: repRange?.lowerBound,
+                    targetRepMax: repRange?.upperBound,
+                    contextLabel: buildSuggestionContextLabel(prescription),
+                    debugLabel: buildSuggestionDebugLabel(prescription, targetRIR: setsToSuggest[i].targetRIR, repRange: repRange)
                 ))
             }
 
@@ -1033,7 +1050,7 @@ final class ActiveWorkoutViewModel {
     private func buildSuggestionsCacheKey(
         exercise: Exercise,
         completedWorking: [WorkoutSet],
-        setsToSuggest: [(setIndex: Int, setNumber: Int, targetReps: Int, targetRIR: Double)],
+        setsToSuggest: [(setIndex: Int, setNumber: Int, targetReps: Int, targetRIR: Double, repRange: ClosedRange<Int>?)],
         profile: HealthProfile?
     ) -> String {
         let completedSignature = completedWorking
@@ -1055,12 +1072,16 @@ final class ActiveWorkoutViewModel {
 
         let pendingSignature = setsToSuggest
             .map { spec in
-                [
+                var parts = [
                     "i\(spec.setIndex)",
                     "n\(spec.setNumber)",
                     "r\(spec.targetReps)",
                     "rir\(signatureNumber(spec.targetRIR))"
-                ].joined(separator: ":")
+                ]
+                if let range = spec.repRange {
+                    parts.append("rng\(range.lowerBound)-\(range.upperBound)")
+                }
+                return parts.joined(separator: ":")
             }
             .joined(separator: "|")
 
@@ -1107,22 +1128,57 @@ final class ActiveWorkoutViewModel {
 
     /// Build a brief context label for a single suggestion.
     private func buildSuggestionContextLabel(_ result: PrescriptionResult) -> String {
-        let e1RMStr = String(format: "%.0f", result.baseE1RM)
-        let fatiguePercent = Int((1.0 - result.fatigueDiscount) * 100)
+        let capacityStr = String(format: "%.1f", result.baseE1RM)
+        let readinessPercent = ((result.effectiveE1RM / result.baseE1RM) - 1.0) * 100.0
 
         let sourceStr: String
         switch result.e1RMSource {
-        case .recentPerformance: sourceStr = "recent workout"
+        case .recentPerformance: sourceStr = "recent top workouts"
         case .historicalPR: sourceStr = "PR history"
         case .noData: sourceStr = "no data"
         }
 
-        var parts = ["\(e1RMStr) kg e1RM from \(sourceStr)"]
-        if result.freshnessApplied {
-            parts.append("+freshness")
-        }
-        parts.append("-\(fatiguePercent)% fatigue")
+        var parts = ["\(capacityStr) kg capacity from \(sourceStr)"]
+        parts.append("readiness \(formatSignedPercent(readinessPercent))")
         return parts.joined(separator: ", ")
+    }
+
+    /// Build a detailed debug label with all calculation parameters (for tap-to-expand).
+    private func buildSuggestionDebugLabel(
+        _ result: PrescriptionResult,
+        targetRIR: Double,
+        repRange: ClosedRange<Int>?
+    ) -> String {
+        var lines: [String] = []
+
+        let capacity = String(format: "%.1f", result.baseE1RM)
+        let effE1RM = String(format: "%.1f", result.effectiveE1RM)
+        let readinessPercent = ((result.effectiveE1RM / result.baseE1RM) - 1.0) * 100.0
+        let raw = String(format: "%.1f", result.rawWeight)
+        let prescribed = String(format: "%.1f", result.prescribedWeight)
+        let inc = String(format: "%.1f", result.weightIncrement)
+        let intensity = String(format: "%.3f", result.intensityFactor)
+        let fatigue = String(format: "%.3f", result.fatigueDiscount)
+        let rir = String(format: "%.0f", targetRIR)
+
+        lines.append("cap e1RM: \(capacity), ready e1RM: \(effE1RM) (\(formatSignedPercent(readinessPercent)))")
+        lines.append("fatigue factor: \(fatigue), freshness: \(result.freshnessApplied ? "on" : "off")")
+        lines.append("int: \(intensity), RIR: \(rir)")
+        lines.append("raw: \(raw) → \(prescribed) (inc \(inc))")
+
+        if let bestReps = result.bestReps, let range = repRange {
+            let impliedE1RM = result.prescribedWeight / max(result.intensityFactor, 0.001)
+            let error = impliedE1RM - result.effectiveE1RM
+            let errorStr = String(format: "%+.1f", error)
+            lines.append("best \(bestReps) of \(range.lowerBound)-\(range.upperBound) (err: \(errorStr))")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    private func formatSignedPercent(_ value: Double) -> String {
+        let sign = value >= 0 ? "+" : ""
+        return "\(sign)\(String(format: "%.1f", value))%"
     }
 
     // MARK: - Summary Computation (T031)
