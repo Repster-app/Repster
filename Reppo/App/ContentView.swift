@@ -6,6 +6,29 @@
 
 import SwiftUI
 
+private enum TemplateEditorRoute: Identifiable {
+    case create(sessionId: UUID)
+    case edit(templateId: UUID)
+
+    var id: String {
+        switch self {
+        case .create(let sessionId):
+            return "create-\(sessionId.uuidString)"
+        case .edit(let templateId):
+            return "edit-\(templateId.uuidString)"
+        }
+    }
+
+    var editingTemplateId: UUID? {
+        switch self {
+        case .create:
+            return nil
+        case .edit(let templateId):
+            return templateId
+        }
+    }
+}
+
 struct ContentView: View {
 
     // MARK: - Environment
@@ -45,16 +68,13 @@ struct ContentView: View {
     @State private var pendingTemplateSheet = false
 
     /// Whether the create/edit template sheet should open after TemplateListSheet dismisses.
-    @State private var pendingCreateTemplateSheet = false
+    @State private var pendingTemplateEditorRoute: TemplateEditorRoute? = nil
 
     /// Whether the Template List sheet is shown.
     @State private var showTemplateListSheet = false
 
-    /// Whether the Create/Edit Template sheet is shown.
-    @State private var showCreateTemplateSheet = false
-
-    /// Template ID being edited (nil = create new).
-    @State private var editingTemplateId: UUID? = nil
+    /// The create/edit template route currently presented.
+    @State private var templateEditorRoute: TemplateEditorRoute? = nil
 
     /// Whether an active workout currently exists (drives FAB behavior).
     @State private var hasActiveWorkout = false
@@ -205,9 +225,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showTemplateListSheet, onDismiss: {
             // Present create/edit template sheet after TemplateListSheet fully dismisses
-            if pendingCreateTemplateSheet {
-                pendingCreateTemplateSheet = false
-                showCreateTemplateSheet = true
+            if let route = pendingTemplateEditorRoute {
+                pendingTemplateEditorRoute = nil
+                templateEditorRoute = route
             }
         }) {
             TemplateListSheet(
@@ -217,23 +237,20 @@ struct ContentView: View {
                     showActiveWorkout = true
                 },
                 onCreateTemplate: {
-                    pendingCreateTemplateSheet = true
+                    pendingTemplateEditorRoute = .create(sessionId: UUID())
                 },
                 onEditTemplate: { templateId in
-                    editingTemplateId = templateId
-                    pendingCreateTemplateSheet = true
+                    pendingTemplateEditorRoute = .edit(templateId: templateId)
                 }
             )
         }
-        .sheet(isPresented: $showCreateTemplateSheet, onDismiss: {
-            editingTemplateId = nil
-        }) {
+        .sheet(item: $templateEditorRoute) { route in
             CreateEditTemplateView(
                 templateService: services.templateService,
                 exerciseService: services.exerciseService,
-                editingTemplateId: editingTemplateId
+                editingTemplateId: route.editingTemplateId
             )
-            .id(editingTemplateId)
+            .id(route.id)
         }
     }
 

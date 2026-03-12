@@ -45,8 +45,8 @@ struct TemplateListSheet: View {
                 Spacer()
 
                 Button {
-                    dismiss()
                     onCreateTemplate()
+                    dismiss()
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "plus")
@@ -165,8 +165,8 @@ struct TemplateListSheet: View {
                             }
                         },
                         onEdit: {
-                            dismiss()
                             onEditTemplate(template.id)
+                            dismiss()
                         },
                         onDelete: {
                             viewModel.confirmDelete(template.id)

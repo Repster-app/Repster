@@ -7,6 +7,7 @@ import SwiftUI
 
 struct CreateEditTemplateView: View {
 
+    private let editingTemplateId: UUID?
     @State private var viewModel: CreateEditTemplateViewModel
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceContainer.self) private var services
@@ -16,10 +17,10 @@ struct CreateEditTemplateView: View {
         exerciseService: any ExerciseServiceProtocol,
         editingTemplateId: UUID? = nil
     ) {
+        self.editingTemplateId = editingTemplateId
         _viewModel = State(initialValue: CreateEditTemplateViewModel(
             templateService: templateService,
-            exerciseService: exerciseService,
-            editingTemplateId: editingTemplateId
+            exerciseService: exerciseService
         ))
     }
 
@@ -41,7 +42,7 @@ struct CreateEditTemplateView: View {
                 .padding(.bottom, 40)
             }
             .background(Color.bg)
-            .navigationTitle(viewModel.editingTemplateId != nil ? "Edit Template" : "New Template")
+            .navigationTitle(editingTemplateId != nil ? "Edit Template" : "New Template")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -64,8 +65,8 @@ struct CreateEditTemplateView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .task {
-            await viewModel.loadIfEditing()
+        .task(id: editingTemplateId) {
+            await viewModel.prepareForPresentation(editingTemplateId: editingTemplateId)
         }
         .sheet(isPresented: $viewModel.showExercisePicker) {
             exercisePickerSheet

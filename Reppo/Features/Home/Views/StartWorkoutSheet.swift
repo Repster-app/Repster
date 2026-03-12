@@ -104,8 +104,8 @@ struct StartWorkoutSheet: View {
 
             // Templates
             Button {
-                dismiss()
                 onTemplates()
+                dismiss()
             } label: {
                 optionRow(
                     icon: "doc.text",

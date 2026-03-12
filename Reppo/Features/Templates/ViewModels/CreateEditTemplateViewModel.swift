@@ -68,6 +68,13 @@ final class CreateEditTemplateViewModel {
         self.editingTemplateId = editingTemplateId
     }
 
+    /// Re-initializes editor state for the current presentation and loads template data if editing.
+    func prepareForPresentation(editingTemplateId: UUID?) async {
+        self.editingTemplateId = editingTemplateId
+        resetEditorState()
+        await loadIfEditing()
+    }
+
     // MARK: - Computed
 
     var canSave: Bool {
@@ -87,44 +94,65 @@ final class CreateEditTemplateViewModel {
         defer { isLoading = false }
 
         do {
-            guard let detail = try await templateService.fetchTemplateDetail(templateId) else { return }
-
-            templateName = detail.template.name
-            templateNotes = detail.template.notes
-
-            exercises = detail.exercises.map { ex in
-                // Track superset groups
-                if let groupId = ex.supersetGroupId {
-                    if supersetGroupLabels[groupId] == nil {
-                        let nextIndex = supersetGroupLabels.count
-                        if nextIndex < supersetLetters.count {
-                            supersetGroupLabels[groupId] = supersetLetters[nextIndex]
-                        }
-                    }
-                }
-
-                return EditorExercise(
-                    id: ex.id,
-                    exerciseId: ex.exerciseId,
-                    exerciseName: ex.exerciseName,
-                    primaryMuscle: ex.primaryMuscle,
-                    sets: ex.sets.map { s in
-                        EditorSet(
-                            id: s.id,
-                            setType: s.setType,
-                            targetRepMin: s.targetRepMin,
-                            targetRepMax: s.targetRepMax,
-                            targetRIR: s.targetRIR
-                        )
-                    },
-                    supersetGroupId: ex.supersetGroupId,
-                    restTimeSeconds: ex.restTimeSeconds,
-                    notes: ex.notes
-                )
-            }
+            guard let detail = try await fetchTemplateDetailWithRetry(templateId) else { return }
+            applyTemplateDetail(detail)
         } catch {
             print("[CreateEditTemplateViewModel] Failed to load template: \(error)")
         }
+    }
+
+    private func fetchTemplateDetailWithRetry(_ templateId: UUID) async throws -> TemplateDetail? {
+        let firstResult = try await templateService.fetchTemplateDetail(templateId)
+        if let firstResult, !firstResult.exercises.isEmpty {
+            return firstResult
+        }
+
+        // Guard against transient empty reads when opening editor immediately after sheet transition.
+        try? await Task.sleep(for: .milliseconds(120))
+        return try await templateService.fetchTemplateDetail(templateId)
+    }
+
+    private func applyTemplateDetail(_ detail: TemplateDetail) {
+        templateName = detail.template.name
+        templateNotes = detail.template.notes
+
+        exercises = detail.exercises.map { ex in
+            // Track superset groups
+            if let groupId = ex.supersetGroupId {
+                if supersetGroupLabels[groupId] == nil {
+                    let nextIndex = supersetGroupLabels.count
+                    if nextIndex < supersetLetters.count {
+                        supersetGroupLabels[groupId] = supersetLetters[nextIndex]
+                    }
+                }
+            }
+
+            return EditorExercise(
+                id: ex.id,
+                exerciseId: ex.exerciseId,
+                exerciseName: ex.exerciseName,
+                primaryMuscle: ex.primaryMuscle,
+                sets: ex.sets.map { s in
+                    EditorSet(
+                        id: s.id,
+                        setType: s.setType,
+                        targetRepMin: s.targetRepMin,
+                        targetRepMax: s.targetRepMax,
+                        targetRIR: s.targetRIR
+                    )
+                },
+                supersetGroupId: ex.supersetGroupId,
+                restTimeSeconds: ex.restTimeSeconds,
+                notes: ex.notes
+            )
+        }
+    }
+
+    private func resetEditorState() {
+        templateName = ""
+        templateNotes = nil
+        exercises = []
+        supersetGroupLabels = [:]
     }
 
     // MARK: - Save
