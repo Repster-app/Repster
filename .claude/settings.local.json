@@ -96,7 +96,9 @@
       "Bash(git config --global user.name \"nikolettkiraly\")",
       "Bash(git config --global user.email \"mespensen@reppo.app\")",
       "Bash(git init)",
-      "Bash(/Users/nikolettkiraly/Downloads/NewWorkoutProject/.gitignore:*)"
+      "Bash(/Users/nikolettkiraly/Downloads/NewWorkoutProject/.gitignore:*)",
+      "Bash(find /Users/nikolettkiraly/Downloads/NewWorkoutProject -type f -name \"*.swift\" -exec grep -l \"menu\\\\|MenuBar\\\\|topBar\\\\|navBar\" {})",
+      "Bash(find /Users/nikolettkiraly/Downloads/NewWorkoutProject/Reppo/Core/Services/Protocols -name *.swift)"
     ]
   }
 }

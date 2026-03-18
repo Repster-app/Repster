@@ -133,6 +133,9 @@ struct SetRowView: View {
     /// Optional suggested weight shown in custom keyboard actions.
     var suggestedWeight: Double? = nil
 
+    /// Overrides `set.cachedPRStatus` for badge display when non-nil (suppresses dominated matches).
+    var prStatusOverride: CachedPRStatus?? = nil
+
     // MARK: - Body
 
     /// Row-local active input field, used by the custom set-entry keyboard flow.
@@ -155,7 +158,7 @@ struct SetRowView: View {
             Color.clear
                 .frame(width: 44, height: 1)
                 .overlay(alignment: .trailing) {
-                    PRBadgeView(status: set.cachedPRStatus)
+                    PRBadgeView(status: prStatusOverride ?? set.cachedPRStatus)
                 }
 
             // Completion checkbox — fixed 40pt column

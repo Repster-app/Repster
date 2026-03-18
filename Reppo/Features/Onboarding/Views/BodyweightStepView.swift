@@ -11,6 +11,8 @@ struct BodyweightStepView: View {
     let onNext: () -> Void
     let onSkip: () -> Void
 
+    @FocusState private var isWeightFocused: Bool
+
     var body: some View {
         VStack(spacing: 32) {
             Spacer()
@@ -33,6 +35,7 @@ struct BodyweightStepView: View {
                     .keyboardType(.decimalPad)
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 150)
+                    .focused($isWeightFocused)
                 Text(unitPreference == .metric ? "kg" : "lbs")
                     .foregroundStyle(Color.textSecondary)
             }
@@ -41,12 +44,18 @@ struct BodyweightStepView: View {
             Spacer()
 
             VStack(spacing: 12) {
-                Button("Continue") { onNext() }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
+                Button("Continue") {
+                    isWeightFocused = false
+                    onNext()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
 
-                Button("Skip") { onSkip() }
-                    .foregroundStyle(Color.textSecondary)
+                Button("Skip") {
+                    isWeightFocused = false
+                    onSkip()
+                }
+                .foregroundStyle(Color.textSecondary)
             }
             .padding(.horizontal, 32)
             .padding(.bottom, 48)

@@ -131,9 +131,9 @@ actor ImportService: ImportServiceProtocol {
         // Column 7: Distance Unit (optional)
         let distUnit = fields[7].trimmingCharacters(in: .whitespaces)
 
-        // Column 8: Time (optional)
+        // Column 8: Time (optional, may be MM:SS or plain seconds)
         let timeStr = fields[8].trimmingCharacters(in: .whitespaces)
-        let duration = timeStr.isEmpty ? nil : Int(timeStr)
+        let duration = parseTimeToSeconds(timeStr)
 
         // Column 9: Notes (optional)
         let notes = fields[9].trimmingCharacters(in: .whitespaces)
@@ -141,15 +141,11 @@ actor ImportService: ImportServiceProtocol {
         // Column 10: Kind (optional)
         let kind = fields[10].trimmingCharacters(in: .whitespaces)
 
-        // Must have at least one data value
-        let hasWeight = weightKg != nil && weightKg! > 0
-        let hasReps = reps != nil && reps! > 0
-        let hasDuration = duration != nil && duration! > 0
-        let hasDistance = distance != nil && distance! > 0
-        let hasData = (hasWeight && hasReps) || hasDuration || hasDistance
+        // Must have at least one data value (nil = absent in CSV; 0 is valid data, e.g. bodyweight exercises)
+        let hasData = weightKg != nil || reps != nil || duration != nil || distance != nil
 
         guard hasData else {
-            return .failure(.init(rowNumber: rowNumber, reason: "Row has no data values (need weight+reps, duration, or distance)"))
+            return .failure(.init(rowNumber: rowNumber, reason: "Row has no data values (need at least one of weight, reps, duration, or distance)"))
         }
 
         return .success(ValidatedRow(
@@ -174,6 +170,12 @@ actor ImportService: ImportServiceProtocol {
         case "d":   return .duration
         case "wd":  return .weightDistance
         case "wrd": return .weightRepsDuration
+        case "wt":  return .duration           // weight + time
+        case "dt":  return .duration           // distance + time
+        case "tr":  return .duration           // time + reps
+        case "t":   return .duration           // time only
+        case "r":   return .weightReps         // reps only
+        case "w":   return .weightReps         // weight only
         default:    return .weightReps
         }
     }
@@ -405,6 +407,21 @@ actor ImportService: ImportServiceProtocol {
             continuation.yield(.failed(.insertFailed(error.localizedDescription)))
             continuation.finish()
         }
+    }
+
+    // MARK: - Time Parsing
+
+    /// Parses FitNotes time strings ("MM:SS" or plain seconds) into total seconds.
+    private nonisolated func parseTimeToSeconds(_ str: String) -> Int? {
+        let trimmed = str.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty { return nil }
+        let parts = trimmed.split(separator: ":")
+        if parts.count == 2,
+           let minutes = Int(parts[0]),
+           let seconds = Int(parts[1]) {
+            return minutes * 60 + seconds
+        }
+        return Int(trimmed)
     }
 
     // MARK: - Helpers

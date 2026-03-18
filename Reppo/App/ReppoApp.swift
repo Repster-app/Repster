@@ -39,6 +39,7 @@ struct ReppoApp: App {
                 OnboardingContainerView(
                     settingsService: services.settingsService,
                     bodyweightService: services.bodyweightService,
+                    importService: services.importService,
                     onComplete: {
                         hasCompletedOnboarding = true
                     }

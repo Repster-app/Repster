@@ -15,6 +15,7 @@ final class BreakdownTabViewModel {
     var summary: BreakdownSummary?
     var isLoading = false
     var dateRangeLabel: String = ""
+    private var earliestWorkoutDate: Date?
 
     // MARK: - Dependencies
 
@@ -36,6 +37,9 @@ final class BreakdownTabViewModel {
             )
             chartData = data
             summary = try await chartDataService.fetchBreakdownSummary(timeRange: selectedTimeRange)
+            if earliestWorkoutDate == nil {
+                earliestWorkoutDate = try await chartDataService.fetchEarliestWorkoutDate()
+            }
             updateDateRangeLabel()
         } catch {
             print("[BreakdownTab] Error loading data: \(error)")
@@ -60,7 +64,7 @@ final class BreakdownTabViewModel {
     private func updateDateRangeLabel() {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d, yyyy"
-        let start = selectedTimeRange.startDate ?? Date(timeIntervalSince1970: 0)
+        let start = selectedTimeRange.startDate ?? earliestWorkoutDate ?? Date()
         dateRangeLabel = "\(formatter.string(from: start)) → \(formatter.string(from: Date()))"
     }
 

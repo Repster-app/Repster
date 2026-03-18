@@ -19,6 +19,9 @@ protocol ChartDataServiceProtocol: Sendable {
 
     // MARK: - Exercises Tab (WP08)
     func fetchExerciseProgress(metric: ExerciseMetric, exerciseIds: [UUID], timeRange: WorkoutsTimeRange) async throws -> [ExerciseProgressSeries]
+
+    // MARK: - Helpers
+    func fetchEarliestWorkoutDate() async throws -> Date?
 }
 
 actor ChartDataService: ChartDataServiceProtocol {
@@ -425,5 +428,12 @@ actor ChartDataService: ChartDataServiceProtocol {
             // Non-weight metrics — no weight x reps to show
             return nil
         }
+    }
+
+    // MARK: - Helpers
+
+    func fetchEarliestWorkoutDate() async throws -> Date? {
+        let workouts = try await workoutRepository.fetchAllWorkouts(limit: nil, offset: nil)
+        return workouts.filter { $0.status == .completed }.map(\.date).min()
     }
 }

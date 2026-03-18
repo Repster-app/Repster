@@ -257,6 +257,22 @@ final class ActiveWorkoutViewModel {
                 self.globalDefaultWarmupRestTime = profile.defaultWarmupRestTimeSeconds
             }
 
+            // 8. Restore persisted rest timer (survives view dismissal)
+            if let savedStartDate = UserDefaults.standard.object(forKey: "restTimerStartDate") as? Date {
+                let savedDuration = UserDefaults.standard.integer(forKey: "restTimerTotalDuration")
+                if savedDuration > 0 {
+                    let elapsed = Int(Date().timeIntervalSince(savedStartDate))
+                    let remaining = savedDuration - elapsed
+                    if remaining > 0 {
+                        startRestTimer(duration: remaining)
+                    } else {
+                        restTimer = .finished
+                        UserDefaults.standard.removeObject(forKey: "restTimerStartDate")
+                        UserDefaults.standard.removeObject(forKey: "restTimerTotalDuration")
+                    }
+                }
+            }
+
         } catch {
             print("[ActiveWorkoutViewModel] Failed to load active workout: \(error)")
         }
@@ -618,6 +634,10 @@ final class ActiveWorkoutViewModel {
         timerTotalDuration = duration
         restTimer = .running(remaining: duration, total: duration)
 
+        // Persist timer state so it survives view dismissal
+        UserDefaults.standard.set(timerStartDate, forKey: "restTimerStartDate")
+        UserDefaults.standard.set(timerTotalDuration, forKey: "restTimerTotalDuration")
+
         // Start 1-second tick via Timer.publish
         timerSubscription = Timer.publish(every: 1, on: .main, in: .common)
             .autoconnect()
@@ -668,6 +688,10 @@ final class ActiveWorkoutViewModel {
         timerStartDate = nil
         restTimer = .idle
 
+        // Clear persisted timer state
+        UserDefaults.standard.removeObject(forKey: "restTimerStartDate")
+        UserDefaults.standard.removeObject(forKey: "restTimerTotalDuration")
+
         // Update Live Activity (timer dismissed)
         updateLiveActivityState()
     }
@@ -702,6 +726,9 @@ final class ActiveWorkoutViewModel {
             restTimer = .finished
             timerSubscription?.cancel()
             timerSubscription = nil
+            // Clear persisted timer state
+            UserDefaults.standard.removeObject(forKey: "restTimerStartDate")
+            UserDefaults.standard.removeObject(forKey: "restTimerTotalDuration")
             // Update Live Activity only on state transition to .finished
             // (NOT every tick — countdown is rendered by ActivityKit's timer text style)
             updateLiveActivityState()
@@ -872,8 +899,8 @@ final class ActiveWorkoutViewModel {
 
     /// Load weight suggestions for unfilled working sets of the current exercise.
     ///
-    /// Uses LoadPrescriptionService.prescribeBatch() to compute fatigue-aware
-    /// weight suggestions, then maps results to WeightSuggestionData for display.
+    /// Uses SuggestionCoordinator to gather app models, LoadPrescriptionService
+    /// to normalize and evaluate, and SuggestionExplainer to build display data.
     /// Does NOT modify any WorkoutSet objects — purely read-only.
     func loadWeightSuggestions() async {
         guard let exercise = currentExercise else {
@@ -906,74 +933,13 @@ final class ActiveWorkoutViewModel {
 
         let sets = currentSets
         let completedWorking = sets.filter { $0.completed && $0.setType != .warmup }
+        let completedSessionSets = SuggestionCoordinator.completedSessionSets(from: sets)
+        let pendingSets = SuggestionCoordinator.pendingSetInputs(from: sets)
 
-        // Build session context from completed sets
-        let completedSessionSets: [SessionSetContext] = completedWorking.map { set in
-            SessionSetContext(
-                weight: set.effectiveWeight ?? set.weight ?? 0,
-                reps: set.reps ?? 0,
-                rir: set.rir,
-                completedAt: set.completedAt,
-                completed: true
-            )
-        }
-
-        // Find unfilled working sets that need suggestions
-        var setsToSuggest: [(setIndex: Int, setNumber: Int, targetReps: Int, targetRIR: Double, repRange: ClosedRange<Int>?)] = []
-        var workingSetNumber = 0
-
-        for (index, set) in sets.enumerated() {
-            guard set.setType != .warmup else { continue }
-            workingSetNumber += 1
-            guard !set.completed else { continue }
-
-            // Determine target reps
-            let targetReps: Int?
-            if let reps = set.reps, reps > 0 {
-                targetReps = reps
-            } else if let min = set.targetRepMin, let max = set.targetRepMax {
-                targetReps = (min + max) / 2
-            } else if let min = set.targetRepMin {
-                targetReps = min
-            } else if let max = set.targetRepMax {
-                targetReps = max
-            } else {
-                targetReps = 8
-            }
-
-            // Determine target RIR
-            let targetRIR: Double
-            if let rir = set.rir {
-                targetRIR = rir
-            } else if let tRIR = set.targetRIR {
-                targetRIR = Double(tRIR)
-            } else {
-                targetRIR = 2.0
-            }
-
-            guard let reps = targetReps, reps > 0 else { continue }
-
-            // Build rep range if both bounds exist
-            let repRange: ClosedRange<Int>?
-            if let min = set.targetRepMin, let max = set.targetRepMax, min < max {
-                repRange = min...max
-            } else {
-                repRange = nil
-            }
-
-            setsToSuggest.append((
-                setIndex: index,
-                setNumber: workingSetNumber,
-                targetReps: reps,
-                targetRIR: targetRIR,
-                repRange: repRange
-            ))
-        }
-
-        let cacheKey = buildSuggestionsCacheKey(
+        let cacheKey = SuggestionCoordinator.cacheKey(
             exercise: exercise,
             completedWorking: completedWorking,
-            setsToSuggest: setsToSuggest,
+            pendingSets: pendingSets,
             profile: resolvedProfile
         )
 
@@ -983,59 +949,19 @@ final class ActiveWorkoutViewModel {
         isLoadingWeightSuggestions = true
         defer { isLoadingWeightSuggestions = false }
 
-        guard !setsToSuggest.isEmpty else {
+        guard !pendingSets.isEmpty else {
             weightSuggestionData = nil
             suggestionsLoadedForKey = cacheKey
             return
         }
 
         do {
-            let batchInput = setsToSuggest.map {
-                (targetReps: $0.targetReps, targetRIR: $0.targetRIR, setIndex: $0.setIndex, repRange: $0.repRange)
-            }
-
-            let results = try await loadPrescriptionService.prescribeBatch(
+            let evaluation = try await loadPrescriptionService.evaluateSuggestions(
                 exerciseId: exercise.id,
-                sets: batchInput,
+                pendingSets: pendingSets,
                 completedSessionSets: completedSessionSets
             )
-
-            var suggestions: [SetSuggestion] = []
-            var baseE1RM: Double?
-            var source: E1RMSource = .noData
-
-            for (i, result) in results.enumerated() {
-                guard let prescription = result, prescription.prescribedWeight > 0 else { continue }
-
-                if baseE1RM == nil {
-                    baseE1RM = prescription.baseE1RM
-                    source = prescription.e1RMSource
-                }
-
-                let repRange = setsToSuggest[i].repRange
-                let displayReps = prescription.bestReps ?? setsToSuggest[i].targetReps
-
-                suggestions.append(SetSuggestion(
-                    setNumber: setsToSuggest[i].setNumber,
-                    suggestedWeight: prescription.prescribedWeight,
-                    targetReps: displayReps,
-                    targetRIR: setsToSuggest[i].targetRIR,
-                    targetRepMin: repRange?.lowerBound,
-                    targetRepMax: repRange?.upperBound,
-                    contextLabel: buildSuggestionContextLabel(prescription),
-                    debugLabel: buildSuggestionDebugLabel(prescription, targetRIR: setsToSuggest[i].targetRIR, repRange: repRange)
-                ))
-            }
-
-            if suggestions.isEmpty {
-                weightSuggestionData = nil
-            } else {
-                weightSuggestionData = WeightSuggestionData(
-                    suggestions: suggestions,
-                    baseE1RM: baseE1RM,
-                    e1RMSource: source
-                )
-            }
+            weightSuggestionData = evaluation.flatMap(SuggestionExplainer.makeWeightSuggestionData)
 
             suggestionsLoadedForKey = cacheKey
 
@@ -1044,141 +970,6 @@ final class ActiveWorkoutViewModel {
             weightSuggestionData = nil
             suggestionsLoadedForKey = cacheKey
         }
-    }
-
-    /// Build a stable cache key from all meaningful inputs to suggestion computation.
-    private func buildSuggestionsCacheKey(
-        exercise: Exercise,
-        completedWorking: [WorkoutSet],
-        setsToSuggest: [(setIndex: Int, setNumber: Int, targetReps: Int, targetRIR: Double, repRange: ClosedRange<Int>?)],
-        profile: HealthProfile?
-    ) -> String {
-        let completedSignature = completedWorking
-            .sorted { $0.orderInExercise < $1.orderInExercise }
-            .map { set in
-                let weight = set.effectiveWeight ?? set.weight ?? 0
-                let reps = set.reps ?? 0
-                let rir = set.rir ?? -1
-                let completedAt = Int(set.completedAt?.timeIntervalSince1970 ?? 0)
-                return [
-                    set.id.uuidString,
-                    "w\(signatureNumber(weight))",
-                    "r\(reps)",
-                    "rir\(signatureNumber(rir))",
-                    "t\(completedAt)"
-                ].joined(separator: ":")
-            }
-            .joined(separator: "|")
-
-        let pendingSignature = setsToSuggest
-            .map { spec in
-                var parts = [
-                    "i\(spec.setIndex)",
-                    "n\(spec.setNumber)",
-                    "r\(spec.targetReps)",
-                    "rir\(signatureNumber(spec.targetRIR))"
-                ]
-                if let range = spec.repRange {
-                    parts.append("rng\(range.lowerBound)-\(range.upperBound)")
-                }
-                return parts.joined(separator: ":")
-            }
-            .joined(separator: "|")
-
-        let profileSignature: String
-        if let profile {
-            profileSignature = [
-                "enabled\(profile.prescriptionEnabled ?? true)",
-                "weeks\(profile.prescriptionRecencyWeeks ?? 6)",
-                "inc\(signatureOptionalNumber(profile.prescriptionDefaultIncrement))",
-                "fresh\(profile.prescriptionFreshnessBonus ?? false)",
-                "freshPct\(signatureOptionalNumber(profile.prescriptionFreshnessBonusPercent))",
-                "fatigue\(profile.prescriptionFatigueModelingEnabled ?? true)",
-                "recovery\(signatureOptionalNumber(profile.prescriptionDefaultRecoveryConstant))",
-                "formula\(profile.e1RMFormula)",
-                "updated\(Int(profile.updatedAt.timeIntervalSince1970))"
-            ].joined(separator: ":")
-        } else {
-            profileSignature = "profile:unknown"
-        }
-
-        let exerciseSignature = [
-            "inc\(signatureOptionalNumber(exercise.weightIncrement))",
-            "fatigueRate\(signatureOptionalNumber(exercise.fatigueRate))",
-            "recovery\(signatureOptionalNumber(exercise.recoveryConstant))"
-        ].joined(separator: ":")
-
-        return [
-            exercise.id.uuidString,
-            exerciseSignature,
-            profileSignature,
-            completedSignature,
-            pendingSignature
-        ].joined(separator: "||")
-    }
-
-    private func signatureNumber(_ value: Double) -> String {
-        String(format: "%.4f", value)
-    }
-
-    private func signatureOptionalNumber(_ value: Double?) -> String {
-        guard let value else { return "nil" }
-        return signatureNumber(value)
-    }
-
-    /// Build a brief context label for a single suggestion.
-    private func buildSuggestionContextLabel(_ result: PrescriptionResult) -> String {
-        let capacityStr = String(format: "%.1f", result.baseE1RM)
-        let readinessPercent = ((result.effectiveE1RM / result.baseE1RM) - 1.0) * 100.0
-
-        let sourceStr: String
-        switch result.e1RMSource {
-        case .recentPerformance: sourceStr = "recent top workouts"
-        case .historicalPR: sourceStr = "PR history"
-        case .noData: sourceStr = "no data"
-        }
-
-        var parts = ["\(capacityStr) kg capacity from \(sourceStr)"]
-        parts.append("readiness \(formatSignedPercent(readinessPercent))")
-        return parts.joined(separator: ", ")
-    }
-
-    /// Build a detailed debug label with all calculation parameters (for tap-to-expand).
-    private func buildSuggestionDebugLabel(
-        _ result: PrescriptionResult,
-        targetRIR: Double,
-        repRange: ClosedRange<Int>?
-    ) -> String {
-        var lines: [String] = []
-
-        let capacity = String(format: "%.1f", result.baseE1RM)
-        let effE1RM = String(format: "%.1f", result.effectiveE1RM)
-        let readinessPercent = ((result.effectiveE1RM / result.baseE1RM) - 1.0) * 100.0
-        let raw = String(format: "%.1f", result.rawWeight)
-        let prescribed = String(format: "%.1f", result.prescribedWeight)
-        let inc = String(format: "%.1f", result.weightIncrement)
-        let intensity = String(format: "%.3f", result.intensityFactor)
-        let fatigue = String(format: "%.3f", result.fatigueDiscount)
-        let rir = String(format: "%.0f", targetRIR)
-
-        lines.append("cap e1RM: \(capacity), ready e1RM: \(effE1RM) (\(formatSignedPercent(readinessPercent)))")
-        lines.append("fatigue factor: \(fatigue), freshness: \(result.freshnessApplied ? "on" : "off")")
-        lines.append("int: \(intensity), RIR: \(rir)")
-        lines.append("raw: \(raw) → \(prescribed) (inc \(inc))")
-
-        if let bestReps = result.bestReps, let range = repRange {
-            let impliedE1RM = result.prescribedWeight / max(result.intensityFactor, 0.001)
-            let error = impliedE1RM - result.effectiveE1RM
-            let errorStr = String(format: "%+.1f", error)
-            lines.append("best \(bestReps) of \(range.lowerBound)-\(range.upperBound) (err: \(errorStr))")
-        }
-
-        return lines.joined(separator: "\n")
-    }
-
-    private func formatSignedPercent(_ value: Double) -> String {
-        let sign = value >= 0 ? "+" : ""
-        return "\(sign)\(String(format: "%.1f", value))%"
     }
 
     // MARK: - Summary Computation (T031)
@@ -1370,6 +1161,10 @@ final class ActiveWorkoutViewModel {
 extension ActiveWorkoutViewModel: SetTableDataSource {
     var currentSuggestedWeight: Double? {
         weightSuggestionData?.suggestions.first?.suggestedWeight
+    }
+
+    func suggestedWeight(for setId: UUID) -> Double? {
+        weightSuggestionData?.suggestion(for: setId)?.suggestedWeight
     }
 
     /// No-op in active workout — sets are saved when the checkbox is tapped.

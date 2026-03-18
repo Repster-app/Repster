@@ -6,6 +6,7 @@
 import SwiftUI
 
 struct WelcomeStepView: View {
+    @Binding var setupMode: OnboardingSetupMode
     let onNext: () -> Void
 
     var body: some View {
@@ -31,11 +32,29 @@ struct WelcomeStepView: View {
 
             Spacer()
 
-            Button("Get Started") { onNext() }
+            VStack(spacing: 12) {
+                Button {
+                    setupMode = .quick
+                    onNext()
+                } label: {
+                    Text("Quick Setup")
+                        .frame(maxWidth: .infinity)
+                }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .padding(.horizontal, 32)
-                .padding(.bottom, 48)
+
+                Button {
+                    setupMode = .advanced
+                    onNext()
+                } label: {
+                    Text("Advanced Setup")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+            }
+            .padding(.horizontal, 32)
+            .padding(.bottom, 48)
         }
     }
 }

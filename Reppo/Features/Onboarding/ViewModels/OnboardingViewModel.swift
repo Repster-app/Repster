@@ -6,11 +6,17 @@
 import Foundation
 import SwiftUI
 
+enum OnboardingSetupMode {
+    case quick    // Skips formula step
+    case advanced // Full flow including formula selection
+}
+
 @Observable @MainActor
 final class OnboardingViewModel {
     // MARK: - Step Progression
 
     var currentStep: OnboardingStep = .welcome
+    var setupMode: OnboardingSetupMode = .quick
 
     // MARK: - User Selections (defaults applied)
 
@@ -37,8 +43,17 @@ final class OnboardingViewModel {
 
     var isLastStep: Bool { currentStep == .importPrompt }
 
+    /// Steps visible for the current setup mode.
+    var visibleSteps: [OnboardingStep] {
+        OnboardingStep.allCases.filter { step in
+            if step == .formula && setupMode == .quick { return false }
+            return true
+        }
+    }
+
     var stepProgress: Double {
-        Double(currentStep.rawValue + 1) / Double(OnboardingStep.totalSteps)
+        guard let index = visibleSteps.firstIndex(of: currentStep) else { return 0 }
+        return Double(index + 1) / Double(visibleSteps.count)
     }
 
     var canSkip: Bool { currentStep.isSkippable }
@@ -46,7 +61,9 @@ final class OnboardingViewModel {
     // MARK: - Navigation
 
     func next() {
-        guard let nextStep = OnboardingStep(rawValue: currentStep.rawValue + 1) else { return }
+        guard let currentIndex = visibleSteps.firstIndex(of: currentStep),
+              currentIndex + 1 < visibleSteps.count else { return }
+        let nextStep = visibleSteps[currentIndex + 1]
         withAnimation { currentStep = nextStep }
     }
 

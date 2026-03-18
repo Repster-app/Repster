@@ -79,8 +79,13 @@ protocol SetTableDataSource: AnyObject, Observable {
     /// Optional suggested weight for the currently selected exercise/set context.
     /// Returns nil when suggestions are unavailable (for example in edit mode).
     var currentSuggestedWeight: Double? { get }
+
+    /// Optional row-addressable suggested weight for a specific pending set.
+    /// Returns nil when suggestions are unavailable or no mapping exists.
+    func suggestedWeight(for setId: UUID) -> Double?
 }
 
 extension SetTableDataSource {
     var currentSuggestedWeight: Double? { nil }
+    func suggestedWeight(for setId: UUID) -> Double? { nil }
 }

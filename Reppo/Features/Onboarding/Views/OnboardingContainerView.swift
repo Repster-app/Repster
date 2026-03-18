@@ -7,15 +7,18 @@ import SwiftUI
 
 struct OnboardingContainerView: View {
     @State private var viewModel: OnboardingViewModel
+    let importService: any ImportServiceProtocol
     let onComplete: () -> Void
 
     init(settingsService: any SettingsServiceProtocol,
          bodyweightService: any BodyweightServiceProtocol,
+         importService: any ImportServiceProtocol,
          onComplete: @escaping () -> Void) {
         _viewModel = State(initialValue: OnboardingViewModel(
             settingsService: settingsService,
             bodyweightService: bodyweightService
         ))
+        self.importService = importService
         self.onComplete = onComplete
     }
 
@@ -24,7 +27,10 @@ struct OnboardingContainerView: View {
             progressDots
 
             TabView(selection: $viewModel.currentStep) {
-                WelcomeStepView(onNext: { viewModel.next() })
+                WelcomeStepView(
+                    setupMode: $viewModel.setupMode,
+                    onNext: { viewModel.next() }
+                )
                     .tag(OnboardingStep.welcome)
 
                 UnitsStepView(
@@ -33,11 +39,13 @@ struct OnboardingContainerView: View {
                 )
                 .tag(OnboardingStep.units)
 
-                FormulaStepView(
-                    selectedFormula: $viewModel.selectedFormula,
-                    onNext: { viewModel.next() }
-                )
-                .tag(OnboardingStep.formula)
+                if viewModel.setupMode == .advanced {
+                    FormulaStepView(
+                        selectedFormula: $viewModel.selectedFormula,
+                        onNext: { viewModel.next() }
+                    )
+                    .tag(OnboardingStep.formula)
+                }
 
                 BodyweightStepView(
                     bodyweightInput: $viewModel.bodyweightInput,
@@ -48,6 +56,7 @@ struct OnboardingContainerView: View {
                 .tag(OnboardingStep.bodyweight)
 
                 ImportStepView(
+                    importService: importService,
                     isSaving: viewModel.isSaving,
                     onFinish: {
                         Task {
@@ -74,9 +83,11 @@ struct OnboardingContainerView: View {
 
     private var progressDots: some View {
         HStack(spacing: 8) {
-            ForEach(OnboardingStep.allCases, id: \.self) { step in
+            ForEach(viewModel.visibleSteps, id: \.self) { step in
+                let currentIndex = viewModel.visibleSteps.firstIndex(of: viewModel.currentStep) ?? 0
+                let stepIndex = viewModel.visibleSteps.firstIndex(of: step) ?? 0
                 Circle()
-                    .fill(step.rawValue <= viewModel.currentStep.rawValue
+                    .fill(stepIndex <= currentIndex
                           ? Color.accent
                           : Color.textSecondary.opacity(0.3))
                     .frame(width: 8, height: 8)

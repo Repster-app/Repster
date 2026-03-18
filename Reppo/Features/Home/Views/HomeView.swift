@@ -6,9 +6,11 @@ import SwiftUI
 
 struct HomeView: View {
     @State private var viewModel: HomeViewModel
+    @State private var navigationPath = NavigationPath()
     @Environment(ServiceContainer.self) private var services
 
     let refreshTrigger: UUID
+    let popToRootTrigger: UUID
     let onStartWorkout: () -> Void
     let onShowStartWorkoutSheet: () -> Void
     let onShowExerciseList: () -> Void
@@ -18,6 +20,7 @@ struct HomeView: View {
         setService: any SetServiceProtocol,
         exerciseService: any ExerciseServiceProtocol,
         refreshTrigger: UUID,
+        popToRootTrigger: UUID = UUID(),
         onStartWorkout: @escaping () -> Void,
         onShowStartWorkoutSheet: @escaping () -> Void,
         onShowExerciseList: @escaping () -> Void
@@ -28,13 +31,14 @@ struct HomeView: View {
             exerciseService: exerciseService
         ))
         self.refreshTrigger = refreshTrigger
+        self.popToRootTrigger = popToRootTrigger
         self.onStartWorkout = onStartWorkout
         self.onShowStartWorkoutSheet = onShowStartWorkoutSheet
         self.onShowExerciseList = onShowExerciseList
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             ScrollView {
                 VStack(spacing: 20) {
                     headerSection
@@ -66,6 +70,9 @@ struct HomeView: View {
             // Reload when refreshTrigger changes (e.g. after workout dismiss)
             viewModel.lastLoadTime = nil
             await viewModel.loadData()
+        }
+        .onChange(of: popToRootTrigger) {
+            navigationPath = NavigationPath()
         }
         .onAppear {
             // Reload when navigating back (e.g. after deleting a workout)

@@ -205,6 +205,7 @@ struct ActiveWorkoutView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 20)
             }
+            .id(viewModel.currentExercise?.id)
             .task(id: viewModel.currentExercise?.id) {
                 await viewModel.loadExerciseInfo()
                 await viewModel.loadWeightSuggestions()

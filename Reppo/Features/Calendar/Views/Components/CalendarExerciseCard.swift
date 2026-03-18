@@ -11,7 +11,7 @@ struct CalendarExerciseCard: View {
     let onTapped: () -> Void
 
     private var displaySets: [WorkoutSet] {
-        sets.filter { $0.modelContext != nil && $0.hasData }
+        sets.filter { $0.hasData }
             .sorted { $0.orderInExercise < $1.orderInExercise }
     }
 
@@ -122,7 +122,7 @@ struct CalendarExerciseCard: View {
             Color.clear
                 .frame(width: 44, height: 1)
                 .overlay(alignment: .trailing) {
-                    PRBadgeView(status: workoutSet.cachedPRStatus)
+                    PRBadgeView(status: CachedPRStatus.effectiveStatus(for: workoutSet, among: displaySets))
                 }
         }
         .padding(.vertical, 4)

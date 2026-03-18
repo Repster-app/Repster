@@ -1,0 +1,91 @@
+Mar 13 13:33:17 Nikoletts-MacBook-Air com.apple.ibtool[47245] <Error>: Unable to deliver request ({
+	    "developer_dir" = "/Applications/Xcode.app/Contents/Developer";
+	    request = "set_developer_dir";
+	}) because we are not connected to CoreSimulatorService.
+Mar 13 13:33:17 Nikoletts-MacBook-Air com.apple.ibtool[47245] <Warning>: Unable to discover any Simulator runtimes. Developer Directory is /Applications/Xcode.app/Contents/Developer.
+Mar 13 13:33:17 Nikoletts-MacBook-Air com.apple.ibtool[47245] <Error>: Could not kickstart simdiskimaged; SimDiskImageManager services will not be available: Error Domain=NSPOSIXErrorDomain Code=53 "Software caused connection abort" UserInfo={NSLocalizedDescription=Error returned in reply from CoreSimulatorService: Connection invalid}
+Mar 13 13:33:17 Nikoletts-MacBook-Air com.apple.ibtool[47245] <Error>: simdiskimaged returned error (invalid), marking disconnected.
+Mar 13 13:33:17 Nikoletts-MacBook-Air com.apple.ibtool[47245] <Error>: simdiskimaged returned error (invalid), marking disconnected.
+Mar 13 13:33:17 Nikoletts-MacBook-Air com.apple.ibtool[47245] <Error>: Could not get list of trusted mount directories: Error Domain=com.apple.CoreSimulator.SimError Code=410 "The service used to manage runtime disk images (simdiskimaged) crashed or is not responding" UserInfo={NSLocalizedDescription=The service used to manage runtime disk images (simdiskimaged) crashed or is not responding}
+Mar 13 13:33:17 Nikoletts-MacBook-Air com.apple.ibtool[47245] <Error>: Unable to deliver request ({
+	    request = "notification_subscription";
+	    "set_path" = "/Users/nikolettkiraly/Library/Developer/CoreSimulator/Devices";
+	}) because we are not connected to CoreSimulatorService.
+Mar 13 13:33:17 Nikoletts-MacBook-Air com.apple.ibtool[47244] <Error>: Unable to deliver request ({
+	    "developer_dir" = "/Applications/Xcode.app/Contents/Developer";
+	    request = "set_developer_dir";
+	}) because we are not connected to CoreSimulatorService.
+Mar 13 13:33:17 Nikoletts-MacBook-Air com.apple.ibtool[47244] <Warning>: Unable to discover any Simulator runtimes. Developer Directory is /Applications/Xcode.app/Contents/Developer.
+Mar 13 13:33:17 Nikoletts-MacBook-Air com.apple.ibtool[47244] <Error>: simdiskimaged returned error (invalid), marking disconnected.
+Mar 13 13:33:17 Nikoletts-MacBook-Air com.apple.ibtool[47244] <Error>: Could not kickstart simdiskimaged; SimDiskImageManager services will not be available: Error Domain=NSPOSIXErrorDomain Code=53 "Software caused connection abort" UserInfo={NSLocalizedDescription=Error returned in reply from CoreSimulatorService: Connection invalid}
+Mar 13 13:33:17 Nikoletts-MacBook-Air com.apple.ibtool[47244] <Error>: Unable to deliver request ({
+	    request = "notification_subscription";
+	    "set_path" = "/Users/nikolettkiraly/Library/Developer/CoreSimulator/Devices";
+	}) because we are not connected to CoreSimulatorService.
+Mar 13 13:33:17 Nikoletts-MacBook-Air com.apple.ibtool[47244] <Error>: Could not get list of trusted mount directories: Error Domain=com.apple.CoreSimulator.SimError Code=409 "Cannot talk to the service used to manage runtime disk images (simdiskimaged) because its launchd job is not registered or was unloaded" UserInfo={NSLocalizedDescription=Cannot talk to the service used to manage runtime disk images (simdiskimaged) because its launchd job is not registered or was unloaded}
+Mar 13 13:33:17 Nikoletts-MacBook-Air com.apple.ibtool[47244] <Error>: simdiskimaged connection is currently unavailable because connection became invalid
+Mar 13 13:33:18 Nikoletts-MacBook-Air com.apple.ibtool[47255] <Error>: Unable to deliver request ({
+	    "developer_dir" = "/Applications/Xcode.app/Contents/Developer";
+	    request = "set_developer_dir";
+	}) because we are not connected to CoreSimulatorService.
+Mar 13 13:33:18 Nikoletts-MacBook-Air com.apple.ibtool[47255] <Warning>: Unable to discover any Simulator runtimes. Developer Directory is /Applications/Xcode.app/Contents/Developer.
+Mar 13 13:33:18 Nikoletts-MacBook-Air com.apple.ibtool[47255] <Error>: Could not kickstart simdiskimaged; SimDiskImageManager services will not be available: Error Domain=NSPOSIXErrorDomain Code=53 "Software caused connection abort" UserInfo={NSLocalizedDescription=Error returned in reply from CoreSimulatorService: Connection invalid}
+Mar 13 13:33:18 Nikoletts-MacBook-Air com.apple.ibtool[47255] <Error>: simdiskimaged connection is currently unavailable because connection became invalid
+Mar 13 13:33:18 Nikoletts-MacBook-Air com.apple.ibtool[47255] <Error>: Unable to deliver request ({
+	    request = "notification_subscription";
+	    "set_path" = "/Users/nikolettkiraly/Library/Developer/CoreSimulator/Devices";
+	}) because we are not connected to CoreSimulatorService.
+Mar 13 13:33:18 Nikoletts-MacBook-Air com.apple.ibtool[47255] <Error>: Could not get list of trusted mount directories: Error Domain=com.apple.CoreSimulator.SimError Code=409 "Cannot talk to the service used to manage runtime disk images (simdiskimaged) because its launchd job is not registered or was unloaded" UserInfo={NSLocalizedDescription=Cannot talk to the service used to manage runtime disk images (simdiskimaged) because its launchd job is not registered or was unloaded}
+Mar 13 13:33:18 Nikoletts-MacBook-Air com.apple.ibtool[47255] <Error>: simdiskimaged connection is currently unavailable because connection became invalid
+Mar 13 13:33:20 Nikoletts-MacBook-Air com.apple.ibtool[47264] <Error>: Unable to deliver request ({
+	    "developer_dir" = "/Applications/Xcode.app/Contents/Developer";
+	    request = "set_developer_dir";
+	}) because we are not connected to CoreSimulatorService.
+Mar 13 13:33:20 Nikoletts-MacBook-Air com.apple.ibtool[47265] <Error>: Unable to deliver request ({
+	    "developer_dir" = "/Applications/Xcode.app/Contents/Developer";
+	    request = "set_developer_dir";
+	}) because we are not connected to CoreSimulatorService.
+Mar 13 13:33:20 Nikoletts-MacBook-Air com.apple.ibtool[47264] <Warning>: Unable to discover any Simulator runtimes. Developer Directory is /Applications/Xcode.app/Contents/Developer.
+Mar 13 13:33:20 Nikoletts-MacBook-Air com.apple.ibtool[47264] <Error>: Could not kickstart simdiskimaged; SimDiskImageManager services will not be available: Error Domain=NSPOSIXErrorDomain Code=53 "Software caused connection abort" UserInfo={NSLocalizedDescription=Error returned in reply from CoreSimulatorService: Connection invalid}
+Mar 13 13:33:20 Nikoletts-MacBook-Air com.apple.ibtool[47264] <Error>: simdiskimaged returned error (invalid), marking disconnected.
+Mar 13 13:33:20 Nikoletts-MacBook-Air com.apple.ibtool[47264] <Error>: Unable to deliver request ({
+	    request = "notification_subscription";
+	    "set_path" = "/Users/nikolettkiraly/Library/Developer/CoreSimulator/Devices";
+	}) because we are not connected to CoreSimulatorService.
+Mar 13 13:33:20 Nikoletts-MacBook-Air com.apple.ibtool[47264] <Error>: simdiskimaged connection is currently unavailable because connection became invalid
+Mar 13 13:33:20 Nikoletts-MacBook-Air com.apple.ibtool[47264] <Error>: Could not get list of trusted mount directories: Error Domain=com.apple.CoreSimulator.SimError Code=409 "Cannot talk to the service used to manage runtime disk images (simdiskimaged) because its launchd job is not registered or was unloaded" UserInfo={NSLocalizedDescription=Cannot talk to the service used to manage runtime disk images (simdiskimaged) because its launchd job is not registered or was unloaded}
+Mar 13 13:33:20 Nikoletts-MacBook-Air com.apple.ibtool[47265] <Warning>: Unable to discover any Simulator runtimes. Developer Directory is /Applications/Xcode.app/Contents/Developer.
+Mar 13 13:33:20 Nikoletts-MacBook-Air com.apple.ibtool[47265] <Error>: Could not kickstart simdiskimaged; SimDiskImageManager services will not be available: Error Domain=NSPOSIXErrorDomain Code=53 "Software caused connection abort" UserInfo={NSLocalizedDescription=Error returned in reply from CoreSimulatorService: Connection invalid}
+Mar 13 13:33:20 Nikoletts-MacBook-Air com.apple.ibtool[47265] <Error>: simdiskimaged returned error (invalid), marking disconnected.
+Mar 13 13:33:20 Nikoletts-MacBook-Air com.apple.ibtool[47265] <Error>: Could not get list of trusted mount directories: Error Domain=com.apple.CoreSimulator.SimError Code=410 "The service used to manage runtime disk images (simdiskimaged) crashed or is not responding" UserInfo={NSLocalizedDescription=The service used to manage runtime disk images (simdiskimaged) crashed or is not responding}
+Mar 13 13:33:20 Nikoletts-MacBook-Air com.apple.ibtool[47265] <Error>: simdiskimaged returned error (invalid), marking disconnected.
+Mar 13 13:33:20 Nikoletts-MacBook-Air com.apple.ibtool[47265] <Error>: Unable to deliver request ({
+	    request = "notification_subscription";
+	    "set_path" = "/Users/nikolettkiraly/Library/Developer/CoreSimulator/Devices";
+	}) because we are not connected to CoreSimulatorService.
+Mar 13 13:33:31 Nikoletts-MacBook-Air com.apple.ibtool[47323] <Error>: Unable to deliver request ({
+	    "developer_dir" = "/Applications/Xcode.app/Contents/Developer";
+	    request = "set_developer_dir";
+	}) because we are not connected to CoreSimulatorService.
+Mar 13 13:33:31 Nikoletts-MacBook-Air com.apple.ibtool[47325] <Error>: Unable to deliver request ({
+	    "developer_dir" = "/Applications/Xcode.app/Contents/Developer";
+	    request = "set_developer_dir";
+	}) because we are not connected to CoreSimulatorService.
+Mar 13 13:33:31 Nikoletts-MacBook-Air com.apple.ibtool[47325] <Warning>: Unable to discover any Simulator runtimes. Developer Directory is /Applications/Xcode.app/Contents/Developer.
+Mar 13 13:33:31 Nikoletts-MacBook-Air com.apple.ibtool[47323] <Warning>: Unable to discover any Simulator runtimes. Developer Directory is /Applications/Xcode.app/Contents/Developer.
+Mar 13 13:33:31 Nikoletts-MacBook-Air com.apple.ibtool[47325] <Error>: Could not kickstart simdiskimaged; SimDiskImageManager services will not be available: Error Domain=NSPOSIXErrorDomain Code=53 "Software caused connection abort" UserInfo={NSLocalizedDescription=Error returned in reply from CoreSimulatorService: Connection invalid}
+Mar 13 13:33:31 Nikoletts-MacBook-Air com.apple.ibtool[47325] <Error>: Unable to deliver request ({
+	    request = "notification_subscription";
+	    "set_path" = "/Users/nikolettkiraly/Library/Developer/CoreSimulator/Devices";
+	}) because we are not connected to CoreSimulatorService.
+Mar 13 13:33:31 Nikoletts-MacBook-Air com.apple.ibtool[47323] <Error>: simdiskimaged returned error (invalid), marking disconnected.
+Mar 13 13:33:31 Nikoletts-MacBook-Air com.apple.ibtool[47325] <Error>: Could not get list of trusted mount directories: Error Domain=com.apple.CoreSimulator.SimError Code=410 "The service used to manage runtime disk images (simdiskimaged) crashed or is not responding" UserInfo={NSLocalizedDescription=The service used to manage runtime disk images (simdiskimaged) crashed or is not responding}
+Mar 13 13:33:31 Nikoletts-MacBook-Air com.apple.ibtool[47325] <Error>: simdiskimaged returned error (invalid), marking disconnected.
+Mar 13 13:33:31 Nikoletts-MacBook-Air com.apple.ibtool[47323] <Error>: simdiskimaged returned error (invalid), marking disconnected.
+Mar 13 13:33:31 Nikoletts-MacBook-Air com.apple.ibtool[47325] <Error>: simdiskimaged returned error (invalid), marking disconnected.
+Mar 13 13:33:31 Nikoletts-MacBook-Air com.apple.ibtool[47323] <Error>: Could not kickstart simdiskimaged; SimDiskImageManager services will not be available: Error Domain=NSPOSIXErrorDomain Code=53 "Software caused connection abort" UserInfo={NSLocalizedDescription=Error returned in reply from CoreSimulatorService: Connection invalid}
+Mar 13 13:33:31 Nikoletts-MacBook-Air com.apple.ibtool[47323] <Error>: Unable to deliver request ({
+	    request = "notification_subscription";
+	    "set_path" = "/Users/nikolettkiraly/Library/Developer/CoreSimulator/Devices";
+	}) because we are not connected to CoreSimulatorService.
+Mar 13 13:33:31 Nikoletts-MacBook-Air com.apple.ibtool[47323] <Error>: Could not get list of trusted mount directories: Error Domain=com.apple.CoreSimulator.SimError Code=410 "The service used to manage runtime disk images (simdiskimaged) crashed or is not responding" UserInfo={NSLocalizedDescription=The service used to manage runtime disk images (simdiskimaged) crashed or is not responding}

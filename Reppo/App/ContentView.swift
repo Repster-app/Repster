@@ -40,6 +40,9 @@ struct ContentView: View {
     /// Currently selected tab.
     @State private var selectedTab: MainTab = .home
 
+    /// Trigger to pop HomeView NavigationStack to root when home tab is re-tapped.
+    @State private var homePopToRootTrigger = UUID()
+
     /// Whether the active workout fullScreenCover is presented.
     @State private var showActiveWorkout = false
 
@@ -85,16 +88,32 @@ struct ContentView: View {
     /// Exercise IDs to pre-add when starting a workout from browse mode (T032).
     @State private var pendingWorkoutExerciseIds: [UUID] = []
 
+    // MARK: - Tab Selection
+
+    /// Custom binding that detects re-selecting the home tab to pop its navigation to root.
+    private var tabSelection: Binding<MainTab> {
+        Binding(
+            get: { selectedTab },
+            set: { newTab in
+                if newTab == selectedTab && newTab == .home {
+                    homePopToRootTrigger = UUID()
+                }
+                selectedTab = newTab
+            }
+        )
+    }
+
     // MARK: - Body
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            TabView(selection: $selectedTab) {
+            TabView(selection: tabSelection) {
                 HomeView(
                     workoutService: services.workoutService,
                     setService: services.setService,
                     exerciseService: services.exerciseService,
                     refreshTrigger: homeRefreshTrigger,
+                    popToRootTrigger: homePopToRootTrigger,
                     onStartWorkout: { showActiveWorkout = true },
                     onShowStartWorkoutSheet: { showStartWorkoutSheet = true },
                     onShowExerciseList: { showExerciseList = true }

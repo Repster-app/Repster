@@ -37,8 +37,8 @@ struct ExerciseHistoryView: View {
                 .foregroundStyle(Color.textSecondary)
 
             VStack(spacing: 0) {
-                ForEach(Array(group.sets.filter { $0.modelContext != nil }.enumerated()), id: \.element.id) { index, set in
-                    setRow(set, index: index)
+                ForEach(Array(group.sets.enumerated()), id: \.element.id) { index, set in
+                    setRow(set, index: index, siblings: group.sets)
                     if index < group.sets.count - 1 {
                         Divider()
                             .background(Color.border)
@@ -53,7 +53,7 @@ struct ExerciseHistoryView: View {
 
     // MARK: - Set Row
 
-    private func setRow(_ set: WorkoutSet, index: Int) -> some View {
+    private func setRow(_ set: WorkoutSet, index: Int, siblings: [WorkoutSet]) -> some View {
         let hasNote = set.notes != nil && !(set.notes?.isEmpty ?? true)
         let isWarmup = set.setType == .warmup
 
@@ -113,7 +113,7 @@ struct ExerciseHistoryView: View {
 
             Spacer()
 
-            PRBadgeView(status: set.cachedPRStatus)
+            PRBadgeView(status: CachedPRStatus.effectiveStatus(for: set, among: siblings))
         }
         .padding(.vertical, 6)
         .opacity(isWarmup ? 0.6 : 1.0)

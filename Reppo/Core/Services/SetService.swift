@@ -45,6 +45,14 @@ actor SetService: SetServiceProtocol {
         )
         set.effectiveWeight = effectiveWeight
 
+        // 1b. Compute e1RM so charts reflect this set immediately
+        if let ew = effectiveWeight, ew > 0, let reps = set.reps, reps > 0 {
+            let profile = try await healthProfileRepo.fetch()
+            let formula = E1RMFormula(rawValue: profile?.e1RMFormula ?? "") ?? .epley
+            set.e1RM = formula.calculate(weight: ew, reps: reps)
+            set.e1RMFormulaVersion = formula.rawValue
+        }
+
         // 2. Persist immediately (FR-012)
         try await setRepo.save(set)
 
@@ -100,6 +108,16 @@ actor SetService: SetServiceProtocol {
         )
         set.effectiveWeight = newEffectiveWeight
         set.updatedAt = Date()
+
+        // 2b. Recompute e1RM with updated values
+        if let ew = newEffectiveWeight, ew > 0, let reps = set.reps, reps > 0 {
+            let profile = try await healthProfileRepo.fetch()
+            let formula = E1RMFormula(rawValue: profile?.e1RMFormula ?? "") ?? .epley
+            set.e1RM = formula.calculate(weight: ew, reps: reps)
+            set.e1RMFormulaVersion = formula.rawValue
+        } else {
+            set.e1RM = nil
+        }
 
         // 3. Persist updated set
         try await setRepo.save(set)

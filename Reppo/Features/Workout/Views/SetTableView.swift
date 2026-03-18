@@ -27,7 +27,7 @@ struct SetTableView: View {
 
     var body: some View {
         let exercise = dataSource.currentExercise
-        let sets = dataSource.currentSets.filter { $0.modelContext != nil }
+        let sets = dataSource.currentSets
 
         VStack(spacing: 0) {
             // Header row
@@ -56,9 +56,10 @@ struct SetTableView: View {
                         set: item.set,
                         exercise: exercise,
                         setNumber: item.number,
+                        siblingsSets: sets,
                         dataSource: dataSource,
                         keyboardManager: keyboardManager,
-                        suggestedWeight: dataSource.currentSuggestedWeight
+                        suggestedWeight: dataSource.suggestedWeight(for: item.set.id)
                     )
                 }
             }
@@ -186,6 +187,7 @@ private struct SetRowWrapper: View {
     let set: WorkoutSet
     let exercise: Exercise?
     let setNumber: Int
+    let siblingsSets: [WorkoutSet]
     var dataSource: any SetTableDataSource
     var keyboardManager: SetEntryKeyboardManager? = nil
     var suggestedWeight: Double? = nil
@@ -206,6 +208,7 @@ private struct SetRowWrapper: View {
         set: WorkoutSet,
         exercise: Exercise?,
         setNumber: Int,
+        siblingsSets: [WorkoutSet] = [],
         dataSource: any SetTableDataSource,
         keyboardManager: SetEntryKeyboardManager? = nil,
         suggestedWeight: Double? = nil
@@ -213,6 +216,7 @@ private struct SetRowWrapper: View {
         self.set = set
         self.exercise = exercise
         self.setNumber = setNumber
+        self.siblingsSets = siblingsSets
         self.dataSource = dataSource
         self.keyboardManager = keyboardManager
         self.suggestedWeight = suggestedWeight
@@ -239,6 +243,7 @@ private struct SetRowWrapper: View {
                 targetRIR: set.targetRIR,
                 repsPlaceholder: Self.repsPlaceholder(for: set),
                 onComplete: {
+
                     Task {
                         if set.completed {
                             await dataSource.uncompleteSet(set)
@@ -268,7 +273,8 @@ private struct SetRowWrapper: View {
                     showNoteAlert = true
                 },
                 keyboardManager: keyboardManager,
-                suggestedWeight: suggestedWeight
+                suggestedWeight: suggestedWeight,
+                prStatusOverride: CachedPRStatus.effectiveStatus(for: set, among: siblingsSets)
             )
             .onChange(of: weightText) { _, newValue in
                 handleFieldEdit {
