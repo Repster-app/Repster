@@ -1,4 +1,5 @@
 import XCTest
+import SwiftData
 @testable import Reppo
 
 @MainActor
@@ -158,17 +159,42 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         XCTAssertFalse(context.viewModel.isLoadingWeightSuggestions)
 
         try await waitUntil {
-            context.viewModel.weightSuggestionData?.suggestions.count == 2
+            context.viewModel.currentSets.count == 2 &&
+            context.viewModel.weightSuggestionData?.rowStates.count == 2
         }
 
         XCTAssertEqual(loadPrescriptionService.evaluationCount, 2)
         XCTAssertEqual(context.viewModel.currentSets.count, 2)
+        XCTAssertEqual(context.viewModel.weightSuggestionData?.suggestions.count, 2)
 
         let firstSuggestion = try XCTUnwrap(context.viewModel.weightSuggestionData?.suggestions.first)
         XCTAssertEqual(
             context.viewModel.suggestedWeight(for: firstSuggestion.pendingSetId),
             firstSuggestion.suggestedWeight
         )
+
+        let newlyAddedSet = try XCTUnwrap(context.viewModel.currentSets.last)
+        XCTAssertNotNil(context.viewModel.suggestionState(for: newlyAddedSet.id)?.suggestion)
+    }
+
+    func testManualRepRangeDraftTriggersDebouncedRefresh() async throws {
+        let loadPrescriptionService = LoadPrescriptionServiceSpy()
+        let context = makeContext(loadPrescriptionService: loadPrescriptionService)
+
+        await context.viewModel.loadWeightSuggestions()
+        XCTAssertEqual(loadPrescriptionService.evaluationCount, 1)
+
+        context.pendingSet.reps = nil
+        context.pendingSet.draftTargetRepMin = 8
+        context.pendingSet.draftTargetRepMax = 12
+        context.viewModel.markSetDirty(context.pendingSet, field: .reps)
+
+        try await waitUntil {
+            loadPrescriptionService.evaluationCount == 2
+        }
+
+        XCTAssertEqual(loadPrescriptionService.lastRecordedTargetReps, [10])
+        XCTAssertEqual(context.viewModel.suggestionState(for: context.pendingSet.id)?.target?.repRange, 8...12)
     }
 
     private func makeContext(
@@ -261,12 +287,19 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
     func testMixedRowStatesPreserveAvailableAndUnavailableRows() {
         let availableSetId = UUID()
         let unavailableSetId = UUID()
-        let target = SuggestionTarget(reps: 8, rir: 2.0, repRange: nil, source: .template)
+        let target = SuggestionTarget(
+            reps: 8,
+            rir: 2.0,
+            repRange: nil,
+            repsSource: .template,
+            rirSource: .template
+        )
         let pendingSet = SuggestionPendingSetInput(
             setId: availableSetId,
             setIndex: 0,
             setNumber: 1,
-            target: target
+            target: target,
+            setType: .working
         )
         let preparation = SuggestionPreparation(
             cacheKey: "mixed-row-states",
@@ -276,13 +309,15 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
                     setId: availableSetId,
                     setIndex: 0,
                     setNumber: 1,
-                    eligibility: .eligible(target: target)
+                    eligibility: .eligible(target: target),
+                    setType: .working
                 ),
                 SuggestionSetResolution(
                     setId: unavailableSetId,
                     setIndex: 1,
                     setNumber: 2,
-                    eligibility: .ineligible(reason: .missingTarget)
+                    eligibility: .ineligible(reason: .missingTarget),
+                    setType: .working
                 )
             ],
             pendingSets: [pendingSet],
@@ -320,12 +355,19 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
 
     func testEligibleRowsReceiveModuleUnavailableReasonWhenEvaluationFails() {
         let setId = UUID()
-        let target = SuggestionTarget(reps: 8, rir: 2.0, repRange: nil, source: .explicitSet)
+        let target = SuggestionTarget(
+            reps: 8,
+            rir: 2.0,
+            repRange: nil,
+            repsSource: .explicitSet,
+            rirSource: .explicitSet
+        )
         let pendingSet = SuggestionPendingSetInput(
             setId: setId,
             setIndex: 0,
             setNumber: 1,
-            target: target
+            target: target,
+            setType: .working
         )
         let preparation = SuggestionPreparation(
             cacheKey: "module-failure",
@@ -335,7 +377,8 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
                     setId: setId,
                     setIndex: 0,
                     setNumber: 1,
-                    eligibility: .eligible(target: target)
+                    eligibility: .eligible(target: target),
+                    setType: .working
                 )
             ],
             pendingSets: [pendingSet],
@@ -353,6 +396,144 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         XCTAssertEqual(data.unavailableReason, .noStrengthData)
     }
 
+    func testMissingTargetUsesSmartSuggestionsDefaultTarget() throws {
+        let exercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps
+        )
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: exercise.id,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: false
+        )
+        let profile = HealthProfile()
+
+        let preparation = SuggestionCoordinator.prepare(
+            exercise: exercise,
+            sets: [set],
+            profile: profile
+        )
+
+        XCTAssertEqual(preparation.pendingSets.count, 1)
+        XCTAssertNil(preparation.unavailableReason)
+
+        let target = try XCTUnwrap(preparation.pendingSets.first?.target)
+        XCTAssertEqual(target.reps, 8)
+        XCTAssertEqual(target.rir, 2.0)
+        XCTAssertEqual(target.repsSource, .smartDefault)
+        XCTAssertEqual(target.rirSource, .smartDefault)
+
+        let evaluation = SuggestionEvaluation(
+            input: makeInput(pendingSets: preparation.pendingSets),
+            decisions: [
+                makeDecision(
+                    setId: set.id,
+                    setIndex: 0,
+                    setNumber: 1,
+                    target: preparation.pendingSets[0].target
+                )
+            ],
+            unavailableReason: nil
+        )
+
+        let data = SuggestionExplainer.makeWeightSuggestionData(
+            preparation: preparation,
+            evaluation: evaluation
+        )
+
+        XCTAssertEqual(data.suggestion(for: set.id)?.explanation.defaultUsageLabel, "using default target")
+        XCTAssertEqual(data.rowState(for: set.id)?.target?.sourceLabel, "Smart Suggestions default")
+    }
+
+    func testPartialTargetUsesDefaultForMissingPiece() throws {
+        let exercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps
+        )
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: exercise.id,
+            reps: 10,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: false
+        )
+        let profile = HealthProfile()
+
+        let preparation = SuggestionCoordinator.prepare(
+            exercise: exercise,
+            sets: [set],
+            profile: profile
+        )
+
+        let target = try XCTUnwrap(preparation.pendingSets.first?.target)
+        XCTAssertEqual(target.reps, 10)
+        XCTAssertEqual(target.rir, 2.0)
+        XCTAssertEqual(target.repsSource, .explicitSet)
+        XCTAssertEqual(target.rirSource, .smartDefault)
+    }
+
+    func testManualRangeUsesExplicitSetSourceAndDefaultRIR() throws {
+        let exercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps
+        )
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: exercise.id,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: false
+        )
+        set.draftTargetRepMin = 8
+        set.draftTargetRepMax = 12
+        let profile = HealthProfile()
+
+        let preparation = SuggestionCoordinator.prepare(
+            exercise: exercise,
+            sets: [set],
+            profile: profile
+        )
+
+        let target = try XCTUnwrap(preparation.pendingSets.first?.target)
+        XCTAssertEqual(target.repRange, 8...12)
+        XCTAssertEqual(target.reps, 10)
+        XCTAssertEqual(target.repsSource, .explicitSet)
+        XCTAssertEqual(target.rirSource, .smartDefault)
+    }
+
+    func testInvalidDefaultsStillYieldMissingTarget() {
+        let exercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps
+        )
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: exercise.id,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: false
+        )
+        let profile = HealthProfile()
+        profile.prescriptionDefaultTargetReps = 0
+        profile.prescriptionDefaultTargetRIR = nil
+
+        let preparation = SuggestionCoordinator.prepare(
+            exercise: exercise,
+            sets: [set],
+            profile: profile
+        )
+
+        XCTAssertTrue(preparation.pendingSets.isEmpty)
+        XCTAssertEqual(preparation.unavailableReason, .missingTarget)
+    }
+
     private func makeInput(pendingSets: [SuggestionPendingSetInput]) -> SuggestionEngineInput {
         SuggestionEngineInput(
             baseE1RM: 100,
@@ -365,7 +546,9 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
                 weightIncrement: 2.5,
                 fatigueEnabled: true,
                 freshnessEnabled: false,
-                freshnessPercent: 0.03
+                freshnessPercent: 0.03,
+                baseFatigueRate: 0.04,
+                recoveryConstant: 180.0
             ),
             calibrationAdjustment: .neutral
         )
@@ -392,9 +575,397 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
             freshnessApplied: false,
             e1RMSource: .recentPerformance,
             bestReps: nil,
-            calibrationAdjustment: .neutral
+            calibrationAdjustment: .neutral,
+            projectedSessionFatigue: 0.0
         )
     }
+}
+
+final class RepsTargetInputParserTests: XCTestCase {
+    func testParseManualRepRange() {
+        XCTAssertEqual(RepsTargetInputParser.parse("8-12"), .range(8, 12))
+        XCTAssertEqual(RepsTargetInputParser.parse(" 8 - 12 "), .range(8, 12))
+    }
+
+    func testParseSingleRepValue() {
+        XCTAssertEqual(RepsTargetInputParser.parse("10"), .single(10))
+    }
+
+    func testParseInvalidPartialRange() {
+        XCTAssertEqual(RepsTargetInputParser.parse("8-"), .invalid)
+        XCTAssertEqual(RepsTargetInputParser.parse("8-8"), .invalid)
+    }
+}
+
+final class SmartSuggestionSettingsTests: XCTestCase {
+    func testSettingsServiceClampsDefaultTargets() async throws {
+        let profile = HealthProfile()
+        let repo = HealthProfileRepositoryStub(profile: profile)
+        let service = SettingsService(
+            healthProfileRepository: repo,
+            prService: PRServiceStub(),
+            statsService: StatsServiceStub()
+        )
+
+        try await service.updatePrescriptionDefaultTargetReps(99)
+        try await service.updatePrescriptionDefaultTargetRIR(-2)
+
+        XCTAssertEqual(profile.prescriptionDefaultTargetReps, 30)
+        XCTAssertEqual(profile.prescriptionDefaultTargetRIR, 0)
+    }
+
+    func testHealthProfileRepositoryBackfillsDefaultTargets() async throws {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: HealthProfile.self, configurations: config)
+        let context = ModelContext(container)
+        let existing = HealthProfile()
+        existing.prescriptionDefaultTargetReps = nil
+        existing.prescriptionDefaultTargetRIR = nil
+        context.insert(existing)
+        try context.save()
+
+        let repo = HealthProfileRepository(modelContainer: container)
+        let profile = try await repo.fetchOrCreate()
+
+        XCTAssertEqual(profile.prescriptionDefaultTargetReps, 8)
+        XCTAssertEqual(profile.prescriptionDefaultTargetRIR, 2)
+    }
+}
+
+@MainActor
+final class TemplateImportExportTests: XCTestCase {
+    func testExportImportRoundtripPreservesTemplateStructure() async throws {
+        let context = try makeTemplateServiceContext()
+        let squat = makeExercise(name: "Back Squat", primaryMuscle: "legs", defaultRestTime: 180)
+        let bench = makeExercise(name: "Bench Press", primaryMuscle: "chest", defaultRestTime: 120)
+        try await context.exerciseRepo.save(squat)
+        try await context.exerciseRepo.save(bench)
+
+        let supersetGroupId = UUID()
+        let templateId = try await context.service.createTemplate(
+            TemplateSaveData(
+                name: "Strength Day",
+                notes: "Heavy compounds",
+                exercises: [
+                    TemplateSaveExercise(
+                        exerciseId: squat.id,
+                        orderInTemplate: 1,
+                        supersetGroupId: supersetGroupId,
+                        restTimeSeconds: 180,
+                        notes: "Brace hard",
+                        sets: [
+                            TemplateSaveSet(
+                                setType: .warmup,
+                                targetRepMin: 5,
+                                targetRepMax: 5,
+                                targetRIR: 4,
+                                orderInExercise: 1
+                            ),
+                            TemplateSaveSet(
+                                setType: .working,
+                                targetRepMin: 3,
+                                targetRepMax: 5,
+                                targetRIR: 2,
+                                orderInExercise: 2
+                            )
+                        ]
+                    ),
+                    TemplateSaveExercise(
+                        exerciseId: bench.id,
+                        orderInTemplate: 2,
+                        supersetGroupId: supersetGroupId,
+                        restTimeSeconds: 120,
+                        notes: "Pause first rep",
+                        sets: [
+                            TemplateSaveSet(
+                                setType: .working,
+                                targetRepMin: 6,
+                                targetRepMax: 8,
+                                targetRIR: 1,
+                                orderInExercise: 1
+                            )
+                        ]
+                    )
+                ]
+            )
+        )
+
+        let exportedData = try await context.service.exportTemplate(templateId)
+        let importedTemplateId = try await context.service.importTemplate(data: exportedData)
+        let importedDetailValue = try await context.service.fetchTemplateDetail(importedTemplateId)
+        let importedDetail = try XCTUnwrap(importedDetailValue)
+        let exercises = try await context.exerciseRepo.fetchAll()
+
+        XCTAssertEqual(importedDetail.template.name, "Strength Day (Imported)")
+        XCTAssertEqual(importedDetail.template.notes, "Heavy compounds")
+        XCTAssertEqual(importedDetail.exercises.count, 2)
+        XCTAssertEqual(exercises.count, 2, "Import should reuse existing exercises via UUID match.")
+
+        let importedSquat = try XCTUnwrap(importedDetail.exercises.first)
+        XCTAssertEqual(importedSquat.exerciseId, squat.id)
+        XCTAssertEqual(importedSquat.orderInTemplate, 1)
+        XCTAssertEqual(importedSquat.restTimeSeconds, 180)
+        XCTAssertEqual(importedSquat.notes, "Brace hard")
+        XCTAssertEqual(importedSquat.sets.map(\.orderInExercise), [1, 2])
+        XCTAssertEqual(importedSquat.sets.map(\.setType), [.warmup, .working])
+        XCTAssertEqual(importedSquat.sets.map(\.targetRepMin), [5 as Int?, 3])
+        XCTAssertEqual(importedSquat.sets.map(\.targetRepMax), [5 as Int?, 5])
+        XCTAssertEqual(importedSquat.sets.map(\.targetRIR), [4 as Int?, 2])
+
+        let importedBench = try XCTUnwrap(importedDetail.exercises.last)
+        XCTAssertEqual(importedBench.exerciseId, bench.id)
+        XCTAssertEqual(importedBench.orderInTemplate, 2)
+        XCTAssertEqual(importedBench.restTimeSeconds, 120)
+        XCTAssertEqual(importedBench.notes, "Pause first rep")
+        XCTAssertEqual(importedBench.sets.count, 1)
+        XCTAssertEqual(importedBench.sets.first?.targetRepMin, 6)
+        XCTAssertEqual(importedBench.sets.first?.targetRepMax, 8)
+        XCTAssertEqual(importedBench.sets.first?.targetRIR, 1)
+        XCTAssertEqual(importedSquat.supersetGroupId, importedBench.supersetGroupId)
+    }
+
+    func testImportMatchesExistingExerciseByNormalizedName() async throws {
+        let context = try makeTemplateServiceContext()
+        let existingExercise = makeExercise(name: "Incline Bench Press", primaryMuscle: "chest", defaultRestTime: 90)
+        try await context.exerciseRepo.save(existingExercise)
+
+        let archiveData = try makeArchiveData(
+            templateName: "Upper Builder",
+            exercises: [
+                makeArchiveExercise(
+                    exerciseId: UUID(),
+                    exerciseName: "  incline   bench press  ",
+                    primaryMuscle: "chest",
+                    defaultRestTime: 90,
+                    orderInTemplate: 1,
+                    sets: [
+                        TemplateArchiveSet(
+                            setType: .working,
+                            targetRepMin: 8,
+                            targetRepMax: 10,
+                            targetRIR: 2,
+                            orderInExercise: 1
+                        )
+                    ]
+                )
+            ]
+        )
+
+        let importedTemplateId = try await context.service.importTemplate(data: archiveData)
+        let importedDetailValue = try await context.service.fetchTemplateDetail(importedTemplateId)
+        let importedDetail = try XCTUnwrap(importedDetailValue)
+        let exercises = try await context.exerciseRepo.fetchAll()
+
+        XCTAssertEqual(importedDetail.exercises.first?.exerciseId, existingExercise.id)
+        XCTAssertEqual(exercises.count, 1, "Import should reuse an existing exercise matched by name.")
+    }
+
+    func testImportCreatesMissingExerciseFromArchiveMetadata() async throws {
+        let context = try makeTemplateServiceContext()
+        let archivedExerciseId = UUID()
+
+        let archiveData = try makeArchiveData(
+            templateName: "Travel Workout",
+            exercises: [
+                makeArchiveExercise(
+                    exerciseId: archivedExerciseId,
+                    exerciseName: "Single Arm Cable Row",
+                    primaryMuscle: "back",
+                    defaultRestTime: 75,
+                    orderInTemplate: 1,
+                    sets: [
+                        TemplateArchiveSet(
+                            setType: .working,
+                            targetRepMin: 10,
+                            targetRepMax: 12,
+                            targetRIR: 1,
+                            orderInExercise: 1
+                        )
+                    ],
+                    unilateral: true,
+                    trackingType: .weightReps,
+                    equipmentType: .cable
+                )
+            ]
+        )
+
+        let importedTemplateId = try await context.service.importTemplate(data: archiveData)
+        let importedDetailValue = try await context.service.fetchTemplateDetail(importedTemplateId)
+        let importedDetail = try XCTUnwrap(importedDetailValue)
+        let createdExercise = try await context.exerciseRepo.fetch(byId: archivedExerciseId)
+
+        XCTAssertEqual(importedDetail.exercises.first?.exerciseId, archivedExerciseId)
+        XCTAssertEqual(createdExercise?.name, "Single Arm Cable Row")
+        XCTAssertEqual(createdExercise?.primaryMuscle, "back")
+        XCTAssertEqual(createdExercise?.defaultRestTime, 75)
+        XCTAssertEqual(createdExercise?.unilateral, true)
+        XCTAssertEqual(createdExercise?.equipmentType, .cable)
+    }
+
+    func testImportAddsImportedSuffixForTemplateNameCollisions() async throws {
+        let context = try makeTemplateServiceContext()
+        let exercise = makeExercise(name: "Pull-Up", primaryMuscle: "back", defaultRestTime: 90)
+        try await context.exerciseRepo.save(exercise)
+
+        _ = try await context.service.createTemplate(
+            TemplateSaveData(
+                name: "Pull Day",
+                notes: nil,
+                exercises: [
+                    TemplateSaveExercise(
+                        exerciseId: exercise.id,
+                        orderInTemplate: 1,
+                        supersetGroupId: nil,
+                        restTimeSeconds: 90,
+                        notes: nil,
+                        sets: [
+                            TemplateSaveSet(
+                                setType: .working,
+                                targetRepMin: 6,
+                                targetRepMax: 8,
+                                targetRIR: 2,
+                                orderInExercise: 1
+                            )
+                        ]
+                    )
+                ]
+            )
+        )
+
+        let archiveData = try makeArchiveData(
+            templateName: "Pull Day",
+            exercises: [
+                makeArchiveExercise(
+                    exerciseId: exercise.id,
+                    exerciseName: exercise.name,
+                    primaryMuscle: "back",
+                    defaultRestTime: 90,
+                    orderInTemplate: 1,
+                    sets: [
+                        TemplateArchiveSet(
+                            setType: .working,
+                            targetRepMin: 6,
+                            targetRepMax: 8,
+                            targetRIR: 2,
+                            orderInExercise: 1
+                        )
+                    ]
+                )
+            ]
+        )
+
+        let firstImportedId = try await context.service.importTemplate(data: archiveData)
+        let secondImportedId = try await context.service.importTemplate(data: archiveData)
+
+        let firstImportedValue = try await context.service.fetchTemplateDetail(firstImportedId)
+        let secondImportedValue = try await context.service.fetchTemplateDetail(secondImportedId)
+        let firstImported = try XCTUnwrap(firstImportedValue)
+        let secondImported = try XCTUnwrap(secondImportedValue)
+
+        XCTAssertEqual(firstImported.template.name, "Pull Day (Imported)")
+        XCTAssertEqual(secondImported.template.name, "Pull Day (Imported 2)")
+    }
+
+    private func makeTemplateServiceContext() throws -> TemplateServiceTestContext {
+        let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(
+            for: Exercise.self,
+            Workout.self,
+            WorkoutSet.self,
+            WorkoutTemplate.self,
+            TemplateExercise.self,
+            TemplateSet.self,
+            configurations: configuration
+        )
+
+        let exerciseRepo = ExerciseRepository(modelContainer: container)
+        let workoutRepo = WorkoutRepository(modelContainer: container)
+        let setRepo = SetRepository(modelContainer: container)
+        let templateRepo = TemplateRepository(modelContainer: container)
+        let service = TemplateService(
+            templateRepository: templateRepo,
+            workoutRepository: workoutRepo,
+            setRepository: setRepo,
+            exerciseRepository: exerciseRepo
+        )
+
+        return TemplateServiceTestContext(
+            service: service,
+            exerciseRepo: exerciseRepo
+        )
+    }
+
+    private func makeExercise(
+        name: String,
+        primaryMuscle: String,
+        defaultRestTime: Int
+    ) -> Exercise {
+        Exercise(
+            name: name,
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: primaryMuscle,
+            defaultRestTime: defaultRestTime
+        )
+    }
+
+    private func makeArchiveData(
+        templateName: String,
+        exercises: [TemplateArchiveExercise]
+    ) throws -> Data {
+        try JSONEncoder().encode(
+            TemplateArchive(
+                version: TemplateArchive.currentVersion,
+                template: TemplateArchiveTemplate(
+                    id: UUID(),
+                    name: templateName,
+                    notes: nil
+                ),
+                exercises: exercises
+            )
+        )
+    }
+
+    private func makeArchiveExercise(
+        exerciseId: UUID,
+        exerciseName: String,
+        primaryMuscle: String,
+        defaultRestTime: Int,
+        orderInTemplate: Int,
+        sets: [TemplateArchiveSet],
+        unilateral: Bool = false,
+        trackingType: TrackingType = .weightReps,
+        equipmentType: EquipmentType = .barbell
+    ) -> TemplateArchiveExercise {
+        TemplateArchiveExercise(
+            exercise: TemplateArchiveExerciseMetadata(
+                id: exerciseId,
+                name: exerciseName,
+                equipmentType: equipmentType,
+                trackingType: trackingType,
+                primaryMuscle: primaryMuscle,
+                secondaryMuscles: [],
+                movementPattern: nil,
+                unilateral: unilateral,
+                bilateralLoadFactor: nil,
+                bodyweightFactor: 0,
+                weightIncrement: 2.5,
+                defaultRestTime: defaultRestTime,
+                fatigueRate: nil,
+                recoveryConstant: nil
+            ),
+            orderInTemplate: orderInTemplate,
+            supersetGroupId: nil,
+            restTimeSeconds: defaultRestTime,
+            notes: nil,
+            sets: sets
+        )
+    }
+}
+
+private struct TemplateServiceTestContext {
+    let service: TemplateService
+    let exerciseRepo: ExerciseRepository
 }
 
 private struct TestContext {
@@ -480,7 +1051,9 @@ private final class LoadPrescriptionServiceSpy: @unchecked Sendable, LoadPrescri
                 weightIncrement: 2.5,
                 fatigueEnabled: true,
                 freshnessEnabled: false,
-                freshnessPercent: 0.03
+                freshnessPercent: 0.03,
+                baseFatigueRate: 0.04,
+                recoveryConstant: 180.0
             ),
             calibrationAdjustment: .neutral
         )
@@ -515,8 +1088,10 @@ private final class LoadPrescriptionServiceSpy: @unchecked Sendable, LoadPrescri
                     reps: item.targetReps,
                     rir: item.targetRIR,
                     repRange: item.repRange,
-                    source: .explicitSet
-                )
+                    repsSource: .explicitSet,
+                    rirSource: .explicitSet
+                ),
+                setType: .working
             )
         }
 
@@ -557,9 +1132,12 @@ private final class SettingsServiceStub: @unchecked Sendable, SettingsServicePro
     func updateIncludeWarmupsInPRs(_ include: Bool) async throws { let _ = include }
     func updateDefaultRestTime(_ seconds: Int?) async throws { let _ = seconds }
     func updateDefaultWarmupRestTime(_ seconds: Int?) async throws { let _ = seconds }
+    func updateRestTimerAlert(_ value: String) async throws { let _ = value }
     func updatePrescriptionEnabled(_ enabled: Bool) async throws { let _ = enabled }
     func updatePrescriptionRecencyWeeks(_ weeks: Int) async throws { let _ = weeks }
     func updatePrescriptionDefaultIncrement(_ increment: Double) async throws { let _ = increment }
+    func updatePrescriptionDefaultTargetReps(_ reps: Int) async throws { let _ = reps }
+    func updatePrescriptionDefaultTargetRIR(_ rir: Int) async throws { let _ = rir }
     func updatePrescriptionFreshnessBonus(enabled: Bool, percent: Double) async throws {
         let _ = enabled
         let _ = percent
@@ -759,6 +1337,334 @@ private final class PRServiceStub: @unchecked Sendable, PRServiceProtocol {
 
     func rebuildAll() async throws {}
     func rebuild(for exerciseId: UUID) async throws { let _ = exerciseId }
+}
+
+// MARK: - Fatigue Model v2 Tests
+
+final class FatigueModelV2Tests: XCTestCase {
+
+    // MARK: - Set-type multipliers
+
+    func testWarmupMultiplierIsZero() {
+        XCTAssertEqual(SuggestionEngine.setTypeMultiplier(.warmup), 0.0)
+    }
+
+    func testAMRAPMultiplierIsHigherThanWorking() {
+        XCTAssertGreaterThan(
+            SuggestionEngine.setTypeMultiplier(.amrap),
+            SuggestionEngine.setTypeMultiplier(.working)
+        )
+    }
+
+    func testBackoffMultiplierIsLowerThanWorking() {
+        XCTAssertLessThan(
+            SuggestionEngine.setTypeMultiplier(.backoff),
+            SuggestionEngine.setTypeMultiplier(.working)
+        )
+    }
+
+    // MARK: - Per-set fatigue formula
+
+    func testComputeSetFatigueWithWorkingSet() {
+        // baseFatigueRate(0.04) * typeMultiplier(1.0) * effortScale(1.15 at RIR 2) * repScale(1.0 at 8 reps)
+        let fatigue = SuggestionEngine.computeSetFatigue(
+            reps: 8, rir: 2.0, setType: .working, baseFatigueRate: 0.04
+        )
+        XCTAssertEqual(fatigue, 0.04 * 1.0 * 1.15 * 1.0, accuracy: 0.0001)
+    }
+
+    func testComputeSetFatigueWarmupIsZero() {
+        let fatigue = SuggestionEngine.computeSetFatigue(
+            reps: 8, rir: 3.0, setType: .warmup, baseFatigueRate: 0.04
+        )
+        XCTAssertEqual(fatigue, 0.0)
+    }
+
+    func testRepScaleFloorAt0_6() {
+        // 1 rep: reps/8 = 0.125, but floor is 0.6
+        let fatigue = SuggestionEngine.computeSetFatigue(
+            reps: 1, rir: 2.0, setType: .working, baseFatigueRate: 0.04
+        )
+        let expected = 0.04 * 1.0 * 1.15 * 0.6
+        XCTAssertEqual(fatigue, expected, accuracy: 0.0001)
+    }
+
+    func testEffortScaleAtDifferentRIRs() {
+        // RIR 3+: effortScale = 1.0
+        let fatigueRIR3 = SuggestionEngine.computeSetFatigue(
+            reps: 8, rir: 3.0, setType: .working, baseFatigueRate: 0.04
+        )
+        let fatigueRIR0 = SuggestionEngine.computeSetFatigue(
+            reps: 8, rir: 0.0, setType: .working, baseFatigueRate: 0.04
+        )
+        // RIR 0: effortScale = 1.45, RIR 3: effortScale = 1.0
+        XCTAssertGreaterThan(fatigueRIR0, fatigueRIR3)
+        XCTAssertEqual(fatigueRIR0 / fatigueRIR3, 1.45, accuracy: 0.01)
+    }
+
+    func testMissingRIRDefaultsTo1() {
+        // Missing RIR defaults to 1.0, effortScale = 1.0 + max(0, 3.0 - 1.0) * 0.15 = 1.30
+        let fatigueNilRIR = SuggestionEngine.computeSetFatigue(
+            reps: 8, rir: nil, setType: .working, baseFatigueRate: 0.04
+        )
+        let fatigueRIR1 = SuggestionEngine.computeSetFatigue(
+            reps: 8, rir: 1.0, setType: .working, baseFatigueRate: 0.04
+        )
+        XCTAssertEqual(fatigueNilRIR, fatigueRIR1, accuracy: 0.0001)
+    }
+
+    // MARK: - Forward projection
+
+    func testForwardProjectionDecreasesSuggestions() {
+        let pendingSets = (0..<3).map { i in
+            SuggestionPendingSetInput(
+                setId: UUID(),
+                setIndex: i,
+                setNumber: i + 1,
+                target: SuggestionTarget(
+                    reps: 8, rir: 2.0, repRange: nil,
+                    repsSource: .template, rirSource: .template
+                ),
+                setType: .working
+            )
+        }
+
+        let input = SuggestionEngineInput(
+            baseE1RM: 140,
+            baseSource: .recentPerformance,
+            completedSessionSets: [
+                SessionSetContext(
+                    weight: 100, reps: 8, rir: 2.0,
+                    completedAt: Date(), completed: true,
+                    setType: .working, restDurationSeconds: nil
+                )
+            ],
+            pendingSets: pendingSets,
+            settings: SuggestionSettingsSnapshot(
+                formula: .epley,
+                restTimerSeconds: 150,
+                weightIncrement: 2.5,
+                fatigueEnabled: true,
+                freshnessEnabled: false,
+                freshnessPercent: 0.03,
+                baseFatigueRate: 0.04,
+                recoveryConstant: 180.0
+            ),
+            calibrationAdjustment: .neutral
+        )
+
+        let decisions = SuggestionEngine.evaluate(input)
+        XCTAssertEqual(decisions.count, 3)
+
+        // Each successive pending set should have higher projected fatigue
+        XCTAssertGreaterThan(decisions[1].projectedSessionFatigue, decisions[0].projectedSessionFatigue)
+        XCTAssertGreaterThan(decisions[2].projectedSessionFatigue, decisions[1].projectedSessionFatigue)
+
+        // And lower prescribed weights
+        XCTAssertGreaterThanOrEqual(decisions[0].prescribedWeight, decisions[1].prescribedWeight)
+        XCTAssertGreaterThanOrEqual(decisions[1].prescribedWeight, decisions[2].prescribedWeight)
+    }
+
+    // MARK: - Rest timer duration fallback
+
+    func testRestTimerDurationUsedForDecay() {
+        // With captured rest duration of 300s, fatigue should decay more than with 60s
+        let longRest = [
+            SessionSetContext(
+                weight: 100, reps: 8, rir: 2.0,
+                completedAt: Date(), completed: true,
+                setType: .working, restDurationSeconds: nil
+            ),
+            SessionSetContext(
+                weight: 100, reps: 8, rir: 2.0,
+                completedAt: Date(), completed: true,
+                setType: .working, restDurationSeconds: 300
+            )
+        ]
+        let shortRest = [
+            SessionSetContext(
+                weight: 100, reps: 8, rir: 2.0,
+                completedAt: Date(), completed: true,
+                setType: .working, restDurationSeconds: nil
+            ),
+            SessionSetContext(
+                weight: 100, reps: 8, rir: 2.0,
+                completedAt: Date(), completed: true,
+                setType: .working, restDurationSeconds: 60
+            )
+        ]
+
+        let fatigueLongRest = SuggestionEngine.computeSessionFatigue(
+            completedSets: longRest,
+            configuredRestSeconds: 150,
+            recoveryConstant: 180,
+            baseFatigueRate: 0.04
+        )
+        let fatigueShortRest = SuggestionEngine.computeSessionFatigue(
+            completedSets: shortRest,
+            configuredRestSeconds: 150,
+            recoveryConstant: 180,
+            baseFatigueRate: 0.04
+        )
+
+        // Long rest → more decay → lower accumulated fatigue
+        XCTAssertLessThan(fatigueLongRest, fatigueShortRest)
+    }
+
+    func testNilRestDurationFallsBackToConfigured() {
+        let setsWithNil = [
+            SessionSetContext(
+                weight: 100, reps: 8, rir: 2.0,
+                completedAt: Date(), completed: true,
+                setType: .working, restDurationSeconds: nil
+            ),
+            SessionSetContext(
+                weight: 100, reps: 8, rir: 2.0,
+                completedAt: Date(), completed: true,
+                setType: .working, restDurationSeconds: nil
+            )
+        ]
+        let setsWithExplicit = [
+            SessionSetContext(
+                weight: 100, reps: 8, rir: 2.0,
+                completedAt: Date(), completed: true,
+                setType: .working, restDurationSeconds: nil
+            ),
+            SessionSetContext(
+                weight: 100, reps: 8, rir: 2.0,
+                completedAt: Date(), completed: true,
+                setType: .working, restDurationSeconds: 150
+            )
+        ]
+
+        let fatigueNil = SuggestionEngine.computeSessionFatigue(
+            completedSets: setsWithNil,
+            configuredRestSeconds: 150,
+            recoveryConstant: 180,
+            baseFatigueRate: 0.04
+        )
+        let fatigueExplicit = SuggestionEngine.computeSessionFatigue(
+            completedSets: setsWithExplicit,
+            configuredRestSeconds: 150,
+            recoveryConstant: 180,
+            baseFatigueRate: 0.04
+        )
+
+        // Both should be identical since nil falls back to configuredRestSeconds=150
+        XCTAssertEqual(fatigueNil, fatigueExplicit, accuracy: 0.0001)
+    }
+
+    // MARK: - Readiness clamp
+
+    func testReadinessClampAllowsUp12PercentReduction() {
+        // With enough fatigue, readiness should be able to go down to 88%
+        let completedSets = (0..<5).map { _ in
+            SessionSetContext(
+                weight: 100, reps: 8, rir: 0.0,
+                completedAt: Date(), completed: true,
+                setType: .amrap, restDurationSeconds: 60
+            )
+        }
+
+        let pendingSet = SuggestionPendingSetInput(
+            setId: UUID(),
+            setIndex: 5,
+            setNumber: 1,
+            target: SuggestionTarget(
+                reps: 8, rir: 2.0, repRange: nil,
+                repsSource: .template, rirSource: .template
+            ),
+            setType: .working
+        )
+
+        let input = SuggestionEngineInput(
+            baseE1RM: 100,
+            baseSource: .recentPerformance,
+            completedSessionSets: completedSets,
+            pendingSets: [pendingSet],
+            settings: SuggestionSettingsSnapshot(
+                formula: .epley,
+                restTimerSeconds: 60,
+                weightIncrement: 2.5,
+                fatigueEnabled: true,
+                freshnessEnabled: false,
+                freshnessPercent: 0.03,
+                baseFatigueRate: 0.04,
+                recoveryConstant: 180.0
+            ),
+            calibrationAdjustment: .neutral
+        )
+
+        let decisions = SuggestionEngine.evaluate(input)
+        let decision = decisions[0]
+        let readinessPercent = decision.effectiveE1RM / decision.baseE1RM
+
+        // Should be at or near 88% (the new floor)
+        XCTAssertGreaterThanOrEqual(readinessPercent, 0.88 - 0.001)
+        XCTAssertLessThan(readinessPercent, 0.95) // v1 floor was 0.95, v2 goes lower
+    }
+
+    // MARK: - Worked example from design doc
+
+    func testWorkedExampleFromDesignDoc() {
+        // Barbell squat, baseE1RM = 140kg, 5×8 @ RIR 2, 150s rest, recovery τ = 210s
+        // Two completed sets, three pending
+        let completedSets = [
+            SessionSetContext(
+                weight: 100, reps: 8, rir: 2.0,
+                completedAt: Date(), completed: true,
+                setType: .working, restDurationSeconds: 150
+            ),
+            SessionSetContext(
+                weight: 100, reps: 8, rir: 2.0,
+                completedAt: Date(), completed: true,
+                setType: .working, restDurationSeconds: 150
+            )
+        ]
+
+        let pendingSets = (0..<3).map { i in
+            SuggestionPendingSetInput(
+                setId: UUID(),
+                setIndex: 2 + i,
+                setNumber: i + 1,
+                target: SuggestionTarget(
+                    reps: 8, rir: 2.0, repRange: nil,
+                    repsSource: .template, rirSource: .template
+                ),
+                setType: .working
+            )
+        }
+
+        let input = SuggestionEngineInput(
+            baseE1RM: 140,
+            baseSource: .recentPerformance,
+            completedSessionSets: completedSets,
+            pendingSets: pendingSets,
+            settings: SuggestionSettingsSnapshot(
+                formula: .epley,
+                restTimerSeconds: 150,
+                weightIncrement: 2.5,
+                fatigueEnabled: true,
+                freshnessEnabled: false,
+                freshnessPercent: 0.03,
+                baseFatigueRate: 0.04,
+                recoveryConstant: 210.0
+            ),
+            calibrationAdjustment: .neutral
+        )
+
+        let decisions = SuggestionEngine.evaluate(input)
+        XCTAssertEqual(decisions.count, 3)
+
+        // Progressive fatigue should increase
+        XCTAssertGreaterThan(decisions[1].projectedSessionFatigue, decisions[0].projectedSessionFatigue)
+        XCTAssertGreaterThan(decisions[2].projectedSessionFatigue, decisions[1].projectedSessionFatigue)
+
+        // Effective e1RM should be less than base for all pending sets
+        for decision in decisions {
+            XCTAssertLessThan(decision.effectiveE1RM, 140)
+        }
+    }
 }
 
 private extension PREvaluationResult {

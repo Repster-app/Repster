@@ -21,12 +21,15 @@ protocol SettingsServiceProtocol: Sendable {
     func updateIncludeWarmupsInPRs(_ include: Bool) async throws
     func updateDefaultRestTime(_ seconds: Int?) async throws
     func updateDefaultWarmupRestTime(_ seconds: Int?) async throws
+    func updateRestTimerAlert(_ value: String) async throws
 
-    // MARK: - Weight Prescription Settings
+    // MARK: - Smart Suggestions Settings
 
     func updatePrescriptionEnabled(_ enabled: Bool) async throws
     func updatePrescriptionRecencyWeeks(_ weeks: Int) async throws
     func updatePrescriptionDefaultIncrement(_ increment: Double) async throws
+    func updatePrescriptionDefaultTargetReps(_ reps: Int) async throws
+    func updatePrescriptionDefaultTargetRIR(_ rir: Int) async throws
     func updatePrescriptionFreshnessBonus(enabled: Bool, percent: Double) async throws
     func updatePrescriptionFatigueModelingEnabled(_ enabled: Bool) async throws
     func updatePrescriptionDefaultRecoveryConstant(_ seconds: Double) async throws

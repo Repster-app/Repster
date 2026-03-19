@@ -7,7 +7,9 @@ import SwiftUI
 struct TemplateCardView: View {
 
     let template: TemplateSummary
+    let isExporting: Bool
     let onTap: () -> Void
+    let onExport: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
 
@@ -23,71 +25,90 @@ struct TemplateCardView: View {
     }
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 14) {
-                // Icon
-                Text(iconLetter)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(iconColor)
-                    .frame(width: 44, height: 44)
-                    .background(iconColor.opacity(0.15))
-                    .cornerRadius(12)
+        HStack(spacing: 12) {
+            Button(action: onTap) {
+                HStack(spacing: 14) {
+                    // Icon
+                    Text(iconLetter)
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(iconColor)
+                        .frame(width: 44, height: 44)
+                        .background(iconColor.opacity(0.15))
+                        .cornerRadius(12)
 
-                // Info
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(template.name)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.textPrimary)
+                    // Info
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(template.name)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.textPrimary)
 
-                    HStack(spacing: 8) {
-                        Text("\(template.exerciseCount) exercises")
-                            .font(.system(size: 12, weight: .regular))
-                            .foregroundColor(.textSecondary)
+                        HStack(spacing: 8) {
+                            Text("\(template.exerciseCount) exercises")
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundColor(.textSecondary)
 
-                        Circle()
-                            .fill(Color.textTertiary)
-                            .frame(width: 3, height: 3)
+                            Circle()
+                                .fill(Color.textTertiary)
+                                .frame(width: 3, height: 3)
 
-                        Text("\(template.totalSetCount) sets")
-                            .font(.system(size: 12, weight: .regular))
-                            .foregroundColor(.textSecondary)
-                    }
+                            Text("\(template.totalSetCount) sets")
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundColor(.textSecondary)
+                        }
 
-                    if !template.muscleGroups.isEmpty {
-                        HStack(spacing: 4) {
-                            ForEach(template.muscleGroups.prefix(4), id: \.self) { muscle in
-                                Text(muscle.capitalized)
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundColor(.textSecondary)
-                                    .padding(.horizontal, 7)
-                                    .padding(.vertical, 2)
-                                    .background(Color.bgSubtle)
-                                    .cornerRadius(4)
+                        if !template.muscleGroups.isEmpty {
+                            HStack(spacing: 4) {
+                                ForEach(template.muscleGroups.prefix(4), id: \.self) { muscle in
+                                    Text(muscle.capitalized)
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundColor(.textSecondary)
+                                        .padding(.horizontal, 7)
+                                        .padding(.vertical, 2)
+                                        .background(Color.bgSubtle)
+                                        .cornerRadius(4)
+                                }
                             }
                         }
                     }
-                }
 
-                Spacer()
+                    Spacer()
 
-                // Right side
-                VStack(alignment: .trailing, spacing: 4) {
                     if let lastUsed = template.lastUsedAt {
                         Text(relativeDate(lastUsed))
                             .font(.system(size: 11, weight: .regular))
                             .foregroundColor(.textTertiary)
                     }
-
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.textTertiary)
                 }
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 14)
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+
+            VStack(spacing: 6) {
+                Button(action: onExport) {
+                    Group {
+                        if isExporting {
+                            ProgressView()
+                                .tint(Color.textSecondary)
+                        } else {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.textSecondary)
+                        }
+                    }
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(isExporting)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.textTertiary)
+            }
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .contentShape(Rectangle())
         .overlay(
             Rectangle()
                 .frame(height: 1)
@@ -95,6 +116,12 @@ struct TemplateCardView: View {
             alignment: .bottom
         )
         .contextMenu {
+            Button {
+                onExport()
+            } label: {
+                Label("Export Template", systemImage: "square.and.arrow.up")
+            }
+
             Button {
                 onEdit()
             } label: {

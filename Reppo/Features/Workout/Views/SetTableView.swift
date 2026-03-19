@@ -8,6 +8,57 @@
 
 import SwiftUI
 
+enum RepsTargetInput: Equatable {
+    case empty
+    case single(Int)
+    case range(Int, Int)
+    case invalid
+
+    var completionReps: Int? {
+        guard case let .single(reps) = self else { return nil }
+        return reps
+    }
+
+    var blocksCompletion: Bool {
+        switch self {
+        case .range, .invalid:
+            return true
+        case .empty, .single:
+            return false
+        }
+    }
+}
+
+enum RepsTargetInputParser {
+    static func parse(_ text: String) -> RepsTargetInput {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return .empty
+        }
+
+        if let reps = Int(trimmed), reps > 0 {
+            return .single(reps)
+        }
+
+        let parts = trimmed.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 2 else { return .invalid }
+
+        let lowerText = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+        let upperText = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard
+            let lowerBound = Int(lowerText),
+            let upperBound = Int(upperText),
+            lowerBound > 0,
+            upperBound > 0,
+            lowerBound < upperBound
+        else {
+            return .invalid
+        }
+
+        return .range(lowerBound, upperBound)
+    }
+}
+
 /// The set table for the currently selected exercise.
 ///
 /// Renders a header row with column labels, set rows via `SetRowView`,
@@ -223,7 +274,7 @@ private struct SetRowWrapper: View {
 
         // Initialize text from model values
         _weightText = State(initialValue: set.weight.map { Self.formatWeight($0) } ?? "")
-        _repsText = State(initialValue: set.reps.map { "\($0)" } ?? "")
+        _repsText = State(initialValue: Self.repsTextValue(for: set))
         _durationText = State(initialValue: set.durationSeconds.map { "\($0)" } ?? "")
         _distanceText = State(initialValue: set.distanceMeters.map { Self.formatDistance($0) } ?? "")
         _rirValue = State(initialValue: set.rir)
@@ -248,10 +299,12 @@ private struct SetRowWrapper: View {
                         if set.completed {
                             await dataSource.uncompleteSet(set)
                         } else {
+                            let parsedReps = RepsTargetInputParser.parse(repsText)
+                            guard !parsedReps.blocksCompletion else { return }
                             await dataSource.completeSet(
                                 set,
                                 weight: UnitConversion.parseDecimal(weightText),
-                                reps: Int(repsText),
+                                reps: parsedReps.completionReps,
                                 durationSeconds: Int(durationText),
                                 distanceMeters: UnitConversion.parseDecimal(distanceText)
                             )
@@ -283,7 +336,22 @@ private struct SetRowWrapper: View {
             }
             .onChange(of: repsText) { _, newValue in
                 handleFieldEdit(field: .reps) {
-                    set.reps = Int(newValue)
+                    switch RepsTargetInputParser.parse(newValue) {
+                    case .empty:
+                        set.reps = nil
+                        set.draftTargetRepMin = nil
+                        set.draftTargetRepMax = nil
+                    case let .single(reps):
+                        set.reps = reps
+                        set.draftTargetRepMin = nil
+                        set.draftTargetRepMax = nil
+                    case let .range(min, max):
+                        set.reps = nil
+                        set.draftTargetRepMin = min
+                        set.draftTargetRepMax = max
+                    case .invalid:
+                        break
+                    }
                 }
             }
             .onChange(of: durationText) { _, newValue in
@@ -354,6 +422,16 @@ private struct SetRowWrapper: View {
         UnitConversion.formatWeight(value)
     }
 
+    private static func repsTextValue(for set: WorkoutSet) -> String {
+        if let reps = set.reps {
+            return "\(reps)"
+        }
+        if let draftRange = set.draftTargetRepRange {
+            return "\(draftRange.lowerBound)-\(draftRange.upperBound)"
+        }
+        return ""
+    }
+
     /// Compute the reps placeholder from template target rep range.
     ///
     /// - Both min & max set and different → "8-12"
@@ -407,6 +485,7 @@ final class SetEntryKeyboardContext {
     init(
         ownerSetID: UUID,
         trackingType: TrackingType,
+        activeField: SetRowInputField? = nil,
         getFocusedField: @escaping () -> SetRowInputField?,
         setFocusedField: @escaping (SetRowInputField?) -> Void,
         getFieldValue: @escaping (SetRowInputField) -> String,
@@ -438,7 +517,7 @@ final class SetEntryKeyboardContext {
         self.movePrevious = movePrevious
         self.moveNext = moveNext
         self.dismiss = dismiss
-        self.trackedField = getFocusedField()
+        self.trackedField = activeField ?? getFocusedField()
     }
 }
 

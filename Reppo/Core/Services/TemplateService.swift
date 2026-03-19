@@ -8,6 +8,8 @@ import Foundation
 enum TemplateServiceError: Error {
     case templateNotFound(UUID)
     case workoutNotFound(UUID)
+    case exerciseNotFound(UUID)
+    case invalidTemplateArchiveVersion(Int)
 }
 
 actor TemplateService: TemplateServiceProtocol {
@@ -321,5 +323,186 @@ actor TemplateService: TemplateServiceProtocol {
         )
 
         return try await createTemplate(saveData)
+    }
+
+    // MARK: - Import / Export
+
+    func exportTemplate(_ templateId: UUID) async throws -> Data {
+        guard let detail = try await fetchTemplateDetail(templateId) else {
+            throw TemplateServiceError.templateNotFound(templateId)
+        }
+
+        let archiveExercises = try await detail.exercises.mapAsync { exerciseDetail in
+            guard let exercise = try await exerciseRepo.fetch(byId: exerciseDetail.exerciseId) else {
+                throw TemplateServiceError.exerciseNotFound(exerciseDetail.exerciseId)
+            }
+
+            return TemplateArchiveExercise(
+                exercise: TemplateArchiveExerciseMetadata(
+                    id: exercise.id,
+                    name: exercise.name,
+                    equipmentType: exercise.equipmentType,
+                    trackingType: exercise.trackingType,
+                    primaryMuscle: exercise.primaryMuscle,
+                    secondaryMuscles: exercise.secondaryMuscles,
+                    movementPattern: exercise.movementPattern,
+                    unilateral: exercise.unilateral,
+                    bilateralLoadFactor: exercise.bilateralLoadFactor,
+                    bodyweightFactor: exercise.bodyweightFactor,
+                    weightIncrement: exercise.weightIncrement,
+                    defaultRestTime: exercise.defaultRestTime,
+                    fatigueRate: exercise.fatigueRate,
+                    recoveryConstant: exercise.recoveryConstant
+                ),
+                orderInTemplate: exerciseDetail.orderInTemplate,
+                supersetGroupId: exerciseDetail.supersetGroupId,
+                restTimeSeconds: exerciseDetail.restTimeSeconds,
+                notes: exerciseDetail.notes,
+                sets: exerciseDetail.sets.map { set in
+                    TemplateArchiveSet(
+                        setType: set.setType,
+                        targetRepMin: set.targetRepMin,
+                        targetRepMax: set.targetRepMax,
+                        targetRIR: set.targetRIR,
+                        orderInExercise: set.orderInExercise
+                    )
+                }
+            )
+        }
+
+        let archive = TemplateArchive(
+            version: TemplateArchive.currentVersion,
+            template: TemplateArchiveTemplate(
+                id: detail.template.id,
+                name: detail.template.name,
+                notes: detail.template.notes
+            ),
+            exercises: archiveExercises
+        )
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return try encoder.encode(archive)
+    }
+
+    func importTemplate(data: Data) async throws -> UUID {
+        let archive = try JSONDecoder().decode(TemplateArchive.self, from: data)
+        guard archive.version == TemplateArchive.currentVersion else {
+            throw TemplateServiceError.invalidTemplateArchiveVersion(archive.version)
+        }
+
+        let templateName = try await uniqueImportedTemplateName(for: archive.template.name)
+        let exercises = try await archive.exercises
+            .sorted(by: { $0.orderInTemplate < $1.orderInTemplate })
+            .mapAsync { archivedExercise in
+                let resolvedExercise = try await resolveExercise(for: archivedExercise.exercise)
+                return TemplateSaveExercise(
+                    exerciseId: resolvedExercise.id,
+                    orderInTemplate: archivedExercise.orderInTemplate,
+                    supersetGroupId: archivedExercise.supersetGroupId,
+                    restTimeSeconds: archivedExercise.restTimeSeconds,
+                    notes: archivedExercise.notes,
+                    sets: archivedExercise.sets
+                        .sorted(by: { $0.orderInExercise < $1.orderInExercise })
+                        .map { set in
+                            TemplateSaveSet(
+                                setType: set.setType,
+                                targetRepMin: set.targetRepMin,
+                                targetRepMax: set.targetRepMax,
+                                targetRIR: set.targetRIR,
+                                orderInExercise: set.orderInExercise
+                            )
+                        }
+                )
+            }
+
+        let saveData = TemplateSaveData(
+            name: templateName,
+            notes: archive.template.notes,
+            exercises: exercises
+        )
+        return try await createTemplate(saveData)
+    }
+
+    // MARK: - Helpers
+
+    private func resolveExercise(for archivedExercise: TemplateArchiveExerciseMetadata) async throws -> Exercise {
+        if let existingById = try await exerciseRepo.fetch(byId: archivedExercise.id) {
+            return existingById
+        }
+
+        let normalizedArchivedName = normalizeName(archivedExercise.name)
+        let allExercises = try await exerciseRepo.fetchAll()
+        if let existingByName = allExercises.first(where: {
+            normalizeName($0.name) == normalizedArchivedName
+        }) {
+            return existingByName
+        }
+
+        let newExercise = Exercise(
+            id: archivedExercise.id,
+            name: archivedExercise.name,
+            equipmentType: archivedExercise.equipmentType,
+            trackingType: archivedExercise.trackingType,
+            primaryMuscle: archivedExercise.primaryMuscle,
+            secondaryMuscles: archivedExercise.secondaryMuscles,
+            movementPattern: archivedExercise.movementPattern,
+            unilateral: archivedExercise.unilateral,
+            bilateralLoadFactor: archivedExercise.bilateralLoadFactor,
+            bodyweightFactor: archivedExercise.bodyweightFactor,
+            weightIncrement: archivedExercise.weightIncrement,
+            defaultRestTime: archivedExercise.defaultRestTime,
+            fatigueRate: archivedExercise.fatigueRate,
+            recoveryConstant: archivedExercise.recoveryConstant
+        )
+        try await exerciseRepo.save(newExercise)
+        return newExercise
+    }
+
+    private func uniqueImportedTemplateName(for proposedName: String) async throws -> String {
+        let baseName = proposedName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "Imported Template"
+            : proposedName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let existingTemplates = try await templateRepo.fetchAllTemplates()
+        let existingNames = Set(existingTemplates.map { normalizeName($0.name) })
+        let normalizedBaseName = normalizeName(baseName)
+
+        if !existingNames.contains(normalizedBaseName) {
+            return baseName
+        }
+
+        let importedName = "\(baseName) (Imported)"
+        if !existingNames.contains(normalizeName(importedName)) {
+            return importedName
+        }
+
+        var index = 2
+        while true {
+            let candidate = "\(baseName) (Imported \(index))"
+            if !existingNames.contains(normalizeName(candidate)) {
+                return candidate
+            }
+            index += 1
+        }
+    }
+
+    private func normalizeName(_ name: String) -> String {
+        name
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+            .lowercased()
+    }
+}
+
+private extension Array {
+    func mapAsync<T>(_ transform: (Element) async throws -> T) async rethrows -> [T] {
+        var result: [T] = []
+        result.reserveCapacity(count)
+        for element in self {
+            result.append(try await transform(element))
+        }
+        return result
     }
 }

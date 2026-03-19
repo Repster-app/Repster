@@ -81,7 +81,9 @@ enum ExerciseInfoProvider {
                 reps: set.reps ?? 0,
                 rir: set.rir,
                 completedAt: set.completedAt,
-                completed: true
+                completed: true,
+                setType: set.setType,
+                restDurationSeconds: set.restDurationSeconds
             )
         }
 

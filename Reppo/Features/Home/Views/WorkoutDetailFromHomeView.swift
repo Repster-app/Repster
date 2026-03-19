@@ -19,6 +19,8 @@ struct WorkoutDetailFromHomeView: View {
     @State private var isDeleting = false
     @State private var showEditWorkout = false
     @State private var selectedExerciseId: UUID?
+    @State private var saveAsTemplateController = SaveWorkoutAsTemplateController()
+    @State private var templateFeedback: TemplateSaveFeedback? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceContainer.self) private var services
 
@@ -32,6 +34,7 @@ struct WorkoutDetailFromHomeView: View {
                 CalendarWorkoutDetailView(
                     workoutDetails: workoutDetails,
                     selectedDate: workoutDetails.first?.workout.date ?? Date(),
+                    onSaveAsTemplate: nil,
                     onExerciseTapped: { exerciseId in
                         selectedExerciseId = exerciseId
                     }
@@ -51,13 +54,12 @@ struct WorkoutDetailFromHomeView: View {
                         Label("Edit Workout", systemImage: "pencil")
                     }
 
-                    // Save as Template — placeholder for future
                     Button {
-                        // Future: save as template
+                        guard let workout = workoutDetails.first?.workout else { return }
+                        saveAsTemplateController.begin(defaultName: workout.displayTitle)
                     } label: {
                         Label("Save as Template", systemImage: "doc.on.doc")
                     }
-                    .disabled(true)
 
                     Divider()
 
@@ -103,6 +105,29 @@ struct WorkoutDetailFromHomeView: View {
         }
         .task {
             await loadDetail()
+        }
+        .saveWorkoutAsTemplatePrompt(
+            controller: saveAsTemplateController,
+            workoutId: workoutDetails.first?.workout.id,
+            onSaved: { savedName in
+                templateFeedback = TemplateSaveFeedback(
+                    title: "Template Saved",
+                    message: "\"\(savedName)\" was created from this workout."
+                )
+            },
+            onError: { error in
+                templateFeedback = TemplateSaveFeedback(
+                    title: "Save Failed",
+                    message: error.localizedDescription
+                )
+            }
+        )
+        .alert(item: $templateFeedback) { feedback in
+            Alert(
+                title: Text(feedback.title),
+                message: Text(feedback.message),
+                dismissButton: .default(Text("OK"))
+            )
         }
         .fullScreenCover(isPresented: $showEditWorkout) {
             EditWorkoutView(workoutId: workoutId, services: services)

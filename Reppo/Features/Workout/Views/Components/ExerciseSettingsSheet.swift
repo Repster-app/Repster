@@ -1,11 +1,11 @@
 // ExerciseSettingsSheet.swift
 // Per-exercise settings sheet for configuring rest time, weight increment,
 // and fatigue parameters. Accessible from Active Workout and Exercise Detail.
-// Feature: Weight Prescription — exercise-specific overrides
+// Feature: Smart Suggestions — exercise-specific overrides
 
 import SwiftUI
 
-/// Sheet for editing per-exercise settings that affect weight prescription and rest timer.
+/// Sheet for editing per-exercise settings that affect Smart Suggestions and the rest timer.
 ///
 /// Settings:
 /// - Default rest time (seconds) — overrides global default

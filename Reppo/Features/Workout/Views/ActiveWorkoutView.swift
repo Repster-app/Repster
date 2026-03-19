@@ -186,7 +186,7 @@ struct ActiveWorkoutView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
 
-                // Weight Suggestion module (opt-in, read-only suggestions)
+                // Smart Suggestions module (opt-in, read-only suggestions)
                 WeightSuggestionModuleView(
                     data: viewModel.weightSuggestionData,
                     unitPreference: viewModel.unitPreference,

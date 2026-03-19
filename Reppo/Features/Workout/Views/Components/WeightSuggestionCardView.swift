@@ -13,10 +13,10 @@ struct WeightSuggestionCardView: View {
         VStack(alignment: .leading, spacing: 10) {
             header
 
-            ForEach(Array(data.suggestions.enumerated()), id: \.element.id) { index, suggestion in
-                suggestionRow(suggestion)
+            ForEach(Array(data.rowStates.enumerated()), id: \.element.id) { index, rowState in
+                rowStateRow(rowState)
 
-                if index < data.suggestions.count - 1 {
+                if index < data.rowStates.count - 1 {
                     Divider()
                         .overlay(Color.border.opacity(0.45))
                         .padding(.vertical, 2)
@@ -54,6 +54,12 @@ struct WeightSuggestionCardView: View {
                 }
             }
 
+            if let summary = availabilitySummary {
+                Text(summary)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.textTertiary)
+            }
+
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     showDetails.toggle()
@@ -75,7 +81,17 @@ struct WeightSuggestionCardView: View {
         }
     }
 
-    // MARK: - Suggestion Row
+    // MARK: - Row State
+
+    @ViewBuilder
+    private func rowStateRow(_ rowState: SetSuggestionState) -> some View {
+        switch rowState.availability {
+        case let .available(suggestion):
+            suggestionRow(suggestion)
+        case let .unavailable(reason):
+            unavailableRow(rowState, reason: reason)
+        }
+    }
 
     private func suggestionRow(_ suggestion: SetSuggestion) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -103,6 +119,28 @@ struct WeightSuggestionCardView: View {
         }
     }
 
+    private func unavailableRow(_ rowState: SetSuggestionState, reason: SuggestionUnavailableReason) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Text("Set \(rowState.setNumber):")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color.textSecondary)
+
+                Text(reason.title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.textPrimary)
+            }
+
+            Text(reason.message)
+                .font(.system(size: 11))
+                .foregroundStyle(Color.textTertiary)
+
+            if showDetails {
+                unavailableDetails(rowState, reason: reason)
+            }
+        }
+    }
+
     // MARK: - Details
 
     private func suggestionDetails(_ diagnostics: SetSuggestionDiagnostics) -> some View {
@@ -116,7 +154,10 @@ struct WeightSuggestionCardView: View {
                     "base \(formatWeight(diagnostics.baseE1RM)) | effective \(formatWeight(diagnostics.effectiveE1RM)) (\(formatSignedPercent(diagnostics.readinessPercent)))"
                 )
                 Text(
-                    "fatigue \(String(format: "%.3f", diagnostics.fatigueDiscount)) | freshness \(diagnostics.freshnessApplied ? "on" : "off")"
+                    "fatigue \(String(format: "%.3f", diagnostics.fatigueDiscount)) | projected \(String(format: "%.3f", diagnostics.projectedSessionFatigue)) | freshness \(diagnostics.freshnessApplied ? "on" : "off")"
+                )
+                Text(
+                    "type multiplier \(String(format: "%.1f", diagnostics.setTypeFatigueMultiplier))x | rest \(Int(diagnostics.restSecondsUsed))s (\(diagnostics.restSource))"
                 )
                 Text(
                     "intensity \(String(format: "%.3f", diagnostics.intensityFactor)) | RIR \(formatSimpleNumber(diagnostics.targetRIR))"
@@ -124,6 +165,12 @@ struct WeightSuggestionCardView: View {
                 Text(
                     "target source \(diagnostics.targetSourceLabel) | baseline \(diagnostics.baselineSourceLabel)"
                 )
+                Text(
+                    "reps source \(diagnostics.repsSourceLabel) | RIR source \(diagnostics.rirSourceLabel)"
+                )
+                if let defaultUsageLabel = diagnostics.defaultUsageLabel {
+                    Text(defaultUsageLabel)
+                }
                 Text(
                     diagnostics.calibrationLabel
                 )
@@ -144,6 +191,39 @@ struct WeightSuggestionCardView: View {
             ForEach(diagnostics.alternatives) { alternative in
                 alternativeRow(alternative, chosenReps: diagnostics.chosenReps)
             }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.bg.opacity(0.45))
+        .cornerRadius(10)
+    }
+
+    private func unavailableDetails(
+        _ rowState: SetSuggestionState,
+        reason: SuggestionUnavailableReason
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Details")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Color.textSecondary)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("status \(reason.title)")
+
+                if let target = rowState.target {
+                    Text("resolved target \(targetDescription(target))")
+                    Text("target source \(target.sourceLabel)")
+                    Text("reps source \(target.repsSourceLabel)")
+                    Text("RIR source \(target.rirSourceLabel)")
+                    if let defaultUsageLabel = target.defaultUsageLabel {
+                        Text(defaultUsageLabel)
+                    }
+                } else {
+                    Text("no target could be resolved for this set")
+                }
+            }
+            .font(.system(size: 10))
+            .foregroundStyle(Color.textTertiary)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -224,11 +304,37 @@ struct WeightSuggestionCardView: View {
         }
     }
 
+    private var availabilitySummary: String? {
+        let readyCount = data.suggestions.count
+        let unavailableCount = data.rowStates.count - readyCount
+
+        if readyCount == 0, unavailableCount == 0 {
+            return nil
+        }
+
+        if readyCount == 0, unavailableCount > 0, let reason = data.unavailableReason {
+            return "\(unavailableCount) unavailable • \(reason.title)"
+        }
+
+        if unavailableCount == 0 {
+            return readyCount == 1 ? "1 suggestion ready" : "\(readyCount) suggestions ready"
+        }
+
+        return "\(readyCount) ready • \(unavailableCount) unavailable"
+    }
+
     private func alternativesHeaderText(_ diagnostics: SetSuggestionDiagnostics) -> String {
         guard let range = diagnostics.targetRepRange else {
             return "Alternatives (x...x+3)"
         }
         return "Alternatives (\(range.lowerBound)-\(range.upperBound) rep range)"
+    }
+
+    private func targetDescription(_ target: SuggestionTarget) -> String {
+        if let repRange = target.repRange {
+            return "\(repRange.lowerBound)-\(repRange.upperBound) reps (resolved \(target.reps)) @ RIR \(formatSimpleNumber(target.rir))"
+        }
+        return "\(target.reps) reps @ RIR \(formatSimpleNumber(target.rir))"
     }
 
     private func formatCloseness(_ closeness: E1RMCloseness) -> String {

@@ -4,11 +4,14 @@
 // superset grouping, rest time, and notes per exercise.
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct CreateEditTemplateView: View {
 
     private let editingTemplateId: UUID?
     @State private var viewModel: CreateEditTemplateViewModel
+    @State private var draggedExerciseId: UUID? = nil
+    @State private var dropTargetExerciseId: UUID? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceContainer.self) private var services
 
@@ -37,7 +40,7 @@ struct CreateEditTemplateView: View {
                     // Add exercise button
                     addExerciseButton
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
                 .padding(.top, 16)
                 .padding(.bottom, 40)
             }
@@ -121,7 +124,9 @@ struct CreateEditTemplateView: View {
                     TemplateExerciseCard(
                         exercise: exercise,
                         exerciseIndex: index,
-                        viewModel: viewModel
+                        viewModel: viewModel,
+                        draggedExerciseId: $draggedExerciseId,
+                        dropTargetExerciseId: $dropTargetExerciseId
                     )
                 }
             }
@@ -195,6 +200,16 @@ private struct TemplateExerciseCard: View {
     let exercise: EditorExercise
     let exerciseIndex: Int
     var viewModel: CreateEditTemplateViewModel
+    @Binding var draggedExerciseId: UUID?
+    @Binding var dropTargetExerciseId: UUID?
+
+    private var isDraggedCard: Bool {
+        draggedExerciseId == exercise.id
+    }
+
+    private var isDropTargetCard: Bool {
+        dropTargetExerciseId == exercise.id && draggedExerciseId != exercise.id
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -207,158 +222,148 @@ private struct TemplateExerciseCard: View {
                     .background(Color.border)
 
                 expandedContent
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 12)
                     .padding(.vertical, 12)
             }
         }
-        .background(Color.bgCard)
+        .background(isDropTargetCard ? Color.accentSoft.opacity(0.28) : Color.bgCard)
         .cornerRadius(14)
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.border, lineWidth: 1)
+                .stroke(
+                    isDropTargetCard ? Color.accent : (isDraggedCard ? Color.accent.opacity(0.45) : Color.border),
+                    lineWidth: isDropTargetCard ? 1.5 : 1
+                )
+        )
+        .overlay(alignment: .topLeading) {
+            if isDropTargetCard {
+                Capsule()
+                    .fill(Color.accent)
+                    .frame(width: 44, height: 4)
+                    .padding(.top, 10)
+                    .padding(.leading, 14)
+                    .transition(.scale(scale: 0.9).combined(with: .opacity))
+            }
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 14))
+        .scaleEffect(isDraggedCard ? 0.985 : (isDropTargetCard ? 1.01 : 1))
+        .opacity(isDraggedCard ? 0.72 : 1)
+        .shadow(
+            color: isDropTargetCard ? Color.accent.opacity(0.18) : .clear,
+            radius: isDropTargetCard ? 14 : 0,
+            x: 0,
+            y: isDropTargetCard ? 8 : 0
+        )
+        .animation(.spring(response: 0.24, dampingFraction: 0.84), value: isDraggedCard)
+        .animation(.spring(response: 0.24, dampingFraction: 0.84), value: isDropTargetCard)
+        .onDrop(
+            of: [UTType.text],
+            delegate: TemplateExerciseDropDelegate(
+                targetExerciseId: exercise.id,
+                draggedExerciseId: $draggedExerciseId,
+                dropTargetExerciseId: $dropTargetExerciseId,
+                viewModel: viewModel
+            )
         )
     }
 
     // MARK: - Header
 
     private var headerRow: some View {
-        Button {
-            viewModel.toggleExpanded(at: exerciseIndex)
-        } label: {
-            HStack(spacing: 10) {
-                // Reorder buttons
-                VStack(spacing: 2) {
-                    Button {
-                        if exerciseIndex > 0 {
-                            viewModel.moveExercise(
-                                from: IndexSet(integer: exerciseIndex),
-                                to: exerciseIndex - 1
-                            )
-                        }
-                    } label: {
-                        Image(systemName: "chevron.up")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(exerciseIndex > 0 ? .textSecondary : .textTertiary.opacity(0.3))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(exerciseIndex <= 0)
-
-                    Button {
-                        if exerciseIndex < viewModel.exercises.count - 1 {
-                            viewModel.moveExercise(
-                                from: IndexSet(integer: exerciseIndex),
-                                to: exerciseIndex + 2
-                            )
-                        }
-                    } label: {
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(exerciseIndex < viewModel.exercises.count - 1 ? .textSecondary : .textTertiary.opacity(0.3))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(exerciseIndex >= viewModel.exercises.count - 1)
+        HStack(spacing: 10) {
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.textTertiary)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+                .onDrag {
+                    draggedExerciseId = exercise.id
+                    return NSItemProvider(object: exercise.id.uuidString as NSString)
                 }
-                .frame(width: 16)
+                .accessibilityLabel("Reorder exercise")
 
-                // Exercise name with superset color
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        if let label = viewModel.supersetLabel(for: exercise.supersetGroupId) {
-                            Text(label)
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(viewModel.supersetColor(for: exercise.supersetGroupId))
+            Button {
+                viewModel.toggleExpanded(at: exerciseIndex)
+            } label: {
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            if let label = viewModel.supersetLabel(for: exercise.supersetGroupId) {
+                                Text(label)
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(viewModel.supersetColor(for: exercise.supersetGroupId))
+                            }
+                            Text(exercise.exerciseName)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(exercise.supersetGroupId != nil
+                                    ? viewModel.supersetColor(for: exercise.supersetGroupId)
+                                    : .textPrimary)
                         }
-                        Text(exercise.exerciseName)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(exercise.supersetGroupId != nil
-                                ? viewModel.supersetColor(for: exercise.supersetGroupId)
-                                : .textPrimary)
+
+                        Text(exerciseSummaryText)
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundColor(.textSecondary)
                     }
 
-                    Text(exerciseSummaryText)
-                        .font(.system(size: 12, weight: .regular))
-                        .foregroundColor(.textSecondary)
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.textTertiary)
+                        .rotationEffect(exercise.isExpanded ? .degrees(90) : .zero)
+                        .animation(.easeInOut(duration: 0.2), value: exercise.isExpanded)
                 }
-
-                Spacer()
-
-                // Expand arrow
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.textTertiary)
-                    .rotationEffect(exercise.isExpanded ? .degrees(90) : .zero)
-                    .animation(.easeInOut(duration: 0.2), value: exercise.isExpanded)
+                .contentShape(Rectangle())
             }
-            .padding(14)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .contextMenu {
-            // Move Up (if not first)
-            if exerciseIndex > 0 {
-                Button {
-                    viewModel.moveExercise(
-                        from: IndexSet(integer: exerciseIndex),
-                        to: exerciseIndex - 1
-                    )
-                } label: {
-                    Label("Move Up", systemImage: "arrow.up")
-                }
-            }
+            .buttonStyle(.plain)
 
-            // Move Down (if not last)
-            if exerciseIndex < viewModel.exercises.count - 1 {
-                Button {
-                    viewModel.moveExercise(
-                        from: IndexSet(integer: exerciseIndex),
-                        to: exerciseIndex + 2
-                    )
-                } label: {
-                    Label("Move Down", systemImage: "arrow.down")
-                }
-            }
-
-            Divider()
-
-            // Superset group
-            Menu("Superset Group") {
-                ForEach(["A", "B", "C"], id: \.self) { label in
-                    Button {
-                        viewModel.setSupersetGroup(for: exerciseIndex, label: label)
-                    } label: {
-                        HStack {
-                            Text("Group \(label)")
-                            if viewModel.currentSupersetLabel(for: exerciseIndex) == label {
-                                Image(systemName: "checkmark")
+            Menu {
+                Menu("Superset Group") {
+                    ForEach(["A", "B", "C"], id: \.self) { label in
+                        Button {
+                            viewModel.setSupersetGroup(for: exerciseIndex, label: label)
+                        } label: {
+                            HStack {
+                                Text("Group \(label)")
+                                if viewModel.currentSupersetLabel(for: exerciseIndex) == label {
+                                    Image(systemName: "checkmark")
+                                }
                             }
                         }
                     }
-                }
-                Button("None") {
-                    viewModel.setSupersetGroup(for: exerciseIndex, label: nil)
-                }
-            }
 
-            // Notes
-            Button {
-                // Toggle notes visibility — for now just set empty notes to trigger editing
-                if exercise.notes == nil {
-                    viewModel.exercises[exerciseIndex].notes = ""
-                    viewModel.exercises[exerciseIndex].isExpanded = true
+                    Button("None") {
+                        viewModel.setSupersetGroup(for: exerciseIndex, label: nil)
+                    }
+                }
+
+                Button {
+                    if exercise.notes == nil {
+                        viewModel.exercises[exerciseIndex].notes = ""
+                        viewModel.exercises[exerciseIndex].isExpanded = true
+                    } else {
+                        viewModel.exercises[exerciseIndex].isExpanded = true
+                    }
+                } label: {
+                    Label(exercise.notes != nil ? "Edit Note" : "Add Note", systemImage: "note.text")
+                }
+
+                Divider()
+
+                Button(role: .destructive) {
+                    viewModel.removeExercise(at: exerciseIndex)
+                } label: {
+                    Label("Remove Exercise", systemImage: "trash")
                 }
             } label: {
-                Label(exercise.notes != nil ? "Edit Note" : "Add Note", systemImage: "note.text")
+                Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.textTertiary)
+                    .frame(width: 28, height: 28)
             }
-
-            Divider()
-
-            // Remove exercise
-            Button(role: .destructive) {
-                viewModel.removeExercise(at: exerciseIndex)
-            } label: {
-                Label("Remove Exercise", systemImage: "trash")
-            }
+            .buttonStyle(.plain)
         }
+        .padding(14)
     }
 
     private var exerciseSummaryText: String {
@@ -556,12 +561,12 @@ private struct TemplateSetRow: View {
     @State private var rirText: String = ""
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             // Set badge
             Text(displayNumber)
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(isWarmup ? .gold : .textPrimary)
-                .frame(width: 26, height: 26)
+                .frame(width: 28, height: 28)
                 .background(isWarmup ? Color.goldSoft : Color.bgSubtle)
                 .cornerRadius(7)
 
@@ -569,7 +574,7 @@ private struct TemplateSetRow: View {
             Text(isWarmup ? "W" : "Set")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.textSecondary)
-                .frame(width: 28, alignment: .leading)
+                .frame(width: 26, alignment: .leading)
 
             // Rep range input
             TextField("6-8", text: $repRangeText)
@@ -584,7 +589,7 @@ private struct TemplateSetRow: View {
                     RoundedRectangle(cornerRadius: 6)
                         .stroke(Color.border, lineWidth: 1)
                 )
-                .frame(maxWidth: .infinity)
+                .frame(width: 88)
                 .onChange(of: repRangeText) { _, newValue in
                     parseRepRange(newValue)
                 }
@@ -602,22 +607,24 @@ private struct TemplateSetRow: View {
                     RoundedRectangle(cornerRadius: 6)
                         .stroke(Color.border, lineWidth: 1)
                 )
-                .frame(width: 44)
+                .frame(width: 50)
                 .keyboardType(.numberPad)
                 .onChange(of: rirText) { _, newValue in
                     viewModel.exercises[exerciseIndex].sets[setIndex].targetRIR = Int(newValue)
                 }
+
+            Spacer(minLength: 0)
 
             // Copy button
             Button {
                 viewModel.duplicateSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
             } label: {
                 Image(systemName: "doc.on.doc")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.textTertiary)
-                    .frame(width: 26, height: 26)
+                    .frame(width: 36, height: 36)
                     .background(Color.bgSubtle)
-                    .cornerRadius(7)
+                    .cornerRadius(9)
             }
             .buttonStyle(.plain)
 
@@ -626,16 +633,16 @@ private struct TemplateSetRow: View {
                 viewModel.removeSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.danger)
-                    .frame(width: 26, height: 26)
+                    .frame(width: 36, height: 36)
                     .background(Color.dangerSoft)
-                    .cornerRadius(7)
+                    .cornerRadius(9)
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         .background(Color.bg)
         .cornerRadius(8)
         .overlay(
@@ -676,5 +683,47 @@ private struct TemplateSetRow: View {
             viewModel.exercises[exerciseIndex].sets[setIndex].targetRepMin = nil
             viewModel.exercises[exerciseIndex].sets[setIndex].targetRepMax = nil
         }
+    }
+}
+
+private struct TemplateExerciseDropDelegate: DropDelegate {
+    let targetExerciseId: UUID
+    @Binding var draggedExerciseId: UUID?
+    @Binding var dropTargetExerciseId: UUID?
+    let viewModel: CreateEditTemplateViewModel
+
+    func dropEntered(info: DropInfo) {
+        guard let draggedExerciseId else { return }
+
+        withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
+            if draggedExerciseId == targetExerciseId {
+                dropTargetExerciseId = nil
+            } else {
+                dropTargetExerciseId = targetExerciseId
+                viewModel.moveExercise(
+                    draggedExerciseId: draggedExerciseId,
+                    toDropTargetExerciseId: targetExerciseId
+                )
+            }
+        }
+    }
+
+    func dropExited(info: DropInfo) {
+        guard dropTargetExerciseId == targetExerciseId else { return }
+        withAnimation(.easeOut(duration: 0.16)) {
+            dropTargetExerciseId = nil
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        withAnimation(.easeOut(duration: 0.18)) {
+            draggedExerciseId = nil
+            dropTargetExerciseId = nil
+        }
+        return true
     }
 }

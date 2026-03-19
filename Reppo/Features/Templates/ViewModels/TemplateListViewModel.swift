@@ -46,6 +46,14 @@ final class TemplateListViewModel {
         return workout
     }
 
+    func exportTemplate(_ templateId: UUID) async throws -> Data {
+        try await templateService.exportTemplate(templateId)
+    }
+
+    func importTemplate(data: Data) async throws -> UUID {
+        try await templateService.importTemplate(data: data)
+    }
+
     func deleteTemplate(_ templateId: UUID) async {
         do {
             try await templateService.deleteTemplate(templateId)

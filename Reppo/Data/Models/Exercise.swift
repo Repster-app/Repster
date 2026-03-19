@@ -16,7 +16,7 @@ final class Exercise {
     var weightIncrement: Double?
     var defaultRestTime: Int?
 
-    // MARK: - Fatigue Profile (Weight Prescription)
+    // MARK: - Fatigue Profile (Smart Suggestions)
 
     /// Per-exercise fatigue rate. nil = use global default (0.05).
     /// Controls how much each set's stress accumulates as session fatigue.

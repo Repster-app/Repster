@@ -1,7 +1,7 @@
 // LoadPrescriptionServiceProtocol.swift
-// Contract for the fatigue-aware weight prescription engine.
+// Contract for the fatigue-aware Smart Suggestions engine.
 // Based on: RIR_Fatigue_Aware_1RM_Model.pdf
-// Feature: Weight Prescription (magic wand)
+// Feature: Smart Suggestions (magic wand)
 
 import Foundation
 
@@ -18,13 +18,17 @@ struct SessionSetContext: Sendable {
     let completedAt: Date?
     /// Whether this set has been completed.
     let completed: Bool
+    /// The type of set (working, amrap, dropset, etc.) for fatigue multiplier lookup.
+    let setType: SetType
+    /// Actual rest duration captured from the rest timer (nil = use configured rest).
+    let restDurationSeconds: Int?
 }
 
-/// Where a suggestion target came from.
-enum SuggestionTargetSource: String, Sendable {
+/// Where an individual target component came from.
+enum SuggestionTargetComponentSource: String, Sendable, Equatable {
     case explicitSet
     case template
-    case implicitFallback
+    case smartDefault
 
     var label: String {
         switch self {
@@ -32,8 +36,8 @@ enum SuggestionTargetSource: String, Sendable {
             return "set entry"
         case .template:
             return "template target"
-        case .implicitFallback:
-            return "implicit fallback"
+        case .smartDefault:
+            return "Smart Suggestions default"
         }
     }
 }
@@ -43,7 +47,32 @@ struct SuggestionTarget: Sendable {
     let reps: Int
     let rir: Double
     let repRange: ClosedRange<Int>?
-    let source: SuggestionTargetSource
+    let repsSource: SuggestionTargetComponentSource
+    let rirSource: SuggestionTargetComponentSource
+
+    var repsSourceLabel: String { repsSource.label }
+    var rirSourceLabel: String { rirSource.label }
+
+    var sourceLabel: String {
+        var orderedSources: [SuggestionTargetComponentSource] = []
+        for source in [repsSource, rirSource] where !orderedSources.contains(source) {
+            orderedSources.append(source)
+        }
+        return orderedSources.map(\.label).joined(separator: " + ")
+    }
+
+    var defaultUsageLabel: String? {
+        switch (repsSource == .smartDefault, rirSource == .smartDefault) {
+        case (true, true):
+            return "using default target"
+        case (true, false):
+            return "using default reps"
+        case (false, true):
+            return "using default RIR"
+        case (false, false):
+            return nil
+        }
+    }
 }
 
 /// Typed reason for why a smart suggestion is unavailable.
@@ -86,7 +115,7 @@ enum SuggestionUnavailableReason: String, Sendable, Equatable {
         case .noPendingSets:
             return "All working sets are complete or there are no remaining sets to suggest."
         case .missingTarget:
-            return "This set does not have enough target information to generate a suggestion."
+            return "This set needs reps or RIR guidance from the set entry, template, or Smart Suggestions defaults."
         case .noStrengthData:
             return "Complete more sets for this exercise before Smart Suggestions can estimate a baseline."
         case .calculationFailed:
@@ -107,6 +136,7 @@ struct SuggestionSetResolution: Sendable {
     let setIndex: Int
     let setNumber: Int
     let eligibility: SuggestionEligibility
+    let setType: SetType
 }
 
 /// Neutral calibration seam for future per-user/per-exercise personalization.
@@ -145,11 +175,13 @@ struct SuggestionPendingSetInput: Sendable {
     let setNumber: Int
     /// The resolved target used for this suggestion.
     let target: SuggestionTarget
+    /// The set type for fatigue multiplier lookup during forward projection.
+    let setType: SetType
 
     var targetReps: Int { target.reps }
     var targetRIR: Double { target.rir }
     var repRange: ClosedRange<Int>? { target.repRange }
-    var targetSource: SuggestionTargetSource { target.source }
+    var targetSourceLabel: String { target.sourceLabel }
 }
 
 /// Snapshot of resolved settings and exercise overrides used by the engine.
@@ -160,6 +192,10 @@ struct SuggestionSettingsSnapshot: Sendable {
     let fatigueEnabled: Bool
     let freshnessEnabled: Bool
     let freshnessPercent: Double
+    /// Per-exercise or global base fatigue rate (default 0.04 for v2).
+    let baseFatigueRate: Double
+    /// Per-exercise or global recovery time constant in seconds (default 180 for v2).
+    let recoveryConstant: Double
 }
 
 /// Normalized engine input after app-model resolution.
@@ -189,11 +225,16 @@ struct SuggestionDecision: Sendable {
     let e1RMSource: E1RMSource
     let bestReps: Int?
     let calibrationAdjustment: SuggestionCalibrationAdjustment
+    /// Projected cumulative session fatigue at the point this set would be performed.
+    let projectedSessionFatigue: Double
 
     var targetReps: Int { target.reps }
     var targetRIR: Double { target.rir }
     var repRange: ClosedRange<Int>? { target.repRange }
-    var targetSource: SuggestionTargetSource { target.source }
+    var targetSourceLabel: String { target.sourceLabel }
+    var targetRepsSourceLabel: String { target.repsSourceLabel }
+    var targetRIRSourceLabel: String { target.rirSourceLabel }
+    var targetDefaultUsageLabel: String? { target.defaultUsageLabel }
 }
 
 /// Expected-vs-actual set outcome payload for future calibration work.
@@ -294,30 +335,126 @@ enum E1RMSource: Sendable {
 /// normalized inputs so the current behavior can be audited and evolved separately
 /// from app-model gathering and UI explanation.
 enum SuggestionEngine {
-    private static let recoveryConstant: Double = 300.0
-    private static let maxFatigue: Double = 0.20
-    private static let readinessMinFactor: Double = 0.95
+    // MARK: - v2 constants
+
+    private static let defaultBaseFatigueRate: Double = 0.04
+    private static let defaultRecoveryConstant: Double = 180.0
+    private static let maxFatigue: Double = 0.25
+    private static let readinessMinFactor: Double = 0.88
     private static let readinessMaxFactor: Double = 1.05
+    private static let missingRIRDefault: Double = 1.0
+
+    // MARK: - Set-type fatigue multipliers
+
+    static func setTypeMultiplier(_ type: SetType) -> Double {
+        switch type {
+        case .warmup:    return 0.0
+        case .working:   return 1.0
+        case .tempo:     return 1.1
+        case .backoff:   return 0.7
+        case .cluster:   return 0.8
+        case .restpause: return 1.3
+        case .myo:       return 1.3
+        case .dropset:   return 1.4
+        case .amrap:     return 1.5
+        case .failure:   return 1.5
+        case .partial:   return 0.5
+        case .isometric: return 0.9
+        case .eccentric: return 1.2
+        }
+    }
+
+    // MARK: - Per-set fatigue calculation
+
+    /// Compute fatigue contribution for a single set.
+    /// Formula: baseFatigueRate * typeMultiplier * effortScale * repScale
+    static func computeSetFatigue(
+        reps: Int,
+        rir: Double?,
+        setType: SetType,
+        baseFatigueRate: Double
+    ) -> Double {
+        let effectiveRIR = rir ?? Self.missingRIRDefault
+        let effortScale = 1.0 + max(0.0, 3.0 - effectiveRIR) * 0.15
+        let repScale = max(0.6, min(Double(reps) / 8.0, 1.5))
+        let typeMultiplier = setTypeMultiplier(setType)
+        return baseFatigueRate * typeMultiplier * effortScale * repScale
+    }
+
+    // MARK: - Session fatigue from completed sets
+
+    static func computeSessionFatigue(
+        completedSets: [SessionSetContext],
+        configuredRestSeconds: Double,
+        recoveryConstant: Double,
+        baseFatigueRate: Double
+    ) -> Double {
+        var sessionFatigue: Double = 0.0
+        let sortedSets = completedSets.filter(\.completed)
+
+        for (index, set) in sortedSets.enumerated() {
+            if index > 0 {
+                // Use actual captured rest duration if available, otherwise configured rest.
+                let restSeconds = Double(set.restDurationSeconds ?? Int(configuredRestSeconds))
+                sessionFatigue *= exp(-restSeconds / recoveryConstant)
+            }
+
+            let setFatigue = computeSetFatigue(
+                reps: set.reps,
+                rir: set.rir,
+                setType: set.setType,
+                baseFatigueRate: baseFatigueRate
+            )
+            sessionFatigue += setFatigue
+        }
+
+        return min(sessionFatigue, Self.maxFatigue)
+    }
+
+    // MARK: - Evaluate with forward projection
 
     static func evaluate(_ input: SuggestionEngineInput) -> [SuggestionDecision] {
-        let sessionFatigue: Double
+        let baseFatigueRate = input.settings.baseFatigueRate
+        let recoveryConstant = input.settings.recoveryConstant
+        let configuredRestSeconds = input.settings.restTimerSeconds
+
+        // Accumulate fatigue from completed sets.
+        var runningFatigue: Double = 0.0
         if input.settings.fatigueEnabled {
-            sessionFatigue = computeSessionFatigue(
+            runningFatigue = computeSessionFatigue(
                 completedSets: input.completedSessionSets,
-                restTimerSeconds: input.settings.restTimerSeconds
+                configuredRestSeconds: configuredRestSeconds,
+                recoveryConstant: recoveryConstant,
+                baseFatigueRate: baseFatigueRate
             )
-        } else {
-            sessionFatigue = 0.0
         }
 
         let firstSuggestedSetIndex = input.pendingSets.map(\.setIndex).min()
+        var decisions: [SuggestionDecision] = []
 
-        return input.pendingSets.map { setSpec in
+        for (pendingIndex, setSpec) in input.pendingSets.enumerated() {
             let isFirstSet = input.completedSessionSets.isEmpty && setSpec.setIndex == firstSuggestedSetIndex
+
+            // Forward projection: decay fatigue between pending sets using configured rest.
+            if input.settings.fatigueEnabled && pendingIndex > 0 {
+                runningFatigue *= exp(-configuredRestSeconds / recoveryConstant)
+
+                // Project the previous pending set's fatigue contribution.
+                let prev = input.pendingSets[pendingIndex - 1]
+                let prevFatigue = computeSetFatigue(
+                    reps: prev.targetReps,
+                    rir: prev.targetRIR,
+                    setType: prev.setType,
+                    baseFatigueRate: baseFatigueRate
+                )
+                runningFatigue = min(runningFatigue + prevFatigue, Self.maxFatigue)
+            }
+
+            let projectedFatigue = runningFatigue
 
             let fatigueDiscount = min(
                 1.0,
-                max(0.0, (1.0 - sessionFatigue) + input.calibrationAdjustment.fatigueDiscountOffset)
+                max(0.0, (1.0 - projectedFatigue) + input.calibrationAdjustment.fatigueDiscountOffset)
             )
             var readinessRawE1RM = input.baseE1RM * input.calibrationAdjustment.readinessMultiplier * fatigueDiscount
 
@@ -372,7 +509,7 @@ enum SuggestionEngine {
                 prescribedWeight = roundToIncrement(rawWeight, increment: input.settings.weightIncrement)
             }
 
-            return SuggestionDecision(
+            decisions.append(SuggestionDecision(
                 setId: setSpec.setId,
                 setIndex: setSpec.setIndex,
                 setNumber: setSpec.setNumber,
@@ -387,33 +524,12 @@ enum SuggestionEngine {
                 freshnessApplied: freshnessApplied,
                 e1RMSource: input.baseSource,
                 bestReps: bestReps,
-                calibrationAdjustment: input.calibrationAdjustment
-            )
-        }
-    }
-
-    private static func computeSessionFatigue(
-        completedSets: [SessionSetContext],
-        restTimerSeconds: Double
-    ) -> Double {
-        var sessionFatigue: Double = 0.0
-        let sortedSets = completedSets.filter(\.completed)
-
-        for (index, set) in sortedSets.enumerated() {
-            if index > 0 {
-                sessionFatigue *= exp(-restTimerSeconds / Self.recoveryConstant)
-            }
-
-            let rir = set.rir ?? 2.0
-            let baseFatigue: Double = 0.03
-            let rirBonus = max(0.0, 2.0 - rir) * 0.02
-            let repScale = min(Double(set.reps) / 8.0, 1.5)
-            let setFatigue = (baseFatigue + rirBonus) * repScale
-
-            sessionFatigue += setFatigue
+                calibrationAdjustment: input.calibrationAdjustment,
+                projectedSessionFatigue: projectedFatigue
+            ))
         }
 
-        return min(sessionFatigue, Self.maxFatigue)
+        return decisions
     }
 
     private static func roundToIncrement(_ value: Double, increment: Double) -> Double {

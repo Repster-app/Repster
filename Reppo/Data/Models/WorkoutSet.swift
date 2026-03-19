@@ -40,6 +40,22 @@ final class WorkoutSet {
     var targetRIR: Int?
     var createdAt: Date
     var updatedAt: Date
+    /// Actual rest duration in seconds captured from the rest timer when it runs to zero.
+    /// Nil when timer was dismissed early or no timer was used — falls back to configured rest.
+    var restDurationSeconds: Int?
+
+    /// Draft-only rep-range override typed during an active workout (for example "8-12").
+    @Transient var draftTargetRepMin: Int? = nil
+
+    /// Draft-only rep-range override typed during an active workout (for example "8-12").
+    @Transient var draftTargetRepMax: Int? = nil
+
+    var draftTargetRepRange: ClosedRange<Int>? {
+        guard let draftTargetRepMin, let draftTargetRepMax, draftTargetRepMin < draftTargetRepMax else {
+            return nil
+        }
+        return draftTargetRepMin...draftTargetRepMax
+    }
 
     var hasData: Bool {
         ((weight ?? 0) > 0 && (reps ?? 0) > 0) ||
@@ -84,7 +100,8 @@ final class WorkoutSet {
         targetRPE: Double? = nil,
         targetRIR: Int? = nil,
         createdAt: Date = Date(),
-        updatedAt: Date = Date()
+        updatedAt: Date = Date(),
+        restDurationSeconds: Int? = nil
     ) {
         self.id = id
         self.workoutId = workoutId
@@ -118,6 +135,7 @@ final class WorkoutSet {
         self.targetRIR = targetRIR
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.restDurationSeconds = restDurationSeconds
     }
 }
 

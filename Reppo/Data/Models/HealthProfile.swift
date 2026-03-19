@@ -14,7 +14,11 @@ final class HealthProfile {
     /// When nil, falls back to defaultRestTimeSeconds.
     var defaultWarmupRestTimeSeconds: Int?
 
-    // MARK: - Weight Prescription Settings (optional for migration compatibility)
+    /// Alert mode when rest timer finishes: "off", "vibration", "sound", or "both".
+    /// Default: "vibration".
+    var restTimerAlert: String?
+
+    // MARK: - Smart Suggestions Settings (legacy field names for migration compatibility)
 
     /// Whether smart weight suggestions are enabled globally. Default: true.
     var prescriptionEnabled: Bool?
@@ -24,6 +28,12 @@ final class HealthProfile {
 
     /// Default weight increment for rounding prescribed weights (kg). Default: 2.5.
     var prescriptionDefaultIncrement: Double?
+
+    /// Default reps target used when a set is missing reps guidance. Default: 8.
+    var prescriptionDefaultTargetReps: Int?
+
+    /// Default RIR target used when a set is missing RIR guidance. Default: 2.
+    var prescriptionDefaultTargetRIR: Int?
 
     /// Whether to apply a freshness bonus (~3-6%) on the first set. Default: false.
     var prescriptionFreshnessBonus: Bool?
@@ -47,9 +57,12 @@ final class HealthProfile {
         includeWarmupsInPRs: Bool = false,
         e1RMFormula: String = "epley",
         defaultRestTimeSeconds: Int? = 150,
+        restTimerAlert: String = "vibration",
         prescriptionEnabled: Bool = true,
         prescriptionRecencyWeeks: Int = 6,
         prescriptionDefaultIncrement: Double = 2.5,
+        prescriptionDefaultTargetReps: Int = 8,
+        prescriptionDefaultTargetRIR: Int = 2,
         prescriptionFreshnessBonus: Bool = false,
         prescriptionFreshnessBonusPercent: Double = 0.03,
         prescriptionFatigueModelingEnabled: Bool = true,
@@ -63,9 +76,12 @@ final class HealthProfile {
         self.includeWarmupsInPRs = includeWarmupsInPRs
         self.e1RMFormula = e1RMFormula
         self.defaultRestTimeSeconds = defaultRestTimeSeconds
+        self.restTimerAlert = restTimerAlert
         self.prescriptionEnabled = prescriptionEnabled
         self.prescriptionRecencyWeeks = prescriptionRecencyWeeks
         self.prescriptionDefaultIncrement = prescriptionDefaultIncrement
+        self.prescriptionDefaultTargetReps = prescriptionDefaultTargetReps
+        self.prescriptionDefaultTargetRIR = prescriptionDefaultTargetRIR
         self.prescriptionFreshnessBonus = prescriptionFreshnessBonus
         self.prescriptionFreshnessBonusPercent = prescriptionFreshnessBonusPercent
         self.prescriptionFatigueModelingEnabled = prescriptionFatigueModelingEnabled

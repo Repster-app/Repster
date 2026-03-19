@@ -1,14 +1,15 @@
 // LoadPrescriptionService.swift
-// Fatigue-aware weight prescription engine.
-// Feature: Weight Prescription (magic wand)
+// Fatigue-aware Smart Suggestions engine.
+// Feature: Smart Suggestions (magic wand)
 //
-// Algorithm summary:
+// Algorithm summary (v2):
 // 1. Estimate capacity e1RM from recent workout history using recent top workout peaks
-// 2. Accumulate session fatigue: each set adds 3% base + up to 4% RIR bonus, scaled by reps
-// 3. Between sets: fatigue decays via exp(-restTimerSeconds / τ), where τ = 300s
-// 4. Compute readiness e1RM from fatigue/freshness and clamp it to ±5% around capacity
-// 5. Compute intensity_factor from selected formula: reverseCalculate(1.0, targetReps + targetRIR)
-// 6. target_weight = readiness_e1RM × intensity_factor, rounded to increment
+// 2. Accumulate session fatigue per set: baseFatigueRate * typeMultiplier * effortScale * repScale
+// 3. Between sets: fatigue decays via exp(-restSeconds / τ), τ = 180s default (per-exercise override)
+// 4. Forward-project fatigue across pending sets (progressive decrease)
+// 5. Compute readiness e1RM from fatigue/freshness and clamp to 0.88–1.05 around capacity
+// 6. Compute intensity_factor from selected formula: reverseCalculate(1.0, targetReps + targetRIR)
+// 7. target_weight = readiness_e1RM × intensity_factor, rounded to increment
 //
 // Fatigue model calibrated against: Willardson load-reduction studies,
 // Nuzzo/SBS rep drop-off meta-analysis, RTS fatigue percents, PCr resynthesis research.
@@ -91,6 +92,8 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         let freshnessEnabled = profile.prescriptionFreshnessBonus ?? false
         let freshnessPercent = profile.prescriptionFreshnessBonusPercent ?? 0.03
         let formula = E1RMFormula(rawValue: profile.e1RMFormula) ?? .epley
+        let baseFatigueRate = exercise.fatigueRate ?? 0.04
+        let recoveryConstant = exercise.recoveryConstant ?? profile.prescriptionDefaultRecoveryConstant ?? 180.0
 
         let baseEstimate = try await estimateBaseE1RM(
             exerciseId: exerciseId,
@@ -114,7 +117,9 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
                 weightIncrement: weightIncrement,
                 fatigueEnabled: fatigueEnabled,
                 freshnessEnabled: freshnessEnabled,
-                freshnessPercent: freshnessPercent
+                freshnessPercent: freshnessPercent,
+                baseFatigueRate: baseFatigueRate,
+                recoveryConstant: recoveryConstant
             ),
             calibrationAdjustment: calibrationAdjustment
         )
@@ -149,8 +154,10 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
                     reps: set.targetReps,
                     rir: set.targetRIR,
                     repRange: set.repRange,
-                    source: .explicitSet
-                )
+                    repsSource: .explicitSet,
+                    rirSource: .explicitSet
+                ),
+                setType: .working
             )
         }
 

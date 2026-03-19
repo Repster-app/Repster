@@ -11,6 +11,9 @@ struct CalendarView: View {
     @Environment(ServiceContainer.self) private var services
     @State private var viewModel: CalendarViewModel
     @State private var navigationPath = NavigationPath()
+    @State private var workoutToSaveAsTemplate: Workout? = nil
+    @State private var saveAsTemplateController = SaveWorkoutAsTemplateController()
+    @State private var templateFeedback: TemplateSaveFeedback? = nil
 
     init(
         workoutService: WorkoutServiceProtocol,
@@ -100,6 +103,29 @@ struct CalendarView: View {
             .task {
                 await viewModel.loadAllDots()
             }
+            .saveWorkoutAsTemplatePrompt(
+                controller: saveAsTemplateController,
+                workoutId: workoutToSaveAsTemplate?.id,
+                onSaved: { savedName in
+                    templateFeedback = TemplateSaveFeedback(
+                        title: "Template Saved",
+                        message: "\"\(savedName)\" was created from this workout."
+                    )
+                },
+                onError: { error in
+                    templateFeedback = TemplateSaveFeedback(
+                        title: "Save Failed",
+                        message: error.localizedDescription
+                    )
+                }
+            )
+            .alert(item: $templateFeedback) { feedback in
+                Alert(
+                    title: Text(feedback.title),
+                    message: Text(feedback.message),
+                    dismissButton: .default(Text("OK"))
+                )
+            }
         }
     }
 
@@ -167,6 +193,10 @@ struct CalendarView: View {
                 CalendarWorkoutDetailView(
                     workoutDetails: viewModel.selectedDateWorkoutDetails,
                     selectedDate: selectedDate,
+                    onSaveAsTemplate: { workout in
+                        workoutToSaveAsTemplate = workout
+                        saveAsTemplateController.begin(defaultName: workout.displayTitle)
+                    },
                     onExerciseTapped: { exerciseId in
                         navigationPath.append(exerciseId)
                     }

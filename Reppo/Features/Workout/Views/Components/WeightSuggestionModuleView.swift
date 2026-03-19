@@ -12,7 +12,7 @@ struct WeightSuggestionModuleView: View {
 
     var body: some View {
         if let data, !isLoading {
-            if !data.suggestions.isEmpty {
+            if !data.rowStates.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     sectionLabel
 
@@ -31,7 +31,7 @@ struct WeightSuggestionModuleView: View {
     }
 
     private var sectionLabel: some View {
-        Text("WEIGHT SUGGESTIONS")
+        Text("SMART SUGGESTIONS")
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(Color.textTertiary)
             .kerning(0.8)

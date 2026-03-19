@@ -4,10 +4,17 @@
 // Supports: template selection, create new, edit, delete (swipe).
 
 import SwiftUI
+import UniformTypeIdentifiers
+import UIKit
 
 struct TemplateListSheet: View {
 
     @State private var viewModel: TemplateListViewModel
+    @State private var showImportPicker = false
+    @State private var isImportingTemplate = false
+    @State private var exportingTemplateId: UUID? = nil
+    @State private var shareSheetItem: TemplateShareItem? = nil
+    @State private var actionAlert: TemplateActionAlert? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceContainer.self) private var services
 
@@ -44,23 +51,42 @@ struct TemplateListSheet: View {
 
                 Spacer()
 
-                Button {
-                    onCreateTemplate()
-                    dismiss()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 12, weight: .bold))
-                        Text("New")
-                            .font(.system(size: 13, weight: .semibold))
+                HStack(spacing: 8) {
+                    Button {
+                        showImportPicker = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "square.and.arrow.down")
+                                .font(.system(size: 12, weight: .bold))
+                            Text("Import")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .foregroundColor(.accent)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.accentSoft)
+                        .cornerRadius(10)
                     }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Color.accent)
-                    .cornerRadius(10)
+                    .buttonStyle(.plain)
+
+                    Button {
+                        onCreateTemplate()
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 12, weight: .bold))
+                            Text("New")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.accent)
+                        .cornerRadius(10)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 4)
@@ -110,6 +136,15 @@ struct TemplateListSheet: View {
         .presentationDragIndicator(.hidden)
         .presentationBackground(Color.bgCard)
         .preferredColorScheme(.dark)
+        .fileImporter(
+            isPresented: $showImportPicker,
+            allowedContentTypes: [.reppoTemplate]
+        ) { result in
+            handleImportSelection(result)
+        }
+        .sheet(item: $shareSheetItem) { item in
+            ActivityShareSheet(activityItems: [item.url])
+        }
         .task {
             await viewModel.loadTemplates()
         }
@@ -120,6 +155,30 @@ struct TemplateListSheet: View {
             }
         } message: {
             Text("This will permanently delete this template. This action cannot be undone.")
+        }
+        .alert(item: $actionAlert) { alert in
+            Alert(
+                title: Text(alert.title),
+                message: Text(alert.message),
+                dismissButton: .default(Text("OK"))
+            )
+        }
+        .overlay {
+            if isImportingTemplate || exportingTemplateId != nil {
+                ZStack {
+                    Color.black.opacity(0.28)
+                        .ignoresSafeArea()
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .tint(Color.accent)
+                        Text(isImportingTemplate ? "Importing template…" : "Preparing export…")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                    .padding(24)
+                    .background(Color.bgCard, in: RoundedRectangle(cornerRadius: 12))
+                }
+            }
         }
     }
 
@@ -153,6 +212,7 @@ struct TemplateListSheet: View {
                 ForEach(viewModel.templates) { template in
                     TemplateCardView(
                         template: template,
+                        isExporting: exportingTemplateId == template.id,
                         onTap: {
                             Task {
                                 do {
@@ -163,6 +223,9 @@ struct TemplateListSheet: View {
                                     print("[TemplateListSheet] Start from template failed: \(error)")
                                 }
                             }
+                        },
+                        onExport: {
+                            Task { await exportTemplate(template) }
                         },
                         onEdit: {
                             onEditTemplate(template.id)
@@ -176,4 +239,105 @@ struct TemplateListSheet: View {
             }
         }
     }
+
+    private func handleImportSelection(_ result: Result<URL, Error>) {
+        switch result {
+        case .failure(let error):
+            actionAlert = TemplateActionAlert(
+                title: "Import Failed",
+                message: error.localizedDescription
+            )
+
+        case .success(let url):
+            Task {
+                await importTemplate(from: url)
+            }
+        }
+    }
+
+    private func importTemplate(from url: URL) async {
+        isImportingTemplate = true
+        defer { isImportingTemplate = false }
+
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessing {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        do {
+            let data = try Data(contentsOf: url)
+            let importedId = try await viewModel.importTemplate(data: data)
+            await viewModel.loadTemplates()
+
+            let importedName = viewModel.templates.first(where: { $0.id == importedId })?.name ?? "Template"
+            actionAlert = TemplateActionAlert(
+                title: "Template Imported",
+                message: "\"\(importedName)\" was added to your templates."
+            )
+        } catch {
+            actionAlert = TemplateActionAlert(
+                title: "Import Failed",
+                message: error.localizedDescription
+            )
+        }
+    }
+
+    private func exportTemplate(_ template: TemplateSummary) async {
+        exportingTemplateId = template.id
+        defer { exportingTemplateId = nil }
+
+        do {
+            let data = try await viewModel.exportTemplate(template.id)
+            let url = try temporaryShareURL(for: template.name, data: data)
+            shareSheetItem = TemplateShareItem(url: url)
+        } catch {
+            actionAlert = TemplateActionAlert(
+                title: "Export Failed",
+                message: error.localizedDescription
+            )
+        }
+    }
+
+    private func temporaryShareURL(for templateName: String, data: Data) throws -> URL {
+        let sanitizedName = sanitizedFilename(templateName)
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(sanitizedName).reppotemplate")
+        try data.write(to: url, options: .atomic)
+        return url
+    }
+
+    private func sanitizedFilename(_ name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallback = trimmed.isEmpty ? "template" : trimmed
+        let invalidCharacters = CharacterSet(charactersIn: "/\\?%*|\"<>:")
+        let components = fallback.components(separatedBy: invalidCharacters)
+        return components.joined(separator: "-")
+    }
+}
+
+private struct TemplateActionAlert: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
+}
+
+private struct TemplateShareItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+private struct ActivityShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+private extension UTType {
+    static let reppoTemplate = UTType(exportedAs: "com.magnusespensen.reppo.template", conformingTo: .json)
 }

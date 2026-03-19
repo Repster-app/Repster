@@ -1,18 +1,17 @@
 // PrescriptionSettingsView.swift
-// Advanced settings for the fatigue-aware weight prescription engine.
-// Accessed from Settings → Weight Prescription → Advanced.
-// Feature: Weight Prescription
+// Advanced settings for Smart Suggestions.
+// Accessed from Settings → Smart Suggestions → Advanced.
+// Feature: Smart Suggestions
 
 import SwiftUI
 
-/// Advanced settings view for tuning the weight prescription algorithm.
+/// Advanced settings view for tuning Smart Suggestions.
 ///
 /// Provides control over:
 /// - Freshness bonus (on/off + percentage)
 /// - Fatigue modeling (on/off)
-/// - Default recovery constant (seconds)
 /// - Recency window (weeks)
-struct PrescriptionAdvancedSettingsView: View {
+struct SmartSuggestionsAdvancedSettingsView: View {
 
     // MARK: - State
 
@@ -20,6 +19,8 @@ struct PrescriptionAdvancedSettingsView: View {
     @State private var freshnessPercent: Double
     @State private var fatigueEnabled: Bool
     @State private var recencyWeeks: Int
+    @State private var defaultTargetReps: Int
+    @State private var defaultTargetRIR: Int
 
     private let settingsService: any SettingsServiceProtocol
 
@@ -36,6 +37,8 @@ struct PrescriptionAdvancedSettingsView: View {
         _freshnessPercent = State(initialValue: (profile.prescriptionFreshnessBonusPercent ?? 0.03) * 100)
         _fatigueEnabled = State(initialValue: profile.prescriptionFatigueModelingEnabled ?? true)
         _recencyWeeks = State(initialValue: profile.prescriptionRecencyWeeks ?? 6)
+        _defaultTargetReps = State(initialValue: profile.prescriptionDefaultTargetReps ?? 8)
+        _defaultTargetRIR = State(initialValue: profile.prescriptionDefaultTargetRIR ?? 2)
         self.settingsService = settingsService
     }
 
@@ -43,6 +46,35 @@ struct PrescriptionAdvancedSettingsView: View {
 
     var body: some View {
         Form {
+            Section {
+                Stepper(value: $defaultTargetReps, in: 1...30) {
+                    HStack {
+                        Text("Default Reps")
+                            .foregroundColor(.textPrimary)
+                        Spacer()
+                        Text("\(defaultTargetReps)")
+                            .foregroundColor(.textSecondary)
+                    }
+                }
+                .onChange(of: defaultTargetReps) { _, newValue in
+                    Task { try? await settingsService.updatePrescriptionDefaultTargetReps(newValue) }
+                }
+
+                Picker("Default RIR", selection: $defaultTargetRIR) {
+                    ForEach(0...5, id: \.self) { rir in
+                        Text(rir == 5 ? "5+" : "\(rir)").tag(rir)
+                    }
+                }
+                .foregroundColor(.textPrimary)
+                .pickerStyle(.menu)
+                .onChange(of: defaultTargetRIR) { _, newValue in
+                    Task { try? await settingsService.updatePrescriptionDefaultTargetRIR(newValue) }
+                }
+            } footer: {
+                Text("Used when a set is missing reps guidance, RIR guidance, or both. Smart Suggestions will fill only the missing piece.")
+                    .foregroundColor(.textTertiary)
+            }
+
             // Recency Window
             Section {
                 Picker("Recency Window", selection: $recencyWeeks) {
@@ -113,7 +145,7 @@ struct PrescriptionAdvancedSettingsView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Color.bg)
-        .navigationTitle("Advanced")
+        .navigationTitle("Smart Suggestions")
         .navigationBarTitleDisplayMode(.inline)
     }
 

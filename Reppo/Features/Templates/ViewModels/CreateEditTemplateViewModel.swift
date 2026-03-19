@@ -241,6 +241,21 @@ final class CreateEditTemplateViewModel {
         exercises.move(fromOffsets: source, toOffset: destination)
     }
 
+    func moveExercise(draggedExerciseId: UUID, toDropTargetExerciseId targetExerciseId: UUID) {
+        guard draggedExerciseId != targetExerciseId,
+              let sourceIndex = exercises.firstIndex(where: { $0.id == draggedExerciseId }),
+              let targetIndex = exercises.firstIndex(where: { $0.id == targetExerciseId }) else { return }
+
+        let draggedExercise = exercises.remove(at: sourceIndex)
+        if targetIndex >= exercises.count {
+            exercises.append(draggedExercise)
+            return
+        }
+
+        let adjustedTargetIndex = sourceIndex < targetIndex ? max(targetIndex - 1, 0) : targetIndex
+        exercises.insert(draggedExercise, at: adjustedTargetIndex)
+    }
+
     func toggleExpanded(at index: Int) {
         guard index >= 0, index < exercises.count else { return }
         exercises[index].isExpanded.toggle()

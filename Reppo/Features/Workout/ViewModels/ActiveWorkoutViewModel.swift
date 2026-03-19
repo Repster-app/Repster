@@ -7,6 +7,7 @@
 // Spec: specdoc S3, S4, S6.2, S8.8; AGENT_RULES S6, S7.3
 
 import ActivityKit
+import AudioToolbox
 import Combine
 import Foundation
 import SwiftUI
@@ -86,6 +87,9 @@ final class ActiveWorkoutViewModel {
 
     /// Global default warmup rest time from HealthProfile. When nil, falls back to globalDefaultRestTime.
     private var globalDefaultWarmupRestTime: Int?
+
+    /// Rest timer alert mode: "off", "vibration", "sound", or "both".
+    private var restTimerAlertMode: String = "vibration"
 
     /// Sets grouped by exerciseId.
     var setsByExercise: [UUID: [WorkoutSet]] = [:]
@@ -270,6 +274,7 @@ final class ActiveWorkoutViewModel {
             if let profile = try? await settingsService.fetchSettings() {
                 self.globalDefaultRestTime = profile.defaultRestTimeSeconds ?? 150
                 self.globalDefaultWarmupRestTime = profile.defaultWarmupRestTimeSeconds
+                self.restTimerAlertMode = profile.restTimerAlert ?? "vibration"
             }
 
             // 8. Restore persisted rest timer (survives view dismissal)
@@ -724,6 +729,8 @@ final class ActiveWorkoutViewModel {
             restTimer = .finished
             timerSubscription?.cancel()
             timerSubscription = nil
+            captureRestDurationOnLastCompletedSet()
+            fireTimerAlert()
         } else {
             restTimer = .running(remaining: remaining, total: timerTotalDuration)
         }
@@ -742,11 +749,37 @@ final class ActiveWorkoutViewModel {
             // Clear persisted timer state
             UserDefaults.standard.removeObject(forKey: "restTimerStartDate")
             UserDefaults.standard.removeObject(forKey: "restTimerTotalDuration")
+            captureRestDurationOnLastCompletedSet()
+            fireTimerAlert()
             // Update Live Activity only on state transition to .finished
             // (NOT every tick — countdown is rendered by ActivityKit's timer text style)
             updateLiveActivityState()
         } else {
             restTimer = .running(remaining: remaining - 1, total: total)
+        }
+    }
+
+    /// Capture the rest timer's total duration onto the most recently completed set
+    /// for fatigue model v2. Only called when the timer runs to zero (not on early dismissal).
+    private func captureRestDurationOnLastCompletedSet() {
+        guard let exercise = currentExercise else { return }
+        let sets = setsByExercise[exercise.id] ?? []
+        // Find the most recently completed set (by completedAt timestamp).
+        guard let lastCompleted = sets
+            .filter({ $0.completed })
+            .max(by: { ($0.completedAt ?? .distantPast) < ($1.completedAt ?? .distantPast) })
+        else { return }
+        lastCompleted.restDurationSeconds = timerTotalDuration
+    }
+
+    /// Fire haptic feedback and/or sound based on the restTimerAlertMode setting.
+    private func fireTimerAlert() {
+        let mode = restTimerAlertMode
+        if mode == "vibration" || mode == "both" {
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
+        if mode == "sound" || mode == "both" {
+            AudioServicesPlaySystemSound(1007)
         }
     }
 

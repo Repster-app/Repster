@@ -46,6 +46,9 @@ struct SuggestionRepAlternative: Identifiable, Sendable {
 struct SuggestionExplanation: Sendable {
     let summary: String
     let targetSourceLabel: String
+    let repsSourceLabel: String
+    let rirSourceLabel: String
+    let defaultUsageLabel: String?
     let baselineSourceLabel: String
     let calibrationLabel: String
 }
@@ -65,9 +68,17 @@ struct SetSuggestionDiagnostics: Sendable {
     let targetRIR: Double
     let targetRepRange: ClosedRange<Int>?
     let targetSourceLabel: String
+    let repsSourceLabel: String
+    let rirSourceLabel: String
+    let defaultUsageLabel: String?
     let baselineSourceLabel: String
     let calibrationLabel: String
     let alternatives: [SuggestionRepAlternative]
+    // v2 fatigue diagnostics
+    let projectedSessionFatigue: Double
+    let setTypeFatigueMultiplier: Double
+    let restSecondsUsed: Double
+    let restSource: String
 }
 
 /// A single per-set weight suggestion for display.
@@ -177,7 +188,7 @@ enum SuggestionCoordinator {
         profile: HealthProfile?
     ) -> SuggestionPreparation {
         let completedSessionSets = completedSessionSets(from: sets)
-        let setResolutions = resolvePendingSets(from: sets)
+        let setResolutions = resolvePendingSets(from: sets, profile: profile)
         let pendingSets = setResolutions.compactMap(pendingSetInput(from:))
 
         let unavailableReason: SuggestionUnavailableReason?
@@ -219,7 +230,9 @@ enum SuggestionCoordinator {
                     reps: set.reps ?? 0,
                     rir: set.rir,
                     completedAt: set.completedAt,
-                    completed: true
+                    completed: true,
+                    setType: set.setType,
+                    restDurationSeconds: set.restDurationSeconds
                 )
             }
     }
@@ -228,7 +241,10 @@ enum SuggestionCoordinator {
         exercise.trackingType == .weightReps || exercise.trackingType == .weightRepsDuration
     }
 
-    private static func resolvePendingSets(from sets: [WorkoutSet]) -> [SuggestionSetResolution] {
+    private static func resolvePendingSets(
+        from sets: [WorkoutSet],
+        profile: HealthProfile?
+    ) -> [SuggestionSetResolution] {
         var resolutions: [SuggestionSetResolution] = []
         var workingSetNumber = 0
 
@@ -242,7 +258,8 @@ enum SuggestionCoordinator {
                     setId: set.id,
                     setIndex: index,
                     setNumber: workingSetNumber,
-                    eligibility: resolveTarget(for: set)
+                    eligibility: resolveTarget(for: set, profile: profile),
+                    setType: set.setType
                 )
             )
         }
@@ -250,47 +267,62 @@ enum SuggestionCoordinator {
         return resolutions
     }
 
-    private static func resolveTarget(for set: WorkoutSet) -> SuggestionEligibility {
-        let repRange: ClosedRange<Int>?
+    private static func resolveTarget(
+        for set: WorkoutSet,
+        profile: HealthProfile?
+    ) -> SuggestionEligibility {
+        let templateRepRange: ClosedRange<Int>?
         if let min = set.targetRepMin, let max = set.targetRepMax, min < max {
-            repRange = min...max
+            templateRepRange = min...max
         } else {
-            repRange = nil
+            templateRepRange = nil
         }
 
-        let repsResolution: (value: Int, source: SuggestionTargetSource)?
+        let draftRepRange = set.draftTargetRepRange
+        let defaultTargetReps = normalizedDefaultTargetReps(from: profile)
+        let defaultTargetRIR = normalizedDefaultTargetRIR(from: profile)
+
+        let repsResolution: (value: Int, source: SuggestionTargetComponentSource)?
         if let reps = set.reps, reps > 0 {
             repsResolution = (reps, .explicitSet)
+        } else if let draftRepRange {
+            repsResolution = ((draftRepRange.lowerBound + draftRepRange.upperBound) / 2, .explicitSet)
         } else if let min = set.targetRepMin, let max = set.targetRepMax {
             repsResolution = ((min + max) / 2, .template)
         } else if let min = set.targetRepMin {
             repsResolution = (min, .template)
         } else if let max = set.targetRepMax {
             repsResolution = (max, .template)
+        } else if let defaultTargetReps {
+            repsResolution = (defaultTargetReps, .smartDefault)
         } else {
-            repsResolution = (8, .implicitFallback)
+            repsResolution = nil
         }
 
-        let rirResolution: (value: Double, source: SuggestionTargetSource)?
+        let rirResolution: (value: Double, source: SuggestionTargetComponentSource)?
         if let rir = set.rir {
             rirResolution = (rir, .explicitSet)
         } else if let templateRIR = set.targetRIR {
             rirResolution = (Double(templateRIR), .template)
+        } else if let defaultTargetRIR {
+            rirResolution = (Double(defaultTargetRIR), .smartDefault)
         } else {
-            rirResolution = (2.0, .implicitFallback)
+            rirResolution = nil
         }
 
         guard let repsResolution, repsResolution.value > 0, let rirResolution else {
             return .ineligible(reason: .missingTarget)
         }
 
-        let source: SuggestionTargetSource
-        if repsResolution.source == .explicitSet || rirResolution.source == .explicitSet {
-            source = .explicitSet
-        } else if repsResolution.source == .template || rirResolution.source == .template {
-            source = .template
+        let repRange: ClosedRange<Int>?
+        if set.reps != nil {
+            repRange = nil
+        } else if let draftRepRange {
+            repRange = draftRepRange
+        } else if repsResolution.source == .template {
+            repRange = templateRepRange
         } else {
-            source = .implicitFallback
+            repRange = nil
         }
 
         return .eligible(
@@ -298,7 +330,8 @@ enum SuggestionCoordinator {
                 reps: repsResolution.value,
                 rir: rirResolution.value,
                 repRange: repRange,
-                source: source
+                repsSource: repsResolution.source,
+                rirSource: rirResolution.source
             )
         )
     }
@@ -309,7 +342,8 @@ enum SuggestionCoordinator {
             setId: resolution.setId,
             setIndex: resolution.setIndex,
             setNumber: resolution.setNumber,
-            target: target
+            target: target,
+            setType: resolution.setType
         )
     }
 
@@ -351,7 +385,8 @@ enum SuggestionCoordinator {
                         "eligible",
                         "r\(target.reps)",
                         "rir\(signatureNumber(target.rir))",
-                        "src\(target.source.rawValue)"
+                        "repsrc\(target.repsSource.rawValue)",
+                        "rirsrc\(target.rirSource.rawValue)"
                     ]
                     if let range = target.repRange {
                         parts.append("rng\(range.lowerBound)-\(range.upperBound)")
@@ -369,12 +404,12 @@ enum SuggestionCoordinator {
                 "enabled\(profile.prescriptionEnabled ?? true)",
                 "weeks\(profile.prescriptionRecencyWeeks ?? 6)",
                 "inc\(signatureOptionalNumber(profile.prescriptionDefaultIncrement))",
+                "defaultReps\(profile.prescriptionDefaultTargetReps ?? 8)",
+                "defaultRIR\(profile.prescriptionDefaultTargetRIR ?? 2)",
                 "fresh\(profile.prescriptionFreshnessBonus ?? false)",
                 "freshPct\(signatureOptionalNumber(profile.prescriptionFreshnessBonusPercent))",
                 "fatigue\(profile.prescriptionFatigueModelingEnabled ?? true)",
-                "recovery\(signatureOptionalNumber(profile.prescriptionDefaultRecoveryConstant))",
-                "formula\(profile.e1RMFormula)",
-                "updated\(Int(profile.updatedAt.timeIntervalSince1970))"
+                "formula\(profile.e1RMFormula)"
             ].joined(separator: ":")
         } else {
             profileSignature = "profile:unknown"
@@ -385,9 +420,7 @@ enum SuggestionCoordinator {
             exerciseSignature = [
                 exercise.id.uuidString,
                 "tracking\(exercise.trackingType.rawValue)",
-                "inc\(signatureOptionalNumber(exercise.weightIncrement))",
-                "fatigueRate\(signatureOptionalNumber(exercise.fatigueRate))",
-                "recovery\(signatureOptionalNumber(exercise.recoveryConstant))"
+                "inc\(signatureOptionalNumber(exercise.weightIncrement))"
             ].joined(separator: ":")
         } else {
             exerciseSignature = "exercise:missing"
@@ -410,6 +443,16 @@ enum SuggestionCoordinator {
         guard let value else { return "nil" }
         return signatureNumber(value)
     }
+
+    private static func normalizedDefaultTargetReps(from profile: HealthProfile?) -> Int? {
+        guard let reps = profile?.prescriptionDefaultTargetReps, (1...30).contains(reps) else { return nil }
+        return reps
+    }
+
+    private static func normalizedDefaultTargetRIR(from profile: HealthProfile?) -> Int? {
+        guard let rir = profile?.prescriptionDefaultTargetRIR, (0...5).contains(rir) else { return nil }
+        return rir
+    }
 }
 
 /// Presentation/explanation layer for Smart Suggestions.
@@ -419,13 +462,15 @@ enum SuggestionExplainer {
         evaluation: SuggestionEvaluation
     ) -> WeightSuggestionData {
         let formula = evaluation.input?.settings.formula ?? .epley
+        let configuredRestSeconds = evaluation.input?.settings.restTimerSeconds ?? 150.0
         let decisionsBySetId = Dictionary(uniqueKeysWithValues: evaluation.decisions.map { ($0.setId, $0) })
         let rowStates = preparation.setResolutions.map { resolution in
             makeRowState(
                 from: resolution,
                 decision: decisionsBySetId[resolution.setId],
                 fallbackReason: evaluation.unavailableReason ?? preparation.unavailableReason,
-                formula: formula
+                formula: formula,
+                configuredRestSeconds: configuredRestSeconds
             )
         }
 
@@ -453,7 +498,8 @@ enum SuggestionExplainer {
         from resolution: SuggestionSetResolution,
         decision: SuggestionDecision?,
         fallbackReason: SuggestionUnavailableReason?,
-        formula: E1RMFormula
+        formula: E1RMFormula,
+        configuredRestSeconds: Double
     ) -> SetSuggestionState {
         let target: SuggestionTarget?
         if case let .eligible(resolvedTarget) = resolution.eligibility {
@@ -468,7 +514,12 @@ enum SuggestionExplainer {
                 setIndex: resolution.setIndex,
                 setNumber: resolution.setNumber,
                 target: target,
-                availability: .available(makeSuggestion(for: decision, formula: formula))
+                availability: .available(makeSuggestion(
+                    for: decision,
+                    formula: formula,
+                    setType: resolution.setType,
+                    configuredRestSeconds: configuredRestSeconds
+                ))
             )
         }
 
@@ -491,7 +542,9 @@ enum SuggestionExplainer {
 
     private static func makeSuggestion(
         for decision: SuggestionDecision,
-        formula: E1RMFormula
+        formula: E1RMFormula,
+        setType: SetType,
+        configuredRestSeconds: Double
     ) -> SetSuggestion {
         let chosenReps = decision.bestReps ?? decision.targetReps
         return SetSuggestion(
@@ -503,21 +556,33 @@ enum SuggestionExplainer {
             targetRepMin: decision.repRange?.lowerBound,
             targetRepMax: decision.repRange?.upperBound,
             explanation: explanation(for: decision),
-            diagnostics: diagnostics(for: decision, formula: formula)
+            diagnostics: diagnostics(
+                for: decision,
+                formula: formula,
+                setType: setType,
+                configuredRestSeconds: configuredRestSeconds
+            )
         )
     }
 
     private static func explanation(for decision: SuggestionDecision) -> SuggestionExplanation {
         let readinessPercent = ((decision.effectiveE1RM / decision.baseE1RM) - 1.0) * 100.0
-        let summary = [
+        var summaryParts = [
             "\(String(format: "%.1f", decision.baseE1RM)) kg capacity from \(decision.e1RMSource.label)",
             "readiness \(formatSignedPercent(readinessPercent))",
-            "target from \(decision.targetSource.label)"
-        ].joined(separator: ", ")
+            "target from \(decision.targetSourceLabel)"
+        ]
+        if let defaultUsageLabel = decision.targetDefaultUsageLabel {
+            summaryParts.append(defaultUsageLabel)
+        }
+        let summary = summaryParts.joined(separator: ", ")
 
         return SuggestionExplanation(
             summary: summary,
-            targetSourceLabel: decision.targetSource.label,
+            targetSourceLabel: decision.targetSourceLabel,
+            repsSourceLabel: decision.targetRepsSourceLabel,
+            rirSourceLabel: decision.targetRIRSourceLabel,
+            defaultUsageLabel: decision.targetDefaultUsageLabel,
             baselineSourceLabel: decision.e1RMSource.label,
             calibrationLabel: decision.calibrationAdjustment.explanation
         )
@@ -525,7 +590,9 @@ enum SuggestionExplainer {
 
     private static func diagnostics(
         for decision: SuggestionDecision,
-        formula: E1RMFormula
+        formula: E1RMFormula,
+        setType: SetType,
+        configuredRestSeconds: Double
     ) -> SetSuggestionDiagnostics {
         let chosenReps = decision.bestReps ?? decision.targetReps
         let readinessPercent = ((decision.effectiveE1RM / decision.baseE1RM) - 1.0) * 100.0
@@ -543,10 +610,17 @@ enum SuggestionExplainer {
             chosenReps: chosenReps,
             targetRIR: decision.targetRIR,
             targetRepRange: decision.repRange,
-            targetSourceLabel: decision.targetSource.label,
+            targetSourceLabel: decision.targetSourceLabel,
+            repsSourceLabel: decision.targetRepsSourceLabel,
+            rirSourceLabel: decision.targetRIRSourceLabel,
+            defaultUsageLabel: decision.targetDefaultUsageLabel,
             baselineSourceLabel: decision.e1RMSource.label,
             calibrationLabel: decision.calibrationAdjustment.explanation,
-            alternatives: alternatives(for: decision, formula: formula)
+            alternatives: alternatives(for: decision, formula: formula),
+            projectedSessionFatigue: decision.projectedSessionFatigue,
+            setTypeFatigueMultiplier: SuggestionEngine.setTypeMultiplier(setType),
+            restSecondsUsed: configuredRestSeconds,
+            restSource: "configured"
         )
     }
 

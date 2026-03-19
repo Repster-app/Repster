@@ -67,7 +67,14 @@ actor SettingsService: SettingsServiceProtocol {
         try await healthProfileRepository.save(profile)
     }
 
-    // MARK: - Weight Prescription Settings
+    func updateRestTimerAlert(_ value: String) async throws {
+        let profile = try await healthProfileRepository.fetchOrCreate()
+        profile.restTimerAlert = value
+        profile.updatedAt = Date()
+        try await healthProfileRepository.save(profile)
+    }
+
+    // MARK: - Smart Suggestions Settings
 
     func updatePrescriptionEnabled(_ enabled: Bool) async throws {
         let profile = try await healthProfileRepository.fetchOrCreate()
@@ -86,6 +93,20 @@ actor SettingsService: SettingsServiceProtocol {
     func updatePrescriptionDefaultIncrement(_ increment: Double) async throws {
         let profile = try await healthProfileRepository.fetchOrCreate()
         profile.prescriptionDefaultIncrement = increment
+        profile.updatedAt = Date()
+        try await healthProfileRepository.save(profile)
+    }
+
+    func updatePrescriptionDefaultTargetReps(_ reps: Int) async throws {
+        let profile = try await healthProfileRepository.fetchOrCreate()
+        profile.prescriptionDefaultTargetReps = max(1, min(30, reps))
+        profile.updatedAt = Date()
+        try await healthProfileRepository.save(profile)
+    }
+
+    func updatePrescriptionDefaultTargetRIR(_ rir: Int) async throws {
+        let profile = try await healthProfileRepository.fetchOrCreate()
+        profile.prescriptionDefaultTargetRIR = max(0, min(5, rir))
         profile.updatedAt = Date()
         try await healthProfileRepository.save(profile)
     }

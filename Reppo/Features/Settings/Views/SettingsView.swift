@@ -35,7 +35,7 @@ struct SettingsView: View {
             Form {
                 generalSection
                 workoutPreferencesSection
-                weightPrescriptionSection
+                smartSuggestionsSection
                 dataSection
                 bodySection
                 aboutSection
@@ -189,15 +189,34 @@ struct SettingsView: View {
                         .foregroundStyle(Color.textTertiary)
                 }
             }
+
+            HStack {
+                Label("Timer Alert", systemImage: "bell")
+                    .foregroundStyle(Color.textPrimary)
+                Spacer()
+                Picker("", selection: Binding(
+                    get: { viewModel.profile?.restTimerAlert ?? "vibration" },
+                    set: { newValue in
+                        Task { await viewModel.updateRestTimerAlert(newValue) }
+                    }
+                )) {
+                    Text("Off").tag("off")
+                    Text("Vibration").tag("vibration")
+                    Text("Sound").tag("sound")
+                    Text("Both").tag("both")
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+            }
         }
     }
 
-    // MARK: - WEIGHT PRESCRIPTION Section
+    // MARK: - SMART SUGGESTIONS Section
 
-    private var weightPrescriptionSection: some View {
-        Section("Weight Prescription") {
+    private var smartSuggestionsSection: some View {
+        Section("Smart Suggestions") {
             Toggle(isOn: Binding(
-                get: { viewModel.prescriptionEnabled },
+                get: { viewModel.smartSuggestionsEnabled },
                 set: { newValue in
                     Task {
                         do {
@@ -207,11 +226,11 @@ struct SettingsView: View {
                     }
                 }
             )) {
-                Label("Smart Suggestions", systemImage: "wand.and.stars")
+                Label("Enable Smart Suggestions", systemImage: "wand.and.stars")
                     .foregroundStyle(Color.textPrimary)
             }
 
-            if viewModel.prescriptionEnabled {
+            if viewModel.smartSuggestionsEnabled {
                 HStack {
                     Label("Default Increment", systemImage: "plusminus")
                         .foregroundStyle(Color.textPrimary)
@@ -240,7 +259,7 @@ struct SettingsView: View {
 
                 if let profile = viewModel.profile {
                     NavigationLink {
-                        PrescriptionAdvancedSettingsView(
+                        SmartSuggestionsAdvancedSettingsView(
                             profile: profile,
                             settingsService: settingsService
                         )

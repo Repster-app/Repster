@@ -8,6 +8,7 @@ import SwiftUI
 struct CalendarWorkoutDetailView: View {
     let workoutDetails: [WorkoutDetail]
     let selectedDate: Date
+    let onSaveAsTemplate: ((Workout) -> Void)?
     let onExerciseTapped: (UUID) -> Void
 
     var body: some View {
@@ -34,7 +35,9 @@ struct CalendarWorkoutDetailView: View {
     @ViewBuilder
     private func workoutSection(_ detail: WorkoutDetail) -> some View {
         VStack(spacing: 12) {
-            if workoutDetails.count > 1 {
+            if let onSaveAsTemplate {
+                workoutHeader(detail.workout, onSaveAsTemplate: onSaveAsTemplate)
+            } else if workoutDetails.count > 1 {
                 sessionLabel(detail.workout)
             }
 
@@ -57,6 +60,39 @@ struct CalendarWorkoutDetailView: View {
     }
 
     // MARK: - Session Label (T016)
+
+    private func workoutHeader(
+        _ workout: Workout,
+        onSaveAsTemplate: @escaping (Workout) -> Void
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(workout.displayTitle)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.textPrimary)
+
+                if workoutDetails.count > 1 {
+                    sessionLabel(workout)
+                }
+            }
+
+            Spacer()
+
+            Menu {
+                Button {
+                    onSaveAsTemplate(workout)
+                } label: {
+                    Label("Save as Template", systemImage: "doc.on.doc")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.textSecondary)
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
+        }
+    }
 
     private func sessionLabel(_ workout: Workout) -> some View {
         let label: String = {

@@ -54,9 +54,19 @@ final class SettingsViewModel {
         return "Same as working"
     }
 
-    // MARK: - Prescription Computed Helpers
+    var restTimerAlertDisplayName: String {
+        switch profile?.restTimerAlert ?? "vibration" {
+        case "off": return "Off"
+        case "vibration": return "Vibration"
+        case "sound": return "Sound"
+        case "both": return "Both"
+        default: return "Vibration"
+        }
+    }
 
-    var prescriptionEnabled: Bool {
+    // MARK: - Smart Suggestions Computed Helpers
+
+    var smartSuggestionsEnabled: Bool {
         profile?.prescriptionEnabled ?? true
     }
 
@@ -125,6 +135,16 @@ final class SettingsViewModel {
     func updateDefaultWarmupRestTime(_ seconds: Int?) async {
         do {
             try await settingsService.updateDefaultWarmupRestTime(seconds)
+            profile = try await settingsService.fetchSettings()
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+    }
+
+    func updateRestTimerAlert(_ value: String) async {
+        do {
+            try await settingsService.updateRestTimerAlert(value)
             profile = try await settingsService.fetchSettings()
         } catch {
             errorMessage = error.localizedDescription

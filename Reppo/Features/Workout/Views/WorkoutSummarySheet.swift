@@ -43,14 +43,8 @@ struct WorkoutSummarySheet: View {
     /// Whether the discard operation is in progress.
     @State private var isDiscarding = false
 
-    /// Whether the "Save as Template" sheet is showing.
-    @State private var showSaveAsTemplate = false
-
-    /// Template name for save-as-template flow.
-    @State private var saveTemplateName: String = ""
-
-    /// Whether the template save is in progress.
-    @State private var isSavingTemplate = false
+    /// Shared controller for the save-as-template prompt flow.
+    @State private var saveAsTemplateController = SaveWorkoutAsTemplateController()
 
     /// Whether the template was saved successfully (shows confirmation).
     @State private var templateSavedSuccessfully = false
@@ -117,6 +111,16 @@ struct WorkoutSummarySheet: View {
             // Pre-populate notes from existing workout data
             notes = viewModel.workout?.notes ?? ""
         }
+        .saveWorkoutAsTemplatePrompt(
+            controller: saveAsTemplateController,
+            workoutId: viewModel.workout?.id,
+            onSaved: { _ in
+                templateSavedSuccessfully = true
+            },
+            onError: { error in
+                print("[WorkoutSummarySheet] Save as template failed: \(error)")
+            }
+        )
     }
 
     // MARK: - Header Section
@@ -275,8 +279,7 @@ struct WorkoutSummarySheet: View {
     /// Button to save the workout structure as a reusable template.
     private var saveAsTemplateButton: some View {
         Button {
-            saveTemplateName = workoutTitle.isEmpty ? "Workout" : workoutTitle
-            showSaveAsTemplate = true
+            saveAsTemplateController.begin(defaultName: workoutTitle.isEmpty ? "Workout" : workoutTitle)
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "doc.text")
@@ -289,36 +292,7 @@ struct WorkoutSummarySheet: View {
             .background(templateSavedSuccessfully ? Color.successSoft : Color.accentSoft)
             .cornerRadius(10)
         }
-        .disabled(templateSavedSuccessfully || isSavingTemplate)
-        .alert("Save as Template", isPresented: $showSaveAsTemplate) {
-            TextField("Template name", text: $saveTemplateName)
-            Button("Cancel", role: .cancel) { }
-            Button("Save") {
-                Task { await saveAsTemplate() }
-            }
-        } message: {
-            Text("Save this workout's exercises and set structure as a reusable template. Weights are not included.")
-        }
-    }
-
-    /// Save the current workout as a template via TemplateService.
-    @Environment(ServiceContainer.self) private var services
-
-    private func saveAsTemplate() async {
-        guard let workoutId = viewModel.workout?.id else { return }
-        isSavingTemplate = true
-        defer { isSavingTemplate = false }
-
-        do {
-            let name = saveTemplateName.trimmingCharacters(in: .whitespacesAndNewlines)
-            _ = try await services.templateService.createTemplateFromWorkout(
-                workoutId,
-                name: name.isEmpty ? "Workout" : name
-            )
-            templateSavedSuccessfully = true
-        } catch {
-            print("[WorkoutSummarySheet] Save as template failed: \(error)")
-        }
+        .disabled(templateSavedSuccessfully || saveAsTemplateController.isSaving)
     }
 
     // MARK: - Discard Workout
@@ -417,5 +391,91 @@ struct WorkoutSummarySheet: View {
     /// Format weight using locale-aware decimal separator.
     private func formatWeight(_ weight: Double) -> String {
         "\(UnitConversion.formatWeight(weight)) kg"
+    }
+}
+
+@Observable
+@MainActor
+final class SaveWorkoutAsTemplateController {
+    var showPrompt = false
+    var templateName = ""
+    var isSaving = false
+
+    func begin(defaultName: String) {
+        let trimmedName = defaultName.trimmingCharacters(in: .whitespacesAndNewlines)
+        templateName = trimmedName.isEmpty ? "Workout" : trimmedName
+        showPrompt = true
+    }
+
+    func save(
+        workoutId: UUID,
+        templateService: any TemplateServiceProtocol
+    ) async throws -> String {
+        isSaving = true
+        defer { isSaving = false }
+
+        let trimmedName = templateName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedName = trimmedName.isEmpty ? "Workout" : trimmedName
+        _ = try await templateService.createTemplateFromWorkout(workoutId, name: resolvedName)
+        showPrompt = false
+        return resolvedName
+    }
+}
+
+struct TemplateSaveFeedback: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
+}
+
+private struct SaveWorkoutAsTemplatePromptModifier: ViewModifier {
+    @Environment(ServiceContainer.self) private var services
+    @Bindable var controller: SaveWorkoutAsTemplateController
+
+    let workoutId: UUID?
+    let onSaved: (String) -> Void
+    let onError: (Error) -> Void
+
+    func body(content: Content) -> some View {
+        content.alert("Save as Template", isPresented: $controller.showPrompt) {
+            TextField("Template name", text: $controller.templateName)
+            Button("Cancel", role: .cancel) { }
+            Button("Save") {
+                guard let workoutId else { return }
+                Task { await handleSave(workoutId: workoutId) }
+            }
+        } message: {
+            Text("Save this workout's exercises and set structure as a reusable template. Weights are not included.")
+        }
+    }
+
+    private func handleSave(workoutId: UUID) async {
+        do {
+            let savedName = try await controller.save(
+                workoutId: workoutId,
+                templateService: services.templateService
+            )
+            onSaved(savedName)
+        } catch {
+            onError(error)
+        }
+    }
+}
+
+extension View {
+    func saveWorkoutAsTemplatePrompt(
+        controller: SaveWorkoutAsTemplateController,
+        workoutId: UUID?,
+        onSaved: @escaping (String) -> Void,
+        onError: @escaping (Error) -> Void
+    ) -> some View {
+        modifier(
+            SaveWorkoutAsTemplatePromptModifier(
+                controller: controller,
+                workoutId: workoutId,
+                onSaved: onSaved,
+                onError: onError
+            )
+        )
     }
 }

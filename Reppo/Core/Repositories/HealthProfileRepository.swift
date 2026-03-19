@@ -21,6 +21,19 @@ actor HealthProfileRepository: HealthProfileRepositoryProtocol {
 
     func fetchOrCreate() throws -> HealthProfile {
         if let existing = try fetch() {
+            var didBackfill = false
+            if existing.prescriptionDefaultTargetReps == nil {
+                existing.prescriptionDefaultTargetReps = 8
+                didBackfill = true
+            }
+            if existing.prescriptionDefaultTargetRIR == nil {
+                existing.prescriptionDefaultTargetRIR = 2
+                didBackfill = true
+            }
+            if didBackfill {
+                existing.updatedAt = Date()
+                try modelContext.save()
+            }
             return existing
         }
         let profile = HealthProfile(

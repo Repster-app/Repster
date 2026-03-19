@@ -498,10 +498,10 @@ struct SetRowView: View {
 
     private func activateCustomKeyboard(for field: SetRowInputField) {
         focusedInput = field
-        keyboardManager?.show(makeKeyboardContext())
+        keyboardManager?.show(makeKeyboardContext(activeField: field))
     }
 
-    private func makeKeyboardContext() -> SetEntryKeyboardContext {
+    private func makeKeyboardContext(activeField: SetRowInputField? = nil) -> SetEntryKeyboardContext {
         let setID = set.id
         let trackingType = exercise.trackingType
         let focusBinding = $focusedInput
@@ -514,6 +514,7 @@ struct SetRowView: View {
         return SetEntryKeyboardContext(
             ownerSetID: setID,
             trackingType: trackingType,
+            activeField: activeField,
             getFocusedField: { focusBinding.wrappedValue },
             setFocusedField: { focusBinding.wrappedValue = $0 },
             getFieldValue: { field in

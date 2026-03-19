@@ -70,6 +70,55 @@ struct TemplateSaveSet: Sendable {
     let orderInExercise: Int
 }
 
+/// Versioned archive payload for template import/export.
+struct TemplateArchive: Codable, Sendable {
+    static let currentVersion = 1
+
+    let version: Int
+    let template: TemplateArchiveTemplate
+    let exercises: [TemplateArchiveExercise]
+}
+
+struct TemplateArchiveTemplate: Codable, Sendable {
+    let id: UUID
+    let name: String
+    let notes: String?
+}
+
+struct TemplateArchiveExercise: Codable, Sendable {
+    let exercise: TemplateArchiveExerciseMetadata
+    let orderInTemplate: Int
+    let supersetGroupId: UUID?
+    let restTimeSeconds: Int?
+    let notes: String?
+    let sets: [TemplateArchiveSet]
+}
+
+struct TemplateArchiveExerciseMetadata: Codable, Sendable {
+    let id: UUID
+    let name: String
+    let equipmentType: EquipmentType
+    let trackingType: TrackingType
+    let primaryMuscle: String?
+    let secondaryMuscles: [String]
+    let movementPattern: MovementPattern?
+    let unilateral: Bool
+    let bilateralLoadFactor: Double?
+    let bodyweightFactor: Double
+    let weightIncrement: Double?
+    let defaultRestTime: Int?
+    let fatigueRate: Double?
+    let recoveryConstant: Double?
+}
+
+struct TemplateArchiveSet: Codable, Sendable {
+    let setType: SetType
+    let targetRepMin: Int?
+    let targetRepMax: Int?
+    let targetRIR: Int?
+    let orderInExercise: Int
+}
+
 /// TemplateService owns all template operations.
 ///
 /// Responsibilities:
@@ -111,4 +160,12 @@ protocol TemplateServiceProtocol: Sendable {
     /// Copies exercises, set types, and set counts. Does NOT copy weights.
     /// Returns the created template's ID.
     func createTemplateFromWorkout(_ workoutId: UUID, name: String) async throws -> UUID
+
+    // MARK: - Import / Export
+
+    /// Export a single template as a versioned archive payload.
+    func exportTemplate(_ templateId: UUID) async throws -> Data
+
+    /// Import a single template archive and return the created template ID.
+    func importTemplate(data: Data) async throws -> UUID
 }
