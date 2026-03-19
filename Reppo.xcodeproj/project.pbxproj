@@ -13,6 +13,8 @@
 		0823BFAB2F5D621200A513BE /* LiveActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0823BFAA2F5D621200A513BE /* LiveActivityManager.swift */; };
 		0823BFAD2F5D62E500A513BE /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0823BFAC2F5D62E500A513BE /* WorkoutActivityAttributes.swift */; };
 		0823BFAE2F5D62E500A513BE /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0823BFAC2F5D62E500A513BE /* WorkoutActivityAttributes.swift */; };
+		TT0001 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */; };
+		TT0002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = TT2003 /* XCTest.framework */; };
 		A10001 /* TrackingType.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001 /* TrackingType.swift */; };
 		A10002 /* SetType.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002 /* SetType.swift */; };
 		A10003 /* EquipmentType.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10003 /* EquipmentType.swift */; };
@@ -211,6 +213,13 @@
 			remoteGlobalIDString = 0823BF8D2F5D608400A513BE;
 			remoteInfo = WorkoutLiveActivityExtension;
 		};
+		TT1001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D00002 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E10001;
+			remoteInfo = Reppo;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -233,6 +242,9 @@
 		0823BF922F5D608400A513BE /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		0823BFAA2F5D621200A513BE /* LiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityManager.swift; sourceTree = "<group>"; };
 		0823BFAC2F5D62E500A513BE /* WorkoutActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutActivityAttributes.swift; sourceTree = "<group>"; };
+		TT2001 /* ReppoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ReppoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutViewModelSuggestionRefreshTests.swift; sourceTree = "<group>"; };
+		TT2003 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 		B10001 /* TrackingType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingType.swift; sourceTree = "<group>"; };
 		B10002 /* SetType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetType.swift; sourceTree = "<group>"; };
 		B10003 /* EquipmentType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentType.swift; sourceTree = "<group>"; };
@@ -455,6 +467,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		TT3001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				TT0002 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -463,6 +483,7 @@
 			children = (
 				0823BF902F5D608400A513BE /* WidgetKit.framework */,
 				0823BF922F5D608400A513BE /* SwiftUI.framework */,
+				TT2003 /* XCTest.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -471,10 +492,19 @@
 			isa = PBXGroup;
 			children = (
 				D10001 /* Reppo */,
+				TT4001 /* ReppoTests */,
 				0823BF942F5D608400A513BE /* WorkoutLiveActivity */,
 				0823BF8F2F5D608400A513BE /* Frameworks */,
 				D90001 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		TT4001 /* ReppoTests */ = {
+			isa = PBXGroup;
+			children = (
+				TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */,
+			);
+			path = ReppoTests;
 			sourceTree = "<group>";
 		};
 		D10001 /* Reppo */ = {
@@ -1007,6 +1037,7 @@
 			isa = PBXGroup;
 			children = (
 				B90001 /* Reppo.app */,
+				TT2001 /* ReppoTests.xctest */,
 				0823BF8E2F5D608400A513BE /* WorkoutLiveActivityExtension.appex */,
 			);
 			name = Products;
@@ -1167,6 +1198,26 @@
 			productReference = B90001 /* Reppo.app */;
 			productType = "com.apple.product-type.application";
 		};
+		TT5001 /* ReppoTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = TT9101 /* Build configuration list for PBXNativeTarget "ReppoTests" */;
+			buildPhases = (
+				TT7001 /* Sources */,
+				TT3001 /* Frameworks */,
+				TT6001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				TT8001 /* PBXTargetDependency */,
+			);
+			name = ReppoTests;
+			packageProductDependencies = (
+			);
+			productName = ReppoTests;
+			productReference = TT2001 /* ReppoTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -1182,6 +1233,10 @@
 					};
 					E10001 = {
 						CreatedOnToolsVersion = 16.0;
+					};
+					TT5001 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = E10001;
 					};
 				};
 			};
@@ -1199,6 +1254,7 @@
 			projectRoot = "";
 			targets = (
 				E10001 /* Reppo */,
+				TT5001 /* ReppoTests */,
 				0823BF8D2F5D608400A513BE /* WorkoutLiveActivityExtension */,
 			);
 		};
@@ -1218,6 +1274,13 @@
 			files = (
 				A10010 /* Assets.xcassets in Resources */,
 				A10012 /* seed_exercises.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		TT6001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1427,6 +1490,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		TT7001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				TT0001 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -1434,6 +1505,11 @@
 			isa = PBXTargetDependency;
 			target = 0823BF8D2F5D608400A513BE /* WorkoutLiveActivityExtension */;
 			targetProxy = 0823BF9E2F5D608500A513BE /* PBXContainerItemProxy */;
+		};
+		TT8001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E10001 /* Reppo */;
+			targetProxy = TT1001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1686,6 +1762,59 @@
 			};
 			name = Release;
 		};
+		TT9001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8HPA5639FW;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.ReppoTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Reppo.app/Reppo";
+				TEST_TARGET_NAME = Reppo;
+			};
+			name = Debug;
+		};
+		TT9002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8HPA5639FW;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.ReppoTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Reppo.app/Reppo";
+				TEST_TARGET_NAME = Reppo;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1712,6 +1841,15 @@
 			buildConfigurations = (
 				F40001 /* Debug */,
 				F40002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		TT9101 /* Build configuration list for PBXNativeTarget "ReppoTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				TT9001 /* Debug */,
+				TT9002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -1,5 +1,5 @@
 // WeightSuggestionData.swift
-// Transient display models and presentation helpers for Smart Suggestions.
+// Transient display models and orchestration helpers for Smart Suggestions.
 // The pure engine lives in LoadPrescriptionServiceProtocol.swift via SuggestionEngine.
 
 import Foundation
@@ -42,6 +42,14 @@ struct SuggestionRepAlternative: Identifiable, Sendable {
     let candidates: [SuggestionWeightCandidate]
 }
 
+/// User-facing explanation for why a suggestion exists.
+struct SuggestionExplanation: Sendable {
+    let summary: String
+    let targetSourceLabel: String
+    let baselineSourceLabel: String
+    let calibrationLabel: String
+}
+
 /// Expanded diagnostics payload for a single suggestion row.
 struct SetSuggestionDiagnostics: Sendable {
     let baseE1RM: Double
@@ -56,6 +64,9 @@ struct SetSuggestionDiagnostics: Sendable {
     let chosenReps: Int
     let targetRIR: Double
     let targetRepRange: ClosedRange<Int>?
+    let targetSourceLabel: String
+    let baselineSourceLabel: String
+    let calibrationLabel: String
     let alternatives: [SuggestionRepAlternative]
 }
 
@@ -76,28 +87,129 @@ struct SetSuggestion: Identifiable, Sendable {
     let targetRepMin: Int?
     /// Optional maximum target reps when the set is prescribed as a range.
     let targetRepMax: Int?
-    /// Brief context string, e.g. "104 kg capacity from recent top workouts, readiness -5.0%".
-    let contextLabel: String
+    /// Structured explanation shown in summary and details.
+    let explanation: SuggestionExplanation
     /// Structured diagnostics shown in the expanded details panel.
     let diagnostics: SetSuggestionDiagnostics
+
+    var contextLabel: String { explanation.summary }
+}
+
+/// Row-level Smart Suggestion state for a pending set.
+struct SetSuggestionState: Identifiable, Sendable {
+    enum Availability: Sendable {
+        case available(SetSuggestion)
+        case unavailable(SuggestionUnavailableReason)
+    }
+
+    let setId: UUID
+    let setIndex: Int
+    let setNumber: Int
+    let target: SuggestionTarget?
+    let availability: Availability
+
+    var id: UUID { setId }
+
+    var suggestion: SetSuggestion? {
+        guard case let .available(suggestion) = availability else { return nil }
+        return suggestion
+    }
+
+    var unavailableReason: SuggestionUnavailableReason? {
+        guard case let .unavailable(reason) = availability else { return nil }
+        return reason
+    }
+}
+
+/// Availability state for the current exercise's suggestion module.
+enum SuggestionAvailability: Sendable {
+    case available
+    case unavailable(SuggestionUnavailableReason)
 }
 
 /// Container for all weight suggestions for the current exercise.
 struct WeightSuggestionData: Sendable {
-    /// Per-set suggestions for unfilled working sets.
-    let suggestions: [SetSuggestion]
+    /// Ordered row-level state for each pending non-warmup set.
+    let rowStates: [SetSuggestionState]
     /// The base e1RM used for all suggestions (for display in header).
     let baseE1RM: Double?
     /// Source of the e1RM estimate.
     let e1RMSource: E1RMSource
+    /// Whether the module is available or unavailable for a typed reason.
+    let availability: SuggestionAvailability
+
+    var unavailableReason: SuggestionUnavailableReason? {
+        guard case let .unavailable(reason) = availability else { return nil }
+        return reason
+    }
+
+    var suggestions: [SetSuggestion] {
+        rowStates.compactMap(\.suggestion)
+    }
+
+    func rowState(for setId: UUID) -> SetSuggestionState? {
+        rowStates.first { $0.setId == setId }
+    }
 
     func suggestion(for setId: UUID) -> SetSuggestion? {
-        suggestions.first { $0.pendingSetId == setId }
+        rowState(for: setId)?.suggestion
     }
+
+    func suggestedWeight(for setId: UUID) -> Double? {
+        suggestion(for: setId)?.suggestedWeight
+    }
+}
+
+/// Prepared current-state snapshot used before engine evaluation.
+struct SuggestionPreparation: Sendable {
+    let cacheKey: String
+    let completedSessionSets: [SessionSetContext]
+    let setResolutions: [SuggestionSetResolution]
+    let pendingSets: [SuggestionPendingSetInput]
+    let unavailableReason: SuggestionUnavailableReason?
 }
 
 /// App-model gathering and cache-key helpers for Smart Suggestions.
 enum SuggestionCoordinator {
+    static func prepare(
+        exercise: Exercise?,
+        sets: [WorkoutSet],
+        profile: HealthProfile?
+    ) -> SuggestionPreparation {
+        let completedSessionSets = completedSessionSets(from: sets)
+        let setResolutions = resolvePendingSets(from: sets)
+        let pendingSets = setResolutions.compactMap(pendingSetInput(from:))
+
+        let unavailableReason: SuggestionUnavailableReason?
+        if exercise == nil {
+            unavailableReason = .missingExercise
+        } else if !(profile?.prescriptionEnabled ?? true) {
+            unavailableReason = .featureDisabled
+        } else if let exercise, !supportsSuggestions(for: exercise) {
+            unavailableReason = .unsupportedExercise
+        } else if setResolutions.isEmpty {
+            unavailableReason = .noPendingSets
+        } else if pendingSets.isEmpty {
+            unavailableReason = .missingTarget
+        } else {
+            unavailableReason = nil
+        }
+
+        return SuggestionPreparation(
+            cacheKey: cacheKey(
+                exercise: exercise,
+                completedWorking: sets.filter { $0.completed && $0.setType != .warmup },
+                setResolutions: setResolutions,
+                profile: profile,
+                unavailableReason: unavailableReason
+            ),
+            completedSessionSets: completedSessionSets,
+            setResolutions: setResolutions,
+            pendingSets: pendingSets,
+            unavailableReason: unavailableReason
+        )
+    }
+
     static func completedSessionSets(from sets: [WorkoutSet]) -> [SessionSetContext] {
         sets
             .filter { $0.completed && $0.setType != .warmup }
@@ -112,8 +224,12 @@ enum SuggestionCoordinator {
             }
     }
 
-    static func pendingSetInputs(from sets: [WorkoutSet]) -> [SuggestionPendingSetInput] {
-        var pendingSets: [SuggestionPendingSetInput] = []
+    private static func supportsSuggestions(for exercise: Exercise) -> Bool {
+        exercise.trackingType == .weightReps || exercise.trackingType == .weightRepsDuration
+    }
+
+    private static func resolvePendingSets(from sets: [WorkoutSet]) -> [SuggestionSetResolution] {
+        var resolutions: [SuggestionSetResolution] = []
         var workingSetNumber = 0
 
         for (index, set) in sets.enumerated() {
@@ -121,57 +237,88 @@ enum SuggestionCoordinator {
             workingSetNumber += 1
             guard !set.completed else { continue }
 
-            let targetReps: Int?
-            if let reps = set.reps, reps > 0 {
-                targetReps = reps
-            } else if let min = set.targetRepMin, let max = set.targetRepMax {
-                targetReps = (min + max) / 2
-            } else if let min = set.targetRepMin {
-                targetReps = min
-            } else if let max = set.targetRepMax {
-                targetReps = max
-            } else {
-                targetReps = 8
-            }
-
-            let targetRIR: Double
-            if let rir = set.rir {
-                targetRIR = rir
-            } else if let templateRIR = set.targetRIR {
-                targetRIR = Double(templateRIR)
-            } else {
-                targetRIR = 2.0
-            }
-
-            guard let targetReps, targetReps > 0 else { continue }
-
-            let repRange: ClosedRange<Int>?
-            if let min = set.targetRepMin, let max = set.targetRepMax, min < max {
-                repRange = min...max
-            } else {
-                repRange = nil
-            }
-
-            pendingSets.append(
-                SuggestionPendingSetInput(
+            resolutions.append(
+                SuggestionSetResolution(
                     setId: set.id,
                     setIndex: index,
                     setNumber: workingSetNumber,
-                    targetReps: targetReps,
-                    targetRIR: targetRIR,
-                    repRange: repRange
+                    eligibility: resolveTarget(for: set)
                 )
             )
         }
 
-        return pendingSets
+        return resolutions
     }
 
-    static func cacheKey(
-        exercise: Exercise,
+    private static func resolveTarget(for set: WorkoutSet) -> SuggestionEligibility {
+        let repRange: ClosedRange<Int>?
+        if let min = set.targetRepMin, let max = set.targetRepMax, min < max {
+            repRange = min...max
+        } else {
+            repRange = nil
+        }
+
+        let repsResolution: (value: Int, source: SuggestionTargetSource)?
+        if let reps = set.reps, reps > 0 {
+            repsResolution = (reps, .explicitSet)
+        } else if let min = set.targetRepMin, let max = set.targetRepMax {
+            repsResolution = ((min + max) / 2, .template)
+        } else if let min = set.targetRepMin {
+            repsResolution = (min, .template)
+        } else if let max = set.targetRepMax {
+            repsResolution = (max, .template)
+        } else {
+            repsResolution = (8, .implicitFallback)
+        }
+
+        let rirResolution: (value: Double, source: SuggestionTargetSource)?
+        if let rir = set.rir {
+            rirResolution = (rir, .explicitSet)
+        } else if let templateRIR = set.targetRIR {
+            rirResolution = (Double(templateRIR), .template)
+        } else {
+            rirResolution = (2.0, .implicitFallback)
+        }
+
+        guard let repsResolution, repsResolution.value > 0, let rirResolution else {
+            return .ineligible(reason: .missingTarget)
+        }
+
+        let source: SuggestionTargetSource
+        if repsResolution.source == .explicitSet || rirResolution.source == .explicitSet {
+            source = .explicitSet
+        } else if repsResolution.source == .template || rirResolution.source == .template {
+            source = .template
+        } else {
+            source = .implicitFallback
+        }
+
+        return .eligible(
+            target: SuggestionTarget(
+                reps: repsResolution.value,
+                rir: rirResolution.value,
+                repRange: repRange,
+                source: source
+            )
+        )
+    }
+
+    private static func pendingSetInput(from resolution: SuggestionSetResolution) -> SuggestionPendingSetInput? {
+        guard case let .eligible(target) = resolution.eligibility else { return nil }
+        return SuggestionPendingSetInput(
+            setId: resolution.setId,
+            setIndex: resolution.setIndex,
+            setNumber: resolution.setNumber,
+            target: target
+        )
+    }
+
+    private static func cacheKey(
+        exercise: Exercise?,
         completedWorking: [WorkoutSet],
-        pendingSets: [SuggestionPendingSetInput],
-        profile: HealthProfile?
+        setResolutions: [SuggestionSetResolution],
+        profile: HealthProfile?,
+        unavailableReason: SuggestionUnavailableReason?
     ) -> String {
         let completedSignature = completedWorking
             .sorted { $0.orderInExercise < $1.orderInExercise }
@@ -190,19 +337,29 @@ enum SuggestionCoordinator {
             }
             .joined(separator: "|")
 
-        let pendingSignature = pendingSets
-            .map { pendingSet in
-                var parts = [
-                    pendingSet.setId.uuidString,
-                    "i\(pendingSet.setIndex)",
-                    "n\(pendingSet.setNumber)",
-                    "r\(pendingSet.targetReps)",
-                    "rir\(signatureNumber(pendingSet.targetRIR))"
+        let resolutionSignature = setResolutions
+            .map { resolution in
+                let base = [
+                    resolution.setId.uuidString,
+                    "i\(resolution.setIndex)",
+                    "n\(resolution.setNumber)"
                 ]
-                if let range = pendingSet.repRange {
-                    parts.append("rng\(range.lowerBound)-\(range.upperBound)")
+
+                switch resolution.eligibility {
+                case let .eligible(target):
+                    var parts = base + [
+                        "eligible",
+                        "r\(target.reps)",
+                        "rir\(signatureNumber(target.rir))",
+                        "src\(target.source.rawValue)"
+                    ]
+                    if let range = target.repRange {
+                        parts.append("rng\(range.lowerBound)-\(range.upperBound)")
+                    }
+                    return parts.joined(separator: ":")
+                case let .ineligible(reason):
+                    return (base + ["ineligible", reason.rawValue]).joined(separator: ":")
                 }
-                return parts.joined(separator: ":")
             }
             .joined(separator: "|")
 
@@ -223,18 +380,25 @@ enum SuggestionCoordinator {
             profileSignature = "profile:unknown"
         }
 
-        let exerciseSignature = [
-            "inc\(signatureOptionalNumber(exercise.weightIncrement))",
-            "fatigueRate\(signatureOptionalNumber(exercise.fatigueRate))",
-            "recovery\(signatureOptionalNumber(exercise.recoveryConstant))"
-        ].joined(separator: ":")
+        let exerciseSignature: String
+        if let exercise {
+            exerciseSignature = [
+                exercise.id.uuidString,
+                "tracking\(exercise.trackingType.rawValue)",
+                "inc\(signatureOptionalNumber(exercise.weightIncrement))",
+                "fatigueRate\(signatureOptionalNumber(exercise.fatigueRate))",
+                "recovery\(signatureOptionalNumber(exercise.recoveryConstant))"
+            ].joined(separator: ":")
+        } else {
+            exerciseSignature = "exercise:missing"
+        }
 
         return [
-            exercise.id.uuidString,
             exerciseSignature,
             profileSignature,
+            "reason:\(unavailableReason?.rawValue ?? "none")",
             completedSignature,
-            pendingSignature
+            resolutionSignature
         ].joined(separator: "||")
     }
 
@@ -250,89 +414,156 @@ enum SuggestionCoordinator {
 
 /// Presentation/explanation layer for Smart Suggestions.
 enum SuggestionExplainer {
-    static func makeWeightSuggestionData(_ evaluation: SuggestionEvaluation) -> WeightSuggestionData? {
-        let suggestions = evaluation.results.map { result in
-            let chosenReps = result.bestReps ?? result.targetReps
-            return SetSuggestion(
-                pendingSetId: result.setId,
-                setNumber: result.setNumber,
-                suggestedWeight: result.prescribedWeight,
-                targetReps: chosenReps,
-                targetRIR: result.targetRIR,
-                targetRepMin: result.repRange?.lowerBound,
-                targetRepMax: result.repRange?.upperBound,
-                contextLabel: contextLabel(for: result),
-                diagnostics: diagnostics(for: result, formula: evaluation.input.settings.formula)
+    static func makeWeightSuggestionData(
+        preparation: SuggestionPreparation,
+        evaluation: SuggestionEvaluation
+    ) -> WeightSuggestionData {
+        let formula = evaluation.input?.settings.formula ?? .epley
+        let decisionsBySetId = Dictionary(uniqueKeysWithValues: evaluation.decisions.map { ($0.setId, $0) })
+        let rowStates = preparation.setResolutions.map { resolution in
+            makeRowState(
+                from: resolution,
+                decision: decisionsBySetId[resolution.setId],
+                fallbackReason: evaluation.unavailableReason ?? preparation.unavailableReason,
+                formula: formula
             )
         }
 
-        guard !suggestions.isEmpty else { return nil }
+        let availability: SuggestionAvailability
+        if rowStates.contains(where: { $0.suggestion != nil }) {
+            availability = .available
+        } else {
+            availability = .unavailable(
+                evaluation.unavailableReason ??
+                preparation.unavailableReason ??
+                rowStates.first?.unavailableReason ??
+                .calculationFailed
+            )
+        }
 
         return WeightSuggestionData(
-            suggestions: suggestions,
-            baseE1RM: evaluation.results.first?.baseE1RM,
-            e1RMSource: evaluation.results.first?.e1RMSource ?? evaluation.input.baseSource
+            rowStates: rowStates,
+            baseE1RM: evaluation.decisions.first?.baseE1RM ?? evaluation.input?.baseE1RM,
+            e1RMSource: evaluation.decisions.first?.e1RMSource ?? evaluation.input?.baseSource ?? .noData,
+            availability: availability
         )
     }
 
-    private static func contextLabel(for result: SuggestionEngineResult) -> String {
-        let capacityStr = String(format: "%.1f", result.baseE1RM)
-        let readinessPercent = ((result.effectiveE1RM / result.baseE1RM) - 1.0) * 100.0
-
-        let sourceStr: String
-        switch result.e1RMSource {
-        case .recentPerformance:
-            sourceStr = "recent top workouts"
-        case .historicalPR:
-            sourceStr = "PR history"
-        case .noData:
-            sourceStr = "no data"
+    private static func makeRowState(
+        from resolution: SuggestionSetResolution,
+        decision: SuggestionDecision?,
+        fallbackReason: SuggestionUnavailableReason?,
+        formula: E1RMFormula
+    ) -> SetSuggestionState {
+        let target: SuggestionTarget?
+        if case let .eligible(resolvedTarget) = resolution.eligibility {
+            target = resolvedTarget
+        } else {
+            target = nil
         }
 
-        return [
-            "\(capacityStr) kg capacity from \(sourceStr)",
-            "readiness \(formatSignedPercent(readinessPercent))"
+        if let decision {
+            return SetSuggestionState(
+                setId: resolution.setId,
+                setIndex: resolution.setIndex,
+                setNumber: resolution.setNumber,
+                target: target,
+                availability: .available(makeSuggestion(for: decision, formula: formula))
+            )
+        }
+
+        let reason: SuggestionUnavailableReason
+        switch resolution.eligibility {
+        case let .ineligible(unavailableReason):
+            reason = unavailableReason
+        case .eligible:
+            reason = fallbackReason ?? .calculationFailed
+        }
+
+        return SetSuggestionState(
+            setId: resolution.setId,
+            setIndex: resolution.setIndex,
+            setNumber: resolution.setNumber,
+            target: target,
+            availability: .unavailable(reason)
+        )
+    }
+
+    private static func makeSuggestion(
+        for decision: SuggestionDecision,
+        formula: E1RMFormula
+    ) -> SetSuggestion {
+        let chosenReps = decision.bestReps ?? decision.targetReps
+        return SetSuggestion(
+            pendingSetId: decision.setId,
+            setNumber: decision.setNumber,
+            suggestedWeight: decision.prescribedWeight,
+            targetReps: chosenReps,
+            targetRIR: decision.targetRIR,
+            targetRepMin: decision.repRange?.lowerBound,
+            targetRepMax: decision.repRange?.upperBound,
+            explanation: explanation(for: decision),
+            diagnostics: diagnostics(for: decision, formula: formula)
+        )
+    }
+
+    private static func explanation(for decision: SuggestionDecision) -> SuggestionExplanation {
+        let readinessPercent = ((decision.effectiveE1RM / decision.baseE1RM) - 1.0) * 100.0
+        let summary = [
+            "\(String(format: "%.1f", decision.baseE1RM)) kg capacity from \(decision.e1RMSource.label)",
+            "readiness \(formatSignedPercent(readinessPercent))",
+            "target from \(decision.targetSource.label)"
         ].joined(separator: ", ")
+
+        return SuggestionExplanation(
+            summary: summary,
+            targetSourceLabel: decision.targetSource.label,
+            baselineSourceLabel: decision.e1RMSource.label,
+            calibrationLabel: decision.calibrationAdjustment.explanation
+        )
     }
 
     private static func diagnostics(
-        for result: SuggestionEngineResult,
+        for decision: SuggestionDecision,
         formula: E1RMFormula
     ) -> SetSuggestionDiagnostics {
-        let chosenReps = result.bestReps ?? result.targetReps
-        let readinessPercent = ((result.effectiveE1RM / result.baseE1RM) - 1.0) * 100.0
+        let chosenReps = decision.bestReps ?? decision.targetReps
+        let readinessPercent = ((decision.effectiveE1RM / decision.baseE1RM) - 1.0) * 100.0
 
         return SetSuggestionDiagnostics(
-            baseE1RM: result.baseE1RM,
-            effectiveE1RM: result.effectiveE1RM,
+            baseE1RM: decision.baseE1RM,
+            effectiveE1RM: decision.effectiveE1RM,
             readinessPercent: readinessPercent,
-            fatigueDiscount: result.fatigueDiscount,
-            freshnessApplied: result.freshnessApplied,
-            weightIncrement: result.weightIncrement,
-            intensityFactor: result.intensityFactor,
-            rawWeight: result.rawWeight,
-            roundedWeight: result.prescribedWeight,
+            fatigueDiscount: decision.fatigueDiscount,
+            freshnessApplied: decision.freshnessApplied,
+            weightIncrement: decision.weightIncrement,
+            intensityFactor: decision.intensityFactor,
+            rawWeight: decision.rawWeight,
+            roundedWeight: decision.prescribedWeight,
             chosenReps: chosenReps,
-            targetRIR: result.targetRIR,
-            targetRepRange: result.repRange,
-            alternatives: alternatives(for: result, formula: formula)
+            targetRIR: decision.targetRIR,
+            targetRepRange: decision.repRange,
+            targetSourceLabel: decision.targetSource.label,
+            baselineSourceLabel: decision.e1RMSource.label,
+            calibrationLabel: decision.calibrationAdjustment.explanation,
+            alternatives: alternatives(for: decision, formula: formula)
         )
     }
 
     private static func alternatives(
-        for result: SuggestionEngineResult,
+        for decision: SuggestionDecision,
         formula: E1RMFormula
     ) -> [SuggestionRepAlternative] {
-        let chosenReps = result.bestReps ?? result.targetReps
+        let chosenReps = decision.bestReps ?? decision.targetReps
         let resolvedChosenReps: Int
-        if let repRange = result.repRange {
+        if let repRange = decision.repRange {
             resolvedChosenReps = min(max(chosenReps, repRange.lowerBound), repRange.upperBound)
         } else {
             resolvedChosenReps = chosenReps
         }
 
         let repCandidates: [Int]
-        if let repRange = result.repRange {
+        if let repRange = decision.repRange {
             repCandidates = Array(repRange)
         } else {
             repCandidates = (0..<4).map { resolvedChosenReps + $0 }
@@ -340,12 +571,12 @@ enum SuggestionExplainer {
 
         return repCandidates.map { candidateReps in
             let reps = max(1, candidateReps)
-            let totalReps = max(1, reps + Int(result.targetRIR))
+            let totalReps = max(1, reps + Int(decision.targetRIR))
             let intensityFactor = max(0.3, formula.reverseCalculate(e1RM: 1.0, reps: totalReps))
-            let rawWeight = result.effectiveE1RM * intensityFactor
-            let roundedWeight = roundToIncrement(rawWeight, increment: result.weightIncrement)
-            let downWeight = max(0, roundedWeight - result.weightIncrement)
-            let upWeight = roundedWeight + result.weightIncrement
+            let rawWeight = decision.effectiveE1RM * intensityFactor
+            let roundedWeight = roundToIncrement(rawWeight, increment: decision.weightIncrement)
+            let downWeight = max(0, roundedWeight - decision.weightIncrement)
+            let upWeight = roundedWeight + decision.weightIncrement
 
             let candidateKinds: [SuggestionWeightCandidate.Kind] = [
                 .downOneIncrement,
@@ -369,8 +600,8 @@ enum SuggestionExplainer {
                     kind: kind,
                     weight: weight,
                     impliedE1RM: impliedE1RM,
-                    closenessToEffectiveE1RM: closeness(impliedE1RM: impliedE1RM, referenceE1RM: result.effectiveE1RM),
-                    closenessToBaseE1RM: closeness(impliedE1RM: impliedE1RM, referenceE1RM: result.baseE1RM),
+                    closenessToEffectiveE1RM: closeness(impliedE1RM: impliedE1RM, referenceE1RM: decision.effectiveE1RM),
+                    closenessToBaseE1RM: closeness(impliedE1RM: impliedE1RM, referenceE1RM: decision.baseE1RM),
                     isRecommended: reps == resolvedChosenReps && kind == .suggested
                 )
             }
@@ -378,7 +609,7 @@ enum SuggestionExplainer {
             return SuggestionRepAlternative(
                 reps: reps,
                 totalReps: totalReps,
-                targetRIR: result.targetRIR,
+                targetRIR: decision.targetRIR,
                 intensityFactor: intensityFactor,
                 rawWeight: rawWeight,
                 candidates: candidates

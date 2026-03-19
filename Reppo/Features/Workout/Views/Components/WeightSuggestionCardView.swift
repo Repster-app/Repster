@@ -93,7 +93,7 @@ struct WeightSuggestionCardView: View {
                     .foregroundStyle(Color.textSecondary)
             }
 
-            Text(suggestion.contextLabel)
+            Text(suggestion.explanation.summary)
                 .font(.system(size: 11))
                 .foregroundStyle(Color.textTertiary)
 
@@ -120,6 +120,12 @@ struct WeightSuggestionCardView: View {
                 )
                 Text(
                     "intensity \(String(format: "%.3f", diagnostics.intensityFactor)) | RIR \(formatSimpleNumber(diagnostics.targetRIR))"
+                )
+                Text(
+                    "target source \(diagnostics.targetSourceLabel) | baseline \(diagnostics.baselineSourceLabel)"
+                )
+                Text(
+                    diagnostics.calibrationLabel
                 )
                 Text(
                     "raw \(formatWeight(diagnostics.rawWeight)) -> rounded \(formatWeight(diagnostics.roundedWeight)) (inc \(formatWeight(diagnostics.weightIncrement)))"

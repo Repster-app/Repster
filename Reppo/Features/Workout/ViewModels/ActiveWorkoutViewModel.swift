@@ -51,6 +51,11 @@ enum RestTimerState: Equatable {
 @MainActor
 final class ActiveWorkoutViewModel {
 
+    private enum SuggestionLoadPresentation {
+        case blocking
+        case preserveExisting
+    }
+
     // MARK: - Dependencies
 
     private let workoutService: any WorkoutServiceProtocol
@@ -135,10 +140,11 @@ final class ActiveWorkoutViewModel {
 
     // MARK: - Weight Suggestion Module State
 
-    /// Computed suggestion data for the current exercise (nil = not available/disabled).
+    /// Computed suggestion data for the current exercise.
+    /// The data can represent either available suggestions or a typed unavailable state.
     var weightSuggestionData: WeightSuggestionData?
 
-    /// Whether suggestions are currently being computed.
+    /// Whether the module should show blocking loading UI.
     var isLoadingWeightSuggestions: Bool = false
 
     /// Whether prescription is globally enabled (fetched from HealthProfile).
@@ -146,6 +152,15 @@ final class ActiveWorkoutViewModel {
 
     /// Tracks exerciseId + completed set count to avoid redundant re-computation.
     private var suggestionsLoadedForKey: String?
+
+    /// Debounce applied to live recompute after reps/RIR draft edits.
+    private let suggestionDraftEditDebounce: Duration = .milliseconds(300)
+
+    /// Pending or in-flight suggestion refresh work.
+    private var suggestionRefreshTask: Task<Void, Never>?
+
+    /// Monotonic generation used to drop stale suggestion refresh completions.
+    private var suggestionRefreshGeneration: UInt64 = 0
 
     // MARK: - Timer Internals
 
@@ -335,9 +350,10 @@ final class ActiveWorkoutViewModel {
             exerciseInfoLoadedForExerciseId = nil
             prsLoadedForExerciseId = nil
             historyLoadedForExerciseId = nil
-            suggestionsLoadedForKey = nil
             await loadExerciseInfo()
-            await loadWeightSuggestions()
+            if currentExercise?.id == set.exerciseId {
+                requestWeightSuggestionRefresh(mode: .preserveExisting, invalidateCache: true)
+            }
 
         } catch {
             print("[ActiveWorkoutViewModel] Failed to complete set: \(error)")
@@ -370,9 +386,10 @@ final class ActiveWorkoutViewModel {
             exerciseInfoLoadedForExerciseId = nil
             prsLoadedForExerciseId = nil
             historyLoadedForExerciseId = nil
-            suggestionsLoadedForKey = nil
             await loadExerciseInfo()
-            await loadWeightSuggestions()
+            if currentExercise?.id == exerciseId {
+                requestWeightSuggestionRefresh(mode: .preserveExisting, invalidateCache: true)
+            }
         } catch {
             // Revert on failure
             set.completed = oldCompleted
@@ -414,9 +431,8 @@ final class ActiveWorkoutViewModel {
             updateLiveActivityState()
 
             // Invalidate and refresh suggestions for the currently visible exercise
-            suggestionsLoadedForKey = nil
             if currentExercise?.id == exerciseId {
-                await loadWeightSuggestions()
+                requestWeightSuggestionRefresh(mode: .preserveExisting, invalidateCache: true)
             }
 
         } catch {
@@ -455,9 +471,8 @@ final class ActiveWorkoutViewModel {
             setsByExercise[exerciseId] = exerciseSets
 
             // Invalidate and refresh suggestions for the currently visible exercise
-            suggestionsLoadedForKey = nil
             if currentExercise?.id == exerciseId {
-                await loadWeightSuggestions()
+                requestWeightSuggestionRefresh(mode: .preserveExisting, invalidateCache: true)
             }
 
         } catch {
@@ -489,9 +504,8 @@ final class ActiveWorkoutViewModel {
             await loadExerciseInfo()
 
             // Deletion can change fatigue context and first-working-set freshness logic
-            suggestionsLoadedForKey = nil
             if currentExercise?.id == exerciseId {
-                await loadWeightSuggestions()
+                requestWeightSuggestionRefresh(mode: .preserveExisting, invalidateCache: true)
             }
 
         } catch {
@@ -518,9 +532,8 @@ final class ActiveWorkoutViewModel {
             await loadExerciseInfo()
 
             // Type changes can add/remove a set from suggestion inputs
-            suggestionsLoadedForKey = nil
             if currentExercise?.id == set.exerciseId {
-                await loadWeightSuggestions()
+                requestWeightSuggestionRefresh(mode: .preserveExisting, invalidateCache: true)
             }
 
         } catch {
@@ -899,77 +912,137 @@ final class ActiveWorkoutViewModel {
 
     /// Load weight suggestions for unfilled working sets of the current exercise.
     ///
-    /// Uses SuggestionCoordinator to gather app models, LoadPrescriptionService
-    /// to normalize and evaluate, and SuggestionExplainer to build display data.
-    /// Does NOT modify any WorkoutSet objects — purely read-only.
+    /// Uses SuggestionCoordinator to gather app models, resolve targets, and
+    /// produce typed unavailable states. LoadPrescriptionService evaluates only
+    /// when the current exercise is eligible. SuggestionExplainer then builds
+    /// the read-only UI model from the evaluation result.
     func loadWeightSuggestions() async {
-        guard let exercise = currentExercise else {
-            weightSuggestionData = nil
-            return
+        let task = requestWeightSuggestionRefresh(mode: .blocking)
+        await task.value
+    }
+
+    @discardableResult
+    private func requestWeightSuggestionRefresh(
+        mode: SuggestionLoadPresentation,
+        invalidateCache: Bool = false,
+        debounce: Duration? = nil
+    ) -> Task<Void, Never> {
+        suggestionRefreshTask?.cancel()
+        suggestionRefreshGeneration &+= 1
+
+        let generation = suggestionRefreshGeneration
+        let expectedExerciseId = currentExercise?.id
+
+        if invalidateCache {
+            invalidateSuggestions()
         }
 
-        // Only compute for weight-based exercises
-        guard exercise.trackingType == .weightReps ||
-              exercise.trackingType == .weightRepsDuration else {
-            weightSuggestionData = nil
-            return
+        isLoadingWeightSuggestions = mode == .blocking
+
+        let task = Task { [weak self] in
+            if let debounce {
+                do {
+                    try await Task.sleep(for: debounce)
+                } catch {
+                    return
+                }
+            }
+
+            guard !Task.isCancelled else { return }
+            await self?.performWeightSuggestionRefresh(
+                generation: generation,
+                expectedExerciseId: expectedExerciseId,
+                mode: mode
+            )
         }
+
+        suggestionRefreshTask = task
+        return task
+    }
+
+    private func performWeightSuggestionRefresh(
+        generation: UInt64,
+        expectedExerciseId: UUID?,
+        mode: SuggestionLoadPresentation
+    ) async {
+        defer {
+            if isCurrentSuggestionRefresh(generation, expectedExerciseId: expectedExerciseId) {
+                suggestionRefreshTask = nil
+                if mode == .blocking {
+                    isLoadingWeightSuggestions = false
+                }
+            }
+        }
+
+        guard isCurrentSuggestionRefresh(generation, expectedExerciseId: expectedExerciseId) else { return }
 
         // Refresh setting-dependent inputs so cache keys and gating stay accurate.
-        var resolvedProfile: HealthProfile? = try? await settingsService.fetchSettings()
-        if resolvedProfile == nil {
-            resolvedProfile = try? await healthProfileRepo.fetchOrCreate()
-        }
+        let resolvedProfile = await resolveSuggestionProfile()
+
+        guard isCurrentSuggestionRefresh(generation, expectedExerciseId: expectedExerciseId) else { return }
+
         if let resolvedProfile {
             unitPreference = resolvedProfile.unitPreference
             prescriptionEnabled = resolvedProfile.prescriptionEnabled ?? true
         }
 
-        // Check global toggle
-        guard prescriptionEnabled else {
+        guard let currentExercise else {
             weightSuggestionData = nil
+            suggestionsLoadedForKey = nil
             return
         }
 
-        let sets = currentSets
-        let completedWorking = sets.filter { $0.completed && $0.setType != .warmup }
-        let completedSessionSets = SuggestionCoordinator.completedSessionSets(from: sets)
-        let pendingSets = SuggestionCoordinator.pendingSetInputs(from: sets)
-
-        let cacheKey = SuggestionCoordinator.cacheKey(
-            exercise: exercise,
-            completedWorking: completedWorking,
-            pendingSets: pendingSets,
+        let preparation = SuggestionCoordinator.prepare(
+            exercise: currentExercise,
+            sets: currentSets,
             profile: resolvedProfile
         )
 
         // Cache check — skip if already computed for this exact input state
-        guard suggestionsLoadedForKey != cacheKey else { return }
-
-        isLoadingWeightSuggestions = true
-        defer { isLoadingWeightSuggestions = false }
-
-        guard !pendingSets.isEmpty else {
-            weightSuggestionData = nil
-            suggestionsLoadedForKey = cacheKey
-            return
-        }
+        guard suggestionsLoadedForKey != preparation.cacheKey else { return }
 
         do {
-            let evaluation = try await loadPrescriptionService.evaluateSuggestions(
-                exerciseId: exercise.id,
-                pendingSets: pendingSets,
-                completedSessionSets: completedSessionSets
+            let evaluation: SuggestionEvaluation
+            if preparation.unavailableReason == nil {
+                evaluation = try await loadPrescriptionService.evaluateSuggestions(
+                    exerciseId: currentExercise.id,
+                    pendingSets: preparation.pendingSets,
+                    completedSessionSets: preparation.completedSessionSets
+                )
+            } else {
+                evaluation = .unavailable(preparation.unavailableReason ?? .calculationFailed)
+            }
+
+            guard isCurrentSuggestionRefresh(generation, expectedExerciseId: expectedExerciseId) else { return }
+            weightSuggestionData = SuggestionExplainer.makeWeightSuggestionData(
+                preparation: preparation,
+                evaluation: evaluation
             )
-            weightSuggestionData = evaluation.flatMap(SuggestionExplainer.makeWeightSuggestionData)
-
-            suggestionsLoadedForKey = cacheKey
-
+            suggestionsLoadedForKey = preparation.cacheKey
         } catch {
+            guard isCurrentSuggestionRefresh(generation, expectedExerciseId: expectedExerciseId) else { return }
             print("[WeightSuggestion] Failed to load suggestions: \(error)")
-            weightSuggestionData = nil
-            suggestionsLoadedForKey = cacheKey
+            weightSuggestionData = SuggestionExplainer.makeWeightSuggestionData(
+                preparation: preparation,
+                evaluation: .unavailable(.calculationFailed)
+            )
+            suggestionsLoadedForKey = preparation.cacheKey
         }
+    }
+
+    private func resolveSuggestionProfile() async -> HealthProfile? {
+        var resolvedProfile: HealthProfile? = try? await settingsService.fetchSettings()
+        if resolvedProfile == nil {
+            resolvedProfile = try? await healthProfileRepo.fetchOrCreate()
+        }
+        return resolvedProfile
+    }
+
+    private func isCurrentSuggestionRefresh(
+        _ generation: UInt64,
+        expectedExerciseId: UUID?
+    ) -> Bool {
+        suggestionRefreshGeneration == generation && currentExercise?.id == expectedExerciseId
     }
 
     // MARK: - Summary Computation (T031)
@@ -1159,16 +1232,28 @@ final class ActiveWorkoutViewModel {
 // MARK: - SetTableDataSource Conformance
 
 extension ActiveWorkoutViewModel: SetTableDataSource {
-    var currentSuggestedWeight: Double? {
-        weightSuggestionData?.suggestions.first?.suggestedWeight
+    func suggestionState(for setId: UUID) -> SetSuggestionState? {
+        weightSuggestionData?.rowState(for: setId)
     }
 
     func suggestedWeight(for setId: UUID) -> Double? {
-        weightSuggestionData?.suggestion(for: setId)?.suggestedWeight
+        weightSuggestionData?.suggestedWeight(for: setId)
     }
 
-    /// No-op in active workout — sets are saved when the checkbox is tapped.
-    func markSetDirty(_ set: WorkoutSet) { }
+    /// Draft edits only affect live suggestions for reps and RIR on incomplete sets.
+    func markSetDirty(_ set: WorkoutSet, field: SetDraftField) {
+        guard !set.completed, currentExercise?.id == set.exerciseId else { return }
+
+        switch field {
+        case .reps, .rir:
+            requestWeightSuggestionRefresh(
+                mode: .preserveExisting,
+                debounce: suggestionDraftEditDebounce
+            )
+        case .weight, .duration, .distance:
+            break
+        }
+    }
 
     /// Update the note on a set and persist immediately.
     func updateSetNote(_ set: WorkoutSet, note: String?) async {

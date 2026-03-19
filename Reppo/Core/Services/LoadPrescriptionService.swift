@@ -25,6 +25,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
     private let exerciseRepo: ExerciseRepositoryProtocol
     private let performanceRecordRepo: PerformanceRecordRepositoryProtocol
     private let healthProfileRepo: HealthProfileRepositoryProtocol
+    private let calibrationProvider: any SuggestionCalibrationProviderProtocol
 
     // MARK: - Constants (defaults when no per-exercise override)
 
@@ -38,12 +39,14 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         setRepository: SetRepositoryProtocol,
         exerciseRepository: ExerciseRepositoryProtocol,
         performanceRecordRepository: PerformanceRecordRepositoryProtocol,
-        healthProfileRepository: HealthProfileRepositoryProtocol
+        healthProfileRepository: HealthProfileRepositoryProtocol,
+        calibrationProvider: any SuggestionCalibrationProviderProtocol = NeutralSuggestionCalibrationProvider()
     ) {
         self.setRepo = setRepository
         self.exerciseRepo = exerciseRepository
         self.performanceRecordRepo = performanceRecordRepository
         self.healthProfileRepo = healthProfileRepository
+        self.calibrationProvider = calibrationProvider
     }
 
     // MARK: - LoadPrescriptionServiceProtocol
@@ -67,19 +70,19 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         exerciseId: UUID,
         pendingSets: [SuggestionPendingSetInput],
         completedSessionSets: [SessionSetContext]
-    ) async throws -> SuggestionEvaluation? {
+    ) async throws -> SuggestionEvaluation {
         let profile = try await healthProfileRepo.fetchOrCreate()
 
         guard profile.prescriptionEnabled ?? true else {
-            return nil
+            return .unavailable(.featureDisabled)
         }
 
         guard let exercise = try await exerciseRepo.fetch(byId: exerciseId) else {
-            return nil
+            return .unavailable(.missingExercise)
         }
 
         guard !pendingSets.isEmpty else {
-            return nil
+            return .unavailable(.noPendingSets)
         }
 
         let restTimerSeconds = Double(exercise.defaultRestTime ?? profile.defaultRestTimeSeconds ?? 150)
@@ -95,8 +98,10 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         )
 
         guard let baseE1RM = baseEstimate.value, baseEstimate.source != .noData else {
-            return nil
+            return .unavailable(.noStrengthData)
         }
+
+        let calibrationAdjustment = await calibrationProvider.calibrationAdjustment(for: exerciseId)
 
         let input = SuggestionEngineInput(
             baseE1RM: baseE1RM,
@@ -110,12 +115,14 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
                 fatigueEnabled: fatigueEnabled,
                 freshnessEnabled: freshnessEnabled,
                 freshnessPercent: freshnessPercent
-            )
+            ),
+            calibrationAdjustment: calibrationAdjustment
         )
 
         return SuggestionEvaluation(
             input: input,
-            results: SuggestionEngine.evaluate(input)
+            decisions: SuggestionEngine.evaluate(input),
+            unavailableReason: nil
         )
     }
 
@@ -138,21 +145,26 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
                 setId: UUID(uuidString: "00000000-0000-0000-0000-\(String(format: "%012d", index + 1))") ?? UUID(),
                 setIndex: set.setIndex,
                 setNumber: index + 1,
-                targetReps: set.targetReps,
-                targetRIR: set.targetRIR,
-                repRange: set.repRange
+                target: SuggestionTarget(
+                    reps: set.targetReps,
+                    rir: set.targetRIR,
+                    repRange: set.repRange,
+                    source: .explicitSet
+                )
             )
         }
 
-        guard let evaluation = try await evaluateSuggestions(
+        let evaluation = try await evaluateSuggestions(
             exerciseId: exerciseId,
             pendingSets: pendingSets,
             completedSessionSets: completedSessionSets
-        ) else {
+        )
+
+        guard !evaluation.decisions.isEmpty else {
             return Array(repeating: nil, count: sets.count)
         }
 
-        let resultsBySetId = Dictionary(uniqueKeysWithValues: evaluation.results.map { ($0.setId, $0) })
+        let resultsBySetId = Dictionary(uniqueKeysWithValues: evaluation.decisions.map { ($0.setId, $0) })
         return pendingSets.map { pendingSet in
             guard let result = resultsBySetId[pendingSet.setId] else { return nil }
             return PrescriptionResult(

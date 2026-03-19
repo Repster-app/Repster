@@ -371,7 +371,8 @@ final class EditWorkoutViewModel {
     // MARK: - Dirty Set Tracking
 
     /// Mark a set as having unsaved text changes.
-    func markSetDirty(_ set: WorkoutSet) {
+    func markSetDirty(_ set: WorkoutSet, field: SetDraftField) {
+        let _ = field
         dirtySetIds.insert(set.id)
     }
 

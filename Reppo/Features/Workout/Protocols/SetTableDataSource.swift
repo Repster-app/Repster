@@ -5,6 +5,15 @@
 
 import Foundation
 
+/// Draft-edit field identity for set table rows.
+enum SetDraftField: Sendable {
+    case weight
+    case reps
+    case duration
+    case distance
+    case rir
+}
+
 /// Data source protocol for set table and exercise tab strip components.
 ///
 /// Conforming types provide exercise/set state and handle user actions
@@ -59,8 +68,8 @@ protocol SetTableDataSource: AnyObject, Observable {
     func changeSetType(_ set: WorkoutSet, to type: SetType) async
 
     /// Mark a set as having unsaved text field changes.
-    /// Called when the user edits weight/reps/duration/distance text.
-    func markSetDirty(_ set: WorkoutSet)
+    /// Called when the user edits a set-table field.
+    func markSetDirty(_ set: WorkoutSet, field: SetDraftField)
 
     /// Update the note on a set. Called from the context menu note editor.
     func updateSetNote(_ set: WorkoutSet, note: String?) async
@@ -76,9 +85,9 @@ protocol SetTableDataSource: AnyObject, Observable {
     /// Sets grouped by exercise ID for checking completion status.
     var setsByExercise: [UUID: [WorkoutSet]] { get }
 
-    /// Optional suggested weight for the currently selected exercise/set context.
-    /// Returns nil when suggestions are unavailable (for example in edit mode).
-    var currentSuggestedWeight: Double? { get }
+    /// Optional row-addressable Smart Suggestion state for a specific pending set.
+    /// Returns nil when suggestions are unavailable or the row has no pending state.
+    func suggestionState(for setId: UUID) -> SetSuggestionState?
 
     /// Optional row-addressable suggested weight for a specific pending set.
     /// Returns nil when suggestions are unavailable or no mapping exists.
@@ -86,6 +95,8 @@ protocol SetTableDataSource: AnyObject, Observable {
 }
 
 extension SetTableDataSource {
-    var currentSuggestedWeight: Double? { nil }
-    func suggestedWeight(for setId: UUID) -> Double? { nil }
+    func suggestionState(for setId: UUID) -> SetSuggestionState? { nil }
+    func suggestedWeight(for setId: UUID) -> Double? {
+        suggestionState(for: setId)?.suggestion?.suggestedWeight
+    }
 }

@@ -20,6 +20,121 @@ struct SessionSetContext: Sendable {
     let completed: Bool
 }
 
+/// Where a suggestion target came from.
+enum SuggestionTargetSource: String, Sendable {
+    case explicitSet
+    case template
+    case implicitFallback
+
+    var label: String {
+        switch self {
+        case .explicitSet:
+            return "set entry"
+        case .template:
+            return "template target"
+        case .implicitFallback:
+            return "implicit fallback"
+        }
+    }
+}
+
+/// Resolved reps/RIR target for a pending suggestion.
+struct SuggestionTarget: Sendable {
+    let reps: Int
+    let rir: Double
+    let repRange: ClosedRange<Int>?
+    let source: SuggestionTargetSource
+}
+
+/// Typed reason for why a smart suggestion is unavailable.
+enum SuggestionUnavailableReason: String, Sendable, Equatable {
+    case missingExercise
+    case unsupportedExercise
+    case featureDisabled
+    case noPendingSets
+    case missingTarget
+    case noStrengthData
+    case calculationFailed
+
+    var title: String {
+        switch self {
+        case .missingExercise:
+            return "No exercise selected"
+        case .unsupportedExercise:
+            return "Suggestions unavailable"
+        case .featureDisabled:
+            return "Smart Suggestions disabled"
+        case .noPendingSets:
+            return "No pending sets"
+        case .missingTarget:
+            return "Missing target"
+        case .noStrengthData:
+            return "Not enough history"
+        case .calculationFailed:
+            return "Suggestion unavailable"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .missingExercise:
+            return "Select an exercise to load Smart Suggestions."
+        case .unsupportedExercise:
+            return "Smart Suggestions currently support weight-based exercises only."
+        case .featureDisabled:
+            return "Enable Smart Suggestions in Settings to show recommendations here."
+        case .noPendingSets:
+            return "All working sets are complete or there are no remaining sets to suggest."
+        case .missingTarget:
+            return "This set does not have enough target information to generate a suggestion."
+        case .noStrengthData:
+            return "Complete more sets for this exercise before Smart Suggestions can estimate a baseline."
+        case .calculationFailed:
+            return "The app could not build a suggestion from the current input state."
+        }
+    }
+}
+
+/// Result of resolving whether a pending set can receive a suggestion.
+enum SuggestionEligibility: Sendable {
+    case eligible(target: SuggestionTarget)
+    case ineligible(reason: SuggestionUnavailableReason)
+}
+
+/// Intermediate pending-set resolution used before engine evaluation.
+struct SuggestionSetResolution: Sendable {
+    let setId: UUID
+    let setIndex: Int
+    let setNumber: Int
+    let eligibility: SuggestionEligibility
+}
+
+/// Neutral calibration seam for future per-user/per-exercise personalization.
+struct SuggestionCalibrationAdjustment: Sendable {
+    let readinessMultiplier: Double
+    let fatigueDiscountOffset: Double
+    let explanation: String
+
+    static let neutral = SuggestionCalibrationAdjustment(
+        readinessMultiplier: 1.0,
+        fatigueDiscountOffset: 0.0,
+        explanation: "No calibration adjustment applied"
+    )
+}
+
+/// Provider for future exercise-specific suggestion calibration.
+protocol SuggestionCalibrationProviderProtocol: Sendable {
+    func calibrationAdjustment(for exerciseId: UUID) async -> SuggestionCalibrationAdjustment
+}
+
+/// Default no-op calibration provider.
+struct NeutralSuggestionCalibrationProvider: SuggestionCalibrationProviderProtocol {
+    func calibrationAdjustment(for exerciseId: UUID) async -> SuggestionCalibrationAdjustment {
+        let _ = exerciseId
+        return .neutral
+    }
+}
+
 /// A pending set that needs a smart suggestion.
 struct SuggestionPendingSetInput: Sendable {
     /// The underlying WorkoutSet identifier for row-level mapping.
@@ -28,12 +143,13 @@ struct SuggestionPendingSetInput: Sendable {
     let setIndex: Int
     /// The display set number among non-warmup sets (1-indexed).
     let setNumber: Int
-    /// The single reps target used when no range optimization applies.
-    let targetReps: Int
-    /// The target RIR used for load selection.
-    let targetRIR: Double
-    /// Optional rep range for range-aware optimization.
-    let repRange: ClosedRange<Int>?
+    /// The resolved target used for this suggestion.
+    let target: SuggestionTarget
+
+    var targetReps: Int { target.reps }
+    var targetRIR: Double { target.rir }
+    var repRange: ClosedRange<Int>? { target.repRange }
+    var targetSource: SuggestionTargetSource { target.source }
 }
 
 /// Snapshot of resolved settings and exercise overrides used by the engine.
@@ -53,16 +169,15 @@ struct SuggestionEngineInput: Sendable {
     let completedSessionSets: [SessionSetContext]
     let pendingSets: [SuggestionPendingSetInput]
     let settings: SuggestionSettingsSnapshot
+    let calibrationAdjustment: SuggestionCalibrationAdjustment
 }
 
-/// Pure engine output for one pending set.
-struct SuggestionEngineResult: Sendable {
+/// Pure decision output for one pending set.
+struct SuggestionDecision: Sendable {
     let setId: UUID
     let setIndex: Int
     let setNumber: Int
-    let targetReps: Int
-    let targetRIR: Double
-    let repRange: ClosedRange<Int>?
+    let target: SuggestionTarget
     let prescribedWeight: Double
     let rawWeight: Double
     let weightIncrement: Double
@@ -73,12 +188,38 @@ struct SuggestionEngineResult: Sendable {
     let freshnessApplied: Bool
     let e1RMSource: E1RMSource
     let bestReps: Int?
+    let calibrationAdjustment: SuggestionCalibrationAdjustment
+
+    var targetReps: Int { target.reps }
+    var targetRIR: Double { target.rir }
+    var repRange: ClosedRange<Int>? { target.repRange }
+    var targetSource: SuggestionTargetSource { target.source }
+}
+
+/// Expected-vs-actual set outcome payload for future calibration work.
+struct SuggestionOutcome: Sendable {
+    let setId: UUID
+    let expectedWeight: Double
+    let expectedReps: Int
+    let expectedRIR: Double
+    let actualWeight: Double?
+    let actualReps: Int?
+    let actualRIR: Double?
 }
 
 /// Bundles normalized input with the engine's outputs for explanation/UI layers.
 struct SuggestionEvaluation: Sendable {
-    let input: SuggestionEngineInput
-    let results: [SuggestionEngineResult]
+    let input: SuggestionEngineInput?
+    let decisions: [SuggestionDecision]
+    let unavailableReason: SuggestionUnavailableReason?
+
+    static func unavailable(_ reason: SuggestionUnavailableReason) -> SuggestionEvaluation {
+        SuggestionEvaluation(
+            input: nil,
+            decisions: [],
+            unavailableReason: reason
+        )
+    }
 }
 
 /// Request to prescribe weight for a single set.
@@ -134,6 +275,17 @@ enum E1RMSource: Sendable {
     case historicalPR
     /// No data available — prescription not possible.
     case noData
+
+    var label: String {
+        switch self {
+        case .recentPerformance:
+            return "recent top workouts"
+        case .historicalPR:
+            return "PR history"
+        case .noData:
+            return "no data"
+        }
+    }
 }
 
 /// Pure smart-suggestion calculation engine.
@@ -147,7 +299,7 @@ enum SuggestionEngine {
     private static let readinessMinFactor: Double = 0.95
     private static let readinessMaxFactor: Double = 1.05
 
-    static func evaluate(_ input: SuggestionEngineInput) -> [SuggestionEngineResult] {
+    static func evaluate(_ input: SuggestionEngineInput) -> [SuggestionDecision] {
         let sessionFatigue: Double
         if input.settings.fatigueEnabled {
             sessionFatigue = computeSessionFatigue(
@@ -163,8 +315,11 @@ enum SuggestionEngine {
         return input.pendingSets.map { setSpec in
             let isFirstSet = input.completedSessionSets.isEmpty && setSpec.setIndex == firstSuggestedSetIndex
 
-            let fatigueDiscount = 1.0 - sessionFatigue
-            var readinessRawE1RM = input.baseE1RM * fatigueDiscount
+            let fatigueDiscount = min(
+                1.0,
+                max(0.0, (1.0 - sessionFatigue) + input.calibrationAdjustment.fatigueDiscountOffset)
+            )
+            var readinessRawE1RM = input.baseE1RM * input.calibrationAdjustment.readinessMultiplier * fatigueDiscount
 
             var freshnessApplied = false
             if isFirstSet && input.settings.freshnessEnabled {
@@ -217,13 +372,11 @@ enum SuggestionEngine {
                 prescribedWeight = roundToIncrement(rawWeight, increment: input.settings.weightIncrement)
             }
 
-            return SuggestionEngineResult(
+            return SuggestionDecision(
                 setId: setSpec.setId,
                 setIndex: setSpec.setIndex,
                 setNumber: setSpec.setNumber,
-                targetReps: setSpec.targetReps,
-                targetRIR: setSpec.targetRIR,
-                repRange: setSpec.repRange,
+                target: setSpec.target,
                 prescribedWeight: max(0, prescribedWeight),
                 rawWeight: rawWeight,
                 weightIncrement: input.settings.weightIncrement,
@@ -233,7 +386,8 @@ enum SuggestionEngine {
                 fatigueDiscount: fatigueDiscount,
                 freshnessApplied: freshnessApplied,
                 e1RMSource: input.baseSource,
-                bestReps: bestReps
+                bestReps: bestReps,
+                calibrationAdjustment: input.calibrationAdjustment
             )
         }
     }
@@ -302,7 +456,7 @@ protocol LoadPrescriptionServiceProtocol: Sendable {
         exerciseId: UUID,
         pendingSets: [SuggestionPendingSetInput],
         completedSessionSets: [SessionSetContext]
-    ) async throws -> SuggestionEvaluation?
+    ) async throws -> SuggestionEvaluation
 
     /// Prescribe a weight for a single set.
     ///

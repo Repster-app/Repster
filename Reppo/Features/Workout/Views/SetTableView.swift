@@ -277,27 +277,27 @@ private struct SetRowWrapper: View {
                 prStatusOverride: CachedPRStatus.effectiveStatus(for: set, among: siblingsSets)
             )
             .onChange(of: weightText) { _, newValue in
-                handleFieldEdit {
+                handleFieldEdit(field: .weight) {
                     set.weight = UnitConversion.parseDecimal(newValue)
                 }
             }
             .onChange(of: repsText) { _, newValue in
-                handleFieldEdit {
+                handleFieldEdit(field: .reps) {
                     set.reps = Int(newValue)
                 }
             }
             .onChange(of: durationText) { _, newValue in
-                handleFieldEdit {
+                handleFieldEdit(field: .duration) {
                     set.durationSeconds = Int(newValue)
                 }
             }
             .onChange(of: distanceText) { _, newValue in
-                handleFieldEdit {
+                handleFieldEdit(field: .distance) {
                     set.distanceMeters = UnitConversion.parseDecimal(newValue)
                 }
             }
             .onChange(of: rirValue) { _, newValue in
-                handleFieldEdit {
+                handleFieldEdit(field: .rir) {
                     set.rir = newValue
                 }
             }
@@ -324,12 +324,12 @@ private struct SetRowWrapper: View {
     }
 
     /// Apply an input edit and ensure completed sets are automatically uncompleted.
-    private func handleFieldEdit(_ edit: () -> Void) {
+    private func handleFieldEdit(field: SetDraftField, _ edit: () -> Void) {
         edit()
 
         if set.completed {
             guard !isAutoUncompleting else {
-                dataSource.markSetDirty(set)
+                dataSource.markSetDirty(set, field: field)
                 return
             }
             isAutoUncompleting = true
@@ -338,7 +338,7 @@ private struct SetRowWrapper: View {
                 isAutoUncompleting = false
             }
         } else {
-            dataSource.markSetDirty(set)
+            dataSource.markSetDirty(set, field: field)
         }
     }
 
