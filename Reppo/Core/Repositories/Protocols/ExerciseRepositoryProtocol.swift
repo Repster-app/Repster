@@ -19,6 +19,9 @@ protocol ExerciseRepositoryProtocol: Sendable {
     /// Fetch all exercises, ordered by name ASC.
     func fetchAll() async throws -> [Exercise]
 
+    /// Fetch chart-safe exercise snapshots ordered by name ASC.
+    func fetchAllChartExercises() async throws -> [ChartExerciseData]
+
     /// Search exercises by name (case-insensitive, contains).
     /// Used by exercise list autocomplete (~200 exercises).
     func search(name: String) async throws -> [Exercise]

@@ -32,6 +32,10 @@ actor ExerciseRepository: ExerciseRepositoryProtocol {
         return try modelContext.fetch(descriptor)
     }
 
+    func fetchAllChartExercises() throws -> [ChartExerciseData] {
+        try fetchAll().map(ChartExerciseData.init(from:))
+    }
+
     func search(name: String) throws -> [Exercise] {
         let descriptor = FetchDescriptor<Exercise>(
             predicate: #Predicate {

@@ -41,6 +41,7 @@ final class ImportViewModel {
 
     // Error
     var errorMessage: String?
+    private(set) var importError: ImportError?
 
     // MARK: - Dependencies
 
@@ -53,19 +54,27 @@ final class ImportViewModel {
         self.importService = importService
     }
 
+    var shouldShowSupportCTA: Bool {
+        if case .some(.invalidHeader(_, _)) = importError {
+            return true
+        }
+        return false
+    }
+
     // MARK: - File Selection
 
     func handleFileSelected(_ result: Result<URL, Error>) {
         switch result {
         case .failure(let error):
-            errorMessage = error.localizedDescription
-            state = .failed
+            setFailure(error)
 
         case .success(let url):
             let accessing = url.startAccessingSecurityScopedResource()
             defer { if accessing { url.stopAccessingSecurityScopedResource() } }
 
             do {
+                errorMessage = nil
+                importError = nil
                 let data = try Data(contentsOf: url)
                 self.importData = data
 
@@ -75,8 +84,7 @@ final class ImportViewModel {
                 self.estimatedTotalRows = preview.estimatedTotalRows
                 self.state = .previewing
             } catch {
-                errorMessage = error.localizedDescription
-                state = .failed
+                setFailure(error)
             }
         }
     }
@@ -128,8 +136,7 @@ final class ImportViewModel {
             progressFraction = 1.0
 
         case .failed(let error):
-            errorMessage = error.localizedDescription
-            state = .failed
+            setFailure(error)
         }
     }
 
@@ -147,11 +154,28 @@ final class ImportViewModel {
         totalSets = 0
         result = nil
         errorMessage = nil
+        importError = nil
     }
 
     func retry() {
+        importData = nil
+        previewHeaders = []
+        previewRows = []
+        estimatedTotalRows = 0
+        progressFraction = 0
+        progressLabel = ""
+        setsInserted = 0
+        totalSets = 0
+        result = nil
         errorMessage = nil
+        importError = nil
         state = .idle
         showFilePicker = true
+    }
+
+    private func setFailure(_ error: Error) {
+        importError = error as? ImportError
+        errorMessage = error.localizedDescription
+        state = .failed
     }
 }

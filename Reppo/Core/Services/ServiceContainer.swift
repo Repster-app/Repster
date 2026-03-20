@@ -22,7 +22,7 @@ final class ServiceContainer {
     let chartDataService: any ChartDataServiceProtocol
     let settingsService: any SettingsServiceProtocol
     let importService: any ImportServiceProtocol
-    let exportService: any ExportServiceProtocol
+    let workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol
     let templateService: any TemplateServiceProtocol
     let loadPrescriptionService: any LoadPrescriptionServiceProtocol
     let healthProfileRepo: any HealthProfileRepositoryProtocol
@@ -81,7 +81,8 @@ final class ServiceContainer {
         let settingsService = SettingsService(
             healthProfileRepository: repositoryContainer.healthProfileRepository,
             prService: prService,
-            statsService: statsService
+            statsService: statsService,
+            modelContainer: repositoryContainer.modelContainer
         )
 
         // 8. ExerciseService — depends on repos + PRService + StatsService
@@ -105,10 +106,14 @@ final class ServiceContainer {
             modelContainer: repositoryContainer.modelContainer
         )
 
-        // 10. ExportService — depends on repos only
-        let exportService = ExportService(
+        // 10. WorkoutHistoryBackupService — archive export + restore
+        let workoutHistoryBackupService = WorkoutHistoryBackupService(
+            workoutRepo: repositoryContainer.workoutRepository,
             exerciseRepo: repositoryContainer.exerciseRepository,
-            setRepo: repositoryContainer.setRepository
+            setRepo: repositoryContainer.setRepository,
+            statsService: statsService,
+            prService: prService,
+            modelContainer: repositoryContainer.modelContainer
         )
 
         // 11. TemplateService — depends on repos only
@@ -136,7 +141,7 @@ final class ServiceContainer {
         self.chartDataService = chartDataService
         self.settingsService = settingsService
         self.importService = importService
-        self.exportService = exportService
+        self.workoutHistoryBackupService = workoutHistoryBackupService
         self.templateService = templateService
         self.loadPrescriptionService = loadPrescriptionService
         self.healthProfileRepo = repositoryContainer.healthProfileRepository

@@ -1,18 +1,39 @@
 import Foundation
+import SwiftData
+
+enum SettingsResetError: LocalizedError {
+    case seedLibraryUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .seedLibraryUnavailable:
+            return "Reset completed, but the built-in exercise library could not be restored."
+        }
+    }
+}
 
 actor SettingsService: SettingsServiceProtocol {
     private let healthProfileRepository: any HealthProfileRepositoryProtocol
     private let prService: any PRServiceProtocol
     private let statsService: any StatsServiceProtocol
+    private let modelContainer: ModelContainer
+    private let userDefaults: UserDefaults
+    private let seedExercises: @Sendable (ModelContext) -> Void
 
     init(
         healthProfileRepository: any HealthProfileRepositoryProtocol,
         prService: any PRServiceProtocol,
-        statsService: any StatsServiceProtocol
+        statsService: any StatsServiceProtocol,
+        modelContainer: ModelContainer,
+        userDefaults: UserDefaults = .standard,
+        seedExercises: @escaping @Sendable (ModelContext) -> Void = SeedService.seedIfNeeded
     ) {
         self.healthProfileRepository = healthProfileRepository
         self.prService = prService
         self.statsService = statsService
+        self.modelContainer = modelContainer
+        self.userDefaults = userDefaults
+        self.seedExercises = seedExercises
     }
 
     // MARK: - Read
@@ -133,6 +154,38 @@ actor SettingsService: SettingsServiceProtocol {
         try await healthProfileRepository.save(profile)
     }
 
+    // MARK: - Data Reset
+
+    func resetAllAppData() async throws {
+        let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
+
+        try deleteAll(WorkoutSet.self, in: context)
+        try deleteAll(Workout.self, in: context)
+        try deleteAll(ExerciseStats.self, in: context)
+        try deleteAll(PerformanceRecord.self, in: context)
+        try deleteAll(BodyweightEntry.self, in: context)
+        try deleteAll(HealthProfile.self, in: context)
+        try deleteAll(ProgramExercise.self, in: context)
+        try deleteAll(Program.self, in: context)
+        try deleteAll(PlannedSet.self, in: context)
+        try deleteAll(PlannedWorkout.self, in: context)
+        try deleteAll(TemplateSet.self, in: context)
+        try deleteAll(TemplateExercise.self, in: context)
+        try deleteAll(WorkoutTemplate.self, in: context)
+        try deleteAll(Exercise.self, in: context)
+        try context.save()
+
+        clearStoredAppState()
+        seedExercises(context)
+
+        guard try context.fetchCount(FetchDescriptor<Exercise>()) > 0 else {
+            throw SettingsResetError.seedLibraryUnavailable
+        }
+
+        _ = try await healthProfileRepository.fetchOrCreate()
+    }
+
     // MARK: - Rebuild Operations
 
     func rebuildPRs() async throws {
@@ -146,5 +199,20 @@ actor SettingsService: SettingsServiceProtocol {
     func rebuildAll() async throws {
         try await prService.rebuildAll()
         try await statsService.rebuildAll()
+    }
+
+    // MARK: - Helpers
+
+    private func deleteAll<Model: PersistentModel>(_ modelType: Model.Type, in context: ModelContext) throws {
+        let models = try context.fetch(FetchDescriptor<Model>())
+        for model in models {
+            context.delete(model)
+        }
+    }
+
+    private func clearStoredAppState() {
+        userDefaults.removeObject(forKey: "chartExercisePresets")
+        userDefaults.removeObject(forKey: "restTimerStartDate")
+        userDefaults.removeObject(forKey: "restTimerTotalDuration")
     }
 }

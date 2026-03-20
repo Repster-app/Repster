@@ -107,6 +107,10 @@ actor SetRepository: SetRepositoryProtocol {
         return try modelContext.fetch(descriptor)
     }
 
+    func fetchChartSets(from startDate: Date, to endDate: Date) throws -> [ChartSetData] {
+        try fetchSets(from: startDate, to: endDate).map(ChartSetData.init(from:))
+    }
+
     func fetchSets(exerciseId: UUID, from startDate: Date?, to endDate: Date) throws -> [WorkoutSet] {
         let descriptor: FetchDescriptor<WorkoutSet>
         if let startDate {
@@ -125,6 +129,10 @@ actor SetRepository: SetRepositoryProtocol {
             )
         }
         return try modelContext.fetch(descriptor)
+    }
+
+    func fetchChartSets(exerciseId: UUID, from startDate: Date?, to endDate: Date) throws -> [ChartSetData] {
+        try fetchSets(exerciseId: exerciseId, from: startDate, to: endDate).map(ChartSetData.init(from:))
     }
 
     // MARK: - Aggregation (FR-009)

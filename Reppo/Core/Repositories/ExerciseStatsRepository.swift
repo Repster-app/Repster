@@ -29,4 +29,8 @@ actor ExerciseStatsRepository: ExerciseStatsRepositoryProtocol {
         let descriptor = FetchDescriptor<ExerciseStats>()
         return try modelContext.fetch(descriptor)
     }
+
+    func fetchAllChartExerciseStats() throws -> [ChartExerciseStatsData] {
+        try fetchAll().map(ChartExerciseStatsData.init(from:))
+    }
 }

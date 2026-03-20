@@ -601,10 +601,30 @@ final class SmartSuggestionSettingsTests: XCTestCase {
     func testSettingsServiceClampsDefaultTargets() async throws {
         let profile = HealthProfile()
         let repo = HealthProfileRepositoryStub(profile: profile)
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(
+            for: Exercise.self,
+            Workout.self,
+            WorkoutSet.self,
+            ExerciseStats.self,
+            PerformanceRecord.self,
+            BodyweightEntry.self,
+            HealthProfile.self,
+            Program.self,
+            ProgramExercise.self,
+            PlannedWorkout.self,
+            PlannedSet.self,
+            WorkoutTemplate.self,
+            TemplateExercise.self,
+            TemplateSet.self,
+            configurations: config
+        )
         let service = SettingsService(
             healthProfileRepository: repo,
             prService: PRServiceStub(),
-            statsService: StatsServiceStub()
+            statsService: StatsServiceStub(),
+            modelContainer: container,
+            seedExercises: { _ in }
         )
 
         try await service.updatePrescriptionDefaultTargetReps(99)
@@ -963,9 +983,433 @@ final class TemplateImportExportTests: XCTestCase {
     }
 }
 
+@MainActor
+final class WorkoutHistoryBackupServiceTests: XCTestCase {
+    func testExportBackupPreservesMultipleSameDayWorkoutsAndMetadata() async throws {
+        let context = try makeBackupServiceContext()
+
+        let bench = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest",
+            bodyweightFactor: 0.35,
+            weightIncrement: 2.5,
+            defaultRestTime: 180,
+            createdAt: makeDate(2026, 3, 18, 9, 0),
+            updatedAt: makeDate(2026, 3, 18, 9, 15)
+        )
+        try await context.exerciseRepo.save(bench)
+
+        let firstStart = makeDate(2026, 3, 19, 0, 30)
+        let secondStart = makeDate(2026, 3, 19, 18, 0)
+
+        let midnightWorkout = Workout(
+            date: firstStart,
+            title: "Midnight Session",
+            startTime: firstStart,
+            endTime: makeDate(2026, 3, 19, 1, 25),
+            duration: 3300,
+            perceivedEffort: 8.5,
+            notes: "Opened the gym and hit bench",
+            status: .completed,
+            createdAt: firstStart,
+            updatedAt: makeDate(2026, 3, 19, 1, 26)
+        )
+        let eveningWorkout = Workout(
+            date: secondStart,
+            title: "Evening Session",
+            startTime: secondStart,
+            endTime: makeDate(2026, 3, 19, 19, 5),
+            duration: 3900,
+            perceivedEffort: 7.0,
+            notes: "Accessories only",
+            status: .completed,
+            createdAt: secondStart,
+            updatedAt: makeDate(2026, 3, 19, 19, 6)
+        )
+        try await context.workoutRepo.save(midnightWorkout)
+        try await context.workoutRepo.save(eveningWorkout)
+
+        let warmupSet = WorkoutSet(
+            workoutId: midnightWorkout.id,
+            exerciseId: bench.id,
+            date: firstStart,
+            completedAt: makeDate(2026, 3, 19, 0, 40),
+            weight: 60,
+            effectiveWeight: 88,
+            reps: 5,
+            e1RM: 98,
+            e1RMFormulaVersion: "epley",
+            setType: .warmup,
+            notes: "Quick primer",
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true,
+            excludeFromPRs: true,
+            createdAt: makeDate(2026, 3, 19, 0, 35),
+            updatedAt: makeDate(2026, 3, 19, 0, 40),
+            restDurationSeconds: 90
+        )
+        let placeholderSet = WorkoutSet(
+            workoutId: eveningWorkout.id,
+            exerciseId: bench.id,
+            date: secondStart,
+            setType: .working,
+            notes: "Left blank intentionally",
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: false,
+            createdAt: secondStart,
+            updatedAt: makeDate(2026, 3, 19, 18, 5)
+        )
+        try await context.setRepo.save(warmupSet)
+        try await context.setRepo.save(placeholderSet)
+
+        let exportedData = try await context.service.exportBackup()
+        let archive = try decodeBackupArchive(exportedData)
+        let preview = try context.service.previewBackup(data: exportedData)
+
+        XCTAssertEqual(archive.version, WorkoutHistoryArchive.currentVersion)
+        XCTAssertEqual(archive.workouts.map(\.id), [midnightWorkout.id, eveningWorkout.id])
+        XCTAssertEqual(archive.workouts.first?.title, "Midnight Session")
+        XCTAssertEqual(archive.workouts.first?.notes, "Opened the gym and hit bench")
+        XCTAssertEqual(archive.workouts.last?.title, "Evening Session")
+        XCTAssertEqual(archive.exercises.count, 1)
+        XCTAssertEqual(archive.exercises.first?.bodyweightFactor, 0.35)
+
+        let exportedWarmup = try XCTUnwrap(archive.sets.first(where: { $0.id == warmupSet.id }))
+        XCTAssertEqual(exportedWarmup.setType, .warmup)
+        XCTAssertEqual(exportedWarmup.excludeFromPRs, true)
+        XCTAssertEqual(exportedWarmup.restDurationSeconds, 90)
+
+        let exportedPlaceholder = try XCTUnwrap(archive.sets.first(where: { $0.id == placeholderSet.id }))
+        XCTAssertNil(exportedPlaceholder.weight)
+        XCTAssertNil(exportedPlaceholder.reps)
+        XCTAssertFalse(exportedPlaceholder.completed)
+        XCTAssertEqual(exportedPlaceholder.notes, "Left blank intentionally")
+
+        XCTAssertEqual(preview.workoutCount, 2)
+        XCTAssertEqual(preview.exerciseCount, 1)
+        XCTAssertEqual(preview.setCount, 2)
+        XCTAssertEqual(preview.earliestWorkoutDate, firstStart)
+        XCTAssertEqual(preview.latestWorkoutDate, secondStart)
+    }
+
+    func testRestoreBackupReplacesHistoryAndKeepsUnrelatedData() async throws {
+        let context = try makeBackupServiceContext()
+        let profile = try await context.healthProfileRepo.fetchOrCreate()
+
+        let archivedExercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest",
+            defaultRestTime: 180
+        )
+        let unrelatedExercise = Exercise(
+            name: "Jogging",
+            equipmentType: .bodyweight,
+            trackingType: .duration,
+            primaryMuscle: "legs"
+        )
+        try await context.exerciseRepo.save(archivedExercise)
+        try await context.exerciseRepo.save(unrelatedExercise)
+
+        let bodyweightEntry = BodyweightEntry(
+            healthProfileId: profile.id,
+            date: makeDate(2026, 3, 18, 7, 0),
+            bodyweightKg: 82.5
+        )
+        try await context.bodyweightRepo.save(bodyweightEntry)
+
+        let firstWorkout = Workout(
+            date: makeDate(2026, 3, 19, 0, 30),
+            title: "Backup A",
+            startTime: makeDate(2026, 3, 19, 0, 30),
+            endTime: makeDate(2026, 3, 19, 1, 10),
+            duration: 2400,
+            perceivedEffort: 8,
+            notes: "Midnight history",
+            status: .completed,
+            createdAt: makeDate(2026, 3, 19, 0, 30),
+            updatedAt: makeDate(2026, 3, 19, 1, 11)
+        )
+        let secondWorkout = Workout(
+            date: makeDate(2026, 3, 19, 18, 0),
+            title: "Backup B",
+            startTime: makeDate(2026, 3, 19, 18, 0),
+            endTime: makeDate(2026, 3, 19, 18, 50),
+            duration: 3000,
+            perceivedEffort: 7,
+            notes: "Evening history",
+            status: .completed,
+            createdAt: makeDate(2026, 3, 19, 18, 0),
+            updatedAt: makeDate(2026, 3, 19, 18, 55)
+        )
+        try await context.workoutRepo.save(firstWorkout)
+        try await context.workoutRepo.save(secondWorkout)
+
+        let workingSet = WorkoutSet(
+            workoutId: firstWorkout.id,
+            exerciseId: archivedExercise.id,
+            date: firstWorkout.date,
+            completedAt: makeDate(2026, 3, 19, 0, 50),
+            weight: 100,
+            effectiveWeight: 100,
+            reps: 5,
+            e1RM: 116.7,
+            e1RMFormulaVersion: "epley",
+            setType: .working,
+            notes: "Top set",
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true,
+            createdAt: makeDate(2026, 3, 19, 0, 45),
+            updatedAt: makeDate(2026, 3, 19, 0, 50)
+        )
+        let placeholderSet = WorkoutSet(
+            workoutId: secondWorkout.id,
+            exerciseId: archivedExercise.id,
+            date: secondWorkout.date,
+            setType: .working,
+            notes: "Still blank",
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: false,
+            createdAt: secondWorkout.date,
+            updatedAt: makeDate(2026, 3, 19, 18, 5)
+        )
+        try await context.setRepo.save(workingSet)
+        try await context.setRepo.save(placeholderSet)
+
+        let backupData = try await context.service.exportBackup()
+
+        let replacementWorkout = Workout(
+            date: makeDate(2026, 3, 20, 9, 0),
+            title: "Current History",
+            startTime: makeDate(2026, 3, 20, 9, 0),
+            endTime: makeDate(2026, 3, 20, 10, 0),
+            duration: 3600,
+            status: .completed
+        )
+        try await context.workoutRepo.save(replacementWorkout)
+        let replacementSet = WorkoutSet(
+            workoutId: replacementWorkout.id,
+            exerciseId: archivedExercise.id,
+            date: replacementWorkout.date,
+            weight: 80,
+            effectiveWeight: 80,
+            reps: 8,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+        try await context.setRepo.save(replacementSet)
+
+        let replacementWorkoutId = replacementWorkout.id
+        let firstWorkoutDate = firstWorkout.date
+        let placeholderSetId = placeholderSet.id
+        let unrelatedExerciseId = unrelatedExercise.id
+        let bodyweightEntryId = bodyweightEntry.id
+        let archivedExerciseId = archivedExercise.id
+
+        let restoreResult = try await context.service.restoreBackup(data: backupData)
+
+        let restoredWorkouts = try await context.workoutRepo.fetchAllWorkouts(limit: nil, offset: nil)
+        let restoredSets = try await context.setRepo.fetchSets(from: .distantPast, to: .distantFuture)
+        let allExercises = try await context.exerciseRepo.fetchAll()
+        let bodyweightEntries = try await context.bodyweightRepo.fetchAll(for: profile.id)
+        let stats = try await context.exerciseStatsRepo.fetch(for: archivedExerciseId)
+        let records = try await context.performanceRecordRepo.fetchAll(for: archivedExerciseId)
+
+        XCTAssertEqual(restoreResult.workoutsRestored, 2)
+        XCTAssertEqual(restoreResult.exercisesUpserted, 1)
+        XCTAssertEqual(restoreResult.setsRestored, 2)
+        XCTAssertEqual(restoredWorkouts.count, 2)
+        XCTAssertFalse(restoredWorkouts.contains(where: { $0.id == replacementWorkoutId }))
+        XCTAssertEqual(restoredWorkouts.filter { Calendar.current.isDate($0.date, inSameDayAs: firstWorkoutDate) }.count, 2)
+        XCTAssertEqual(restoredSets.count, 2)
+        XCTAssertTrue(restoredSets.contains(where: { $0.id == placeholderSetId && $0.completed == false && $0.weight == nil }))
+        XCTAssertTrue(allExercises.contains(where: { $0.id == unrelatedExerciseId }))
+        XCTAssertEqual(bodyweightEntries.count, 1)
+        XCTAssertEqual(bodyweightEntries.first?.id, bodyweightEntryId)
+        XCTAssertNotNil(stats)
+        XCTAssertEqual(records.count, 1)
+    }
+
+    func testRestoreBackupRejectsUnsupportedArchiveVersion() async throws {
+        let context = try makeBackupServiceContext()
+        let invalidArchive = WorkoutHistoryArchive(
+            version: 99,
+            exportedAt: Date(),
+            workouts: [],
+            exercises: [],
+            sets: []
+        )
+        let invalidData = try encodeBackupArchive(invalidArchive)
+
+        do {
+            _ = try await context.service.restoreBackup(data: invalidData)
+            XCTFail("Expected unsupported backup version to fail")
+        } catch let error as WorkoutHistoryBackupError {
+            guard case .invalidArchiveVersion(let version) = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+            XCTAssertEqual(version, 99)
+        }
+    }
+
+    private func makeBackupServiceContext() throws -> WorkoutHistoryBackupServiceTestContext {
+        let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(
+            for: Exercise.self,
+            Workout.self,
+            WorkoutSet.self,
+            ExerciseStats.self,
+            PerformanceRecord.self,
+            BodyweightEntry.self,
+            HealthProfile.self,
+            configurations: configuration
+        )
+
+        let exerciseRepo = ExerciseRepository(modelContainer: container)
+        let workoutRepo = WorkoutRepository(modelContainer: container)
+        let setRepo = SetRepository(modelContainer: container)
+        let exerciseStatsRepo = ExerciseStatsRepository(modelContainer: container)
+        let performanceRecordRepo = PerformanceRecordRepository(modelContainer: container)
+        let bodyweightRepo = BodyweightEntryRepository(modelContainer: container)
+        let healthProfileRepo = HealthProfileRepository(modelContainer: container)
+
+        let statsService = StatsService(
+            exerciseStatsRepository: exerciseStatsRepo,
+            setRepository: setRepo,
+            exerciseRepository: exerciseRepo,
+            healthProfileRepository: healthProfileRepo
+        )
+        let prService = PRService(
+            performanceRecordRepository: performanceRecordRepo,
+            setRepository: setRepo,
+            healthProfileRepository: healthProfileRepo,
+            exerciseRepository: exerciseRepo
+        )
+        let service = WorkoutHistoryBackupService(
+            workoutRepo: workoutRepo,
+            exerciseRepo: exerciseRepo,
+            setRepo: setRepo,
+            statsService: statsService,
+            prService: prService,
+            modelContainer: container
+        )
+
+        return WorkoutHistoryBackupServiceTestContext(
+            service: service,
+            exerciseRepo: exerciseRepo,
+            workoutRepo: workoutRepo,
+            setRepo: setRepo,
+            exerciseStatsRepo: exerciseStatsRepo,
+            performanceRecordRepo: performanceRecordRepo,
+            bodyweightRepo: bodyweightRepo,
+            healthProfileRepo: healthProfileRepo
+        )
+    }
+
+    private func decodeBackupArchive(_ data: Data) throws -> WorkoutHistoryArchive {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(WorkoutHistoryArchive.self, from: data)
+    }
+
+    private func encodeBackupArchive(_ archive: WorkoutHistoryArchive) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return try encoder.encode(archive)
+    }
+
+    private func makeDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int, _ minute: Int) -> Date {
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.timeZone = TimeZone(secondsFromGMT: 0)
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+        return components.date!
+    }
+}
+
+@MainActor
+final class WorkoutHistoryBackupViewModelTests: XCTestCase {
+    func testExportViewModelCreatesShareItemAfterSuccessfulExport() async throws {
+        let service = WorkoutHistoryBackupServiceStub()
+        let viewModel = ExportViewModel(workoutHistoryBackupService: service)
+
+        viewModel.generateExport()
+
+        try await waitUntilOnMainActor {
+            viewModel.shareItem != nil && viewModel.isExporting == false
+        }
+
+        let shareURL = try XCTUnwrap(viewModel.shareItem?.url)
+        XCTAssertEqual(shareURL.pathExtension, "reppobackup")
+        XCTAssertNil(viewModel.errorMessage)
+    }
+
+    func testRestoreBackupViewModelPreviewsBeforeConfirmation() throws {
+        let service = WorkoutHistoryBackupServiceStub()
+        let viewModel = RestoreBackupViewModel(workoutHistoryBackupService: service)
+        let fileURL = try makeBackupFileURL()
+
+        viewModel.handleFileSelected(.success(fileURL))
+
+        XCTAssertEqual(viewModel.state, .previewing)
+        XCTAssertEqual(viewModel.preview?.workoutCount, 2)
+        viewModel.confirmRestore()
+        XCTAssertTrue(viewModel.showReplaceConfirmation)
+    }
+
+    func testRestoreBackupViewModelCompletesRestoreAfterConfirmation() async throws {
+        let service = WorkoutHistoryBackupServiceStub()
+        let viewModel = RestoreBackupViewModel(workoutHistoryBackupService: service)
+        let fileURL = try makeBackupFileURL()
+
+        viewModel.handleFileSelected(.success(fileURL))
+        viewModel.performRestore()
+
+        try await waitUntilOnMainActor {
+            viewModel.state == .completed
+        }
+
+        XCTAssertEqual(service.restoreCallCount, 1)
+        XCTAssertEqual(viewModel.result?.workoutsRestored, 2)
+        XCTAssertNil(viewModel.errorMessage)
+    }
+
+    private func makeBackupFileURL() throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("reppobackup")
+        try Data("backup".utf8).write(to: url, options: .atomic)
+        return url
+    }
+}
+
 private struct TemplateServiceTestContext {
     let service: TemplateService
     let exerciseRepo: ExerciseRepository
+}
+
+private struct WorkoutHistoryBackupServiceTestContext {
+    let service: WorkoutHistoryBackupService
+    let exerciseRepo: ExerciseRepository
+    let workoutRepo: WorkoutRepository
+    let setRepo: SetRepository
+    let exerciseStatsRepo: ExerciseStatsRepository
+    let performanceRecordRepo: PerformanceRecordRepository
+    let bodyweightRepo: BodyweightEntryRepository
+    let healthProfileRepo: HealthProfileRepository
 }
 
 private struct TestContext {
@@ -973,6 +1417,56 @@ private struct TestContext {
     let exercise: Exercise
     let pendingSet: WorkoutSet
     let secondExercise: Exercise?
+}
+
+private final class WorkoutHistoryBackupServiceStub: @unchecked Sendable, WorkoutHistoryBackupServiceProtocol {
+    var exportData = Data("backup".utf8)
+    var previewResult = WorkoutHistoryBackupPreview(
+        archiveVersion: WorkoutHistoryArchive.currentVersion,
+        exportedAt: Date(),
+        workoutCount: 2,
+        exerciseCount: 1,
+        setCount: 3,
+        earliestWorkoutDate: Date(timeIntervalSince1970: 1_710_000_000),
+        latestWorkoutDate: Date(timeIntervalSince1970: 1_710_086_400)
+    )
+    var restoreResult = WorkoutHistoryRestoreResult(
+        workoutsRestored: 2,
+        exercisesUpserted: 1,
+        setsRestored: 3,
+        duration: 0.4
+    )
+    var restoreCallCount = 0
+
+    func exportBackup() async throws -> Data {
+        exportData
+    }
+
+    func previewBackup(data: Data) throws -> WorkoutHistoryBackupPreview {
+        previewResult
+    }
+
+    func restoreBackup(data: Data) async throws -> WorkoutHistoryRestoreResult {
+        restoreCallCount += 1
+        return restoreResult
+    }
+}
+
+private func waitUntilOnMainActor(
+    timeout: Duration = .seconds(2),
+    pollInterval: Duration = .milliseconds(20),
+    condition: @escaping @MainActor () -> Bool
+) async throws {
+    let clock = ContinuousClock()
+    let deadline = clock.now + timeout
+
+    while !(await condition()) {
+        if clock.now >= deadline {
+            XCTFail("Timed out waiting for condition")
+            return
+        }
+        try await Task.sleep(for: pollInterval)
+    }
 }
 
 private final class LoadPrescriptionServiceSpy: @unchecked Sendable, LoadPrescriptionServiceProtocol {
@@ -1144,6 +1638,7 @@ private final class SettingsServiceStub: @unchecked Sendable, SettingsServicePro
     }
     func updatePrescriptionFatigueModelingEnabled(_ enabled: Bool) async throws { let _ = enabled }
     func updatePrescriptionDefaultRecoveryConstant(_ seconds: Double) async throws { let _ = seconds }
+    func resetAllAppData() async throws {}
     func rebuildPRs() async throws {}
     func rebuildStats() async throws {}
     func rebuildAll() async throws {}
@@ -1337,6 +1832,143 @@ private final class PRServiceStub: @unchecked Sendable, PRServiceProtocol {
 
     func rebuildAll() async throws {}
     func rebuild(for exerciseId: UUID) async throws { let _ = exerciseId }
+}
+
+final class ImportSupportTests: XCTestCase {
+    func testPreviewCSVAcceptsFitNotesHeaders() throws {
+        let service = try makeImportService()
+
+        let preview = try service.previewCSV(data: Data(validFitNotesCSV.utf8))
+
+        XCTAssertEqual(preview.headers.first, "Date")
+        XCTAssertEqual(preview.sampleRows.count, 1)
+        XCTAssertEqual(preview.estimatedTotalRows, 1)
+    }
+
+    func testPreviewCSVRejectsUnsupportedHeaders() throws {
+        let service = try makeImportService()
+
+        XCTAssertThrowsError(try service.previewCSV(data: Data(unsupportedCSV.utf8))) { error in
+            guard let importError = error as? ImportError else {
+                return XCTFail("Expected ImportError, got \(type(of: error))")
+            }
+
+            guard case .invalidHeader = importError else {
+                return XCTFail("Expected invalidHeader, got \(importError)")
+            }
+
+            XCTAssertEqual(
+                importError.errorDescription,
+                "This CSV doesn't look like a FitNotes export. Reppo currently supports FitNotes CSV imports only."
+            )
+        }
+    }
+
+    func testImportSupportEmailUsesFeedbackInboxAndImportSubject() throws {
+        let url = try XCTUnwrap(
+            SupportEmailComposer.importSupportURL(
+                appVersion: "1.2.3",
+                build: "45",
+                systemVersion: "18.0"
+            )
+        )
+        let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
+        let queryItems = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+
+        XCTAssertEqual(components.scheme, "mailto")
+        XCTAssertEqual(components.path, SupportEmailComposer.address)
+        XCTAssertEqual(queryItems["subject"], "CSV Import Support")
+        XCTAssertTrue(queryItems["body"]?.contains("App Version: 1.2.3 (45)") == true)
+        XCTAssertTrue(queryItems["body"]?.contains("iOS: 18.0") == true)
+    }
+
+    private func makeImportService() throws -> ImportService {
+        let container = try ModelContainer(
+            for: Workout.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+
+        return ImportService(
+            exerciseRepo: ImportExerciseRepositoryStub(),
+            workoutRepo: ImportWorkoutRepositoryStub(),
+            bodyweightRepo: ImportBodyweightRepositoryStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: HealthProfile()),
+            prService: PRServiceStub(),
+            statsService: StatsServiceStub(),
+            modelContainer: container
+        )
+    }
+
+    private var validFitNotesCSV: String {
+        """
+        Date,Exercise,Category,Weight (kg),Weight (lbs),Reps,Distance,Distance Unit,Time,Notes,Kind
+        2026-03-20,Squat,Legs,100,,5,,,,wr
+        """
+    }
+
+    private var unsupportedCSV: String {
+        """
+        Workout Date,Exercise,Category,Weight (kg),Weight (lbs),Reps,Distance,Distance Unit,Time,Notes,Kind
+        2026-03-20,Squat,Legs,100,,5,,,,wr
+        """
+    }
+}
+
+private final class ImportExerciseRepositoryStub: @unchecked Sendable, ExerciseRepositoryProtocol {
+    func save(_ exercise: Exercise) async throws { let _ = exercise }
+    func delete(_ exercise: Exercise) async throws { let _ = exercise }
+    func fetch(byId id: UUID) async throws -> Exercise? {
+        let _ = id
+        return nil
+    }
+    func fetchAll() async throws -> [Exercise] { [] }
+    func fetchAllChartExercises() async throws -> [ChartExerciseData] { [] }
+    func search(name: String) async throws -> [Exercise] {
+        let _ = name
+        return []
+    }
+    func hasAssociatedSets(_ exerciseId: UUID) async throws -> Bool {
+        let _ = exerciseId
+        return false
+    }
+}
+
+private final class ImportWorkoutRepositoryStub: @unchecked Sendable, WorkoutRepositoryProtocol {
+    func save(_ workout: Workout) async throws { let _ = workout }
+    func delete(_ workout: Workout) async throws { let _ = workout }
+    func fetch(byId id: UUID) async throws -> Workout? {
+        let _ = id
+        return nil
+    }
+    func fetchInProgress() async throws -> Workout? { nil }
+    func fetchWorkouts(for dateRange: ClosedRange<Date>) async throws -> [Workout] {
+        let _ = dateRange
+        return []
+    }
+    func fetchAllWorkouts(limit: Int?, offset: Int?) async throws -> [Workout] {
+        let _ = limit
+        let _ = offset
+        return []
+    }
+    func fetchEarliestCompletedWorkoutDate() async throws -> Date? { nil }
+}
+
+private final class ImportBodyweightRepositoryStub: @unchecked Sendable, BodyweightEntryRepositoryProtocol {
+    func save(_ entry: BodyweightEntry) async throws { let _ = entry }
+    func delete(_ entry: BodyweightEntry) async throws { let _ = entry }
+    func fetchAll(for healthProfileId: UUID) async throws -> [BodyweightEntry] {
+        let _ = healthProfileId
+        return []
+    }
+    func fetch(byId id: UUID) async throws -> BodyweightEntry? {
+        let _ = id
+        return nil
+    }
+    func fetchClosest(to date: Date, healthProfileId: UUID) async throws -> BodyweightEntry? {
+        let _ = date
+        let _ = healthProfileId
+        return nil
+    }
 }
 
 // MARK: - Fatigue Model v2 Tests

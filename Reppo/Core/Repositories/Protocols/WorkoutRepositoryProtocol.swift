@@ -27,4 +27,8 @@ protocol WorkoutRepositoryProtocol: Sendable {
 
     /// Fetch all workouts with optional pagination.
     func fetchAllWorkouts(limit: Int?, offset: Int?) async throws -> [Workout]
+
+    /// Fetch the earliest completed workout date.
+    /// Used by Charts to avoid sending live Workout models across actors.
+    func fetchEarliestCompletedWorkoutDate() async throws -> Date?
 }

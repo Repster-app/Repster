@@ -15,7 +15,7 @@ final class HealthProfile {
     var defaultWarmupRestTimeSeconds: Int?
 
     /// Alert mode when rest timer finishes: "off", "vibration", "sound", or "both".
-    /// Default: "vibration".
+    /// Default: "both".
     var restTimerAlert: String?
 
     // MARK: - Smart Suggestions Settings (legacy field names for migration compatibility)

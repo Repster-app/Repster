@@ -35,10 +35,17 @@ protocol SetRepositoryProtocol: Sendable {
     /// Used by overview charts (weekly volume, muscle group distribution).
     func fetchSets(from startDate: Date, to endDate: Date) async throws -> [WorkoutSet]
 
+    /// Fetch chart-safe set snapshots within a date range.
+    /// Used by Charts to avoid crossing live SwiftData models between actors.
+    func fetchChartSets(from startDate: Date, to endDate: Date) async throws -> [ChartSetData]
+
     /// Fetch sets for a specific exercise within an optional date range.
     /// Used by exercise detail charts and sparkline data.
     /// If startDate is nil, fetches all history for the exercise.
     func fetchSets(exerciseId: UUID, from startDate: Date?, to endDate: Date) async throws -> [WorkoutSet]
+
+    /// Fetch chart-safe set snapshots for a specific exercise within an optional date range.
+    func fetchChartSets(exerciseId: UUID, from startDate: Date?, to endDate: Date) async throws -> [ChartSetData]
 
     // MARK: - Aggregation (FR-009)
 

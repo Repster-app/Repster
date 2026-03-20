@@ -52,8 +52,13 @@ actor ChartDataService: ChartDataServiceProtocol {
 
     /// Canonical filter for sets eligible for chart aggregation.
     /// Applied post-fetch since hasData is a computed property.
-    private nonisolated func chartEligibleSets(_ sets: [WorkoutSet]) -> [WorkoutSet] {
+    private nonisolated func chartEligibleSets(_ sets: [ChartSetData]) -> [ChartSetData] {
         sets.filter { $0.hasData && $0.setType != .warmup && $0.setType != .partial }
+    }
+
+    private func fetchExerciseLookup() async throws -> [UUID: ChartExerciseData] {
+        let exercises = try await exerciseRepository.fetchAllChartExercises()
+        return Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0) })
     }
 
     // MARK: - Breakdown Tab (016-charts-tab-v2 WP06, T113)
@@ -61,22 +66,15 @@ actor ChartDataService: ChartDataServiceProtocol {
     func fetchBreakdownData(metric: BreakdownMetric, timeRange: BreakdownTimeRange) async throws -> [BreakdownDataPoint] {
         let startDate = timeRange.startDate ?? Date.distantPast
         let endDate = Date()
-        let allSets = try await setRepository.fetchSets(from: startDate, to: endDate)
+        let allSets = try await setRepository.fetchChartSets(from: startDate, to: endDate)
         let eligible = chartEligibleSets(allSets)
 
         guard !eligible.isEmpty else { return [] }
 
-        // Build exercise cache to avoid N+1 queries
-        let exerciseIds = Swift.Set(eligible.map { $0.exerciseId })
-        var exerciseCache: [UUID: Exercise] = [:]
-        for id in exerciseIds {
-            if let ex = try await exerciseRepository.fetch(byId: id) {
-                exerciseCache[id] = ex
-            }
-        }
+        let exerciseCache = try await fetchExerciseLookup()
 
         // Group by category or exercise
-        var grouped: [String: [WorkoutSet]] = [:]
+        var grouped: [String: [ChartSetData]] = [:]
         for set in eligible {
             guard let exercise = exerciseCache[set.exerciseId] else { continue }
             let key: String
@@ -130,7 +128,7 @@ actor ChartDataService: ChartDataServiceProtocol {
     func fetchBreakdownSummary(timeRange: BreakdownTimeRange) async throws -> BreakdownSummary {
         let startDate = timeRange.startDate ?? Date.distantPast
         let endDate = Date()
-        let allSets = try await setRepository.fetchSets(from: startDate, to: endDate)
+        let allSets = try await setRepository.fetchChartSets(from: startDate, to: endDate)
         let eligible = chartEligibleSets(allSets)
 
         let totalVolume = eligible.reduce(0.0) { $0 + (($1.effectiveWeight ?? 0) * Double($1.reps ?? 0)) }
@@ -158,19 +156,15 @@ actor ChartDataService: ChartDataServiceProtocol {
         let endDate = Date()
 
         // 1. Fetch and filter sets
-        var allSets: [WorkoutSet]
+        var allSets: [ChartSetData]
         switch filter {
         case .all:
-            allSets = try await setRepository.fetchSets(from: startDate, to: endDate)
+            allSets = try await setRepository.fetchChartSets(from: startDate, to: endDate)
         case .exercise(let id, _):
-            allSets = try await setRepository.fetchSets(exerciseId: id, from: startDate, to: endDate)
+            allSets = try await setRepository.fetchChartSets(exerciseId: id, from: startDate, to: endDate)
         case .category(let categoryName):
-            allSets = try await setRepository.fetchSets(from: startDate, to: endDate)
-            let exerciseIds = Swift.Set(allSets.map { $0.exerciseId })
-            var cache: [UUID: Exercise] = [:]
-            for id in exerciseIds {
-                if let ex = try await exerciseRepository.fetch(byId: id) { cache[id] = ex }
-            }
+            allSets = try await setRepository.fetchChartSets(from: startDate, to: endDate)
+            let cache = try await fetchExerciseLookup()
             allSets = allSets.filter { set in
                 guard let ex = cache[set.exerciseId] else { return false }
                 return ex.primaryMuscle?.lowercased() == categoryName.lowercased()
@@ -200,7 +194,7 @@ actor ChartDataService: ChartDataServiceProtocol {
 
     // MARK: - Workouts Tab Helpers
 
-    private func computePerWorkout(eligible: [WorkoutSet], metric: WorkoutsMetric) -> [WorkoutsTimeSeriesPoint] {
+    private func computePerWorkout(eligible: [ChartSetData], metric: WorkoutsMetric) -> [WorkoutsTimeSeriesPoint] {
         let grouped = Dictionary(grouping: eligible) { $0.workoutId }
         var results: [WorkoutsTimeSeriesPoint] = []
 
@@ -214,7 +208,7 @@ actor ChartDataService: ChartDataServiceProtocol {
     }
 
     private func computePeriodic(
-        eligible: [WorkoutSet],
+        eligible: [ChartSetData],
         metric: WorkoutsMetric,
         calendar: Calendar,
         startDate: Date,
@@ -269,7 +263,7 @@ actor ChartDataService: ChartDataServiceProtocol {
         }
     }
 
-    private func computeWorkoutsMetric(_ metric: WorkoutsMetric, for sets: [WorkoutSet]) -> Double {
+    private func computeWorkoutsMetric(_ metric: WorkoutsMetric, for sets: [ChartSetData]) -> Double {
         switch metric {
         case .volume:
             return sets.reduce(0) { $0 + (($1.effectiveWeight ?? 0) * Double($1.reps ?? 0)) }
@@ -289,20 +283,20 @@ actor ChartDataService: ChartDataServiceProtocol {
     // MARK: - Filter Dropdown Data (WP07, T122)
 
     func fetchAvailableCategories() async throws -> [String] {
-        let allExercises = try await exerciseRepository.fetchAll()
+        let allExercises = try await exerciseRepository.fetchAllChartExercises()
         let categories = Swift.Set(allExercises.compactMap { $0.primaryMuscle?.lowercased() })
         return categories.sorted().map { $0.capitalized }
     }
 
     func fetchPerformedExercises() async throws -> [(id: UUID, name: String)] {
-        let allStats = try await exerciseStatsRepository.fetchAll()
-        let performed = allStats.filter { $0.lastPerformedDate != nil }
-        var result: [(id: UUID, name: String)] = []
-        for stat in performed {
-            if let exercise = try await exerciseRepository.fetch(byId: stat.exerciseId) {
-                result.append((id: exercise.id, name: exercise.name))
-            }
-        }
+        let exerciseLookup = try await fetchExerciseLookup()
+        let allStats = try await exerciseStatsRepository.fetchAllChartExerciseStats()
+        let performedIds = Swift.Set(
+            allStats.compactMap { $0.lastPerformedDate == nil ? nil : $0.exerciseId }
+        )
+        let result = exerciseLookup.values
+            .filter { performedIds.contains($0.id) }
+            .map { (id: $0.id, name: $0.name) }
         return result.sorted { $0.name < $1.name }
     }
 
@@ -315,18 +309,15 @@ actor ChartDataService: ChartDataServiceProtocol {
     ) async throws -> [ExerciseProgressSeries] {
         let startDate = timeRange.startDate
         let endDate = Date()
-        let palette = Color.chartPalette
+        let exerciseLookup = try await fetchExerciseLookup()
 
         return try await withThrowingTaskGroup(
             of: (Int, ExerciseProgressSeries?).self
         ) { group in
             for (index, exerciseId) in exerciseIds.enumerated() {
+                guard let exercise = exerciseLookup[exerciseId] else { continue }
                 group.addTask { [self] in
-                    guard let exercise = try await self.exerciseRepository.fetch(byId: exerciseId) else {
-                        return (index, nil)
-                    }
-
-                    let sets = try await self.setRepository.fetchSets(
+                    let sets = try await self.setRepository.fetchChartSets(
                         exerciseId: exerciseId, from: startDate, to: endDate
                     )
                     let eligible = self.chartEligibleSets(sets)
@@ -354,6 +345,7 @@ actor ChartDataService: ChartDataServiceProtocol {
                     points.sort { $0.date < $1.date }
                     guard !points.isEmpty else { return (index, nil) }
 
+                    let palette = Color.chartPalette
                     let color = palette[index % palette.count]
                     return (index, ExerciseProgressSeries(
                         id: exerciseId, name: exercise.name,
@@ -372,7 +364,7 @@ actor ChartDataService: ChartDataServiceProtocol {
 
     // MARK: - Exercise Metric Computation (WP08, T124)
 
-    private nonisolated func computeExerciseMetric(_ metric: ExerciseMetric, for sets: [WorkoutSet]) -> Double? {
+    private nonisolated func computeExerciseMetric(_ metric: ExerciseMetric, for sets: [ChartSetData]) -> Double? {
         switch metric {
         case .estimatedOneRM:
             return sets.compactMap { $0.e1RM }.filter { $0 > 0 }.max()
@@ -408,7 +400,7 @@ actor ChartDataService: ChartDataServiceProtocol {
 
     /// Find the "best" set for a given metric to extract display-friendly weight x reps.
     /// Returns the set that most likely contributed the metric value.
-    private nonisolated func bestSetForDisplay(metric: ExerciseMetric, sets: [WorkoutSet]) -> WorkoutSet? {
+    private nonisolated func bestSetForDisplay(metric: ExerciseMetric, sets: [ChartSetData]) -> ChartSetData? {
         switch metric {
         case .estimatedOneRM:
             return sets.max(by: { ($0.e1RM ?? 0) < ($1.e1RM ?? 0) })
@@ -433,7 +425,6 @@ actor ChartDataService: ChartDataServiceProtocol {
     // MARK: - Helpers
 
     func fetchEarliestWorkoutDate() async throws -> Date? {
-        let workouts = try await workoutRepository.fetchAllWorkouts(limit: nil, offset: nil)
-        return workouts.filter { $0.status == .completed }.map(\.date).min()
+        try await workoutRepository.fetchEarliestCompletedWorkoutDate()
     }
 }

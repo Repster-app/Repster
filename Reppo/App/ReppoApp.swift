@@ -1,6 +1,7 @@
 import ActivityKit
 import SwiftData
 import SwiftUI
+import UserNotifications
 
 @main
 struct ReppoApp: App {
@@ -26,6 +27,9 @@ struct ReppoApp: App {
             // Clean up any stale Live Activities from a previous app session
             // (e.g., user force-quit the app while a workout was active)
             LiveActivityManager().cleanupStaleActivities()
+
+            // Request notification permission for rest timer background alerts
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         } catch {
             fatalError("Failed to initialize ModelContainer: \(error)")
         }

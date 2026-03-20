@@ -60,7 +60,7 @@ struct ImportView: View {
                 .font(.title2.bold())
                 .foregroundStyle(Color.textPrimary)
 
-            Text("Select a CSV file from another training app to import your workout history.")
+            Text("Reppo currently supports FitNotes CSV exports only.")
                 .font(.body)
                 .foregroundStyle(Color.textSecondary)
                 .multilineTextAlignment(.center)
@@ -69,13 +69,16 @@ struct ImportView: View {
             Button {
                 viewModel.showFilePicker = true
             } label: {
-                Label("Select CSV File", systemImage: "doc.badge.plus")
+                Label("Select FitNotes CSV", systemImage: "doc.badge.plus")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
             }
             .buttonStyle(.borderedProminent)
             .padding(.horizontal, 32)
+
+            ImportSupportCallout()
+                .padding(.horizontal, 32)
 
             Spacer()
         }
@@ -307,6 +310,11 @@ struct ImportView: View {
                     .padding(.horizontal, 32)
             }
 
+            if viewModel.shouldShowSupportCTA {
+                ImportSupportCallout()
+                    .padding(.horizontal, 32)
+            }
+
             HStack(spacing: 16) {
                 Button("Cancel") {
                     dismiss()
@@ -355,5 +363,31 @@ struct ImportView: View {
         case "Kind": return "→ Exercise type"
         default: return "→ Unknown"
         }
+    }
+}
+
+struct ImportSupportCallout: View {
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text("Need support for another training app? Email \(SupportEmailComposer.address) and tell us which export you use.")
+                .font(.footnote)
+                .foregroundStyle(Color.textSecondary)
+                .multilineTextAlignment(.center)
+
+            Button {
+                guard let url = SupportEmailComposer.importSupportURL() else { return }
+                openURL(url)
+            } label: {
+                Label("Email \(SupportEmailComposer.address)", systemImage: "envelope")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding()
+        .background(Color.bgCard)
+        .cornerRadius(12)
     }
 }

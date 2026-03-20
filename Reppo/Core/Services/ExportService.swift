@@ -1,134 +1,384 @@
-// ExportService.swift
-// Generates CSV export of all workout data.
-// Spec: FR-001 through FR-009, SC-004 round-trip
-// Feature: 011-csv-import-export WP04 T017-T019
-
 import Foundation
+import SwiftData
 
-actor ExportService: ExportServiceProtocol {
+actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
 
     // MARK: - Dependencies
 
+    private let workoutRepo: any WorkoutRepositoryProtocol
     private let exerciseRepo: any ExerciseRepositoryProtocol
     private let setRepo: any SetRepositoryProtocol
-
-    // MARK: - Constants
-
-    private let header = "Date,Exercise,Category,Weight (kg),Weight (lbs),Reps,Distance,Distance Unit,Time,Notes,Kind"
-    private let kgToLbs = 2.20462
+    private let statsService: any StatsServiceProtocol
+    private let prService: any PRServiceProtocol
+    private let modelContainer: ModelContainer
 
     // MARK: - Init
 
     init(
+        workoutRepo: any WorkoutRepositoryProtocol,
         exerciseRepo: any ExerciseRepositoryProtocol,
-        setRepo: any SetRepositoryProtocol
+        setRepo: any SetRepositoryProtocol,
+        statsService: any StatsServiceProtocol,
+        prService: any PRServiceProtocol,
+        modelContainer: ModelContainer
     ) {
+        self.workoutRepo = workoutRepo
         self.exerciseRepo = exerciseRepo
         self.setRepo = setRepo
+        self.statsService = statsService
+        self.prService = prService
+        self.modelContainer = modelContainer
     }
 
-    // MARK: - ExportServiceProtocol
+    // MARK: - WorkoutHistoryBackupServiceProtocol
 
-    func exportCSV() async throws -> Data {
-        // Fetch all exercises and build lookup
-        let exercises = try await exerciseRepo.fetchAll()
-        let exerciseLookup = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0) })
-
-        // Fetch all sets using full date range
+    func exportBackup() async throws -> Data {
+        let workouts = try await sortedWorkouts()
         let allSets = try await setRepo.fetchSets(from: .distantPast, to: .distantFuture)
+        let exerciseIds = Set(allSets.map(\.exerciseId))
+        let exercises = try await exerciseRepo.fetchAll()
+            .filter { exerciseIds.contains($0.id) }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
 
-        // Sort by date ASC → orderInWorkout ASC
-        let sortedSets = allSets.sorted { a, b in
-            if a.date != b.date { return a.date < b.date }
-            return a.orderInWorkout < b.orderInWorkout
+        let workoutIndex = Dictionary(uniqueKeysWithValues: workouts.enumerated().map { ($0.element.id, $0.offset) })
+        let sortedSets = allSets.sorted { lhs, rhs in
+            let lhsWorkoutOrder = workoutIndex[lhs.workoutId] ?? .max
+            let rhsWorkoutOrder = workoutIndex[rhs.workoutId] ?? .max
+            if lhsWorkoutOrder != rhsWorkoutOrder { return lhsWorkoutOrder < rhsWorkoutOrder }
+            if lhs.orderInWorkout != rhs.orderInWorkout { return lhs.orderInWorkout < rhs.orderInWorkout }
+            return lhs.createdAt < rhs.createdAt
         }
 
-        // Build CSV
-        var csv = header + "\n"
+        let archive = WorkoutHistoryArchive(
+            version: WorkoutHistoryArchive.currentVersion,
+            exportedAt: Date(),
+            workouts: workouts.map(WorkoutHistoryArchiveWorkout.init),
+            exercises: exercises.map(WorkoutHistoryArchiveExercise.init),
+            sets: sortedSets.map(WorkoutHistoryArchiveSet.init)
+        )
 
-        // Date formatter: yyyy-MM-dd in UTC
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        dateFormatter.timeZone = TimeZone(identifier: "UTC")
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        return try encoder.encode(archive)
+    }
 
-        for set in sortedSets {
-            let exercise = exerciseLookup[set.exerciseId]
+    nonisolated func previewBackup(data: Data) throws -> WorkoutHistoryBackupPreview {
+        let archive = try decodeArchive(data)
+        let dates = archive.workouts.map(\.date).sorted()
 
-            let dateStr = dateFormatter.string(from: set.date)
-            let exerciseName = escapeCSVField(exercise?.name ?? "Unknown")
-            let category = escapeCSVField(exercise?.primaryMuscle ?? "")
+        return WorkoutHistoryBackupPreview(
+            archiveVersion: archive.version,
+            exportedAt: archive.exportedAt,
+            workoutCount: archive.workouts.count,
+            exerciseCount: archive.exercises.count,
+            setCount: archive.sets.count,
+            earliestWorkoutDate: dates.first,
+            latestWorkoutDate: dates.last
+        )
+    }
 
-            let weightKg: String
-            let weightLbs: String
-            if let w = set.weight {
-                weightKg = formatWeight(w)
-                weightLbs = formatWeight(w * kgToLbs)
+    func restoreBackup(data: Data) async throws -> WorkoutHistoryRestoreResult {
+        let archive = try decodeArchive(data)
+        try validateArchive(archive)
+
+        let start = Date()
+        let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
+
+        // Apply the replace-history mutation in a single save so restore is all-or-nothing.
+        let existingSets = try context.fetch(FetchDescriptor<WorkoutSet>())
+        for set in existingSets {
+            context.delete(set)
+        }
+
+        let existingWorkouts = try context.fetch(FetchDescriptor<Workout>())
+        for workout in existingWorkouts {
+            context.delete(workout)
+        }
+
+        let existingStats = try context.fetch(FetchDescriptor<ExerciseStats>())
+        for stats in existingStats {
+            context.delete(stats)
+        }
+
+        let existingRecords = try context.fetch(FetchDescriptor<PerformanceRecord>())
+        for record in existingRecords {
+            context.delete(record)
+        }
+
+        let fetchedExercises = try context.fetch(FetchDescriptor<Exercise>())
+        var exercisesById = Dictionary(uniqueKeysWithValues: fetchedExercises.map { ($0.id, $0) })
+
+        for archivedExercise in archive.exercises {
+            if let existing = exercisesById[archivedExercise.id] {
+                existing.applyArchive(archivedExercise)
             } else {
-                weightKg = ""
-                weightLbs = ""
+                let exercise = archivedExercise.makeModel()
+                context.insert(exercise)
+                exercisesById[exercise.id] = exercise
             }
-
-            let reps = set.reps.map { String($0) } ?? ""
-            let distance = set.distanceMeters.map { formatWeight($0) } ?? ""
-            let distanceUnit = set.distanceMeters != nil ? "m" : ""
-            let time = set.durationSeconds.map { String($0) } ?? ""
-            let notes = escapeCSVField(set.notes ?? "")
-            let kind = reverseKindMapping(exercise?.trackingType)
-
-            let row = [dateStr, exerciseName, category, weightKg, weightLbs,
-                        reps, distance, distanceUnit, time, notes, kind]
-            csv += row.joined(separator: ",") + "\n"
         }
 
-        guard let data = csv.data(using: .utf8) else {
-            throw ExportError.encodingFailed
+        let sortedWorkouts = archive.workouts.sorted {
+            if $0.date != $1.date { return $0.date < $1.date }
+            return $0.createdAt < $1.createdAt
         }
-        return data
+        for archivedWorkout in sortedWorkouts {
+            context.insert(archivedWorkout.makeModel())
+        }
+
+        let sortedSets = archive.sets.sorted {
+            if $0.date != $1.date { return $0.date < $1.date }
+            if $0.orderInWorkout != $1.orderInWorkout { return $0.orderInWorkout < $1.orderInWorkout }
+            return $0.createdAt < $1.createdAt
+        }
+        for archivedSet in sortedSets {
+            context.insert(archivedSet.makeModel())
+        }
+
+        try context.save()
+
+        try await statsService.rebuildAll()
+        try await prService.rebuildAll()
+
+        return WorkoutHistoryRestoreResult(
+            workoutsRestored: archive.workouts.count,
+            exercisesUpserted: archive.exercises.count,
+            setsRestored: archive.sets.count,
+            duration: Date().timeIntervalSince(start)
+        )
     }
 
-    // MARK: - Reverse Kind Mapping (T019)
+    // MARK: - Helpers
 
-    private func reverseKindMapping(_ trackingType: TrackingType?) -> String {
-        switch trackingType {
-        case .weightReps:         return "wr"
-        case .duration:           return "d"
-        case .weightDistance:     return "wd"
-        case .weightRepsDuration: return "wrd"
-        case .custom:             return "wr"
-        case nil:                 return "wr"
+    private func sortedWorkouts() async throws -> [Workout] {
+        let workouts = try await workoutRepo.fetchAllWorkouts(limit: nil, offset: nil)
+        return workouts.sorted {
+            if $0.date != $1.date { return $0.date < $1.date }
+            return $0.createdAt < $1.createdAt
         }
     }
 
-    // MARK: - CSV Helpers
+    private nonisolated func decodeArchive(_ data: Data) throws -> WorkoutHistoryArchive {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
 
-    private func escapeCSVField(_ field: String) -> String {
-        if field.contains(",") || field.contains("\"") || field.contains("\n") || field.contains("\r") {
-            let escaped = field.replacingOccurrences(of: "\"", with: "\"\"")
-            return "\"\(escaped)\""
+        let archive: WorkoutHistoryArchive
+        do {
+            archive = try decoder.decode(WorkoutHistoryArchive.self, from: data)
+        } catch {
+            throw WorkoutHistoryBackupError.decodingFailed(error.localizedDescription)
         }
-        return field
+
+        guard archive.version == WorkoutHistoryArchive.currentVersion else {
+            throw WorkoutHistoryBackupError.invalidArchiveVersion(archive.version)
+        }
+
+        return archive
     }
 
-    private func formatWeight(_ value: Double) -> String {
-        // Remove trailing zeros: 50.00 → "50", 50.50 → "50.5"
-        let formatted = String(format: "%.2f", value)
-        if formatted.hasSuffix(".00") {
-            return String(formatted.dropLast(3))
-        } else if formatted.hasSuffix("0") {
-            return String(formatted.dropLast())
+    private nonisolated func validateArchive(_ archive: WorkoutHistoryArchive) throws {
+        let workoutIds = Set(archive.workouts.map(\.id))
+        guard workoutIds.count == archive.workouts.count else {
+            throw WorkoutHistoryBackupError.invalidArchive("Duplicate workout IDs found.")
         }
-        return formatted
+
+        let exerciseIds = Set(archive.exercises.map(\.id))
+        guard exerciseIds.count == archive.exercises.count else {
+            throw WorkoutHistoryBackupError.invalidArchive("Duplicate exercise IDs found.")
+        }
+
+        let setIds = Set(archive.sets.map(\.id))
+        guard setIds.count == archive.sets.count else {
+            throw WorkoutHistoryBackupError.invalidArchive("Duplicate set IDs found.")
+        }
+
+        for set in archive.sets {
+            guard workoutIds.contains(set.workoutId) else {
+                throw WorkoutHistoryBackupError.invalidArchive("Set \(set.id) references a missing workout.")
+            }
+            guard exerciseIds.contains(set.exerciseId) else {
+                throw WorkoutHistoryBackupError.invalidArchive("Set \(set.id) references a missing exercise.")
+            }
+        }
     }
 }
 
-// MARK: - ExportError
+private extension WorkoutHistoryArchiveWorkout {
+    init(_ workout: Workout) {
+        self.init(
+            id: workout.id,
+            date: workout.date,
+            title: workout.title,
+            startTime: workout.startTime,
+            endTime: workout.endTime,
+            duration: workout.duration,
+            perceivedEffort: workout.perceivedEffort,
+            notes: workout.notes,
+            programId: workout.programId,
+            status: workout.status,
+            createdAt: workout.createdAt,
+            updatedAt: workout.updatedAt
+        )
+    }
 
-enum ExportError: Error, LocalizedError {
-    case encodingFailed
+    func makeModel() -> Workout {
+        Workout(
+            id: id,
+            date: date,
+            title: title,
+            startTime: startTime,
+            endTime: endTime,
+            duration: duration,
+            perceivedEffort: perceivedEffort,
+            notes: notes,
+            programId: programId,
+            status: status,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
 
-    var errorDescription: String? {
-        switch self {
-        case .encodingFailed: return "Failed to encode CSV data."
-        }
+private extension WorkoutHistoryArchiveExercise {
+    init(_ exercise: Exercise) {
+        self.init(
+            id: exercise.id,
+            name: exercise.name,
+            equipmentType: exercise.equipmentType,
+            trackingType: exercise.trackingType,
+            primaryMuscle: exercise.primaryMuscle,
+            secondaryMuscles: exercise.secondaryMuscles,
+            movementPattern: exercise.movementPattern,
+            unilateral: exercise.unilateral,
+            bilateralLoadFactor: exercise.bilateralLoadFactor,
+            bodyweightFactor: exercise.bodyweightFactor,
+            weightIncrement: exercise.weightIncrement,
+            defaultRestTime: exercise.defaultRestTime,
+            fatigueRate: exercise.fatigueRate,
+            recoveryConstant: exercise.recoveryConstant,
+            createdAt: exercise.createdAt,
+            updatedAt: exercise.updatedAt
+        )
+    }
+
+    func makeModel() -> Exercise {
+        Exercise(
+            id: id,
+            name: name,
+            equipmentType: equipmentType,
+            trackingType: trackingType,
+            primaryMuscle: primaryMuscle,
+            secondaryMuscles: secondaryMuscles,
+            movementPattern: movementPattern,
+            unilateral: unilateral,
+            bilateralLoadFactor: bilateralLoadFactor,
+            bodyweightFactor: bodyweightFactor,
+            weightIncrement: weightIncrement,
+            defaultRestTime: defaultRestTime,
+            fatigueRate: fatigueRate,
+            recoveryConstant: recoveryConstant,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+private extension Exercise {
+    func applyArchive(_ archive: WorkoutHistoryArchiveExercise) {
+        name = archive.name
+        equipmentType = archive.equipmentType
+        trackingType = archive.trackingType
+        primaryMuscle = archive.primaryMuscle
+        secondaryMuscles = archive.secondaryMuscles
+        movementPattern = archive.movementPattern
+        unilateral = archive.unilateral
+        bilateralLoadFactor = archive.bilateralLoadFactor
+        bodyweightFactor = archive.bodyweightFactor
+        weightIncrement = archive.weightIncrement
+        defaultRestTime = archive.defaultRestTime
+        fatigueRate = archive.fatigueRate
+        recoveryConstant = archive.recoveryConstant
+        createdAt = archive.createdAt
+        updatedAt = archive.updatedAt
+    }
+}
+
+private extension WorkoutHistoryArchiveSet {
+    init(_ set: WorkoutSet) {
+        self.init(
+            id: set.id,
+            workoutId: set.workoutId,
+            exerciseId: set.exerciseId,
+            date: set.date,
+            startedAt: set.startedAt,
+            completedAt: set.completedAt,
+            weight: set.weight,
+            effectiveWeight: set.effectiveWeight,
+            reps: set.reps,
+            durationSeconds: set.durationSeconds,
+            distanceMeters: set.distanceMeters,
+            e1RM: set.e1RM,
+            e1RMFormulaVersion: set.e1RMFormulaVersion,
+            rpe: set.rpe,
+            rir: set.rir,
+            setType: set.setType,
+            pauseDuration: set.pauseDuration,
+            side: set.side,
+            notes: set.notes,
+            orderInWorkout: set.orderInWorkout,
+            orderInExercise: set.orderInExercise,
+            supersetGroupId: set.supersetGroupId,
+            completed: set.completed,
+            excludeFromPRs: set.excludeFromPRs,
+            cachedPRStatus: set.cachedPRStatus,
+            targetWeight: set.targetWeight,
+            targetRepMin: set.targetRepMin,
+            targetRepMax: set.targetRepMax,
+            targetRPE: set.targetRPE,
+            targetRIR: set.targetRIR,
+            createdAt: set.createdAt,
+            updatedAt: set.updatedAt,
+            restDurationSeconds: set.restDurationSeconds
+        )
+    }
+
+    func makeModel() -> WorkoutSet {
+        WorkoutSet(
+            id: id,
+            workoutId: workoutId,
+            exerciseId: exerciseId,
+            date: date,
+            startedAt: startedAt,
+            completedAt: completedAt,
+            weight: weight,
+            effectiveWeight: effectiveWeight,
+            reps: reps,
+            durationSeconds: durationSeconds,
+            distanceMeters: distanceMeters,
+            e1RM: e1RM,
+            e1RMFormulaVersion: e1RMFormulaVersion,
+            rpe: rpe,
+            rir: rir,
+            setType: setType,
+            pauseDuration: pauseDuration,
+            side: side,
+            notes: notes,
+            orderInWorkout: orderInWorkout,
+            orderInExercise: orderInExercise,
+            supersetGroupId: supersetGroupId,
+            completed: completed,
+            excludeFromPRs: excludeFromPRs,
+            cachedPRStatus: cachedPRStatus,
+            targetWeight: targetWeight,
+            targetRepMin: targetRepMin,
+            targetRepMax: targetRepMax,
+            targetRPE: targetRPE,
+            targetRIR: targetRIR,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            restDurationSeconds: restDurationSeconds
+        )
     }
 }

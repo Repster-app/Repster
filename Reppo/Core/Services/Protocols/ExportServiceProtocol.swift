@@ -1,12 +1,121 @@
 import Foundation
 
-// MARK: - ExportServiceProtocol
+struct WorkoutHistoryBackupPreview: Sendable {
+    let archiveVersion: Int
+    let exportedAt: Date
+    let workoutCount: Int
+    let exerciseCount: Int
+    let setCount: Int
+    let earliestWorkoutDate: Date?
+    let latestWorkoutDate: Date?
+}
 
-protocol ExportServiceProtocol: Sendable {
+struct WorkoutHistoryRestoreResult: Sendable {
+    let workoutsRestored: Int
+    let exercisesUpserted: Int
+    let setsRestored: Int
+    let duration: TimeInterval
+}
 
-    // MARK: - Export
+enum WorkoutHistoryBackupError: Error, LocalizedError, Sendable {
+    case invalidArchiveVersion(Int)
+    case decodingFailed(String)
+    case invalidArchive(String)
 
-    /// Generate CSV data for all workouts, exercises, and sets.
-    /// Returns UTF-8 encoded CSV data ready for file sharing.
-    func exportCSV() async throws -> Data
+    var errorDescription: String? {
+        switch self {
+        case .invalidArchiveVersion(let version):
+            return "Unsupported backup version: \(version)."
+        case .decodingFailed(let message):
+            return "Failed to read backup file: \(message)"
+        case .invalidArchive(let message):
+            return "Invalid backup archive: \(message)"
+        }
+    }
+}
+
+struct WorkoutHistoryArchive: Codable, Sendable {
+    static let currentVersion = 1
+
+    let version: Int
+    let exportedAt: Date
+    let workouts: [WorkoutHistoryArchiveWorkout]
+    let exercises: [WorkoutHistoryArchiveExercise]
+    let sets: [WorkoutHistoryArchiveSet]
+}
+
+struct WorkoutHistoryArchiveWorkout: Codable, Sendable {
+    let id: UUID
+    let date: Date
+    let title: String?
+    let startTime: Date?
+    let endTime: Date?
+    let duration: Int?
+    let perceivedEffort: Double?
+    let notes: String?
+    let programId: UUID?
+    let status: WorkoutStatus
+    let createdAt: Date
+    let updatedAt: Date
+}
+
+struct WorkoutHistoryArchiveExercise: Codable, Sendable {
+    let id: UUID
+    let name: String
+    let equipmentType: EquipmentType
+    let trackingType: TrackingType
+    let primaryMuscle: String?
+    let secondaryMuscles: [String]
+    let movementPattern: MovementPattern?
+    let unilateral: Bool
+    let bilateralLoadFactor: Double?
+    let bodyweightFactor: Double
+    let weightIncrement: Double?
+    let defaultRestTime: Int?
+    let fatigueRate: Double?
+    let recoveryConstant: Double?
+    let createdAt: Date
+    let updatedAt: Date
+}
+
+struct WorkoutHistoryArchiveSet: Codable, Sendable {
+    let id: UUID
+    let workoutId: UUID
+    let exerciseId: UUID
+    let date: Date
+    let startedAt: Date?
+    let completedAt: Date?
+    let weight: Double?
+    let effectiveWeight: Double?
+    let reps: Int?
+    let durationSeconds: Int?
+    let distanceMeters: Double?
+    let e1RM: Double?
+    let e1RMFormulaVersion: String?
+    let rpe: Double?
+    let rir: Double?
+    let setType: SetType
+    let pauseDuration: Int?
+    let side: Side?
+    let notes: String?
+    let orderInWorkout: Int
+    let orderInExercise: Int
+    let supersetGroupId: UUID?
+    let completed: Bool
+    let excludeFromPRs: Bool?
+    let cachedPRStatus: CachedPRStatus?
+    let targetWeight: Double?
+    let targetRepMin: Int?
+    let targetRepMax: Int?
+    let targetRPE: Double?
+    let targetRIR: Int?
+    let createdAt: Date
+    let updatedAt: Date
+    let restDurationSeconds: Int?
+}
+
+protocol WorkoutHistoryBackupServiceProtocol: Sendable {
+    func exportBackup() async throws -> Data
+    func previewBackup(data: Data) throws -> WorkoutHistoryBackupPreview
+    func restoreBackup(data: Data) async throws -> WorkoutHistoryRestoreResult
 }

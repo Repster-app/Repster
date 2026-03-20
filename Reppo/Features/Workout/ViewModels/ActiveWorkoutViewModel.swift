@@ -10,6 +10,7 @@ import ActivityKit
 import AudioToolbox
 import Combine
 import Foundation
+import UserNotifications
 import SwiftUI
 
 // MARK: - Workout Summary Types (T031)
@@ -89,7 +90,7 @@ final class ActiveWorkoutViewModel {
     private var globalDefaultWarmupRestTime: Int?
 
     /// Rest timer alert mode: "off", "vibration", "sound", or "both".
-    private var restTimerAlertMode: String = "vibration"
+    private var restTimerAlertMode: String = "both"
 
     /// Sets grouped by exerciseId.
     var setsByExercise: [UUID: [WorkoutSet]] = [:]
@@ -274,7 +275,7 @@ final class ActiveWorkoutViewModel {
             if let profile = try? await settingsService.fetchSettings() {
                 self.globalDefaultRestTime = profile.defaultRestTimeSeconds ?? 150
                 self.globalDefaultWarmupRestTime = profile.defaultWarmupRestTimeSeconds
-                self.restTimerAlertMode = profile.restTimerAlert ?? "vibration"
+                self.restTimerAlertMode = profile.restTimerAlert ?? "both"
             }
 
             // 8. Restore persisted rest timer (survives view dismissal)
@@ -665,6 +666,9 @@ final class ActiveWorkoutViewModel {
                 }
             }
 
+        // Schedule local notification for background alert
+        scheduleRestTimerNotification(seconds: duration)
+
         // Update Live Activity (timer started with new end date)
         updateLiveActivityState()
     }
@@ -677,6 +681,9 @@ final class ActiveWorkoutViewModel {
         timerTotalDuration = newTotal
         restTimer = .running(remaining: newRemaining, total: newTotal)
 
+        // Re-schedule background notification with updated remaining time
+        scheduleRestTimerNotification(seconds: newRemaining)
+
         // Update Live Activity (timer end date changed)
         updateLiveActivityState()
     }
@@ -688,6 +695,9 @@ final class ActiveWorkoutViewModel {
         let newTotal = max(1, total - seconds)
         timerTotalDuration = newTotal
         restTimer = .running(remaining: newRemaining, total: newTotal)
+
+        // Re-schedule background notification with updated remaining time
+        scheduleRestTimerNotification(seconds: newRemaining)
 
         // Update Live Activity (timer end date changed)
         updateLiveActivityState()
@@ -710,6 +720,9 @@ final class ActiveWorkoutViewModel {
         UserDefaults.standard.removeObject(forKey: "restTimerStartDate")
         UserDefaults.standard.removeObject(forKey: "restTimerTotalDuration")
 
+        // Cancel background notification
+        cancelRestTimerNotification()
+
         // Update Live Activity (timer dismissed)
         updateLiveActivityState()
     }
@@ -730,7 +743,9 @@ final class ActiveWorkoutViewModel {
             timerSubscription?.cancel()
             timerSubscription = nil
             captureRestDurationOnLastCompletedSet()
-            fireTimerAlert()
+            // Don't fire the in-app alert here — the background notification
+            // already alerted the user while the app was suspended.
+            cancelRestTimerNotification()
         } else {
             restTimer = .running(remaining: remaining, total: timerTotalDuration)
         }
@@ -781,6 +796,34 @@ final class ActiveWorkoutViewModel {
         if mode == "sound" || mode == "both" {
             AudioServicesPlaySystemSound(1007)
         }
+        cancelRestTimerNotification()
+    }
+
+    // MARK: - Local Notification for Background Timer
+
+    private static let restTimerNotificationId = "restTimerComplete"
+
+    /// Schedule a local notification to fire when the rest timer expires.
+    /// This ensures the user is alerted even when the app is backgrounded.
+    private func scheduleRestTimerNotification(seconds: Int) {
+        guard restTimerAlertMode != "off" else { return }
+
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [Self.restTimerNotificationId])
+
+        let content = UNMutableNotificationContent()
+        content.title = "Rest Timer"
+        content.body = "Rest period is over — time for your next set!"
+        content.sound = (restTimerAlertMode == "vibration") ? nil : .default
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, TimeInterval(seconds)), repeats: false)
+        let request = UNNotificationRequest(identifier: Self.restTimerNotificationId, content: content, trigger: trigger)
+        center.add(request)
+    }
+
+    /// Cancel any pending rest timer notification (e.g. timer dismissed or completed in foreground).
+    private func cancelRestTimerNotification() {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [Self.restTimerNotificationId])
     }
 
     // MARK: - Live Activity Updates

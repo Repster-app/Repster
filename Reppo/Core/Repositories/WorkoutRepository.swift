@@ -56,4 +56,12 @@ actor WorkoutRepository: WorkoutRepositoryProtocol {
         if let offset { descriptor.fetchOffset = offset }
         return try modelContext.fetch(descriptor)
     }
+
+    func fetchEarliestCompletedWorkoutDate() throws -> Date? {
+        let descriptor = FetchDescriptor<Workout>(
+            sortBy: [SortDescriptor(\.date, order: .forward)]
+        )
+        let workouts = try modelContext.fetch(descriptor)
+        return workouts.first { $0.status == .completed }?.date
+    }
 }

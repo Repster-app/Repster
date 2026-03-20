@@ -15,6 +15,8 @@
 		0823BFAE2F5D62E500A513BE /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0823BFAC2F5D62E500A513BE /* WorkoutActivityAttributes.swift */; };
 		TT0001 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */; };
 		TT0002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = TT2003 /* XCTest.framework */; };
+		TT0003 /* ChartDataServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2004 /* ChartDataServiceTests.swift */; };
+		TT0004 /* WorkoutHistoryBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2005 /* WorkoutHistoryBackupTests.swift */; };
 		A10001 /* TrackingType.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001 /* TrackingType.swift */; };
 		A10002 /* SetType.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002 /* SetType.swift */; };
 		A10003 /* EquipmentType.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10003 /* EquipmentType.swift */; };
@@ -120,6 +122,7 @@
 		AH0011 /* CalendarWorkoutDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BH0011 /* CalendarWorkoutDetailView.swift */; };
 		AI0001 /* ChartModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BI0001 /* ChartModels.swift */; };
 		AI0002 /* ChartDataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BI0002 /* ChartDataService.swift */; };
+		AI0003 /* ChartSetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BI0003 /* ChartSetData.swift */; };
 		AIM001 /* ImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BIM001 /* ImportService.swift */; };
 		AJ0001 /* E1RMFormula.swift in Sources */ = {isa = PBXBuildFile; fileRef = BJ0001 /* E1RMFormula.swift */; };
 		AJ0002 /* SettingsServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = BJ0002 /* SettingsServiceProtocol.swift */; };
@@ -245,6 +248,8 @@
 		TT2001 /* ReppoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ReppoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutViewModelSuggestionRefreshTests.swift; sourceTree = "<group>"; };
 		TT2003 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
+		TT2004 /* ChartDataServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartDataServiceTests.swift; sourceTree = "<group>"; };
+		TT2005 /* WorkoutHistoryBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutHistoryBackupTests.swift; sourceTree = "<group>"; };
 		B10001 /* TrackingType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingType.swift; sourceTree = "<group>"; };
 		B10002 /* SetType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetType.swift; sourceTree = "<group>"; };
 		B10003 /* EquipmentType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentType.swift; sourceTree = "<group>"; };
@@ -257,6 +262,7 @@
 		B10010 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B10011 /* ReppoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReppoApp.swift; sourceTree = "<group>"; };
 		B10012 /* seed_exercises.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = seed_exercises.json; sourceTree = "<group>"; };
+		B10013 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B20001 /* WorkoutSet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSet.swift; sourceTree = "<group>"; };
 		B20002 /* Workout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workout.swift; sourceTree = "<group>"; };
 		B20003 /* Exercise.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Exercise.swift; sourceTree = "<group>"; };
@@ -351,6 +357,7 @@
 		BH0011 /* CalendarWorkoutDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarWorkoutDetailView.swift; sourceTree = "<group>"; };
 		BI0001 /* ChartModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartModels.swift; sourceTree = "<group>"; };
 		BI0002 /* ChartDataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartDataService.swift; sourceTree = "<group>"; };
+		BI0003 /* ChartSetData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartSetData.swift; sourceTree = "<group>"; };
 		BIM001 /* ImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportService.swift; sourceTree = "<group>"; };
 		BJ0001 /* E1RMFormula.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E1RMFormula.swift; sourceTree = "<group>"; };
 		BJ0002 /* SettingsServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsServiceProtocol.swift; sourceTree = "<group>"; };
@@ -503,6 +510,8 @@
 			isa = PBXGroup;
 			children = (
 				TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */,
+				TT2004 /* ChartDataServiceTests.swift */,
+				TT2005 /* WorkoutHistoryBackupTests.swift */,
 			);
 			path = ReppoTests;
 			sourceTree = "<group>";
@@ -511,6 +520,7 @@
 			isa = PBXGroup;
 			children = (
 				D10002 /* App */,
+				B10013 /* Info.plist */,
 				D10003 /* Features */,
 				D10004 /* Core */,
 				D10005 /* Data */,
@@ -913,6 +923,7 @@
 				B80005 /* WorkoutService.swift */,
 				B80006 /* ExerciseService.swift */,
 				BI0002 /* ChartDataService.swift */,
+				BI0003 /* ChartSetData.swift */,
 				BJ0003 /* SettingsService.swift */,
 				BW0001 /* LoadPrescriptionService.swift */,
 				BIM001 /* ImportService.swift */,
@@ -1427,6 +1438,7 @@
 				ZA0019 /* ChartPreset.swift in Sources */,
 				ZA0020 /* ExerciseSelectionSheet.swift in Sources */,
 				ZA0021 /* StartWorkoutSheet.swift in Sources */,
+				AI0003 /* ChartSetData.swift in Sources */,
 				AI0002 /* ChartDataService.swift in Sources */,
 				AJ0001 /* E1RMFormula.swift in Sources */,
 				AJ0002 /* SettingsServiceProtocol.swift in Sources */,
@@ -1495,6 +1507,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				TT0001 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift in Sources */,
+				TT0003 /* ChartDataServiceTests.swift in Sources */,
+				TT0004 /* WorkoutHistoryBackupTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1706,14 +1720,8 @@
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Reppo;
-				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Reppo/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1739,14 +1747,8 @@
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Reppo;
-				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Reppo/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

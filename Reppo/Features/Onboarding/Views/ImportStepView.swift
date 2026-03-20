@@ -61,7 +61,7 @@ struct ImportStepView: View {
                     .fontWeight(.bold)
                     .foregroundStyle(Color.textPrimary)
 
-                Text("Import your workout history from a CSV file, or start fresh.")
+                Text("Reppo currently supports FitNotes CSV exports only. You can also start fresh.")
                     .font(.subheadline)
                     .foregroundStyle(Color.textSecondary)
                     .multilineTextAlignment(.center)
@@ -71,13 +71,16 @@ struct ImportStepView: View {
             Button {
                 viewModel.showFilePicker = true
             } label: {
-                Label("Select CSV File", systemImage: "doc.badge.plus")
+                Label("Select FitNotes CSV", systemImage: "doc.badge.plus")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
             }
             .buttonStyle(.borderedProminent)
             .padding(.horizontal, 32)
+
+            ImportSupportCallout()
+                .padding(.horizontal, 32)
 
             Spacer()
 
@@ -224,6 +227,11 @@ struct ImportStepView: View {
                     .font(.body)
                     .foregroundStyle(Color.textSecondary)
                     .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+            }
+
+            if viewModel.shouldShowSupportCTA {
+                ImportSupportCallout()
                     .padding(.horizontal, 32)
             }
 

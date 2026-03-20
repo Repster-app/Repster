@@ -43,8 +43,8 @@ enum ImportError: Error, LocalizedError, Sendable {
             return "Failed to read file: \(msg)"
         case .invalidEncoding:
             return "Unable to read file. Please ensure it is UTF-8 encoded."
-        case .invalidHeader(let expected, let got):
-            return "CSV header mismatch. Expected \(expected.count) columns, found \(got.count)."
+        case .invalidHeader:
+            return "This CSV doesn't look like a FitNotes export. Reppo currently supports FitNotes CSV imports only."
         case .noValidRows:
             return "No valid data rows found in the CSV file."
         case .insertFailed(let msg):

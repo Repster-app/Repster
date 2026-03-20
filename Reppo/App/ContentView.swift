@@ -147,7 +147,7 @@ struct ContentView: View {
                     settingsService: services.settingsService,
                     bodyweightService: services.bodyweightService,
                     importService: services.importService,
-                    exportService: services.exportService
+                    workoutHistoryBackupService: services.workoutHistoryBackupService
                 )
                     .tabItem {
                         Label("Settings", systemImage: "gearshape")

@@ -16,7 +16,7 @@ actor ImportService: ImportServiceProtocol {
     // MARK: - Constants
 
     private let batchSize = 500
-    private let expectedHeaders = [
+    private static let fitNotesHeaders = [
         "Date", "Exercise", "Category", "Weight (kg)", "Weight (lbs)",
         "Reps", "Distance", "Distance Unit", "Time", "Notes", "Kind"
     ]
@@ -44,7 +44,9 @@ actor ImportService: ImportServiceProtocol {
     // MARK: - ImportServiceProtocol
 
     nonisolated func previewCSV(data: Data) throws -> CSVParser.PreviewResult {
-        try CSVParser.parsePreview(data: data)
+        let preview = try CSVParser.parsePreview(data: data)
+        try Self.validateHeader(preview.headers)
+        return preview
     }
 
     nonisolated func importCSV(data: Data) -> AsyncStream<ImportProgress> {
@@ -72,14 +74,14 @@ actor ImportService: ImportServiceProtocol {
 
     // MARK: - Header Validation
 
-    private func validateHeader(_ headers: [String]) throws {
+    private static func validateHeader(_ headers: [String]) throws {
         let normalized = headers.map { $0.trimmingCharacters(in: .whitespaces) }
-        guard normalized.count == expectedHeaders.count else {
-            throw ImportError.invalidHeader(expected: expectedHeaders, got: normalized)
+        guard normalized.count == fitNotesHeaders.count else {
+            throw ImportError.invalidHeader(expected: fitNotesHeaders, got: normalized)
         }
-        for (expected, actual) in zip(expectedHeaders, normalized) {
+        for (expected, actual) in zip(fitNotesHeaders, normalized) {
             guard expected.lowercased() == actual.lowercased() else {
-                throw ImportError.invalidHeader(expected: expectedHeaders, got: normalized)
+                throw ImportError.invalidHeader(expected: fitNotesHeaders, got: normalized)
             }
         }
     }
@@ -87,8 +89,8 @@ actor ImportService: ImportServiceProtocol {
     // MARK: - Row Validation
 
     private func validateRow(_ fields: [String], rowNumber: Int) -> Result<ValidatedRow, CSVParser.ValidationError> {
-        guard fields.count == expectedHeaders.count else {
-            return .failure(.init(rowNumber: rowNumber, reason: "Expected \(expectedHeaders.count) columns, found \(fields.count)"))
+        guard fields.count == Self.fitNotesHeaders.count else {
+            return .failure(.init(rowNumber: rowNumber, reason: "Expected \(Self.fitNotesHeaders.count) columns, found \(fields.count)"))
         }
 
         // Column 0: Date (REQUIRED)
@@ -212,7 +214,7 @@ actor ImportService: ImportServiceProtocol {
             // Phase 1: Parse
             continuation.yield(.parsing)
             let parseResult = try CSVParser.parse(data: data)
-            try validateHeader(parseResult.headers)
+            try Self.validateHeader(parseResult.headers)
 
             // Phase 2: Validate rows
             var validRows: [ValidatedRow] = []

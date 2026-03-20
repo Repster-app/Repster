@@ -6,7 +6,7 @@ import Foundation
 /// SettingsService does NOT:
 /// - Own PR logic (delegates to PRService)
 /// - Own stats logic (delegates to StatsService)
-/// - Access ModelContext directly (uses HealthProfileRepository)
+/// - Own view/UI state
 protocol SettingsServiceProtocol: Sendable {
 
     // MARK: - Read
@@ -33,6 +33,10 @@ protocol SettingsServiceProtocol: Sendable {
     func updatePrescriptionFreshnessBonus(enabled: Bool, percent: Double) async throws
     func updatePrescriptionFatigueModelingEnabled(_ enabled: Bool) async throws
     func updatePrescriptionDefaultRecoveryConstant(_ seconds: Double) async throws
+
+    // MARK: - Data Reset
+
+    func resetAllAppData() async throws
 
     // MARK: - Rebuild Operations
 
