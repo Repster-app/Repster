@@ -33,7 +33,8 @@ final class ServiceContainer {
             exerciseStatsRepository: repositoryContainer.exerciseStatsRepository,
             setRepository: repositoryContainer.setRepository,
             exerciseRepository: repositoryContainer.exerciseRepository,
-            healthProfileRepository: repositoryContainer.healthProfileRepository
+            healthProfileRepository: repositoryContainer.healthProfileRepository,
+            performanceRecordRepository: repositoryContainer.performanceRecordRepository
         )
 
         // 2. PRService — depends on repos only

@@ -18,6 +18,9 @@ struct RestTimerView: View {
     /// Current timer state from the ViewModel.
     let state: RestTimerState
 
+    /// Layout mode for the timer while the set-entry keyboard is active or hidden.
+    let presentationMode: RestTimerPresentationMode
+
     /// Called when the user taps a positive time adjustment (+15s, +30s).
     let onAddTime: (Int) -> Void
 
@@ -45,7 +48,11 @@ struct RestTimerView: View {
             timerContent(remaining: remaining, total: total)
 
         case .finished:
-            finishedContent
+            if presentationMode == .compact {
+                EmptyView()
+            } else {
+                finishedContent
+            }
         }
     }
 
@@ -53,62 +60,33 @@ struct RestTimerView: View {
 
     /// Countdown display with progress ring, time, adjustment buttons, and dismiss.
     private func timerContent(remaining: Int, total: Int) -> some View {
-        VStack(spacing: 8) {
-            // Main timer row
-            HStack(spacing: 16) {
-                // Progress ring
-                ZStack {
-                    Circle()
-                        .stroke(Color.bgSubtle, lineWidth: 4)
-                        .frame(width: 44, height: 44)
-                    Circle()
-                        .trim(from: 0, to: total > 0 ? CGFloat(remaining) / CGFloat(total) : 0)
-                        .stroke(Color.accent, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                        .frame(width: 44, height: 44)
-                        .rotationEffect(.degrees(-90))
-                        .animation(.linear(duration: 1), value: remaining)
+        VStack(spacing: presentationMode == .full ? 8 : 0) {
+            timerHeader(remaining: remaining, total: total)
+
+            if presentationMode == .full {
+                HStack(spacing: 6) {
+                    timerAdjustButton("-30s") { onSubtractTime(30) }
+                    timerAdjustButton("-15s") { onSubtractTime(15) }
+                    timerAdjustButton("+15s") { onAddTime(15) }
+                    timerAdjustButton("+30s") { onAddTime(30) }
+
+                    Button {
+                        exactTimeText = "\(remaining)"
+                        showTimeEditor = true
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.textSecondary)
+                            .frame(width: 36, height: 32)
+                            .background(Color.bgSubtle)
+                            .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
                 }
-
-                // Time remaining
-                Text(formatTime(remaining))
-                    .font(.system(size: 24, weight: .bold, design: .monospaced))
-                    .foregroundColor(.textPrimary)
-
-                Spacer()
-
-                // Dismiss button
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.textTertiary)
-                        .frame(width: 36, height: 36)
-                }
-            }
-
-            // Time adjustment buttons row
-            HStack(spacing: 6) {
-                timerAdjustButton("-30s") { onSubtractTime(30) }
-                timerAdjustButton("-15s") { onSubtractTime(15) }
-                timerAdjustButton("+15s") { onAddTime(15) }
-                timerAdjustButton("+30s") { onAddTime(30) }
-
-                // Edit exact time button
-                Button {
-                    exactTimeText = "\(remaining)"
-                    showTimeEditor = true
-                } label: {
-                    Image(systemName: "pencil")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.textSecondary)
-                        .frame(width: 36, height: 32)
-                        .background(Color.bgSubtle)
-                        .cornerRadius(8)
-                }
-                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.vertical, presentationMode == .full ? 12 : 10)
         .background(Color.bgCard)
         .alert("Set Rest Time", isPresented: $showTimeEditor) {
             TextField("Seconds", text: $exactTimeText)
@@ -121,6 +99,35 @@ struct RestTimerView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Enter rest time in seconds")
+        }
+    }
+
+    private func timerHeader(remaining: Int, total: Int) -> some View {
+        HStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .stroke(Color.bgSubtle, lineWidth: 4)
+                    .frame(width: 44, height: 44)
+                Circle()
+                    .trim(from: 0, to: total > 0 ? CGFloat(remaining) / CGFloat(total) : 0)
+                    .stroke(Color.accent, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .frame(width: 44, height: 44)
+                    .rotationEffect(.degrees(-90))
+                    .animation(.linear(duration: 1), value: remaining)
+            }
+
+            Text(formatTime(remaining))
+                .font(.system(size: 24, weight: .bold, design: .monospaced))
+                .foregroundColor(.textPrimary)
+
+            Spacer()
+
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.textTertiary)
+                    .frame(width: 36, height: 36)
+            }
         }
     }
 
@@ -178,6 +185,7 @@ struct RestTimerView: View {
             Spacer()
             RestTimerView(
                 state: .running(remaining: 90, total: 120),
+                presentationMode: .full,
                 onAddTime: { _ in },
                 onSubtractTime: { _ in },
                 onSetDuration: { _ in },
@@ -194,6 +202,7 @@ struct RestTimerView: View {
             Spacer()
             RestTimerView(
                 state: .running(remaining: 5, total: 90),
+                presentationMode: .full,
                 onAddTime: { _ in },
                 onSubtractTime: { _ in },
                 onSetDuration: { _ in },
@@ -210,6 +219,7 @@ struct RestTimerView: View {
             Spacer()
             RestTimerView(
                 state: .finished,
+                presentationMode: .full,
                 onAddTime: { _ in },
                 onSubtractTime: { _ in },
                 onSetDuration: { _ in },

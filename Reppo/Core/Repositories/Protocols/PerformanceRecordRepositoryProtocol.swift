@@ -32,6 +32,12 @@ protocol PerformanceRecordRepositoryProtocol: Sendable {
     /// Used for displaying rep-max table or e1RM history.
     func fetchAll(for exerciseId: UUID, recordType: RecordType) async throws -> [PerformanceRecord]
 
+    // MARK: - Recent PRs
+
+    /// Fetch recent repMax PerformanceRecords across all exercises since a given date,
+    /// sorted by date descending. Used by Home screen Recent PRs card.
+    func fetchRecentRepMaxRecords(since: Date) async throws -> [PerformanceRecord]
+
     // MARK: - Cascade Deletion (FR-011)
 
     /// Delete all PerformanceRecords for an exercise.

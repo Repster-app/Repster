@@ -101,10 +101,30 @@ struct CreateEditExerciseSheet: View {
 
     private var musclesSection: some View {
         Section("Muscles") {
-            TextField("Primary Muscle", text: $viewModel.primaryMuscle)
-
-            TextField("Secondary Muscles (comma-separated)",
-                      text: secondaryMusclesBinding)
+            Menu {
+                ForEach(viewModel.primaryMuscleOptions, id: \.self) { muscle in
+                    Button {
+                        viewModel.primaryMuscle = muscle
+                    } label: {
+                        if viewModel.primaryMuscle == muscle {
+                            Label(ExercisePrimaryGroup.displayName(for: muscle), systemImage: "checkmark")
+                        } else {
+                            Text(ExercisePrimaryGroup.displayName(for: muscle))
+                        }
+                    }
+                }
+            } label: {
+                HStack {
+                    Text("Primary Muscle")
+                    Spacer()
+                    Text(viewModel.primaryMuscleDisplayName)
+                        .foregroundStyle(
+                            viewModel.primaryMuscle.isEmpty
+                            ? Color.textTertiary
+                            : Color.textSecondary
+                        )
+                }
+            }
 
             Picker("Movement Pattern", selection: $viewModel.movementPattern) {
                 Text("None").tag(Optional<MovementPattern>.none)
@@ -164,19 +184,5 @@ struct CreateEditExerciseSheet: View {
             .font(.caption)
             .foregroundStyle(Color.textTertiary)
         }
-    }
-
-    // MARK: - Bindings
-
-    private var secondaryMusclesBinding: Binding<String> {
-        Binding(
-            get: { viewModel.secondaryMuscles.joined(separator: ", ") },
-            set: { newValue in
-                viewModel.secondaryMuscles = newValue
-                    .split(separator: ",")
-                    .map { $0.trimmingCharacters(in: .whitespaces) }
-                    .filter { !$0.isEmpty }
-            }
-        )
     }
 }

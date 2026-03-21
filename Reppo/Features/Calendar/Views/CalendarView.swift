@@ -14,12 +14,14 @@ struct CalendarView: View {
     @State private var workoutToSaveAsTemplate: Workout? = nil
     @State private var saveAsTemplateController = SaveWorkoutAsTemplateController()
     @State private var templateFeedback: TemplateSaveFeedback? = nil
+    @Binding var initialDate: Date?
 
     init(
         workoutService: WorkoutServiceProtocol,
         setService: SetServiceProtocol,
         exerciseService: ExerciseServiceProtocol,
-        statsService: StatsServiceProtocol
+        statsService: StatsServiceProtocol,
+        initialDate: Binding<Date?> = .constant(nil)
     ) {
         _viewModel = State(initialValue: CalendarViewModel(
             workoutService: workoutService,
@@ -27,6 +29,7 @@ struct CalendarView: View {
             exerciseService: exerciseService,
             statsService: statsService
         ))
+        _initialDate = initialDate
     }
 
     // MARK: - Month Array
@@ -102,6 +105,27 @@ struct CalendarView: View {
             }
             .task {
                 await viewModel.loadAllDots()
+                // Navigate to initial date if provided (e.g. from week strip tap)
+                if let date = initialDate {
+                    initialDate = nil
+                    let calendar = Calendar.current
+                    let targetMonth = calendar.startOfMonth(for: date)
+                    if targetMonth != viewModel.currentMonth {
+                        viewModel.currentMonth = targetMonth
+                    }
+                    await viewModel.selectDate(date)
+                }
+            }
+            .onChange(of: initialDate) { _, newDate in
+                if let date = newDate {
+                    initialDate = nil
+                    let calendar = Calendar.current
+                    let targetMonth = calendar.startOfMonth(for: date)
+                    if targetMonth != viewModel.currentMonth {
+                        viewModel.currentMonth = targetMonth
+                    }
+                    Task { await viewModel.selectDate(date) }
+                }
             }
             .saveWorkoutAsTemplatePrompt(
                 controller: saveAsTemplateController,

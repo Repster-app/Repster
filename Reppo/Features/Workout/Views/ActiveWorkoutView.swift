@@ -9,6 +9,27 @@
 
 import SwiftUI
 
+enum RestTimerPresentationMode: Equatable {
+    case full
+    case compact
+}
+
+enum ActiveWorkoutBottomAccessoryLayout {
+    static func timerPresentationMode(
+        for state: RestTimerState,
+        isKeyboardVisible: Bool
+    ) -> RestTimerPresentationMode? {
+        switch state {
+        case .idle:
+            return nil
+        case .running:
+            return isKeyboardVisible ? .compact : .full
+        case .finished:
+            return isKeyboardVisible ? nil : .full
+        }
+    }
+}
+
 /// The active workout screen — a focused full-screen experience for logging sets.
 ///
 /// Layout (top to bottom):
@@ -82,24 +103,12 @@ struct ActiveWorkoutView: View {
             }
 
             Spacer(minLength: 0)
-
-            // Rest timer bar (WP06 T030)
-            if viewModel.restTimer != .idle {
-                RestTimerView(
-                    state: viewModel.restTimer,
-                    onAddTime: { viewModel.addTime($0) },
-                    onSubtractTime: { viewModel.subtractTime($0) },
-                    onSetDuration: { viewModel.setTimerDuration($0) },
-                    onDismiss: { viewModel.dismissTimer() }
-                )
-            }
         }
         .background(Color.bg.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if selectedSubTab == .sets {
-                SetEntryKeyboardOverlay(manager: setKeyboardManager)
-            }
+            bottomAccessoryArea
         }
+        .animation(.easeInOut(duration: 0.2), value: bottomAccessoryAnimationKey)
         .task {
             await viewModel.loadActiveWorkout()
         }
@@ -194,20 +203,10 @@ struct ActiveWorkoutView: View {
                 )
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
-
-                // Exercise Info section (FR-001, 014 WP03 T010)
-                ExerciseInfoSectionView(
-                    data: viewModel.exerciseInfoData,
-                    unitPreference: viewModel.unitPreference,
-                    isLoading: viewModel.isLoadingExerciseInfo
-                )
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
                 .padding(.bottom, 20)
             }
             .id(viewModel.currentExercise?.id)
             .task(id: viewModel.currentExercise?.id) {
-                await viewModel.loadExerciseInfo()
                 await viewModel.loadWeightSuggestions()
             }
 
@@ -236,6 +235,52 @@ struct ActiveWorkoutView: View {
                     exerciseService: services.exerciseService
                 )
                 .id(exercise.id) // Recreate when exercise changes
+            }
+        }
+    }
+
+    private var isSetKeyboardVisible: Bool {
+        selectedSubTab == .sets && setKeyboardManager.context?.trackedField != nil
+    }
+
+    private var timerPresentationMode: RestTimerPresentationMode? {
+        ActiveWorkoutBottomAccessoryLayout.timerPresentationMode(
+            for: viewModel.restTimer,
+            isKeyboardVisible: isSetKeyboardVisible
+        )
+    }
+
+    private var bottomAccessoryAnimationKey: String {
+        let timerKey: String
+        switch timerPresentationMode {
+        case .full:
+            timerKey = "full"
+        case .compact:
+            timerKey = "compact"
+        case .none:
+            timerKey = "hidden"
+        }
+        return "\(selectedSubTab)-\(isSetKeyboardVisible)-\(timerKey)"
+    }
+
+    @ViewBuilder
+    private var bottomAccessoryArea: some View {
+        VStack(spacing: 0) {
+            if let timerPresentationMode {
+                RestTimerView(
+                    state: viewModel.restTimer,
+                    presentationMode: timerPresentationMode,
+                    onAddTime: { viewModel.addTime($0) },
+                    onSubtractTime: { viewModel.subtractTime($0) },
+                    onSetDuration: { viewModel.setTimerDuration($0) },
+                    onDismiss: { viewModel.dismissTimer() }
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            if selectedSubTab == .sets {
+                SetEntryKeyboardOverlay(manager: setKeyboardManager)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
     }

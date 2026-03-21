@@ -352,11 +352,9 @@ final class ActiveWorkoutViewModel {
                 updateLiveActivityState()
             }
 
-            // 6. Invalidate exercise info, PR, history, and suggestion caches, then reload
-            exerciseInfoLoadedForExerciseId = nil
+            // 6. Invalidate PR, history, and suggestion caches, then reload
             prsLoadedForExerciseId = nil
             historyLoadedForExerciseId = nil
-            await loadExerciseInfo()
             if currentExercise?.id == set.exerciseId {
                 requestWeightSuggestionRefresh(mode: .preserveExisting, invalidateCache: true)
             }
@@ -388,11 +386,9 @@ final class ActiveWorkoutViewModel {
             // Update Live Activity (set progress changed)
             updateLiveActivityState()
 
-            // Invalidate exercise info, PR, history, and suggestion caches, then reload
-            exerciseInfoLoadedForExerciseId = nil
+            // Invalidate PR, history, and suggestion caches, then reload
             prsLoadedForExerciseId = nil
             historyLoadedForExerciseId = nil
-            await loadExerciseInfo()
             if currentExercise?.id == exerciseId {
                 requestWeightSuggestionRefresh(mode: .preserveExisting, invalidateCache: true)
             }
@@ -504,10 +500,8 @@ final class ActiveWorkoutViewModel {
             // Update Live Activity (total sets changed)
             updateLiveActivityState()
 
-            // Invalidate exercise info and PR caches, then reload
-            exerciseInfoLoadedForExerciseId = nil
+            // Invalidate PR cache and refresh suggestions as needed
             prsLoadedForExerciseId = nil
-            await loadExerciseInfo()
 
             // Deletion can change fatigue context and first-working-set freshness logic
             if currentExercise?.id == exerciseId {
@@ -532,10 +526,8 @@ final class ActiveWorkoutViewModel {
             set.cachedPRStatus = result.prResult.newStatus
             applyAffectedSets(result.prResult.affectedSetIds)
 
-            // Invalidate exercise info and PR caches, then reload
-            exerciseInfoLoadedForExerciseId = nil
+            // Invalidate PR cache and refresh suggestions as needed
             prsLoadedForExerciseId = nil
-            await loadExerciseInfo()
 
             // Type changes can add/remove a set from suggestion inputs
             if currentExercise?.id == set.exerciseId {

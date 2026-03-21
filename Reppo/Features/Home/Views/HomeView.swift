@@ -1,5 +1,6 @@
 // HomeView.swift
 // Main Home screen assembling all sub-views in NavigationStack + ScrollView.
+// Supports customizable section ordering, long-press edit mode, and calendar day navigation.
 // Spec: 013-home-screen, WP04 T017
 
 import SwiftUI
@@ -14,27 +15,34 @@ struct HomeView: View {
     let onStartWorkout: () -> Void
     let onShowStartWorkoutSheet: () -> Void
     let onShowExerciseList: () -> Void
+    var onDayTapped: ((Date) -> Void)? = nil
 
     init(
         workoutService: any WorkoutServiceProtocol,
         setService: any SetServiceProtocol,
         exerciseService: any ExerciseServiceProtocol,
+        chartDataService: any ChartDataServiceProtocol,
+        statsService: any StatsServiceProtocol,
         refreshTrigger: UUID,
         popToRootTrigger: UUID = UUID(),
         onStartWorkout: @escaping () -> Void,
         onShowStartWorkoutSheet: @escaping () -> Void,
-        onShowExerciseList: @escaping () -> Void
+        onShowExerciseList: @escaping () -> Void,
+        onDayTapped: ((Date) -> Void)? = nil
     ) {
         _viewModel = State(initialValue: HomeViewModel(
             workoutService: workoutService,
             setService: setService,
-            exerciseService: exerciseService
+            exerciseService: exerciseService,
+            chartDataService: chartDataService,
+            statsService: statsService
         ))
         self.refreshTrigger = refreshTrigger
         self.popToRootTrigger = popToRootTrigger
         self.onStartWorkout = onStartWorkout
         self.onShowStartWorkoutSheet = onShowStartWorkoutSheet
         self.onShowExerciseList = onShowExerciseList
+        self.onDayTapped = onDayTapped
     }
 
     var body: some View {
@@ -42,8 +50,14 @@ struct HomeView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     headerSection
-                    WeekStripView(weekDays: viewModel.weekDays)
+                    WeekStripView(weekDays: viewModel.weekDays, onDayTap: onDayTapped)
                     startWorkoutSection
+
+                    // Customizable sections (ordered by user preference)
+                    ForEach(viewModel.sectionConfig.visibleSections) { section in
+                        customizableSection(section)
+                    }
+
                     recentWorkoutsSection
                 }
                 .padding(.horizontal, 20)
@@ -52,7 +66,6 @@ struct HomeView: View {
             }
             .background(Color.bg)
             .onAppear {
-                // Reload when navigating back (e.g. after deleting a workout)
                 viewModel.lastLoadTime = nil
                 Task { await viewModel.loadData() }
             }
@@ -67,7 +80,6 @@ struct HomeView: View {
             }
         }
         .task(id: refreshTrigger) {
-            // Reload when refreshTrigger changes (e.g. after workout dismiss)
             viewModel.lastLoadTime = nil
             await viewModel.loadData()
         }
@@ -75,9 +87,127 @@ struct HomeView: View {
             navigationPath = NavigationPath()
         }
         .onAppear {
-            // Reload when navigating back (e.g. after deleting a workout)
             viewModel.lastLoadTime = nil
             Task { await viewModel.loadData() }
+        }
+        .onLongPressGesture(minimumDuration: 0.5) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                viewModel.isEditMode = true
+            }
+        }
+        .sheet(isPresented: $viewModel.showCustomizeSheet) {
+            CustomizeHomeSheet(config: $viewModel.sectionConfig)
+        }
+        .overlay {
+            if viewModel.isEditMode {
+                editModeOverlay
+            }
+        }
+    }
+
+    // MARK: - Customizable Section Router
+
+    @ViewBuilder
+    private func customizableSection(_ section: HomeSectionEntry) -> some View {
+        switch section.sectionId {
+        case .monthlyStats:
+            if let stats = viewModel.monthlyStats {
+                MonthlyStatsCardView(
+                    totalWorkouts: stats.totalWorkouts,
+                    totalVolume: stats.totalVolume,
+                    totalSets: stats.totalSets
+                )
+            }
+        case .recentPRs:
+            if !viewModel.recentPRs.isEmpty {
+                RecentPRsView(prs: viewModel.recentPRs)
+            }
+        case .trendingUp:
+            if !viewModel.trendingExercises.isEmpty {
+                TrendingExercisesView(exercises: viewModel.trendingExercises)
+            }
+        }
+    }
+
+    // MARK: - Edit Mode Overlay
+
+    private var editModeOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        viewModel.exitEditMode()
+                    }
+                }
+
+            VStack(spacing: 16) {
+                Text("Edit Home Screen")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.textPrimary)
+
+                // Show each section with toggle
+                ForEach(viewModel.sectionConfig.sections.indices, id: \.self) { index in
+                    let section = viewModel.sectionConfig.sections[index]
+                    HStack {
+                        Text(section.sectionId.displayName)
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(Color.textPrimary)
+                        Spacer()
+                        Button {
+                            viewModel.toggleSectionVisibility(section.sectionId)
+                        } label: {
+                            Image(systemName: section.visible ? "eye.fill" : "eye.slash.fill")
+                                .foregroundStyle(section.visible ? Color.accent : Color.textTertiary)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
+                            .foregroundStyle(Color.border)
+                    )
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.bgCard)
+                    )
+                }
+
+                HStack(spacing: 12) {
+                    Button("Customize") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewModel.isEditMode = false
+                        }
+                        viewModel.showCustomizeSheet = true
+                    }
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.accent)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(Color.accentSoft)
+                    .cornerRadius(10)
+
+                    Button("Done") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewModel.exitEditMode()
+                        }
+                    }
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(Color.accent)
+                    .cornerRadius(10)
+                }
+                .padding(.top, 8)
+            }
+            .padding(24)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.bgCard)
+            )
+            .padding(.horizontal, 32)
         }
     }
 
@@ -96,10 +226,6 @@ struct HomeView: View {
             }
 
             Spacer()
-
-            Circle()
-                .fill(Color.bgSubtle)
-                .frame(width: 36, height: 36)
         }
     }
 

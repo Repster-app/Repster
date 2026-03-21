@@ -10,17 +10,20 @@ actor StatsService: StatsServiceProtocol {
     private let setRepo: SetRepositoryProtocol
     private let exerciseRepo: ExerciseRepositoryProtocol
     private let healthProfileRepo: HealthProfileRepositoryProtocol
+    private let performanceRecordRepo: PerformanceRecordRepositoryProtocol
 
     init(
         exerciseStatsRepository: ExerciseStatsRepositoryProtocol,
         setRepository: SetRepositoryProtocol,
         exerciseRepository: ExerciseRepositoryProtocol,
-        healthProfileRepository: HealthProfileRepositoryProtocol
+        healthProfileRepository: HealthProfileRepositoryProtocol,
+        performanceRecordRepository: PerformanceRecordRepositoryProtocol
     ) {
         self.exerciseStatsRepo = exerciseStatsRepository
         self.setRepo = setRepository
         self.exerciseRepo = exerciseRepository
         self.healthProfileRepo = healthProfileRepository
+        self.performanceRecordRepo = performanceRecordRepository
     }
 
     // MARK: - StatsServiceProtocol
@@ -83,7 +86,14 @@ actor StatsService: StatsServiceProtocol {
         let workoutCount = try await setRepo.fetchWorkoutCount(for: exerciseId)
         let bestE1RM = try await setRepo.fetchBestE1RM(for: exerciseId)
 
-        // 4. Create new ExerciseStats and persist
+        // 4. Get most recent PR date from PerformanceRecords
+        let allPRs = try await performanceRecordRepo.fetchAll(for: exerciseId)
+        let lastPRDate = allPRs.map(\.date).max()
+
+        // 5. Compute e1RM trend slope from recent sets
+        let trendSlope = try await computeE1RMTrendSlope(for: exerciseId)
+
+        // 6. Create new ExerciseStats and persist
         let newStats = ExerciseStats(
             exerciseId: exerciseId,
             totalWorkouts: workoutCount,
@@ -92,6 +102,8 @@ actor StatsService: StatsServiceProtocol {
             totalVolume: aggregate.totalVolume,
             maxWeight: aggregate.maxWeight,
             bestE1RM: bestE1RM ?? 0,
+            estimated1RMTrendSlope: trendSlope,
+            lastPRDate: lastPRDate,
             lastPerformedDate: aggregate.lastPerformedDate
         )
         try await exerciseStatsRepo.save(newStats)
@@ -106,6 +118,22 @@ actor StatsService: StatsServiceProtocol {
     func fetchAllStats() async throws -> [UUID: ExerciseStats] {
         let allStats = try await exerciseStatsRepo.fetchAll()
         return Dictionary(uniqueKeysWithValues: allStats.map { ($0.exerciseId, $0) })
+    }
+
+    // MARK: - Recent PRs (Home Screen)
+
+    func fetchRecentPRs(since: Date, limit: Int) async throws -> [PerformanceRecord] {
+        let records = try await performanceRecordRepo.fetchRecentRepMaxRecords(since: since)
+        // Keep only the most recent PR per exercise
+        var seen = Set<UUID>()
+        var result: [PerformanceRecord] = []
+        for record in records {
+            if seen.insert(record.exerciseId).inserted {
+                result.append(record)
+                if result.count >= limit { break }
+            }
+        }
+        return result
     }
 
     // MARK: - Eligibility
@@ -267,5 +295,49 @@ actor StatsService: StatsServiceProtocol {
     private func recomputeMaxWeight(for exerciseId: UUID) async throws -> Double {
         let allSets = try await setRepo.fetchSets(for: exerciseId, limit: nil)
         return allSets.compactMap(\.effectiveWeight).max() ?? 0
+    }
+
+    /// Compute the e1RM trend slope over the last 60 days using linear regression.
+    /// Returns slope in units of kg/day. Positive = improving.
+    private func computeE1RMTrendSlope(for exerciseId: UUID) async throws -> Double {
+        let sixtyDaysAgo = Calendar.current.date(byAdding: .day, value: -60, to: Date()) ?? Date()
+        let recentSets = try await setRepo.fetchSets(exerciseId: exerciseId, from: sixtyDaysAgo, to: Date())
+
+        // Filter to sets that have e1RM computed
+        let setsWithE1RM = recentSets.filter { $0.e1RM != nil && $0.e1RM! > 0 }
+        guard !setsWithE1RM.isEmpty else { return 0 }
+
+        // Group by day, take max e1RM per day
+        let calendar = Calendar.current
+        var bestByDay: [Date: Double] = [:]
+        for set in setsWithE1RM {
+            let day = calendar.startOfDay(for: set.date)
+            let e1rm = set.e1RM!
+            if let existing = bestByDay[day] {
+                bestByDay[day] = max(existing, e1rm)
+            } else {
+                bestByDay[day] = e1rm
+            }
+        }
+
+        let sortedDays = bestByDay.sorted { $0.key < $1.key }
+        guard sortedDays.count >= 3 else { return 0 }
+
+        // Linear regression: x = days since first data point, y = e1RM
+        let referenceDate = sortedDays[0].key
+        let n = Double(sortedDays.count)
+        var sumX = 0.0, sumY = 0.0, sumXY = 0.0, sumX2 = 0.0
+        for (day, e1rm) in sortedDays {
+            let x = day.timeIntervalSince(referenceDate) / 86400.0
+            sumX += x
+            sumY += e1rm
+            sumXY += x * e1rm
+            sumX2 += x * x
+        }
+
+        let denominator = n * sumX2 - sumX * sumX
+        guard denominator > 0 else { return 0 }
+
+        return (n * sumXY - sumX * sumY) / denominator
     }
 }

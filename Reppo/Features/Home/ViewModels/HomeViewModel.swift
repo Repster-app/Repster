@@ -8,11 +8,18 @@ import SwiftUI
 
 struct WeekDay: Identifiable {
     let id: Int               // 0-6 (Mon=0, Sun=6)
-    let abbreviation: String  // "M", "T", "W", "T", "F", "S", "S"
+    let abbreviation: String  // "MON", "TUE", etc.
     let dateNumber: Int       // day of month (1-31)
     let date: Date            // full date for this day
     let isToday: Bool
     let hasWorkout: Bool
+    let muscleGroups: [String]  // up to 3, for colored dots
+}
+
+struct MonthlyStats {
+    let totalWorkouts: Int
+    let totalVolume: Double
+    let totalSets: Int
 }
 
 struct RecentWorkoutSummary: Identifiable {
@@ -63,6 +70,16 @@ final class HomeViewModel {
     // Recent workouts
     var recentWorkouts: [RecentWorkoutSummary] = []
 
+    // New sections
+    var monthlyStats: MonthlyStats? = nil
+    var recentPRs: [RecentPR] = []
+    var trendingExercises: [TrendingExercise] = []
+
+    // Section customization
+    var sectionConfig: HomeSectionConfig = HomeSectionConfig.load()
+    var isEditMode: Bool = false
+    var showCustomizeSheet: Bool = false
+
     // Loading
     var isLoading: Bool = false
 
@@ -71,6 +88,8 @@ final class HomeViewModel {
     private let workoutService: WorkoutServiceProtocol
     private let setService: SetServiceProtocol
     private let exerciseService: ExerciseServiceProtocol
+    private let chartDataService: ChartDataServiceProtocol
+    private let statsService: StatsServiceProtocol
 
     // MARK: - Cache
 
@@ -80,11 +99,15 @@ final class HomeViewModel {
     init(
         workoutService: WorkoutServiceProtocol,
         setService: SetServiceProtocol,
-        exerciseService: ExerciseServiceProtocol
+        exerciseService: ExerciseServiceProtocol,
+        chartDataService: ChartDataServiceProtocol,
+        statsService: StatsServiceProtocol
     ) {
         self.workoutService = workoutService
         self.setService = setService
         self.exerciseService = exerciseService
+        self.chartDataService = chartDataService
+        self.statsService = statsService
     }
 
     // MARK: - Data Loading
@@ -101,6 +124,9 @@ final class HomeViewModel {
         await loadWeekData()
         await checkActiveWorkout()
         await loadRecentWorkouts()
+        await loadMonthlyStats()
+        await loadRecentPRs()
+        await loadTrendingExercises()
     }
 
     func checkActiveWorkout() async {
@@ -137,7 +163,7 @@ final class HomeViewModel {
             let workouts = try await workoutService.fetchWorkouts(for: weekRange)
             let completed = workouts.filter { $0.status == .completed }
 
-            buildWeekDays(from: completed, weekRange: weekRange)
+            await buildWeekDays(from: completed, weekRange: weekRange)
 
             let calendar = Calendar.current
             thisWeekWorkoutCount = completed.count
@@ -159,15 +185,16 @@ final class HomeViewModel {
         return calendar.startOfDay(for: monday)...calendar.startOfDay(for: sunday).addingTimeInterval(86399)
     }
 
-    private func buildWeekDays(from completedWorkouts: [Workout], weekRange: ClosedRange<Date>) {
+    private func buildWeekDays(from completedWorkouts: [Workout], weekRange: ClosedRange<Date>) async {
         let calendar = Calendar.current
         let monday = calendar.startOfDay(for: weekRange.lowerBound)
 
-        var workoutDayIndices: Set<Int> = []
+        // Group workouts by day index
+        var workoutsByDay: [Int: [Workout]] = [:]
         for workout in completedWorkouts {
             let weekday = calendar.component(.weekday, from: workout.date)
             let index = (weekday + 5) % 7
-            workoutDayIndices.insert(index)
+            workoutsByDay[index, default: []].append(workout)
         }
 
         let abbreviations = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
@@ -175,17 +202,138 @@ final class HomeViewModel {
         for i in 0..<7 {
             guard let dayDate = calendar.date(byAdding: .day, value: i, to: monday) else { continue }
             let dateNumber = calendar.component(.day, from: dayDate)
+
+            // Get muscle groups for this day's workouts (up to 3)
+            var dayMuscleGroups: [String] = []
+            if let dayWorkouts = workoutsByDay[i] {
+                for workout in dayWorkouts {
+                    do {
+                        let exerciseIds = try await setService.fetchExerciseIds(for: workout.id)
+                        for exerciseId in exerciseIds {
+                            if let exercise = try await cachedExercise(exerciseId),
+                               let muscle = exercise.primaryMuscle?.lowercased(),
+                               !dayMuscleGroups.contains(muscle) {
+                                dayMuscleGroups.append(muscle)
+                                if dayMuscleGroups.count >= 3 { break }
+                            }
+                        }
+                    } catch {
+                        // Skip on error
+                    }
+                    if dayMuscleGroups.count >= 3 { break }
+                }
+            }
+
             days.append(WeekDay(
                 id: i,
                 abbreviation: abbreviations[i],
                 dateNumber: dateNumber,
                 date: dayDate,
                 isToday: calendar.isDateInToday(dayDate),
-                hasWorkout: workoutDayIndices.contains(i)
+                hasWorkout: workoutsByDay[i] != nil,
+                muscleGroups: dayMuscleGroups
             ))
         }
 
         weekDays = days
+    }
+
+    // MARK: - Monthly Stats
+
+    private func loadMonthlyStats() async {
+        do {
+            let summary = try await chartDataService.fetchBreakdownSummary(timeRange: .month)
+            if summary.totalWorkouts > 0 {
+                monthlyStats = MonthlyStats(
+                    totalWorkouts: summary.totalWorkouts,
+                    totalVolume: summary.totalVolume,
+                    totalSets: summary.totalSets
+                )
+            } else {
+                monthlyStats = nil
+            }
+        } catch {
+            print("[HomeViewModel] Failed to load monthly stats: \(error)")
+            monthlyStats = nil
+        }
+    }
+
+    // MARK: - Recent PRs
+
+    private func loadRecentPRs() async {
+        do {
+            let fourteenDaysAgo = Calendar.current.date(byAdding: .day, value: -14, to: Date()) ?? Date()
+            let records = try await statsService.fetchRecentPRs(since: fourteenDaysAgo, limit: 3)
+
+            var prs: [RecentPR] = []
+            for record in records {
+                let exerciseName: String
+                if let exercise = try await cachedExercise(record.exerciseId) {
+                    exerciseName = exercise.name
+                } else {
+                    continue
+                }
+                prs.append(RecentPR(
+                    id: record.exerciseId,
+                    exerciseName: exerciseName,
+                    weight: record.value,
+                    reps: record.reps ?? 1,
+                    date: record.date
+                ))
+            }
+
+            recentPRs = prs
+        } catch {
+            print("[HomeViewModel] Failed to load recent PRs: \(error)")
+            recentPRs = []
+        }
+    }
+
+    // MARK: - Trending Exercises
+
+    private func loadTrendingExercises() async {
+        do {
+            let allStats = try await statsService.fetchAllStats()
+
+            var trending: [(exercise: TrendingExercise, score: Double)] = []
+            for (exerciseId, stats) in allStats {
+                guard stats.estimated1RMTrendSlope > 0,
+                      stats.totalWorkouts >= 3,
+                      stats.bestE1RM > 0 else { continue }
+
+                let exerciseName: String
+                if let exercise = try await cachedExercise(exerciseId) {
+                    exerciseName = exercise.name
+                } else {
+                    continue
+                }
+
+                // Convert slope to approximate monthly percentage
+                let monthlyPercent = (stats.estimated1RMTrendSlope * 30) / stats.bestE1RM * 100
+                guard monthlyPercent > 0.5 else { continue }  // only show meaningful trends
+
+                // Blend percentage with workout frequency so well-practiced exercises rank higher
+                let frequencyWeight = min(Double(stats.totalWorkouts) / 10.0, 1.5)
+                let compositeScore = monthlyPercent * frequencyWeight
+
+                trending.append((
+                    exercise: TrendingExercise(
+                        id: exerciseId,
+                        exerciseName: exerciseName,
+                        trendPercent: monthlyPercent
+                    ),
+                    score: compositeScore
+                ))
+            }
+
+            trendingExercises = trending
+                .sorted { $0.score > $1.score }
+                .prefix(2)
+                .map { $0.exercise }
+        } catch {
+            print("[HomeViewModel] Failed to load trending exercises: \(error)")
+            trendingExercises = []
+        }
     }
 
     // MARK: - Recent Workouts
@@ -231,6 +379,20 @@ final class HomeViewModel {
         } catch {
             print("[HomeViewModel] Failed to load recent workouts: \(error)")
         }
+    }
+
+    // MARK: - Section Config
+
+    func toggleSectionVisibility(_ sectionId: HomeSectionId) {
+        if let index = sectionConfig.sections.firstIndex(where: { $0.sectionId == sectionId }) {
+            sectionConfig.sections[index].visible.toggle()
+            sectionConfig.save()
+        }
+    }
+
+    func exitEditMode() {
+        isEditMode = false
+        sectionConfig.save()
     }
 
     // MARK: - Cache Helper

@@ -112,4 +112,10 @@ protocol StatsServiceProtocol: Sendable {
     ///
     /// Used by ExerciseListViewModel to display card metadata (last performed, best lift).
     func fetchAllStats() async throws -> [UUID: ExerciseStats]
+
+    // MARK: - Recent PRs (Home Screen)
+
+    /// Fetch recent repMax PerformanceRecords across all exercises since a given date.
+    /// Returns records sorted by date descending, keeping only the most recent per exercise.
+    func fetchRecentPRs(since: Date, limit: Int) async throws -> [PerformanceRecord]
 }

@@ -50,6 +50,16 @@ actor PerformanceRecordRepository: PerformanceRecordRepositoryProtocol {
         return try modelContext.fetch(descriptor).filter { $0.recordType == recordType }
     }
 
+    // MARK: - Recent PRs
+
+    func fetchRecentRepMaxRecords(since: Date) throws -> [PerformanceRecord] {
+        let descriptor = FetchDescriptor<PerformanceRecord>(
+            predicate: #Predicate { $0.date >= since },
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
+        return try modelContext.fetch(descriptor).filter { $0.recordType == .repMax }
+    }
+
     // MARK: - Cascade Deletion (FR-011)
 
     func deleteAll(for exerciseId: UUID) throws {

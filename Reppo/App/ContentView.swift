@@ -40,6 +40,9 @@ struct ContentView: View {
     /// Currently selected tab.
     @State private var selectedTab: MainTab = .home
 
+    /// Date to navigate to when switching to Calendar tab from week strip tap.
+    @State private var calendarInitialDate: Date? = nil
+
     /// Trigger to pop HomeView NavigationStack to root when home tab is re-tapped.
     @State private var homePopToRootTrigger = UUID()
 
@@ -112,11 +115,17 @@ struct ContentView: View {
                     workoutService: services.workoutService,
                     setService: services.setService,
                     exerciseService: services.exerciseService,
+                    chartDataService: services.chartDataService,
+                    statsService: services.statsService,
                     refreshTrigger: homeRefreshTrigger,
                     popToRootTrigger: homePopToRootTrigger,
                     onStartWorkout: { showActiveWorkout = true },
                     onShowStartWorkoutSheet: { showStartWorkoutSheet = true },
-                    onShowExerciseList: { showExerciseList = true }
+                    onShowExerciseList: { showExerciseList = true },
+                    onDayTapped: { date in
+                        calendarInitialDate = date
+                        selectedTab = .calendar
+                    }
                 )
                     .tabItem {
                         Label("Home", systemImage: "house")
@@ -127,7 +136,8 @@ struct ContentView: View {
                     workoutService: services.workoutService,
                     setService: services.setService,
                     exerciseService: services.exerciseService,
-                    statsService: services.statsService
+                    statsService: services.statsService,
+                    initialDate: $calendarInitialDate
                 )
                     .tabItem {
                         Label("Calendar", systemImage: "calendar")

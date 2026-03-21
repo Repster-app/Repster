@@ -5,6 +5,101 @@ import SwiftData
 @MainActor
 final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
 
+    func testRunningTimerUsesFullPresentationWhenKeyboardHidden() {
+        let mode = ActiveWorkoutBottomAccessoryLayout.timerPresentationMode(
+            for: .running(remaining: 90, total: 120),
+            isKeyboardVisible: false
+        )
+
+        XCTAssertEqual(mode, .full)
+    }
+
+    func testRunningTimerUsesCompactPresentationWhenKeyboardVisible() {
+        let mode = ActiveWorkoutBottomAccessoryLayout.timerPresentationMode(
+            for: .running(remaining: 90, total: 120),
+            isKeyboardVisible: true
+        )
+
+        XCTAssertEqual(mode, .compact)
+    }
+
+    func testFinishedTimerUsesFullPresentationWhenKeyboardHidden() {
+        let mode = ActiveWorkoutBottomAccessoryLayout.timerPresentationMode(
+            for: .finished,
+            isKeyboardVisible: false
+        )
+
+        XCTAssertEqual(mode, .full)
+    }
+
+    func testFinishedTimerIsHiddenWhenKeyboardVisible() {
+        let mode = ActiveWorkoutBottomAccessoryLayout.timerPresentationMode(
+            for: .finished,
+            isKeyboardVisible: true
+        )
+
+        XCTAssertNil(mode)
+    }
+
+    func testCreateEditExerciseViewModelNormalizesPrimaryGroupAndDefaultsSecondaryMusclesOnCreate() async throws {
+        let exerciseService = ExerciseServiceStub()
+        let viewModel = CreateEditExerciseViewModel(
+            exercise: nil,
+            exerciseService: exerciseService
+        )
+
+        viewModel.name = "Burpee"
+        viewModel.primaryMuscle = ExercisePrimaryGroup.fullBody.rawValue
+
+        try await viewModel.save()
+
+        let createdExercise = try XCTUnwrap(exerciseService.createdExercises.last)
+        XCTAssertEqual(createdExercise.primaryMuscle, "full body")
+        XCTAssertEqual(createdExercise.secondaryMuscles, [])
+    }
+
+    func testCreateEditExerciseViewModelPreservesHiddenSecondaryMusclesOnEdit() async throws {
+        let exerciseService = ExerciseServiceStub()
+        let existingExercise = Exercise(
+            name: "Incline Dumbbell Press",
+            equipmentType: .dumbbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest",
+            secondaryMuscles: ["shoulders", "triceps"],
+            unilateral: false
+        )
+        let viewModel = CreateEditExerciseViewModel(
+            exercise: existingExercise,
+            exerciseService: exerciseService
+        )
+
+        viewModel.name = "Incline DB Press"
+        viewModel.primaryMuscle = ExercisePrimaryGroup.fullBody.rawValue
+
+        try await viewModel.save()
+
+        let updatedExercise = try XCTUnwrap(exerciseService.updatedExercises.last)
+        XCTAssertEqual(updatedExercise.primaryMuscle, "full body")
+        XCTAssertEqual(updatedExercise.secondaryMuscles, ["shoulders", "triceps"])
+        XCTAssertEqual(existingExercise.secondaryMuscles, ["shoulders", "triceps"])
+    }
+
+    func testCreateEditExerciseViewModelKeepsLegacyPrimaryGroupSelectableDuringEdit() {
+        let viewModel = CreateEditExerciseViewModel(
+            exercise: Exercise(
+                name: "Hammer Curl",
+                equipmentType: .dumbbell,
+                trackingType: .weightReps,
+                primaryMuscle: "arms"
+            ),
+            exerciseService: ExerciseServiceStub()
+        )
+
+        XCTAssertEqual(viewModel.primaryMuscle, "arms")
+        XCTAssertTrue(viewModel.primaryMuscleOptions.contains("arms"))
+        XCTAssertEqual(viewModel.primaryMuscleDisplayName, "Arms")
+    }
+
     func testWeightEditDoesNotTriggerSuggestionRefresh() async throws {
         let loadPrescriptionService = LoadPrescriptionServiceSpy()
         let context = makeContext(loadPrescriptionService: loadPrescriptionService)
@@ -1729,9 +1824,15 @@ private final class WorkoutServiceStub: @unchecked Sendable, WorkoutServiceProto
 }
 
 private final class ExerciseServiceStub: @unchecked Sendable, ExerciseServiceProtocol {
-    func createExercise(_ exercise: Exercise) async throws { let _ = exercise }
+    var createdExercises: [Exercise] = []
+    var updatedExercises: [Exercise] = []
+    var hasSets = false
+
+    func createExercise(_ exercise: Exercise) async throws {
+        createdExercises.append(exercise)
+    }
     func updateExercise(_ exercise: Exercise, originalTrackingType: TrackingType) async throws {
-        let _ = exercise
+        updatedExercises.append(exercise)
         let _ = originalTrackingType
     }
     func fetchExercise(_ exerciseId: UUID) async throws -> Exercise? {
@@ -1748,7 +1849,7 @@ private final class ExerciseServiceStub: @unchecked Sendable, ExerciseServicePro
     }
     func exerciseHasSets(_ exerciseId: UUID) async throws -> Bool {
         let _ = exerciseId
-        return false
+        return hasSets
     }
 }
 

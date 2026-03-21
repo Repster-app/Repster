@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Home Screen — Enhanced Prototype</title>
+<style>
+  :root {
+    --bg: #111113;
+    --bg-card: #1B1B1F;
+    --bg-hover: #222228;
+    --bg-subtle: #262630;
+    --text-primary: #EAEAEF;
+    --text-secondary: #9999A8;
+    --text-tertiary: #5C5C6E;
+    --accent: #5B8DEF;
+    --accent-soft: rgba(91, 141, 239, 0.10);
+    --success: #5EC269;
+    --success-soft: rgba(94, 194, 105, 0.08);
+    --gold: #D4A23A;
+    --gold-soft: rgba(212, 162, 58, 0.10);
+    --orange: #E89B3E;
+    --orange-soft: rgba(232, 155, 62, 0.10);
+    --purple: #A87EE6;
+    --purple-soft: rgba(168, 126, 230, 0.10);
+    --teal: #4ECDC4;
+    --teal-soft: rgba(78, 205, 196, 0.10);
+    --red: #E05555;
+    --border: rgba(255,255,255,0.06);
+    --r: 14px;
+
+    /* Muscle group colors */
+    --muscle-chest: #5B8DEF;
+    --muscle-back: #5EC269;
+    --muscle-shoulders: #E89B3E;
+    --muscle-triceps: #A87EE6;
+    --muscle-biceps: #E05555;
+    --muscle-quads: #4ECDC4;
+    --muscle-hamstrings: #D4A23A;
+    --muscle-glutes: #E89B3E;
+    --muscle-core: #9999A8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Helvetica Neue', sans-serif;
+    background: #060608;
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+
+  .page-label {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+
+  .variant-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .variant-tab {
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    background: transparent;
+    font-family: inherit;
+  }
+  .variant-tab.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+
+  /* Phone frame */
+  .phone-frame {
+    width: 393px;
+    height: 852px;
+    background: var(--bg);
+    border-radius: 44px;
+    overflow: hidden;
+    position: relative;
+    border: 2px solid rgba(255,255,255,0.08);
+  }
+  .phone-scroll {
+    height: 100%;
+    overflow-y: auto;
+    padding: 60px 20px 40px;
+    scrollbar-width: none;
+  }
+  .phone-scroll::-webkit-scrollbar { display: none; }
+  .content-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding-bottom: 100px;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .header-date {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+  .header-title {
+    font-size: 26px;
+    font-weight: 700;
+    margin-top: 2px;
+  }
+  .header-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--bg-subtle);
+  }
+
+  /* Week strip — enhanced with muscle dots */
+  .week-strip {
+    display: flex;
+    gap: 6px;
+  }
+  .day-card {
+    flex: 1;
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 10px 4px 8px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .day-card:hover { background: var(--bg-hover); }
+  .day-card.today { background: var(--accent); }
+  .day-card.today:hover { background: #6E9DF2; }
+  .day-card .abbr {
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    letter-spacing: 0.5px;
+  }
+  .day-card.today .abbr { color: rgba(255,255,255,0.7); }
+  .day-card .num {
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .day-card.today .num { color: white; }
+
+  /* Muscle dots row under each day */
+  .muscle-dots {
+    display: flex;
+    gap: 3px;
+    margin-top: 2px;
+    min-height: 6px;
+  }
+  .muscle-dots .mdot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+  }
+
+  /* Day tap tooltip */
+  .day-card .tap-hint {
+    display: none;
+    position: absolute;
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 10px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    z-index: 10;
+  }
+
+  /* Start Workout Card */
+  .start-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    background: var(--bg-card);
+    border-radius: var(--r);
+  }
+  .start-card-text { flex: 1; }
+  .start-card-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    letter-spacing: 0.8px;
+  }
+  .start-card-title {
+    font-size: 17px;
+    font-weight: 700;
+    margin-top: 4px;
+  }
+  .start-card-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+  .start-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    color: white;
+    font-weight: 300;
+    flex-shrink: 0;
+  }
+
+  /* Section header */
+  .section-header {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+  }
+
+  /* Monthly Stats */
+  .monthly-card {
+    background: var(--bg-card);
+    border-radius: var(--r);
+    padding: 14px;
+  }
+  .monthly-stats-row {
+    display: flex;
+    gap: 8px;
+  }
+  .monthly-stat {
+    flex: 1;
+    background: var(--bg-subtle);
+    border-radius: 10px;
+    padding: 12px 10px;
+    text-align: center;
+  }
+  .monthly-stat-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  .monthly-stat-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* Recent PRs */
+  .pr-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .pr-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--bg-card);
+    border-radius: var(--r);
+  }
+  .pr-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--gold-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .pr-info { flex: 1; }
+  .pr-exercise {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .pr-detail {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+  .pr-date {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    font-weight: 500;
+  }
+
+  /* Trending Exercises */
+  .trending-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .trending-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--bg-card);
+    border-radius: var(--r);
+  }
+  .trending-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--success-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .trending-info { flex: 1; }
+  .trending-name {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .trending-detail {
+    font-size: 12px;
+    color: var(--success);
+    margin-top: 2px;
+    font-weight: 500;
+  }
+
+  /* Recent Workouts */
+  .workout-card {
+    background: var(--bg-card);
+    border-radius: var(--r);
+    padding: 14px;
+  }
+  .workout-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .workout-title {
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .workout-date {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    font-weight: 500;
+  }
+  .workout-stats {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .stat-pill {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: var(--bg-subtle);
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+  .stat-pill-icon {
+    font-size: 10px;
+    color: var(--text-tertiary);
+  }
+  .muscle-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .muscle-tag {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: var(--bg-subtle);
+  }
+  .muscle-tag-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  /* Customizable section - edit mode */
+  .section-wrapper {
+    position: relative;
+    transition: all 0.2s;
+  }
+  .section-wrapper.editing {
+    outline: 1px dashed rgba(91, 141, 239, 0.3);
+    outline-offset: 6px;
+    border-radius: var(--r);
+  }
+
+  .section-drag-handle {
+    display: none;
+    position: absolute;
+    left: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    color: var(--accent);
+    font-size: 14px;
+    cursor: grab;
+    z-index: 5;
+  }
+  .editing .section-drag-handle { display: flex; align-items: center; justify-content: center; }
+
+  .section-hide-btn {
+    display: none;
+    position: absolute;
+    right: -6px;
+    top: -6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--red);
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    border: 2px solid var(--bg);
+    cursor: pointer;
+    z-index: 5;
+    align-items: center;
+    justify-content: center;
+  }
+  .editing .section-hide-btn { display: flex; }
+
+  /* Edit mode banner */
+  .edit-banner {
+    display: none;
+    position: absolute;
+    top: 56px;
+    left: 20px;
+    right: 20px;
+    background: var(--accent);
+    border-radius: 10px;
+    padding: 10px 14px;
+    z-index: 20;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .edit-banner.visible { display: flex; }
+  .edit-banner-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: white;
+  }
+  .edit-banner-done {
+    padding: 5px 14px;
+    background: white;
+    color: var(--accent);
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  /* Settings: Customize Home */
+  .settings-sheet {
+    display: none;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    border-radius: 20px 20px 0 0;
+    padding: 12px 20px 40px;
+    z-index: 30;
+    animation: slideUp 0.3s ease-out;
+  }
+  .settings-sheet.visible { display: block; }
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  .sheet-handle {
+    width: 36px;
+    height: 5px;
+    background: var(--bg-subtle);
+    border-radius: 3px;
+    margin: 0 auto 20px;
+  }
+  .sheet-title {
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .sheet-subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .settings-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .settings-row:last-child { border-bottom: none; }
+  .settings-row-drag {
+    color: var(--text-tertiary);
+    font-size: 16px;
+    cursor: grab;
+  }
+  .settings-row-label {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 500;
+  }
+  .settings-toggle {
+    width: 44px;
+    height: 26px;
+    border-radius: 13px;
+    border: none;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.2s;
+  }
+  .settings-toggle.on { background: var(--accent); }
+  .settings-toggle.off { background: var(--bg-subtle); }
+  .settings-toggle::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    transition: left 0.2s;
+  }
+  .settings-toggle.on::after { left: 21px; }
+  .settings-toggle.off::after { left: 3px; }
+
+  .settings-close {
+    width: 100%;
+    padding: 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    color: var(--text-secondary);
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    margin-top: 16px;
+    text-align: center;
+    font-family: inherit;
+    transition: background 0.15s;
+  }
+  .settings-close:hover { background: var(--bg-hover); }
+
+  /* Overlay */
+  .settings-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 25;
+    border-radius: 44px;
+  }
+  .settings-overlay.visible { display: block; }
+
+  /* Calendar navigation hint */
+  .cal-nav-toast {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--bg-card);
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    padding: 12px 20px;
+    z-index: 15;
+    text-align: center;
+    animation: fadeIn 0.2s;
+  }
+  .cal-nav-toast.visible { display: block; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+  .cal-nav-toast-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .cal-nav-toast-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+
+  .frame-container { position: relative; }
+</style>
+</head>
+<body>
+
+<div class="page-label">Home Screen — Enhanced Prototype</div>
+
+<div class="variant-tabs">
+  <button class="variant-tab active" onclick="showVariant('full')">Full (with data)</button>
+  <button class="variant-tab" onclick="showVariant('empty')">New User (empty)</button>
+  <button class="variant-tab" onclick="showVariant('edit')">Edit Mode</button>
+  <button class="variant-tab" onclick="showVariant('settings')">Settings Sheet</button>
+</div>
+
+<!-- ========== FULL STATE ========== -->
+<div class="frame-container" id="variant-full">
+<div class="phone-frame">
+  <div class="phone-scroll">
+    <div class="content-stack">
+
+      <!-- Header -->
+      <div class="header">
+        <div>
+          <div class="header-date">Thursday, Mar 20</div>
+          <div class="header-title">Workout</div>
+        </div>
+        <div class="header-avatar"></div>
+      </div>
+
+      <!-- Week Strip — with muscle group dots + tappable -->
+      <div class="week-strip" id="weekStrip">
+        <div class="day-card" onclick="showCalNav(this, 'Monday, Mar 17')">
+          <div class="abbr">MON</div>
+          <div class="num">17</div>
+          <div class="muscle-dots">
+            <div class="mdot" style="background: var(--muscle-chest);" title="Chest"></div>
+            <div class="mdot" style="background: var(--muscle-triceps);" title="Triceps"></div>
+            <div class="mdot" style="background: var(--muscle-shoulders);" title="Shoulders"></div>
+          </div>
+        </div>
+        <div class="day-card" onclick="showCalNav(this, 'Tuesday, Mar 18')">
+          <div class="abbr">TUE</div>
+          <div class="num">18</div>
+          <div class="muscle-dots"></div>
+        </div>
+        <div class="day-card" onclick="showCalNav(this, 'Wednesday, Mar 19')">
+          <div class="abbr">WED</div>
+          <div class="num">19</div>
+          <div class="muscle-dots">
+            <div class="mdot" style="background: var(--muscle-quads);" title="Quads"></div>
+            <div class="mdot" style="background: var(--muscle-hamstrings);" title="Hamstrings"></div>
+            <div class="mdot" style="background: var(--muscle-glutes);" title="Glutes"></div>
+          </div>
+        </div>
+        <div class="day-card today" onclick="showCalNav(this, 'Thursday, Mar 20')">
+          <div class="abbr">THU</div>
+          <div class="num">20</div>
+          <div class="muscle-dots"></div>
+        </div>
+        <div class="day-card" onclick="showCalNav(this, 'Friday, Mar 21')">
+          <div class="abbr">FRI</div>
+          <div class="num">21</div>
+          <div class="muscle-dots"></div>
+        </div>
+        <div class="day-card" onclick="showCalNav(this, 'Saturday, Mar 22')">
+          <div class="abbr">SAT</div>
+          <div class="num">22</div>
+          <div class="muscle-dots"></div>
+        </div>
+        <div class="day-card" onclick="showCalNav(this, 'Sunday, Mar 23')">
+          <div class="abbr">SUN</div>
+          <div class="num">23</div>
+          <div class="muscle-dots"></div>
+        </div>
+      </div>
+
+      <!-- Start Workout Card -->
+      <div class="start-card">
+        <div class="start-card-text">
+          <div class="start-card-label">READY TO TRAIN</div>
+          <div class="start-card-title">Start Workout</div>
+          <div class="start-card-desc">Tap to begin your session</div>
+        </div>
+        <div class="start-btn">+</div>
+      </div>
+
+      <!-- Customizable Section: Monthly Stats -->
+      <div class="section-wrapper" data-section="monthly-stats">
+        <div class="section-header">THIS MONTH</div>
+        <div class="monthly-card" style="margin-top: 10px;">
+          <div class="monthly-stats-row">
+            <div class="monthly-stat">
+              <div class="monthly-stat-value">12</div>
+              <div class="monthly-stat-label">Workouts</div>
+            </div>
+            <div class="monthly-stat">
+              <div class="monthly-stat-value">18.4t</div>
+              <div class="monthly-stat-label">Volume</div>
+            </div>
+            <div class="monthly-stat">
+              <div class="monthly-stat-value">186</div>
+              <div class="monthly-stat-label">Sets</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Customizable Section: Recent PRs -->
+      <div class="section-wrapper" data-section="recent-prs">
+        <div class="section-header">RECENT PRS</div>
+        <div class="pr-list" style="margin-top: 10px;">
+          <div class="pr-card">
+            <div class="pr-icon">&#x1F3C6;</div>
+            <div class="pr-info">
+              <div class="pr-exercise">Bench Press</div>
+              <div class="pr-detail">100kg x 5 reps</div>
+            </div>
+            <div class="pr-date">Today</div>
+          </div>
+          <div class="pr-card">
+            <div class="pr-icon">&#x1F3C6;</div>
+            <div class="pr-info">
+              <div class="pr-exercise">Squat</div>
+              <div class="pr-detail">140kg x 3 reps</div>
+            </div>
+            <div class="pr-date">2 days ago</div>
+          </div>
+          <div class="pr-card">
+            <div class="pr-icon">&#x1F3C6;</div>
+            <div class="pr-info">
+              <div class="pr-exercise">Overhead Press</div>
+              <div class="pr-detail">62.5kg x 6 reps</div>
+            </div>
+            <div class="pr-date">5 days ago</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Customizable Section: Trending Exercises -->
+      <div class="section-wrapper" data-section="trending">
+        <div class="section-header">TRENDING UP</div>
+        <div class="trending-list" style="margin-top: 10px;">
+          <div class="trending-card">
+            <div class="trending-icon">&#x2197;</div>
+            <div class="trending-info">
+              <div class="trending-name">Bench Press</div>
+              <div class="trending-detail">e1RM up 4.2% this month</div>
+            </div>
+          </div>
+          <div class="trending-card">
+            <div class="trending-icon">&#x2197;</div>
+            <div class="trending-info">
+              <div class="trending-name">Romanian Deadlift</div>
+              <div class="trending-detail">e1RM up 2.8% this month</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Customizable Section: Recent Workouts -->
+      <div class="section-wrapper" data-section="recent">
+        <div class="section-header">RECENT</div>
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+          <div class="workout-card">
+            <div class="workout-header">
+              <div class="workout-title">Morning Workout</div>
+              <div class="workout-date">Wednesday, Mar 19</div>
+            </div>
+            <div class="workout-stats">
+              <div class="stat-pill"><span class="stat-pill-icon">&#x1F4AA;</span> 5</div>
+              <div class="stat-pill"><span class="stat-pill-icon">&#x2713;</span> 18</div>
+              <div class="stat-pill"><span class="stat-pill-icon">&#x23F1;</span> 52m</div>
+              <div class="stat-pill"><span class="stat-pill-icon">&#x2696;</span> 2.1t</div>
+            </div>
+            <div class="muscle-tags">
+              <div class="muscle-tag"><div class="muscle-tag-dot" style="background: var(--muscle-chest);"></div>Chest</div>
+              <div class="muscle-tag"><div class="muscle-tag-dot" style="background: var(--muscle-triceps);"></div>Triceps</div>
+              <div class="muscle-tag"><div class="muscle-tag-dot" style="background: var(--muscle-shoulders);"></div>Shoulders</div>
+            </div>
+          </div>
+
+          <div class="workout-card">
+            <div class="workout-header">
+              <div class="workout-title">Afternoon Workout</div>
+              <div class="workout-date">Monday, Mar 17</div>
+            </div>
+            <div class="workout-stats">
+              <div class="stat-pill"><span class="stat-pill-icon">&#x1F4AA;</span> 4</div>
+              <div class="stat-pill"><span class="stat-pill-icon">&#x2713;</span> 16</div>
+              <div class="stat-pill"><span class="stat-pill-icon">&#x23F1;</span> 47m</div>
+              <div class="stat-pill"><span class="stat-pill-icon">&#x2696;</span> 2.8t</div>
+            </div>
+            <div class="muscle-tags">
+              <div class="muscle-tag"><div class="muscle-tag-dot" style="background: var(--muscle-quads);"></div>Quads</div>
+              <div class="muscle-tag"><div class="muscle-tag-dot" style="background: var(--muscle-hamstrings);"></div>Hamstrings</div>
+              <div class="muscle-tag"><div class="muscle-tag-dot" style="background: var(--muscle-glutes);"></div>Glutes</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Calendar navigation toast -->
+  <div class="cal-nav-toast" id="calNavToast">
+    <div class="cal-nav-toast-title" id="calNavDate">Monday, Mar 17</div>
+    <div class="cal-nav-toast-desc">Opens in Calendar tab</div>
+  </div>
+
+</div>
+</div>
+
+<!-- ========== EMPTY STATE ========== -->
+<div class="frame-container" id="variant-empty" style="display: none;">
+<div class="phone-frame">
+  <div class="phone-scroll">
+    <div class="content-stack">
+
+      <div class="header">
+        <div>
+          <div class="header-date">Thursday, Mar 20</div>
+          <div class="header-title">Workout</div>
+        </div>
+        <div class="header-avatar"></div>
+      </div>
+
+      <!-- Week Strip (no workouts — no dots) -->
+      <div class="week-strip">
+        <div class="day-card"><div class="abbr">MON</div><div class="num">17</div><div class="muscle-dots"></div></div>
+        <div class="day-card"><div class="abbr">TUE</div><div class="num">18</div><div class="muscle-dots"></div></div>
+        <div class="day-card"><div class="abbr">WED</div><div class="num">19</div><div class="muscle-dots"></div></div>
+        <div class="day-card today"><div class="abbr">THU</div><div class="num">20</div><div class="muscle-dots"></div></div>
+        <div class="day-card"><div class="abbr">FRI</div><div class="num">21</div><div class="muscle-dots"></div></div>
+        <div class="day-card"><div class="abbr">SAT</div><div class="num">22</div><div class="muscle-dots"></div></div>
+        <div class="day-card"><div class="abbr">SUN</div><div class="num">23</div><div class="muscle-dots"></div></div>
+      </div>
+
+      <div class="start-card">
+        <div class="start-card-text">
+          <div class="start-card-label">READY TO TRAIN</div>
+          <div class="start-card-title">Start Workout</div>
+          <div class="start-card-desc">Tap to begin your session</div>
+        </div>
+        <div class="start-btn">+</div>
+      </div>
+
+      <!-- All customizable sections hidden for new users -->
+
+      <div>
+        <div class="section-header">RECENT</div>
+        <div style="text-align: center; padding: 24px; font-size: 14px; font-weight: 500; color: var(--text-tertiary);">
+          Complete your first workout to see it here
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ========== EDIT MODE ========== -->
+<div class="frame-container" id="variant-edit" style="display: none;">
+<div class="phone-frame">
+
+  <!-- Edit banner -->
+  <div class="edit-banner visible">
+    <div class="edit-banner-text">Editing Home Screen</div>
+    <button class="edit-banner-done" onclick="showVariant('full')">Done</button>
+  </div>
+
+  <div class="phone-scroll" style="padding-top: 100px;">
+    <div class="content-stack">
+
+      <!-- Header (not editable) -->
+      <div class="header" style="opacity: 0.4;">
+        <div>
+          <div class="header-date">Thursday, Mar 20</div>
+          <div class="header-title">Workout</div>
+        </div>
+        <div class="header-avatar"></div>
+      </div>
+
+      <!-- Week Strip (not editable) -->
+      <div class="week-strip" style="opacity: 0.4;">
+        <div class="day-card"><div class="abbr">MON</div><div class="num">17</div><div class="muscle-dots"><div class="mdot" style="background: var(--muscle-chest);"></div><div class="mdot" style="background: var(--muscle-triceps);"></div><div class="mdot" style="background: var(--muscle-shoulders);"></div></div></div>
+        <div class="day-card"><div class="abbr">TUE</div><div class="num">18</div><div class="muscle-dots"></div></div>
+        <div class="day-card"><div class="abbr">WED</div><div class="num">19</div><div class="muscle-dots"><div class="mdot" style="background: var(--muscle-quads);"></div><div class="mdot" style="background: var(--muscle-hamstrings);"></div><div class="mdot" style="background: var(--muscle-glutes);"></div></div></div>
+        <div class="day-card today"><div class="abbr">THU</div><div class="num">20</div><div class="muscle-dots"></div></div>
+        <div class="day-card"><div class="abbr">FRI</div><div class="num">21</div><div class="muscle-dots"></div></div>
+        <div class="day-card"><div class="abbr">SAT</div><div class="num">22</div><div class="muscle-dots"></div></div>
+        <div class="day-card"><div class="abbr">SUN</div><div class="num">23</div><div class="muscle-dots"></div></div>
+      </div>
+
+      <!-- Start Workout (not editable) -->
+      <div class="start-card" style="opacity: 0.4;">
+        <div class="start-card-text">
+          <div class="start-card-label">READY TO TRAIN</div>
+          <div class="start-card-title">Start Workout</div>
+          <div class="start-card-desc">Tap to begin your session</div>
+        </div>
+        <div class="start-btn">+</div>
+      </div>
+
+      <!-- Editable sections with jiggle + controls -->
+      <div class="section-wrapper editing">
+        <div class="section-drag-handle">&#x2630;</div>
+        <div class="section-hide-btn">&#x2715;</div>
+        <div class="section-header">THIS MONTH</div>
+        <div class="monthly-card" style="margin-top: 10px;">
+          <div class="monthly-stats-row">
+            <div class="monthly-stat">
+              <div class="monthly-stat-value">12</div>
+              <div class="monthly-stat-label">Workouts</div>
+            </div>
+            <div class="monthly-stat">
+              <div class="monthly-stat-value">18.4t</div>
+              <div class="monthly-stat-label">Volume</div>
+            </div>
+            <div class="monthly-stat">
+              <div class="monthly-stat-value">186</div>
+              <div class="monthly-stat-label">Sets</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-wrapper editing">
+        <div class="section-drag-handle">&#x2630;</div>
+        <div class="section-hide-btn">&#x2715;</div>
+        <div class="section-header">RECENT PRS</div>
+        <div class="pr-list" style="margin-top: 10px;">
+          <div class="pr-card">
+            <div class="pr-icon">&#x1F3C6;</div>
+            <div class="pr-info">
+              <div class="pr-exercise">Bench Press</div>
+              <div class="pr-detail">100kg x 5 reps</div>
+            </div>
+            <div class="pr-date">Today</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-wrapper editing">
+        <div class="section-drag-handle">&#x2630;</div>
+        <div class="section-hide-btn">&#x2715;</div>
+        <div class="section-header">TRENDING UP</div>
+        <div class="trending-list" style="margin-top: 10px;">
+          <div class="trending-card">
+            <div class="trending-icon">&#x2197;</div>
+            <div class="trending-info">
+              <div class="trending-name">Bench Press</div>
+              <div class="trending-detail">e1RM up 4.2% this month</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Workouts: fixed, not customizable -->
+      <div style="opacity: 0.4;">
+        <div class="section-header">RECENT</div>
+        <div style="margin-top: 10px;">
+          <div class="workout-card">
+            <div class="workout-header">
+              <div class="workout-title">Morning Workout</div>
+              <div class="workout-date">Wednesday, Mar 19</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ========== SETTINGS SHEET ========== -->
+<div class="frame-container" id="variant-settings" style="display: none;">
+<div class="phone-frame">
+  <div class="phone-scroll" style="opacity: 0.3;">
+    <div class="content-stack">
+      <div class="header">
+        <div>
+          <div class="header-date">Thursday, Mar 20</div>
+          <div class="header-title">Workout</div>
+        </div>
+        <div class="header-avatar"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-overlay visible"></div>
+
+  <div class="settings-sheet visible">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Customize Home</div>
+    <div class="sheet-subtitle">Drag to reorder, toggle to show or hide</div>
+
+    <div class="settings-row">
+      <div class="settings-row-drag">&#x2630;</div>
+      <div class="settings-row-label">Monthly Stats</div>
+      <button class="settings-toggle on" onclick="this.classList.toggle('on'); this.classList.toggle('off');"></button>
+    </div>
+    <div class="settings-row">
+      <div class="settings-row-drag">&#x2630;</div>
+      <div class="settings-row-label">Recent PRs</div>
+      <button class="settings-toggle on" onclick="this.classList.toggle('on'); this.classList.toggle('off');"></button>
+    </div>
+    <div class="settings-row">
+      <div class="settings-row-drag">&#x2630;</div>
+      <div class="settings-row-label">Trending Up</div>
+      <button class="settings-toggle on" onclick="this.classList.toggle('on'); this.classList.toggle('off');"></button>
+    </div>
+    <button class="settings-close" onclick="showVariant('full')">Done</button>
+  </div>
+</div>
+</div>
+
+<div style="height: 60px;"></div>
+
+<script>
+function showVariant(v) {
+  ['full','empty','edit','settings'].forEach(id => {
+    document.getElementById('variant-' + id).style.display = 'none';
+  });
+  document.getElementById('variant-' + v).style.display = 'block';
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+// Calendar navigation demo
+let calNavTimeout;
+function showCalNav(el, dateStr) {
+  const toast = document.getElementById('calNavToast');
+  document.getElementById('calNavDate').textContent = dateStr;
+  toast.classList.add('visible');
+  clearTimeout(calNavTimeout);
+  calNavTimeout = setTimeout(() => toast.classList.remove('visible'), 1500);
+}
+</script>
+
+</body>
+</html>

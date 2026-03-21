@@ -20,6 +20,7 @@ final class CreateEditExerciseViewModel {
     var equipmentType: EquipmentType = .barbell
     var trackingType: TrackingType = .weightReps
     var primaryMuscle: String = ""
+    /// Hidden from the current form, but preserved for existing exercises.
     var secondaryMuscles: [String] = []
     var movementPattern: MovementPattern? = nil
     var unilateral: Bool = false
@@ -46,6 +47,18 @@ final class CreateEditExerciseViewModel {
         isEditing ? "Edit Exercise" : "New Exercise"
     }
 
+    var primaryMuscleOptions: [String] {
+        ExercisePrimaryGroup.options(including: primaryMuscle)
+    }
+
+    var primaryMuscleDisplayName: String {
+        guard let primaryMuscle = ExercisePrimaryGroup.normalizedValue(primaryMuscle) else {
+            return "Select Group"
+        }
+
+        return ExercisePrimaryGroup.displayName(for: primaryMuscle)
+    }
+
     // MARK: - Init
 
     init(exercise: Exercise?, exerciseService: any ExerciseServiceProtocol) {
@@ -57,7 +70,7 @@ final class CreateEditExerciseViewModel {
             name = exercise.name
             equipmentType = exercise.equipmentType
             trackingType = exercise.trackingType
-            primaryMuscle = exercise.primaryMuscle ?? ""
+            primaryMuscle = ExercisePrimaryGroup.normalizedValue(exercise.primaryMuscle) ?? ""
             secondaryMuscles = exercise.secondaryMuscles
             movementPattern = exercise.movementPattern
             unilateral = exercise.unilateral
@@ -84,8 +97,7 @@ final class CreateEditExerciseViewModel {
         defer { isSaving = false }
 
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
-        let trimmedMuscle = primaryMuscle.trimmingCharacters(in: .whitespaces)
-        let muscle: String? = trimmedMuscle.isEmpty ? nil : trimmedMuscle.lowercased()
+        let muscle = ExercisePrimaryGroup.normalizedValue(primaryMuscle)
 
         if isEditing, let existing = existingExercise {
             let originalTrackingType = existing.trackingType

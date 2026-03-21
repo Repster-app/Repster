@@ -165,6 +165,11 @@
 		AN0007 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0007 /* HomeView.swift */; };
 		AN0008 /* CopyPreviousSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0008 /* CopyPreviousSheet.swift */; };
 		AN0009 /* WorkoutDetailFromHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0009 /* WorkoutDetailFromHomeView.swift */; };
+		AN0010 /* HomeSectionConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0010 /* HomeSectionConfig.swift */; };
+		AN0011 /* MonthlyStatsCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0011 /* MonthlyStatsCardView.swift */; };
+		AN0012 /* RecentPRsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0012 /* RecentPRsView.swift */; };
+		AN0013 /* TrendingExercisesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0013 /* TrendingExercisesView.swift */; };
+		AN0014 /* CustomizeHomeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0014 /* CustomizeHomeSheet.swift */; };
 		AT0001 /* WorkoutTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BT0001 /* WorkoutTemplate.swift */; };
 		AT0002 /* TemplateExercise.swift in Sources */ = {isa = PBXBuildFile; fileRef = BT0002 /* TemplateExercise.swift */; };
 		AT0003 /* TemplateSet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BT0003 /* TemplateSet.swift */; };
@@ -400,6 +405,11 @@
 		BN0007 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		BN0008 /* CopyPreviousSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyPreviousSheet.swift; sourceTree = "<group>"; };
 		BN0009 /* WorkoutDetailFromHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutDetailFromHomeView.swift; sourceTree = "<group>"; };
+		BN0010 /* HomeSectionConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSectionConfig.swift; sourceTree = "<group>"; };
+		BN0011 /* MonthlyStatsCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthlyStatsCardView.swift; sourceTree = "<group>"; };
+		BN0012 /* RecentPRsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentPRsView.swift; sourceTree = "<group>"; };
+		BN0013 /* TrendingExercisesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendingExercisesView.swift; sourceTree = "<group>"; };
+		BN0014 /* CustomizeHomeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomizeHomeSheet.swift; sourceTree = "<group>"; };
 		BT0001 /* WorkoutTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutTemplate.swift; sourceTree = "<group>"; };
 		BT0002 /* TemplateExercise.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateExercise.swift; sourceTree = "<group>"; };
 		BT0003 /* TemplateSet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateSet.swift; sourceTree = "<group>"; };
@@ -666,6 +676,7 @@
 		D20009 /* Home */ = {
 			isa = PBXGroup;
 			children = (
+				D30024 /* Models */,
 				D30022 /* ViewModels */,
 				D30023 /* Views */,
 			);
@@ -907,9 +918,21 @@
 				BN0007 /* HomeView.swift */,
 				BN0008 /* CopyPreviousSheet.swift */,
 				BN0009 /* WorkoutDetailFromHomeView.swift */,
+				BN0011 /* MonthlyStatsCardView.swift */,
+				BN0012 /* RecentPRsView.swift */,
+				BN0013 /* TrendingExercisesView.swift */,
+				BN0014 /* CustomizeHomeSheet.swift */,
 				ZB0021 /* StartWorkoutSheet.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		D30024 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				BN0010 /* HomeSectionConfig.swift */,
+			);
+			path = Models;
 			sourceTree = "<group>";
 		};
 		D40001 /* Services */ = {
@@ -1416,6 +1439,11 @@
 				AN0007 /* HomeView.swift in Sources */,
 				AN0008 /* CopyPreviousSheet.swift in Sources */,
 				AN0009 /* WorkoutDetailFromHomeView.swift in Sources */,
+				AN0010 /* HomeSectionConfig.swift in Sources */,
+				AN0011 /* MonthlyStatsCardView.swift in Sources */,
+				AN0012 /* RecentPRsView.swift in Sources */,
+				AN0013 /* TrendingExercisesView.swift in Sources */,
+				AN0014 /* CustomizeHomeSheet.swift in Sources */,
 				AI0001 /* ChartModels.swift in Sources */,
 				ZA0001 /* TrendLineCalculator.swift in Sources */,
 				ZA0002 /* ChartsTabViewModel.swift in Sources */,

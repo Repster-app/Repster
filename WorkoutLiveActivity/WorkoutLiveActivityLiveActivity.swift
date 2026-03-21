@@ -28,11 +28,18 @@ struct WorkoutLiveActivityWidget: Widget {
                         Text(context.attributes.workoutTitle)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                         Text(context.state.exerciseName)
                             .font(.subheadline)
                             .fontWeight(.semibold)
                             .lineLimit(1)
+                            .truncationMode(.tail)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, ExpandedIslandLayout.topInset)
+                    .padding(.leading, ExpandedIslandLayout.outerHorizontalInset)
+                    .padding(.trailing, ExpandedIslandLayout.innerHorizontalInset)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     VStack(alignment: .trailing, spacing: 2) {
@@ -43,12 +50,20 @@ struct WorkoutLiveActivityWidget: Widget {
                         )
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
 
                         // Set progress
                         Text("Set \(context.state.currentSetNumber)/\(context.state.totalSets)")
                             .font(.subheadline)
                             .fontWeight(.semibold)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.top, ExpandedIslandLayout.topInset)
+                    .padding(.leading, ExpandedIslandLayout.innerHorizontalInset)
+                    .padding(.trailing, ExpandedIslandLayout.outerHorizontalInset)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     restTimerSection(context: context)
@@ -202,6 +217,12 @@ struct WorkoutLiveActivityWidget: Widget {
         }
     }
 
+}
+
+private enum ExpandedIslandLayout {
+    static let topInset: CGFloat = 6
+    static let outerHorizontalInset: CGFloat = 12
+    static let innerHorizontalInset: CGFloat = 4
 }
 
 // MARK: - Legacy Dark Scheme Modifier
