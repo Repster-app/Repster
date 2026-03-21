@@ -172,6 +172,14 @@ struct SetRowView: View {
         .frame(height: 52)
         .background(rowBackground)
         .opacity(set.setType == .warmup ? 0.5 : 1.0)
+        .overlay {
+            if isEditingRow {
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.accent.opacity(0.20), lineWidth: 1)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 4)
+            }
+        }
         .overlay(
             Rectangle()
                 .frame(height: 1)
@@ -415,12 +423,26 @@ struct SetRowView: View {
     // MARK: - Row Background (T015)
 
     /// Green tint for completed rows, clear otherwise.
-    private var rowBackground: Color {
-        self.set.completed ? Color.successSoft : Color.clear
+    @ViewBuilder
+    private var rowBackground: some View {
+        if self.set.completed {
+            Color.successSoft
+        } else if isEditingRow {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.accent.opacity(0.05))
+                .padding(.horizontal, 4)
+                .padding(.vertical, 4)
+        } else {
+            Color.clear
+        }
     }
 
     private var hasNote: Bool {
         self.set.notes != nil && !(self.set.notes?.isEmpty ?? true)
+    }
+
+    private var isEditingRow: Bool {
+        !set.completed && focusedInput != nil
     }
 
     @ViewBuilder
@@ -429,7 +451,8 @@ struct SetRowView: View {
             number: setNumber,
             setType: set.setType,
             isCompleted: set.completed,
-            hasNote: hasNote
+            hasNote: hasNote,
+            isEditing: isEditingRow
         )
 
         if hasNote {

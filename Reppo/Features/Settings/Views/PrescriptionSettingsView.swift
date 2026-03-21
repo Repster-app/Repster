@@ -7,17 +7,20 @@ import SwiftUI
 struct SmartSuggestionsAdvancedSettingsView: View {
     let profile: HealthProfile
     private let settingsService: any SettingsServiceProtocol
+    let fatigueLearningService: FatigueLearningService
 
-    init(profile: HealthProfile, settingsService: any SettingsServiceProtocol) {
+    init(profile: HealthProfile, settingsService: any SettingsServiceProtocol, fatigueLearningService: FatigueLearningService) {
         self.profile = profile
         self.settingsService = settingsService
+        self.fatigueLearningService = fatigueLearningService
     }
 
     var body: some View {
         Form {
             SmartSuggestionsAdvancedSections(
                 profile: profile,
-                settingsService: settingsService
+                settingsService: settingsService,
+                fatigueLearningService: fatigueLearningService
             )
         }
         .scrollContentBackground(.hidden)
@@ -32,14 +35,13 @@ struct SmartSuggestionsAdvancedSections: View {
 
     // MARK: - State
 
-    @State private var freshnessEnabled: Bool
-    @State private var freshnessPercent: Double
     @State private var fatigueEnabled: Bool
     @State private var recencyWeeks: Int
     @State private var defaultTargetReps: Int
     @State private var defaultTargetRIR: Int
 
     private let settingsService: any SettingsServiceProtocol
+    private let fatigueLearningService: FatigueLearningService
     private let firstSectionTitle: String?
 
     // MARK: - Options
@@ -50,14 +52,14 @@ struct SmartSuggestionsAdvancedSections: View {
 
     init(profile: HealthProfile,
          settingsService: any SettingsServiceProtocol,
+         fatigueLearningService: FatigueLearningService,
          firstSectionTitle: String? = nil) {
-        _freshnessEnabled = State(initialValue: profile.prescriptionFreshnessBonus ?? false)
-        _freshnessPercent = State(initialValue: (profile.prescriptionFreshnessBonusPercent ?? 0.03) * 100)
         _fatigueEnabled = State(initialValue: profile.prescriptionFatigueModelingEnabled ?? true)
         _recencyWeeks = State(initialValue: profile.prescriptionRecencyWeeks ?? 6)
         _defaultTargetReps = State(initialValue: profile.prescriptionDefaultTargetReps ?? 8)
         _defaultTargetRIR = State(initialValue: profile.prescriptionDefaultTargetRIR ?? 2)
         self.settingsService = settingsService
+        self.fatigueLearningService = fatigueLearningService
         self.firstSectionTitle = firstSectionTitle
     }
 
@@ -68,7 +70,6 @@ struct SmartSuggestionsAdvancedSections: View {
             defaultsSection
             recencySection
             fatigueSection
-            freshnessSection
         }
     }
 
@@ -140,53 +141,22 @@ struct SmartSuggestionsAdvancedSections: View {
 
     private var fatigueSection: some View {
         Section {
-            Toggle("Fatigue Modeling", isOn: $fatigueEnabled)
+            Toggle("Fatigue", isOn: $fatigueEnabled)
                 .foregroundColor(.textPrimary)
                 .onChange(of: fatigueEnabled) { _, newValue in
                     Task { try? await settingsService.updatePrescriptionFatigueModelingEnabled(newValue) }
                 }
-        } footer: {
-            Text("When enabled, suggested weights decrease across sets to account for accumulated fatigue. Uses your rest timer duration to model recovery between sets.")
-                .foregroundColor(.textTertiary)
-        }
-    }
 
-    private var freshnessSection: some View {
-        Section {
-            Toggle("First Set Bonus", isOn: $freshnessEnabled)
-                .foregroundColor(.textPrimary)
-                .onChange(of: freshnessEnabled) { _, newValue in
-                    Task {
-                        try? await settingsService.updatePrescriptionFreshnessBonus(
-                            enabled: newValue,
-                            percent: freshnessPercent / 100.0
-                        )
-                    }
+            if fatigueEnabled {
+                NavigationLink {
+                    FatigueLearningAdminView(fatigueLearningService: fatigueLearningService)
+                } label: {
+                    Label("Fatigue Learning", systemImage: "brain.head.profile")
+                        .foregroundStyle(Color.textPrimary)
                 }
-
-            if freshnessEnabled {
-                HStack {
-                    Text("Bonus")
-                        .foregroundColor(.textPrimary)
-                    Spacer()
-                    Text("\(Int(freshnessPercent))%")
-                        .foregroundColor(.textSecondary)
-                        .frame(width: 40)
-                }
-
-                Slider(value: $freshnessPercent, in: 1...10, step: 1)
-                    .tint(.accent)
-                    .onChange(of: freshnessPercent) { _, newValue in
-                        Task {
-                            try? await settingsService.updatePrescriptionFreshnessBonus(
-                                enabled: freshnessEnabled,
-                                percent: newValue / 100.0
-                            )
-                        }
-                    }
             }
         } footer: {
-            Text("Adds a small weight increase on the first set of each exercise to probe your capacity when you're fresh.")
+            Text("When enabled, suggested weights decrease across sets to account for accumulated fatigue. Uses your rest timer duration to model recovery between sets.")
                 .foregroundColor(.textTertiary)
         }
     }

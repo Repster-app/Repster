@@ -424,30 +424,22 @@ private struct SmartSuggestionsSettingsView: View {
                     }
                 }
 
-                if let profile = viewModel.profile {
-                    SmartSuggestionsAdvancedSections(
-                        profile: profile,
-                        settingsService: settingsService,
-                        firstSectionTitle: "Advanced"
-                    )
-                }
             } footer: {
                 Text("Default increment controls how suggested weights are rounded before they appear in your workout.")
                     .foregroundStyle(Color.textTertiary)
             }
 
-            Section {
-                NavigationLink {
-                    FatigueLearningAdminView(fatigueLearningService: fatigueLearningService)
-                } label: {
-                    Label("Fatigue Learning", systemImage: "brain.head.profile")
-                        .foregroundStyle(Color.textPrimary)
-                }
-                .listRowBackground(Color.bgCard)
-            } footer: {
-                Text("View and manage adaptive fatigue rate learning per exercise.")
-                    .foregroundStyle(Color.textTertiary)
+            if let profile = viewModel.profile, viewModel.smartSuggestionsEnabled {
+                SmartSuggestionsAdvancedSections(
+                    profile: profile,
+                    settingsService: settingsService,
+                    fatigueLearningService: fatigueLearningService
+                )
             }
+
+            Section { EmptyView() }
+                .listRowBackground(Color.clear)
+                .frame(height: 80)
         }
         .scrollContentBackground(.hidden)
         .background(Color.bg)

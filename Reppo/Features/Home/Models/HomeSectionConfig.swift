@@ -1,14 +1,14 @@
 // HomeSectionConfig.swift
 // Model for home screen section visibility and ordering.
-// Only the new widget sections (Monthly Stats, Recent PRs, Trending Up) are customizable.
+// Only Monthly Stats and Recent PRs are customizable.
 // Recent Workouts is always fixed at the bottom.
 
 import Foundation
 
-enum HomeSectionId: String, Codable, CaseIterable, Identifiable {
+enum HomeSectionId: String, Codable, Hashable, Identifiable {
     case monthlyStats
     case recentPRs
-    case trendingUp
+    case legacyTrendingUp = "trendingUp"
 
     var id: String { rawValue }
 
@@ -16,25 +16,33 @@ enum HomeSectionId: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .monthlyStats: return "Monthly Stats"
         case .recentPRs: return "Recent PRs"
-        case .trendingUp: return "Trending Up"
+        case .legacyTrendingUp: return "Trending Up"
+        }
+    }
+
+    var isSupportedHomeSection: Bool {
+        switch self {
+        case .monthlyStats, .recentPRs:
+            return true
+        case .legacyTrendingUp:
+            return false
         }
     }
 }
 
-struct HomeSectionEntry: Codable, Identifiable {
+struct HomeSectionEntry: Codable, Equatable, Identifiable {
     let sectionId: HomeSectionId
     var visible: Bool
 
     var id: String { sectionId.rawValue }
 }
 
-struct HomeSectionConfig: Codable {
+struct HomeSectionConfig: Codable, Equatable {
     var sections: [HomeSectionEntry]
 
     static let `default` = HomeSectionConfig(sections: [
         HomeSectionEntry(sectionId: .monthlyStats, visible: true),
         HomeSectionEntry(sectionId: .recentPRs, visible: true),
-        HomeSectionEntry(sectionId: .trendingUp, visible: true),
     ])
 
     var visibleSections: [HomeSectionEntry] {
@@ -50,12 +58,33 @@ struct HomeSectionConfig: Codable {
               let config = try? JSONDecoder().decode(HomeSectionConfig.self, from: data) else {
             return .default
         }
-        return config
+        let sanitized = config.sanitized()
+        if sanitized != config {
+            sanitized.save()
+        }
+        return sanitized
     }
 
     func save() {
         if let data = try? JSONEncoder().encode(self) {
             UserDefaults.standard.set(data, forKey: Self.userDefaultsKey)
         }
+    }
+
+    private func sanitized() -> HomeSectionConfig {
+        let supportedOrder: [HomeSectionId] = [.monthlyStats, .recentPRs]
+        var seen = Set<HomeSectionId>()
+        var sanitizedSections: [HomeSectionEntry] = []
+
+        for entry in sections where entry.sectionId.isSupportedHomeSection {
+            guard seen.insert(entry.sectionId).inserted else { continue }
+            sanitizedSections.append(entry)
+        }
+
+        for sectionId in supportedOrder where !seen.contains(sectionId) {
+            sanitizedSections.append(HomeSectionEntry(sectionId: sectionId, visible: true))
+        }
+
+        return HomeSectionConfig(sections: sanitizedSections)
     }
 }

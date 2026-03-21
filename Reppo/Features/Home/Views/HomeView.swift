@@ -122,10 +122,8 @@ struct HomeView: View {
             if !viewModel.recentPRs.isEmpty {
                 RecentPRsView(prs: viewModel.recentPRs)
             }
-        case .trendingUp:
-            if !viewModel.trendingExercises.isEmpty {
-                TrendingExercisesView(exercises: viewModel.trendingExercises)
-            }
+        case .legacyTrendingUp:
+            EmptyView()
         }
     }
 

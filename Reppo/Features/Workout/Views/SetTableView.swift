@@ -140,7 +140,7 @@ struct SetTableView: View {
             // Input column headers — adapt to trackingType
             switch trackingType {
             case .weightReps, .custom:
-                Text("KG")
+                Text("WEIGHT")
                     .frame(maxWidth: .infinity)
                 Text("REPS")
                     .frame(maxWidth: .infinity)
@@ -150,13 +150,13 @@ struct SetTableView: View {
                     .frame(maxWidth: .infinity)
 
             case .weightDistance:
-                Text("KG")
+                Text("WEIGHT")
                     .frame(maxWidth: .infinity)
                 Text("DIST")
                     .frame(maxWidth: .infinity)
 
             case .weightRepsDuration:
-                Text("KG")
+                Text("WEIGHT")
                     .frame(maxWidth: .infinity)
                 Text("REPS")
                     .frame(maxWidth: .infinity)
@@ -177,14 +177,16 @@ struct SetTableView: View {
                 .frame(width: 40)
         }
         .font(.system(size: 11, weight: .semibold))
+        .kerning(0.8)
         .textCase(.uppercase)
-        .foregroundColor(.textTertiary)
+        .foregroundColor(Color.textPrimary.opacity(0.78))
         .padding(.horizontal, 8)
-        .frame(height: 36)
+        .frame(height: 38)
+        .background(Color.bgInput.opacity(0.78))
         .overlay(
             Rectangle()
                 .frame(height: 1)
-                .foregroundColor(.white.opacity(0.03)),
+                .foregroundColor(.white.opacity(0.08)),
             alignment: .bottom
         )
     }
@@ -195,34 +197,43 @@ struct SetTableView: View {
     @ViewBuilder
     private func addButtons(for exerciseId: UUID) -> some View {
         HStack(spacing: 12) {
-            Button {
+            addActionButton(title: "Add Set") {
                 Task {
                     await dataSource.addSet(for: exerciseId)
                 }
-            } label: {
-                Text("+ Add Set")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.textSecondary)
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 44)
             }
-            .buttonStyle(.plain)
 
-            Button {
+            addActionButton(title: "Add Warmup") {
                 Task {
                     await dataSource.addWarmupSet(for: exerciseId)
                 }
-            } label: {
-                Text("+ Add Warmup")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.textSecondary)
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 44)
             }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
+    }
+
+    private func addActionButton(title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                    .font(.system(size: 13, weight: .semibold))
+
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundColor(.textPrimary)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 44)
+            .background(Color.bgInput)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.border, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -715,7 +726,7 @@ struct SetEntryKeyboardOverlay: View {
                         Image(systemName: "wand.and.stars")
                             .font(.system(size: 13, weight: .semibold))
                         if let weight = suggestedWeight {
-                            Text(UnitConversion.formatWeight(weight))
+                            Text("\(UnitConversion.formatWeight(weight)) kg")
                                 .font(.system(size: 13, weight: .semibold))
                         }
                     }

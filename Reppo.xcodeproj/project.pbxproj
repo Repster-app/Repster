@@ -174,7 +174,6 @@
 		AN0010 /* HomeSectionConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0010 /* HomeSectionConfig.swift */; };
 		AN0011 /* MonthlyStatsCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0011 /* MonthlyStatsCardView.swift */; };
 		AN0012 /* RecentPRsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0012 /* RecentPRsView.swift */; };
-		AN0013 /* TrendingExercisesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0013 /* TrendingExercisesView.swift */; };
 		AN0014 /* CustomizeHomeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0014 /* CustomizeHomeSheet.swift */; };
 		AT0001 /* WorkoutTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BT0001 /* WorkoutTemplate.swift */; };
 		AT0002 /* TemplateExercise.swift in Sources */ = {isa = PBXBuildFile; fileRef = BT0002 /* TemplateExercise.swift */; };
@@ -420,7 +419,6 @@
 		BN0010 /* HomeSectionConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSectionConfig.swift; sourceTree = "<group>"; };
 		BN0011 /* MonthlyStatsCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthlyStatsCardView.swift; sourceTree = "<group>"; };
 		BN0012 /* RecentPRsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentPRsView.swift; sourceTree = "<group>"; };
-		BN0013 /* TrendingExercisesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendingExercisesView.swift; sourceTree = "<group>"; };
 		BN0014 /* CustomizeHomeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomizeHomeSheet.swift; sourceTree = "<group>"; };
 		BT0001 /* WorkoutTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutTemplate.swift; sourceTree = "<group>"; };
 		BT0002 /* TemplateExercise.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateExercise.swift; sourceTree = "<group>"; };
@@ -934,7 +932,6 @@
 				BN0009 /* WorkoutDetailFromHomeView.swift */,
 				BN0011 /* MonthlyStatsCardView.swift */,
 				BN0012 /* RecentPRsView.swift */,
-				BN0013 /* TrendingExercisesView.swift */,
 				BN0014 /* CustomizeHomeSheet.swift */,
 				ZB0021 /* StartWorkoutSheet.swift */,
 			);
@@ -1460,7 +1457,6 @@
 				AN0010 /* HomeSectionConfig.swift in Sources */,
 				AN0011 /* MonthlyStatsCardView.swift in Sources */,
 				AN0012 /* RecentPRsView.swift in Sources */,
-				AN0013 /* TrendingExercisesView.swift in Sources */,
 				AN0014 /* CustomizeHomeSheet.swift in Sources */,
 				AI0001 /* ChartModels.swift in Sources */,
 				ZA0001 /* TrendLineCalculator.swift in Sources */,

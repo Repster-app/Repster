@@ -150,13 +150,9 @@ struct ActiveWorkoutView: View {
 
     /// Segmented picker for [Sets | History | Charts] with exercise settings gear icon.
     private var subTabPicker: some View {
-        HStack(spacing: 8) {
-            Picker("Sub-tab", selection: $selectedSubTab) {
-                ForEach(ExerciseSubTab.allCases, id: \.self) { tab in
-                    Text(tab.rawValue).tag(tab)
-                }
-            }
-            .pickerStyle(.segmented)
+        HStack(spacing: 10) {
+            WorkoutSubTabBar(selectedTab: $selectedSubTab)
+                .frame(maxWidth: .infinity)
 
             // Exercise settings gear icon
             Button {
@@ -397,4 +393,36 @@ struct ActiveWorkoutView: View {
         .frame(maxWidth: .infinity)
     }
 
+}
+
+private struct WorkoutSubTabBar: View {
+    @Binding var selectedTab: ExerciseSubTab
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(ExerciseSubTab.allCases, id: \.self) { tab in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        selectedTab = tab
+                    }
+                } label: {
+                    Text(tab.rawValue)
+                        .font(.system(size: 14, weight: selectedTab == tab ? .semibold : .medium))
+                        .foregroundStyle(selectedTab == tab ? Color.textPrimary : Color.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 44)
+                        .background(selectedTab == tab ? Color.bgSubtle : Color.clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(4)
+        .background(Color.bgCard.opacity(0.9))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.border, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
 }

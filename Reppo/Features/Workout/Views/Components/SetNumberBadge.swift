@@ -27,6 +27,9 @@ struct SetNumberBadge: View {
     /// Whether this set has a note — shows an orange indicator dot.
     var hasNote: Bool = false
 
+    /// Whether this set is currently active for editing.
+    var isEditing: Bool = false
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Group {
@@ -60,18 +63,51 @@ struct SetNumberBadge: View {
         Text("W\(number)")
             .font(.system(size: 11, weight: .semibold))
             .italic()
-            .foregroundColor(.textTertiary)
+            .foregroundColor(isEditing ? .textPrimary : .textTertiary)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 3)
+            .background(isEditing ? Color.accent.opacity(0.08) : Color.clear)
+            .clipShape(Capsule())
     }
 
     /// Numbered badge — green background when completed, subtle background otherwise.
     private var numberedBadge: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 8)
-                .fill(isCompleted ? Color.success : Color.bgSubtle)
+                .fill(numberedBadgeBackground)
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(numberedBadgeBorder, lineWidth: isEditing && !isCompleted ? 1 : 0)
             Text("\(number)")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(isCompleted ? .white : .textTertiary)
+                .foregroundColor(numberedBadgeForeground)
         }
+    }
+
+    private var numberedBadgeBackground: Color {
+        if isCompleted {
+            return .success
+        }
+        if isEditing {
+            return Color.accent.opacity(0.09)
+        }
+        return .bgSubtle
+    }
+
+    private var numberedBadgeBorder: Color {
+        if isCompleted {
+            return .clear
+        }
+        return Color.accent.opacity(0.18)
+    }
+
+    private var numberedBadgeForeground: Color {
+        if isCompleted {
+            return .white
+        }
+        if isEditing {
+            return .textPrimary
+        }
+        return .textTertiary
     }
 }
 

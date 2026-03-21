@@ -124,14 +124,29 @@ actor StatsService: StatsServiceProtocol {
 
     func fetchRecentPRs(since: Date, limit: Int) async throws -> [PerformanceRecord] {
         let records = try await performanceRecordRepo.fetchRecentRepMaxRecords(since: since)
-        // Keep only the most recent PR per exercise
+
+        // Resolve the user's e1RM formula once
+        let profile = try await healthProfileRepo.fetchOrCreate()
+        let formula = E1RMFormula(rawValue: profile.e1RMFormula) ?? .epley
+
+        // Keep only the most recent PR per exercise, but only if it's the e1RM max
         var seen = Set<UUID>()
         var result: [PerformanceRecord] = []
         for record in records {
-            if seen.insert(record.exerciseId).inserted {
-                result.append(record)
-                if result.count >= limit { break }
-            }
+            guard seen.insert(record.exerciseId).inserted else { continue }
+
+            // Check if this record's e1RM is the best across all repMax records for the exercise
+            let allRepMaxes = try await performanceRecordRepo.fetchAll(
+                for: record.exerciseId,
+                recordType: .repMax
+            )
+            let recordE1RM = formula.calculate(weight: record.value, reps: record.reps ?? 1)
+            let bestE1RM = allRepMaxes.map { formula.calculate(weight: $0.value, reps: $0.reps ?? 1) }.max() ?? 0
+
+            guard recordE1RM >= bestE1RM else { continue }
+
+            result.append(record)
+            if result.count >= limit { break }
         }
         return result
     }

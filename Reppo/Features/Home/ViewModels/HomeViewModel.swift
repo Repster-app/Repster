@@ -70,10 +70,9 @@ final class HomeViewModel {
     // Recent workouts
     var recentWorkouts: [RecentWorkoutSummary] = []
 
-    // New sections
+    // Customizable sections
     var monthlyStats: MonthlyStats? = nil
     var recentPRs: [RecentPR] = []
-    var trendingExercises: [TrendingExercise] = []
 
     // Section customization
     var sectionConfig: HomeSectionConfig = HomeSectionConfig.load()
@@ -126,7 +125,6 @@ final class HomeViewModel {
         await loadRecentWorkouts()
         await loadMonthlyStats()
         await loadRecentPRs()
-        await loadTrendingExercises()
     }
 
     func checkActiveWorkout() async {
@@ -286,53 +284,6 @@ final class HomeViewModel {
         } catch {
             print("[HomeViewModel] Failed to load recent PRs: \(error)")
             recentPRs = []
-        }
-    }
-
-    // MARK: - Trending Exercises
-
-    private func loadTrendingExercises() async {
-        do {
-            let allStats = try await statsService.fetchAllStats()
-
-            var trending: [(exercise: TrendingExercise, score: Double)] = []
-            for (exerciseId, stats) in allStats {
-                guard stats.estimated1RMTrendSlope > 0,
-                      stats.totalWorkouts >= 3,
-                      stats.bestE1RM > 0 else { continue }
-
-                let exerciseName: String
-                if let exercise = try await cachedExercise(exerciseId) {
-                    exerciseName = exercise.name
-                } else {
-                    continue
-                }
-
-                // Convert slope to approximate monthly percentage
-                let monthlyPercent = (stats.estimated1RMTrendSlope * 30) / stats.bestE1RM * 100
-                guard monthlyPercent > 0.5 else { continue }  // only show meaningful trends
-
-                // Blend percentage with workout frequency so well-practiced exercises rank higher
-                let frequencyWeight = min(Double(stats.totalWorkouts) / 10.0, 1.5)
-                let compositeScore = monthlyPercent * frequencyWeight
-
-                trending.append((
-                    exercise: TrendingExercise(
-                        id: exerciseId,
-                        exerciseName: exerciseName,
-                        trendPercent: monthlyPercent
-                    ),
-                    score: compositeScore
-                ))
-            }
-
-            trendingExercises = trending
-                .sorted { $0.score > $1.score }
-                .prefix(2)
-                .map { $0.exercise }
-        } catch {
-            print("[HomeViewModel] Failed to load trending exercises: \(error)")
-            trendingExercises = []
         }
     }
 

@@ -2960,6 +2960,43 @@ final class FatigueModelV2Tests: XCTestCase {
     }
 }
 
+@MainActor
+final class TemplateMuscleTagLayoutTests: XCTestCase {
+
+    func testNoMusclesShowsNoVisibleTagsAndNoOverflow() {
+        let layout = TemplateMuscleTagLayout(muscleGroups: [])
+
+        XCTAssertEqual(layout.visibleMuscleGroups, [])
+        XCTAssertEqual(layout.hiddenMuscleGroupCount, 0)
+    }
+
+    func testUpToThreeMusclesShowsAllWithoutOverflow() {
+        let muscles = ["chest", "back", "shoulders"]
+        let layout = TemplateMuscleTagLayout(muscleGroups: muscles)
+
+        XCTAssertEqual(layout.visibleMuscleGroups, muscles)
+        XCTAssertEqual(layout.hiddenMuscleGroupCount, 0)
+    }
+
+    func testFourMusclesShowsFirstThreeAndPlusOne() {
+        let layout = TemplateMuscleTagLayout(
+            muscleGroups: ["chest", "back", "shoulders", "biceps"]
+        )
+
+        XCTAssertEqual(layout.visibleMuscleGroups, ["chest", "back", "shoulders"])
+        XCTAssertEqual(layout.hiddenMuscleGroupCount, 1)
+    }
+
+    func testSixMusclesShowsFirstThreeAndPlusThree() {
+        let layout = TemplateMuscleTagLayout(
+            muscleGroups: ["chest", "back", "shoulders", "biceps", "triceps", "legs"]
+        )
+
+        XCTAssertEqual(layout.visibleMuscleGroups, ["chest", "back", "shoulders"])
+        XCTAssertEqual(layout.hiddenMuscleGroupCount, 3)
+    }
+}
+
 private extension PREvaluationResult {
     static func empty(for setId: UUID) -> PREvaluationResult {
         PREvaluationResult(

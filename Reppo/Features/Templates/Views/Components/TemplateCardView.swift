@@ -24,6 +24,18 @@ struct TemplateCardView: View {
         String(template.name.prefix(1)).uppercased()
     }
 
+    private var muscleTagLayout: TemplateMuscleTagLayout {
+        TemplateMuscleTagLayout(muscleGroups: template.muscleGroups)
+    }
+
+    private var visibleMuscleGroups: [String] {
+        muscleTagLayout.visibleMuscleGroups
+    }
+
+    private var hiddenMuscleGroupCount: Int {
+        muscleTagLayout.hiddenMuscleGroupCount
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             Button(action: onTap) {
@@ -56,16 +68,14 @@ struct TemplateCardView: View {
                                 .foregroundColor(.textSecondary)
                         }
 
-                        if !template.muscleGroups.isEmpty {
+                        if !visibleMuscleGroups.isEmpty {
                             HStack(spacing: 4) {
-                                ForEach(template.muscleGroups.prefix(4), id: \.self) { muscle in
-                                    Text(muscle.capitalized)
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .foregroundColor(.textSecondary)
-                                        .padding(.horizontal, 7)
-                                        .padding(.vertical, 2)
-                                        .background(Color.bgSubtle)
-                                        .cornerRadius(4)
+                                ForEach(visibleMuscleGroups, id: \.self) { muscle in
+                                    muscleTag(muscle.capitalized)
+                                }
+
+                                if hiddenMuscleGroupCount > 0 {
+                                    muscleTag("+\(hiddenMuscleGroupCount)")
                                 }
                             }
                         }
@@ -142,5 +152,30 @@ struct TemplateCardView: View {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
         return formatter.localizedString(for: date, relativeTo: Date())
+    }
+
+    @ViewBuilder
+    private func muscleTag(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundColor(.textSecondary)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(Color.bgSubtle)
+            .cornerRadius(4)
+    }
+}
+
+struct TemplateMuscleTagLayout: Equatable {
+    let visibleMuscleGroups: [String]
+    let hiddenMuscleGroupCount: Int
+
+    init(muscleGroups: [String], maxVisibleMuscleGroups: Int = 3) {
+        let cappedVisibleCount = max(0, maxVisibleMuscleGroups)
+        visibleMuscleGroups = Array(muscleGroups.prefix(cappedVisibleCount))
+        hiddenMuscleGroupCount = max(0, muscleGroups.count - cappedVisibleCount)
     }
 }
