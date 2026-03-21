@@ -261,7 +261,8 @@ final class ChartDataServiceTests: XCTestCase {
             exerciseStatsRepository: exerciseStatsRepo,
             setRepository: setRepo,
             exerciseRepository: exerciseRepo,
-            healthProfileRepository: healthProfileRepo
+            healthProfileRepository: healthProfileRepo,
+            performanceRecordRepository: performanceRecordRepo
         )
         let prService = PRService(
             performanceRecordRepository: performanceRecordRepo,

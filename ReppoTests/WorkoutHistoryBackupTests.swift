@@ -345,7 +345,8 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             exerciseStatsRepository: exerciseStatsRepo,
             setRepository: setRepo,
             exerciseRepository: exerciseRepo,
-            healthProfileRepository: healthProfileRepo
+            healthProfileRepository: healthProfileRepo,
+            performanceRecordRepository: performanceRecordRepo
         )
         let prService = PRService(
             performanceRecordRepository: performanceRecordRepo,
@@ -923,7 +924,8 @@ private func makeResetContext() throws -> SettingsResetTestContext {
         exerciseStatsRepository: exerciseStatsRepo,
         setRepository: setRepo,
         exerciseRepository: exerciseRepo,
-        healthProfileRepository: healthProfileRepo
+        healthProfileRepository: healthProfileRepo,
+        performanceRecordRepository: performanceRecordRepo
     )
     let prService = PRService(
         performanceRecordRepository: performanceRecordRepo,

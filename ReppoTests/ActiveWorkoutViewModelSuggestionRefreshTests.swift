@@ -1381,7 +1381,8 @@ final class WorkoutHistoryBackupServiceTests: XCTestCase {
             exerciseStatsRepository: exerciseStatsRepo,
             setRepository: setRepo,
             exerciseRepository: exerciseRepo,
-            healthProfileRepository: healthProfileRepo
+            healthProfileRepository: healthProfileRepo,
+            performanceRecordRepository: performanceRecordRepo
         )
         let prService = PRService(
             performanceRecordRepository: performanceRecordRepo,
@@ -1865,6 +1866,11 @@ private final class StatsServiceStub: @unchecked Sendable, StatsServiceProtocol 
         return nil
     }
     func fetchAllStats() async throws -> [UUID: ExerciseStats] { [:] }
+    func fetchRecentPRs(since: Date, limit: Int) async throws -> [PerformanceRecord] {
+        let _ = since
+        let _ = limit
+        return []
+    }
 }
 
 private final class PRServiceStub: @unchecked Sendable, PRServiceProtocol {
