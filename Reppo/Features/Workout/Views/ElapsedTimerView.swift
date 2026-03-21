@@ -1,30 +1,46 @@
 // ElapsedTimerView.swift
-// Live-updating elapsed timer showing time since workout started.
+// Tap-to-pause elapsed timer showing the workout clock state.
 // Spec: FR-013 (Elapsed workout timer)
 // Contract: WP05 T024
 //
-// Uses TimelineView for efficient once-per-second updates.
-// Pure presentational — receives startTime, computes display string.
+// Pure presentational — receives already-computed elapsed time plus pause state.
 
 import SwiftUI
 
-/// Displays elapsed time since the workout started, updating every second.
+/// Displays the workout elapsed time and toggles pause/resume when tapped.
 ///
 /// Format: "M:SS" under 1 hour, "H:MM:SS" over 1 hour.
 /// Uses monospaced font design to prevent layout shifts as digits change.
 struct ElapsedTimerView: View {
 
-    /// The workout's start time. Nil hides the timer.
-    let startTime: Date?
+    /// The current workout elapsed time. Nil hides the timer until the workout is loaded.
+    let elapsedTime: TimeInterval?
+
+    /// Whether the workout clock is currently paused.
+    let isPaused: Bool
+
+    /// Called when the user taps the timer text.
+    let onTap: () -> Void
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            if let startTime {
-                let elapsed = max(0, context.date.timeIntervalSince(startTime))
-                Text(formatElapsed(elapsed))
-                    .font(.system(size: 16, weight: .semibold, design: .monospaced))
-                    .foregroundColor(.textPrimary)
+        if let elapsedTime {
+            Button(action: onTap) {
+                HStack(spacing: 4) {
+                    Text(formatElapsed(elapsedTime))
+
+                    if isPaused {
+                        Image(systemName: "pause.fill")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                }
+                .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                .foregroundColor(.textPrimary)
+                .frame(minWidth: 72, minHeight: 44)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isPaused ? "Workout timer paused" : "Workout timer running")
+            .accessibilityHint(isPaused ? "Tap to resume the workout timer" : "Tap to pause the workout timer")
         }
     }
 
@@ -49,7 +65,11 @@ struct ElapsedTimerView: View {
 #Preview("Running Timer") {
     ZStack {
         Color.bg.ignoresSafeArea()
-        ElapsedTimerView(startTime: Date().addingTimeInterval(-3661)) // 1h 1m 1s
+        ElapsedTimerView(
+            elapsedTime: 3661,
+            isPaused: false,
+            onTap: {}
+        )
             .padding()
     }
 }
@@ -57,7 +77,11 @@ struct ElapsedTimerView: View {
 #Preview("Short Timer") {
     ZStack {
         Color.bg.ignoresSafeArea()
-        ElapsedTimerView(startTime: Date().addingTimeInterval(-125)) // 2:05
+        ElapsedTimerView(
+            elapsedTime: 125,
+            isPaused: true,
+            onTap: {}
+        )
             .padding()
     }
 }
@@ -65,7 +89,11 @@ struct ElapsedTimerView: View {
 #Preview("No Start Time") {
     ZStack {
         Color.bg.ignoresSafeArea()
-        ElapsedTimerView(startTime: nil)
+        ElapsedTimerView(
+            elapsedTime: nil,
+            isPaused: false,
+            onTap: {}
+        )
             .padding()
     }
 }

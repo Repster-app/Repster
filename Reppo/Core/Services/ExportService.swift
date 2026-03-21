@@ -8,6 +8,7 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
     private let workoutRepo: any WorkoutRepositoryProtocol
     private let exerciseRepo: any ExerciseRepositoryProtocol
     private let setRepo: any SetRepositoryProtocol
+    private let fatigueObservationRepo: any FatigueObservationRepositoryProtocol
     private let statsService: any StatsServiceProtocol
     private let prService: any PRServiceProtocol
     private let modelContainer: ModelContainer
@@ -18,6 +19,7 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
         workoutRepo: any WorkoutRepositoryProtocol,
         exerciseRepo: any ExerciseRepositoryProtocol,
         setRepo: any SetRepositoryProtocol,
+        fatigueObservationRepo: any FatigueObservationRepositoryProtocol,
         statsService: any StatsServiceProtocol,
         prService: any PRServiceProtocol,
         modelContainer: ModelContainer
@@ -25,6 +27,7 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
         self.workoutRepo = workoutRepo
         self.exerciseRepo = exerciseRepo
         self.setRepo = setRepo
+        self.fatigueObservationRepo = fatigueObservationRepo
         self.statsService = statsService
         self.prService = prService
         self.modelContainer = modelContainer
@@ -49,12 +52,18 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
             return lhs.createdAt < rhs.createdAt
         }
 
+        // Fetch fatigue observations
+        let observationContext = ModelContext(modelContainer)
+        let allObservations = try observationContext.fetch(FetchDescriptor<FatigueObservation>())
+            .sorted { $0.createdAt < $1.createdAt }
+
         let archive = WorkoutHistoryArchive(
             version: WorkoutHistoryArchive.currentVersion,
             exportedAt: Date(),
             workouts: workouts.map(WorkoutHistoryArchiveWorkout.init),
             exercises: exercises.map(WorkoutHistoryArchiveExercise.init),
-            sets: sortedSets.map(WorkoutHistoryArchiveSet.init)
+            sets: sortedSets.map(WorkoutHistoryArchiveSet.init),
+            fatigueObservations: allObservations.map(WorkoutHistoryArchiveFatigueObservation.init)
         )
 
         let encoder = JSONEncoder()
@@ -135,6 +144,17 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
         }
         for archivedSet in sortedSets {
             context.insert(archivedSet.makeModel())
+        }
+
+        // Restore fatigue observations (delete existing, insert from archive)
+        let existingObservations = try context.fetch(FetchDescriptor<FatigueObservation>())
+        for obs in existingObservations {
+            context.delete(obs)
+        }
+        if let archivedObservations = archive.fatigueObservations {
+            for archivedObs in archivedObservations {
+                context.insert(archivedObs.makeModel())
+            }
         }
 
         try context.save()
@@ -258,13 +278,15 @@ private extension WorkoutHistoryArchiveExercise {
             defaultRestTime: exercise.defaultRestTime,
             fatigueRate: exercise.fatigueRate,
             recoveryConstant: exercise.recoveryConstant,
+            fatigueLearningSessionCount: exercise.fatigueLearningSessionCount,
+            fatigueLearningCumulativeError: exercise.fatigueLearningCumulativeError,
             createdAt: exercise.createdAt,
             updatedAt: exercise.updatedAt
         )
     }
 
     func makeModel() -> Exercise {
-        Exercise(
+        let exercise = Exercise(
             id: id,
             name: name,
             equipmentType: equipmentType,
@@ -282,6 +304,9 @@ private extension WorkoutHistoryArchiveExercise {
             createdAt: createdAt,
             updatedAt: updatedAt
         )
+        exercise.fatigueLearningSessionCount = fatigueLearningSessionCount
+        exercise.fatigueLearningCumulativeError = fatigueLearningCumulativeError
+        return exercise
     }
 }
 
@@ -300,6 +325,8 @@ private extension Exercise {
         defaultRestTime = archive.defaultRestTime
         fatigueRate = archive.fatigueRate
         recoveryConstant = archive.recoveryConstant
+        fatigueLearningSessionCount = archive.fatigueLearningSessionCount
+        fatigueLearningCumulativeError = archive.fatigueLearningCumulativeError
         createdAt = archive.createdAt
         updatedAt = archive.updatedAt
     }
@@ -379,6 +406,46 @@ private extension WorkoutHistoryArchiveSet {
             createdAt: createdAt,
             updatedAt: updatedAt,
             restDurationSeconds: restDurationSeconds
+        )
+    }
+}
+
+private extension WorkoutHistoryArchiveFatigueObservation {
+    init(_ obs: FatigueObservation) {
+        self.init(
+            id: obs.id,
+            exerciseId: obs.exerciseId,
+            workoutId: obs.workoutId,
+            setIndex: obs.setIndex,
+            predictedEffectiveE1RM: obs.predictedEffectiveE1RM,
+            actualE1RM: obs.actualE1RM,
+            normalizedError: obs.normalizedError,
+            baseE1RM: obs.baseE1RM,
+            prescribedWeight: obs.prescribedWeight,
+            actualWeight: obs.actualWeight,
+            actualReps: obs.actualReps,
+            actualRIR: obs.actualRIR,
+            restDurationSeconds: obs.restDurationSeconds,
+            createdAt: obs.createdAt
+        )
+    }
+
+    func makeModel() -> FatigueObservation {
+        FatigueObservation(
+            id: id,
+            exerciseId: exerciseId,
+            workoutId: workoutId,
+            setIndex: setIndex,
+            predictedEffectiveE1RM: predictedEffectiveE1RM,
+            actualE1RM: actualE1RM,
+            normalizedError: normalizedError,
+            baseE1RM: baseE1RM,
+            prescribedWeight: prescribedWeight,
+            actualWeight: actualWeight,
+            actualReps: actualReps,
+            actualRIR: actualRIR,
+            restDurationSeconds: restDurationSeconds,
+            createdAt: createdAt
         )
     }
 }

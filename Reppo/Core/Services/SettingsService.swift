@@ -212,7 +212,15 @@ actor SettingsService: SettingsServiceProtocol {
 
     private func clearStoredAppState() {
         userDefaults.removeObject(forKey: "chartExercisePresets")
-        userDefaults.removeObject(forKey: "restTimerStartDate")
-        userDefaults.removeObject(forKey: "restTimerTotalDuration")
+        userDefaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockWorkoutId)
+        userDefaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockAccumulatedElapsedSeconds)
+        userDefaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockLastResumedAt)
+        userDefaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockIsPaused)
+        userDefaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerWorkoutId)
+        userDefaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerStartDate)
+        userDefaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerTotalDuration)
+        userDefaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerRemainingDuration)
+        userDefaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerIsPaused)
+        userDefaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerPauseSource)
     }
 }

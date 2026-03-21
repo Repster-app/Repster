@@ -47,18 +47,21 @@ struct SettingsView: View {
     private let bodyweightService: any BodyweightServiceProtocol
     private let importService: any ImportServiceProtocol
     private let workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol
+    private let fatigueLearningService: FatigueLearningService
 
     // MARK: - Init
 
     init(settingsService: any SettingsServiceProtocol,
          bodyweightService: any BodyweightServiceProtocol,
          importService: any ImportServiceProtocol,
-         workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol) {
+         workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol,
+         fatigueLearningService: FatigueLearningService) {
         _viewModel = State(initialValue: SettingsViewModel(settingsService: settingsService))
         self.settingsService = settingsService
         self.bodyweightService = bodyweightService
         self.importService = importService
         self.workoutHistoryBackupService = workoutHistoryBackupService
+        self.fatigueLearningService = fatigueLearningService
     }
 
     // MARK: - Body
@@ -143,7 +146,8 @@ struct SettingsView: View {
             NavigationLink {
                 SmartSuggestionsSettingsView(
                     viewModel: viewModel,
-                    settingsService: settingsService
+                    settingsService: settingsService,
+                    fatigueLearningService: fatigueLearningService
                 )
             } label: {
                 SettingsNavigationRow(
@@ -383,6 +387,7 @@ private struct WorkoutPreferencesView: View {
 private struct SmartSuggestionsSettingsView: View {
     @Bindable var viewModel: SettingsViewModel
     let settingsService: any SettingsServiceProtocol
+    let fatigueLearningService: FatigueLearningService
 
     private static let incrementOptions = [0.5, 1.0, 1.25, 2.0, 2.5, 5.0]
 
@@ -428,6 +433,19 @@ private struct SmartSuggestionsSettingsView: View {
                 }
             } footer: {
                 Text("Default increment controls how suggested weights are rounded before they appear in your workout.")
+                    .foregroundStyle(Color.textTertiary)
+            }
+
+            Section {
+                NavigationLink {
+                    FatigueLearningAdminView(fatigueLearningService: fatigueLearningService)
+                } label: {
+                    Label("Fatigue Learning", systemImage: "brain.head.profile")
+                        .foregroundStyle(Color.textPrimary)
+                }
+                .listRowBackground(Color.bgCard)
+            } footer: {
+                Text("View and manage adaptive fatigue rate learning per exercise.")
                     .foregroundStyle(Color.textTertiary)
             }
         }

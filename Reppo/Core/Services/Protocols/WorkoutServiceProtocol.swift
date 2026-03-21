@@ -42,7 +42,8 @@ protocol WorkoutServiceProtocol: Sendable {
 
     /// Finish an active workout.
     ///
-    /// Sets status = .completed, endTime = now, duration = endTime - startTime (seconds).
+    /// Sets status = .completed, endTime = now, duration = endTime - startTime (seconds)
+    /// unless a pause-aware override is provided.
     /// Optionally stores user-provided notes and perceived effort (RPE).
     /// Throws if workout not found or already completed.
     ///
@@ -51,7 +52,15 @@ protocol WorkoutServiceProtocol: Sendable {
     ///   - title: Optional user-provided title (e.g. "Push Day"). If nil, displayTitle auto-generates.
     ///   - notes: Optional free-text notes entered on the summary sheet.
     ///   - perceivedEffort: Optional RPE value (1–10) from the summary sheet.
-    func finishWorkout(_ workoutId: UUID, title: String?, notes: String?, perceivedEffort: Double?) async throws
+    ///   - durationSecondsOverride: Optional explicit duration to persist when the active
+    ///     session clock excludes paused time.
+    func finishWorkout(
+        _ workoutId: UUID,
+        title: String?,
+        notes: String?,
+        perceivedEffort: Double?,
+        durationSecondsOverride: Int?
+    ) async throws
 
     // MARK: - Active Workout (FR-003, AGENT_RULES S7.3)
 

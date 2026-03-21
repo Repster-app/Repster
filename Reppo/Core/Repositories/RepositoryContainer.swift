@@ -15,6 +15,7 @@ final class RepositoryContainer {
     let healthProfileRepository: HealthProfileRepository
     let programRepository: ProgramRepository
     let templateRepository: TemplateRepository
+    let fatigueObservationRepository: FatigueObservationRepository
 
     init(modelContainer: ModelContainer) {
         self.modelContainer = modelContainer
@@ -27,5 +28,6 @@ final class RepositoryContainer {
         self.healthProfileRepository = HealthProfileRepository(modelContainer: modelContainer)
         self.programRepository = ProgramRepository(modelContainer: modelContainer)
         self.templateRepository = TemplateRepository(modelContainer: modelContainer)
+        self.fatigueObservationRepository = FatigueObservationRepository(modelContainer: modelContainer)
     }
 }

@@ -157,7 +157,8 @@ struct ContentView: View {
                     settingsService: services.settingsService,
                     bodyweightService: services.bodyweightService,
                     importService: services.importService,
-                    workoutHistoryBackupService: services.workoutHistoryBackupService
+                    workoutHistoryBackupService: services.workoutHistoryBackupService,
+                    fatigueLearningService: services.fatigueLearningService
                 )
                     .tabItem {
                         Label("Settings", systemImage: "gearshape")
@@ -329,13 +330,13 @@ struct ContentView: View {
 
                 // 2. Add exercises to the workout before showing it
                 // We use SetService to create initial sets for each exercise
-                for exerciseId in exerciseIds {
+                for (index, exerciseId) in exerciseIds.enumerated() {
                     let set = WorkoutSet(
                         workoutId: workout.id,
                         exerciseId: exerciseId,
                         date: Date(),
                         setType: .working,
-                        orderInWorkout: 1,
+                        orderInWorkout: index + 1,
                         orderInExercise: 1,
                         completed: false
                     )

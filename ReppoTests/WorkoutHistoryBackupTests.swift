@@ -302,7 +302,8 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             exportedAt: Date(),
             workouts: [],
             exercises: [],
-            sets: []
+            sets: [],
+            fatigueObservations: nil
         )
         let invalidData = try encodeBackupArchive(invalidArchive)
 
@@ -330,6 +331,7 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             WorkoutTemplate.self,
             TemplateExercise.self,
             TemplateSet.self,
+            FatigueObservation.self,
             configurations: configuration
         )
 
@@ -340,6 +342,7 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
         let performanceRecordRepo = PerformanceRecordRepository(modelContainer: container)
         let bodyweightRepo = BodyweightEntryRepository(modelContainer: container)
         let healthProfileRepo = HealthProfileRepository(modelContainer: container)
+        let fatigueObservationRepo = FatigueObservationRepository(modelContainer: container)
 
         let statsService = StatsService(
             exerciseStatsRepository: exerciseStatsRepo,
@@ -358,6 +361,7 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             workoutRepo: workoutRepo,
             exerciseRepo: exerciseRepo,
             setRepo: setRepo,
+            fatigueObservationRepo: fatigueObservationRepo,
             statsService: statsService,
             prService: prService,
             modelContainer: container
@@ -908,6 +912,7 @@ private func makeResetContext() throws -> SettingsResetTestContext {
         WorkoutTemplate.self,
         TemplateExercise.self,
         TemplateSet.self,
+        FatigueObservation.self,
         configurations: configuration
     )
 

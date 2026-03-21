@@ -26,6 +26,15 @@ final class Exercise {
     /// Controls how quickly fatigue decays during rest periods.
     var recoveryConstant: Double?
 
+    // MARK: - Adaptive Fatigue Learning
+
+    /// Number of qualifying workout sessions that contributed to fatigue learning.
+    var fatigueLearningSessionCount: Int?
+
+    /// Running EMA of normalized prediction errors across sessions.
+    /// Negative = model consistently too aggressive, positive = too lenient.
+    var fatigueLearningCumulativeError: Double?
+
     var createdAt: Date
     var updatedAt: Date
 
@@ -44,6 +53,8 @@ final class Exercise {
         defaultRestTime: Int? = nil,
         fatigueRate: Double? = nil,
         recoveryConstant: Double? = nil,
+        fatigueLearningSessionCount: Int? = nil,
+        fatigueLearningCumulativeError: Double? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -61,6 +72,8 @@ final class Exercise {
         self.defaultRestTime = defaultRestTime
         self.fatigueRate = fatigueRate
         self.recoveryConstant = recoveryConstant
+        self.fatigueLearningSessionCount = fatigueLearningSessionCount
+        self.fatigueLearningCumulativeError = fatigueLearningCumulativeError
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

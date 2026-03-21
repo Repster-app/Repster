@@ -3,16 +3,26 @@
 // Spec: FR-008 (Workout summary with stats, notes, RPE)
 // Contract: WP07 T032 (summary view), T033 (notes + RPE), T035 (save & close)
 //
-// Displays workout stats computed from in-memory ViewModel state.
-// User can add notes and select session RPE (1-10) before saving.
+// Redesigned as a layered single sheet: core summary and save inputs first,
+// lower-frequency actions tucked behind secondary disclosure.
 
 import SwiftUI
 
-/// Summary sheet presenting workout statistics, notes, and RPE input.
+/// Summary sheet presenting workout statistics, notes, and effort input.
 ///
 /// Shown as a sheet from ActiveWorkoutView when "Finish" is tapped.
 /// "Save & Close" calls ViewModel.finishWorkout() then dismisses.
 struct WorkoutSummarySheet: View {
+
+    private enum FocusField: Hashable {
+        case title
+    }
+
+    private enum FatigueFeedbackSelection: Equatable {
+        case lessAggressive
+        case aboutRight
+        case moreAggressive
+    }
 
     // MARK: - Dependencies
 
@@ -22,17 +32,21 @@ struct WorkoutSummarySheet: View {
     // MARK: - Environment
 
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var focusedField: FocusField?
 
     // MARK: - State
 
-    /// User-editable workout title (pre-populated with time-based default).
+    /// User-editable workout title. Empty means "use the automatic title".
     @State private var workoutTitle: String = ""
 
     /// Free-form workout notes.
     @State private var notes: String = ""
 
-    /// Selected session RPE (1-10), nil if not set.
-    @State private var selectedRPE: Int? = nil
+    /// Optional session effort value on a 1-10 scale.
+    @State private var selectedEffort: Double? = nil
+
+    /// Per-exercise fatigue feedback selections.
+    @State private var fatigueSelections: [UUID: FatigueFeedbackSelection] = [:]
 
     /// Whether the save operation is in progress.
     @State private var isSaving = false
@@ -49,67 +63,66 @@ struct WorkoutSummarySheet: View {
     /// Whether the template was saved successfully (shows confirmation).
     @State private var templateSavedSuccessfully = false
 
+    /// Whether the inline title editor is expanded.
+    @State private var isEditingTitle = false
+
+    /// Whether suggestion feedback is expanded.
+    @State private var isSuggestionFeedbackExpanded = false
+
     // MARK: - Body
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    if let summary = viewModel.computeSummary() {
-                        // Date + Duration header
-                        headerSection(summary: summary)
+        VStack(spacing: 0) {
+            headerBar
 
-                        // Stats cards row
-                        statsRow(summary: summary)
+            if let summary = viewModel.computeSummary() {
+                ScrollView {
+                    VStack(spacing: 18) {
+                        recapHero(summary: summary)
 
-                        // Per-exercise breakdown
                         if !summary.exerciseSummaries.isEmpty {
-                            exerciseList(summary: summary)
+                            exerciseRecapSection(summary: summary)
                         }
 
-                        // Workout title input
-                        titleSection
+                        if !exercisesForFeedback(summary: summary).isEmpty {
+                            suggestionFeedbackSection(summary: summary)
+                        }
 
-                        // Notes input (T033)
+                        secondaryActionsSection
                         notesSection
-
-                        // RPE selector (T033)
-                        rpeSelector
-
-                        // Save as Template button
-                        saveAsTemplateButton
-
-                        // Discard workout button
-                        discardButton
-                    } else {
-                        // Empty workout fallback
-                        emptyWorkoutMessage
+                        effortSection
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                    .padding(.bottom, 28)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
+                .scrollIndicators(.hidden)
+                .scrollDismissesKeyboard(.interactively)
+            } else {
+                emptyWorkoutMessage
             }
-            .background(Color.bg)
-            .navigationTitle("Workout Complete")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save & Close") {
-                        Task { await saveAndClose() }
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(isSaving)
-                }
+        }
+        .background(Color.bg.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if viewModel.workout != nil {
+                saveActionBar
             }
         }
         .onAppear {
-            // Pre-populate title with time-based default (Strava-style)
-            workoutTitle = viewModel.workout?.displayTitle ?? "Workout"
-            // Pre-populate notes from existing workout data
+            workoutTitle = viewModel.workout?.title ?? ""
             notes = viewModel.workout?.notes ?? ""
+
+            if let perceivedEffort = viewModel.workout?.perceivedEffort {
+                selectedEffort = min(max(perceivedEffort.rounded(), 1), 10)
+            }
+        }
+        .alert("Discard Workout?", isPresented: $showDiscardAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Discard", role: .destructive) {
+                Task { await discardAndClose() }
+            }
+        } message: {
+            Text("This will permanently delete this workout and all its sets. This action cannot be undone.")
         }
         .saveWorkoutAsTemplatePrompt(
             controller: saveAsTemplateController,
@@ -123,250 +136,642 @@ struct WorkoutSummarySheet: View {
         )
     }
 
-    // MARK: - Header Section
+    // MARK: - Header
 
-    /// Date and formatted workout duration.
-    private func headerSection(summary: WorkoutSummaryData) -> some View {
-        VStack(spacing: 4) {
+    private var headerBar: some View {
+        HStack(spacing: 12) {
+            Button("Cancel") {
+                dismiss()
+            }
+            .font(.system(size: 16, weight: .medium))
+            .foregroundColor(.textSecondary)
+            .frame(width: 72, alignment: .leading)
+
+            Spacer()
+
+            Text("Workout complete")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.textPrimary)
+                .lineLimit(1)
+
+            Spacer()
+
+            Color.clear
+                .frame(width: 72, height: 1)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 16)
+        .background(Color.bg)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.border)
+                .frame(height: 1)
+        }
+    }
+
+    // MARK: - Recap Hero
+
+    private func recapHero(summary: WorkoutSummaryData) -> some View {
+        VStack(spacing: 10) {
             Text(summary.date, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day())
                 .font(.subheadline)
                 .foregroundColor(.textSecondary)
-            Text(formatDuration(summary.duration))
-                .font(.system(size: 32, weight: .bold, design: .monospaced))
-                .foregroundColor(.textPrimary)
-        }
-        .padding(.top, 20)
-    }
+                .frame(maxWidth: .infinity)
+                .multilineTextAlignment(.center)
 
-    // MARK: - Stats Row
+            sectionCard {
+                VStack(alignment: .leading, spacing: 14) {
+                    summaryTitleSection
 
-    /// Horizontal row of stat cards (Sets, Volume, PRs).
-    private func statsRow(summary: WorkoutSummaryData) -> some View {
-        HStack(spacing: 12) {
-            statCard(label: "Sets", value: "\(summary.totalSets)")
-            statCard(label: "Volume", value: formatVolume(summary.totalVolume))
-            if summary.prsHit > 0 {
-                statCard(label: "PRs", value: "\(summary.prsHit)", highlight: true)
+                    HStack(spacing: 10) {
+                        compactSummaryMetric(
+                            label: "Time",
+                            value: formatDuration(summary.duration),
+                            prominent: true
+                        )
+                        compactSummaryMetric(label: "Sets", value: "\(summary.totalSets)")
+                        compactSummaryMetric(label: "Volume", value: formatVolume(summary.totalVolume))
+                    }
+
+                    if summary.prsHit > 0 {
+                        HStack(spacing: 8) {
+                            PRBadgeView(status: .current)
+
+                            Text(summary.prsHit == 1 ? "1 PR this session" : "\(summary.prsHit) PRs this session")
+                                .font(.caption)
+                                .foregroundColor(.textSecondary)
+                        }
+                    }
+                }
             }
         }
     }
 
-    /// A single stat card with label and value.
-    private func statCard(label: String, value: String, highlight: Bool = false) -> some View {
-        VStack(spacing: 4) {
+    private func compactSummaryMetric(label: String, value: String, prominent: Bool = false) -> some View {
+        VStack(spacing: 6) {
             Text(value)
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(highlight ? .gold : .textPrimary)
+                .font(.system(size: prominent ? 20 : 18, weight: .bold, design: prominent ? .rounded : .default))
+                .monospacedDigit()
+                .foregroundColor(.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+
             Text(label)
                 .font(.caption)
                 .foregroundColor(.textSecondary)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(highlight ? Color.goldSoft : Color.bgCard)
-        .cornerRadius(10)
+        .frame(maxWidth: .infinity, minHeight: 62)
+        .padding(.horizontal, 8)
+        .background(prominent ? Color.accentSoft : Color.bgInput)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.border, lineWidth: 1)
+        }
     }
 
-    // MARK: - Exercise List
+    // MARK: - Title
 
-    /// Per-exercise breakdown showing name, set count, best weight, and PR indicator.
-    private func exerciseList(summary: WorkoutSummaryData) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Exercises")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.textSecondary)
+    private var summaryTitleSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isEditingTitle.toggle()
+                }
 
-            ForEach(summary.exerciseSummaries) { exercise in
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            Text(exercise.exerciseName)
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(.textPrimary)
-                            if exercise.hadPR {
-                                PRBadgeView(status: .current)
-                            }
+                if isEditingTitle {
+                    focusedField = .title
+                } else {
+                    focusedField = nil
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Workout title")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.textSecondary)
+
+                        Text(resolvedWorkoutTitle)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.textPrimary)
+                            .multilineTextAlignment(.leading)
+                    }
+
+                    Spacer()
+
+                    Label(isEditingTitle ? "Done" : "Edit", systemImage: isEditingTitle ? "checkmark.circle.fill" : "pencil")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(isEditingTitle ? .accent : .textSecondary)
+                }
+            }
+            .buttonStyle(.plain)
+
+            if isEditingTitle {
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField("", text: $workoutTitle, prompt: Text(automaticWorkoutTitle))
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.textPrimary)
+                        .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled()
+                        .padding(12)
+                        .background(Color.bgInput)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(Color.border, lineWidth: 1)
                         }
-                        Text("\(exercise.setCount) sets")
-                            .font(.caption)
+                        .focused($focusedField, equals: .title)
+
+                    Text("Leave blank to keep the automatic title.")
+                        .font(.caption)
+                        .foregroundColor(.textTertiary)
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+    }
+
+    // MARK: - Notes
+
+    private var notesSection: some View {
+        sectionCard {
+            VStack(alignment: .leading, spacing: 12) {
+                sectionHeading(
+                    title: "Notes",
+                    subtitle: "Optional quick note"
+                )
+
+                ZStack(alignment: .topLeading) {
+                    if notes.isEmpty {
+                        Text("Add a quick note...")
+                            .font(.system(size: 15))
+                            .foregroundColor(.textTertiary)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 16)
+                    }
+
+                    TextEditor(text: $notes)
+                        .font(.system(size: 15))
+                        .foregroundColor(.textPrimary)
+                        .scrollContentBackground(.hidden)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .frame(minHeight: 64)
+                        .textInputAutocapitalization(.sentences)
+                }
+                .background(Color.bgInput)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.border, lineWidth: 1)
+                }
+            }
+        }
+    }
+
+    // MARK: - Effort
+
+    private var effortSection: some View {
+        sectionCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .center, spacing: 12) {
+                    Text("How hard did it feel?")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.textPrimary)
+
+                    Spacer()
+
+                    Text(effortValueLabel)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(selectedEffort == nil ? .textSecondary : .textPrimary)
+                        .padding(.horizontal, 10)
+                        .frame(height: 28)
+                        .background(Color.bgInput)
+                        .clipShape(Capsule())
+                }
+
+                if selectedEffort != nil {
+                    Button("Clear") {
+                        selectedEffort = nil
+                    }
+                    .font(.caption)
+                    .foregroundColor(.textSecondary)
+                }
+
+                Slider(value: effortSliderBinding, in: 1...10, step: 1)
+                    .tint(.accent)
+
+                HStack {
+                    Text("Easy")
+                    Spacer()
+                    Text("Max")
+                }
+                .font(.caption)
+                .foregroundColor(.textTertiary)
+            }
+        }
+    }
+
+    // MARK: - Exercise Recap
+
+    private func exerciseRecapSection(summary: WorkoutSummaryData) -> some View {
+        return sectionCard {
+            VStack(alignment: .leading, spacing: 14) {
+                sectionHeading(
+                    title: "Exercises",
+                    subtitle: "\(summary.exerciseSummaries.count) logged"
+                )
+
+                VStack(spacing: 0) {
+                    ForEach(Array(summary.exerciseSummaries.enumerated()), id: \.element.id) { index, exercise in
+                        exerciseSummaryRow(exercise)
+
+                        if index < summary.exerciseSummaries.count - 1 {
+                            Rectangle()
+                                .fill(Color.border)
+                                .frame(height: 1)
+                        }
+                    }
+                }
+                .background(Color.bgInput.opacity(0.75))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+        }
+    }
+
+    private func exerciseSummaryRow(_ exercise: ExerciseSummary) -> some View {
+        HStack(spacing: 10) {
+            Text(exercise.exerciseName)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+
+            Spacer()
+
+            HStack(spacing: 8) {
+                Text("\(exercise.setCount) sets")
+                    .font(.caption)
+                    .foregroundColor(.textSecondary)
+                    .frame(width: 44, alignment: .trailing)
+
+                exercisePRTag(isVisible: exercise.hadPR)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+    }
+
+    private func exercisePRTag(isVisible: Bool) -> some View {
+        Text("PR")
+            .font(.caption.weight(.semibold))
+            .foregroundColor(.gold)
+            .padding(.horizontal, 8)
+            .frame(width: 46, height: 24)
+            .background(Color.goldSoft)
+            .clipShape(Capsule())
+            .opacity(isVisible ? 1 : 0)
+            .accessibilityHidden(!isVisible)
+    }
+
+    // MARK: - Suggestion Feedback
+
+    private func suggestionFeedbackSection(summary: WorkoutSummaryData) -> some View {
+        let feedbackExercises = exercisesForFeedback(summary: summary)
+
+        return sectionCard {
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isSuggestionFeedbackExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                    sectionHeading(
+                        title: "Suggestion feedback",
+                        subtitle: "Only adjust this if the weight changes felt noticeably off."
+                    )
+
+                        Spacer()
+
+                        Image(systemName: isSuggestionFeedbackExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(.textSecondary)
                     }
-                    Spacer()
-                    if let weight = exercise.bestWeight {
-                        Text(formatWeight(weight))
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.textPrimary)
-                    }
                 }
+                .buttonStyle(.plain)
+
+                if isSuggestionFeedbackExpanded {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Your feedback helps fine-tune how quickly future suggestions taper within a workout.")
+                            .font(.caption)
+                            .foregroundColor(.textSecondary)
+
+                        ForEach(feedbackExercises) { exercise in
+                            fatigueFeedbackRow(exercise: exercise)
+                        }
+                    }
+                    .padding(.top, 14)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+        }
+    }
+
+    private func fatigueFeedbackRow(exercise: ExerciseSummary) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(exercise.exerciseName)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.textPrimary)
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    fatigueFeedbackButtons(for: exercise)
+                }
+
+                VStack(spacing: 8) {
+                    fatigueFeedbackButtons(for: exercise)
+                }
+            }
+        }
+        .padding(14)
+        .background(Color.bgInput)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.border, lineWidth: 1)
+        }
+    }
+
+    @ViewBuilder
+    private func fatigueFeedbackButtons(for exercise: ExerciseSummary) -> some View {
+        feedbackButton(
+            title: "Too much drop",
+            isSelected: fatigueSelections[exercise.id] == .lessAggressive,
+            color: .success
+        ) {
+            fatigueSelections[exercise.id] = fatigueSelections[exercise.id] == .lessAggressive ? nil : .lessAggressive
+        }
+
+        feedbackButton(
+            title: "About right",
+            isSelected: fatigueSelections[exercise.id] == .aboutRight,
+            color: .accent
+        ) {
+            fatigueSelections[exercise.id] = fatigueSelections[exercise.id] == .aboutRight ? nil : .aboutRight
+        }
+
+        feedbackButton(
+            title: "Not enough drop",
+            isSelected: fatigueSelections[exercise.id] == .moreAggressive,
+            color: .orange
+        ) {
+            fatigueSelections[exercise.id] = fatigueSelections[exercise.id] == .moreAggressive ? nil : .moreAggressive
+        }
+    }
+
+    private func feedbackButton(title: String, isSelected: Bool, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.caption.weight(.medium))
+                .foregroundColor(isSelected ? .white : color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
-                .padding(.horizontal, 12)
-                .background(Color.bgCard)
-                .cornerRadius(8)
-            }
-        }
-    }
-
-    // MARK: - Title Section
-
-    /// Text field for naming the workout. Pre-populated with time-based default.
-    private var titleSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Workout Title")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.textSecondary)
-            TextField("", text: $workoutTitle)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.textPrimary)
-                .padding(12)
-                .background(Color.bgInput)
-                .cornerRadius(8)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.border, lineWidth: 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(isSelected ? color : Color.bg)
                 )
         }
-    }
-
-    // MARK: - Notes Section (T033)
-
-    /// Free-form text editor for workout notes.
-    private var notesSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Notes")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.textSecondary)
-            TextEditor(text: $notes)
-                .scrollContentBackground(.hidden)
-                .frame(minHeight: 80)
-                .padding(8)
-                .background(Color.bgInput)
-                .cornerRadius(8)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.border, lineWidth: 1)
-                )
-                .font(.system(size: 15))
-                .foregroundColor(.textPrimary)
+        .buttonStyle(.plain)
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(isSelected ? Color.clear : color.opacity(0.25), lineWidth: 1)
         }
     }
 
-    // MARK: - RPE Selector (T033)
+    // MARK: - Secondary Actions
 
-    /// Horizontal row of 1-10 RPE buttons. Tapping the selected RPE deselects it.
-    private var rpeSelector: some View {
+    private var secondaryActionsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Session RPE")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.textSecondary)
-            HStack(spacing: 6) {
-                ForEach(1...10, id: \.self) { rpe in
-                    Button("\(rpe)") {
-                        selectedRPE = (selectedRPE == rpe) ? nil : rpe
+            HStack(spacing: 12) {
+                Button {
+                    saveAsTemplateController.begin(defaultName: resolvedWorkoutTitle)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: templateSavedSuccessfully ? "checkmark.circle.fill" : "doc.text")
+                        Text(templateSavedSuccessfully ? "Template Saved" : "Save as Template")
                     }
-                    .font(.system(size: 14, weight: selectedRPE == rpe ? .bold : .regular))
-                    .foregroundColor(selectedRPE == rpe ? .white : .textSecondary)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(templateSavedSuccessfully ? .success : .accent)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 36)
-                    .background(selectedRPE == rpe ? Color.accent : Color.bgSubtle)
-                    .cornerRadius(6)
+                    .frame(height: 42)
+                    .background(templateSavedSuccessfully ? Color.successSoft : Color.accentSoft)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
+                .buttonStyle(.plain)
+                .disabled(templateSavedSuccessfully || saveAsTemplateController.isSaving || isSaving || viewModel.workout?.id == nil)
+
+                Button(role: .destructive) {
+                    showDiscardAlert = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "trash")
+                        Text("Discard Workout")
+                    }
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.danger)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 42)
+                    .background(Color.dangerSoft)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(isDiscarding || isSaving)
+            }
+
+            if templateSavedSuccessfully {
+                Text("Template saved for reuse.")
+                    .font(.caption)
+                    .foregroundColor(.success)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: - Save as Template
+    // MARK: - Save Bar
 
-    /// Button to save the workout structure as a reusable template.
-    private var saveAsTemplateButton: some View {
-        Button {
-            saveAsTemplateController.begin(defaultName: workoutTitle.isEmpty ? "Workout" : workoutTitle)
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "doc.text")
-                Text(templateSavedSuccessfully ? "Template Saved ✓" : "Save as Template")
-            }
-            .font(.system(size: 15, weight: .medium))
-            .foregroundColor(templateSavedSuccessfully ? .success : .accent)
-            .frame(maxWidth: .infinity)
-            .frame(height: 44)
-            .background(templateSavedSuccessfully ? Color.successSoft : Color.accentSoft)
-            .cornerRadius(10)
-        }
-        .disabled(templateSavedSuccessfully || saveAsTemplateController.isSaving)
-    }
+    private var saveActionBar: some View {
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(Color.border)
+                .frame(height: 1)
 
-    // MARK: - Discard Workout
+            Button {
+                Task { await saveAndClose() }
+            } label: {
+                HStack(spacing: 8) {
+                    if isSaving {
+                        ProgressView()
+                            .tint(.white)
+                    }
 
-    /// Destructive button to discard the workout entirely.
-    /// Shows a confirmation alert before permanently deleting.
-    private var discardButton: some View {
-        Button(role: .destructive) {
-            showDiscardAlert = true
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "trash")
-                Text("Discard Workout")
+                    Text(isSaving ? "Saving..." : "Save & Close")
+                        .font(.system(size: 16, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(Color.accent)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
-            .font(.system(size: 15, weight: .medium))
-            .foregroundColor(.red)
-            .frame(maxWidth: .infinity)
-            .frame(height: 44)
-            .background(Color.red.opacity(0.1))
-            .cornerRadius(10)
+            .buttonStyle(.plain)
+            .disabled(isSaving || isDiscarding)
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 12)
         }
-        .disabled(isDiscarding)
-        .padding(.top, 8)
-        .alert("Discard Workout?", isPresented: $showDiscardAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Discard", role: .destructive) {
-                Task { await discardAndClose() }
-            }
-        } message: {
-            Text("This will permanently delete this workout and all its sets. This action cannot be undone.")
-        }
+        .background(Color.bg)
     }
 
     // MARK: - Empty State
 
-    /// Shown when computeSummary() returns nil (no active workout).
     private var emptyWorkoutMessage: some View {
         VStack(spacing: 12) {
+            Spacer()
+
             Image(systemName: "figure.walk")
                 .font(.system(size: 40))
                 .foregroundColor(.textTertiary)
+
             Text("No workout data")
                 .font(.headline)
                 .foregroundColor(.textSecondary)
+
+            Spacer()
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 40)
     }
 
-    // MARK: - Actions (T035)
+    // MARK: - Actions
 
-    /// Save notes/RPE via ViewModel.finishWorkout(), then dismiss the sheet.
     private func saveAndClose() async {
         isSaving = true
+
+        for (exerciseId, selection) in fatigueSelections {
+            let nudge: FatigueNudge?
+            switch selection {
+            case .lessAggressive:
+                nudge = .lessAggressive
+            case .aboutRight:
+                nudge = nil
+            case .moreAggressive:
+                nudge = .moreAggressive
+            }
+
+            if let nudge {
+                try? await viewModel.fatigueLearningService.applyManualNudge(
+                    exerciseId: exerciseId,
+                    nudge: nudge
+                )
+            }
+        }
+
         await viewModel.finishWorkout(
-            title: workoutTitle.isEmpty ? nil : workoutTitle,
-            notes: notes.isEmpty ? nil : notes,
-            perceivedEffort: selectedRPE.map(Double.init)
+            title: normalizedWorkoutTitle,
+            notes: normalizedNotes,
+            perceivedEffort: selectedEffort
         )
+
         isSaving = false
-        dismiss()
+
+        if viewModel.isWorkoutFinished {
+            dismiss()
+        }
     }
 
-    /// Discard the workout via ViewModel.discardWorkout(), then dismiss the sheet.
     private func discardAndClose() async {
         isDiscarding = true
         await viewModel.discardWorkout()
         isDiscarding = false
-        dismiss()
+
+        if viewModel.isWorkoutFinished {
+            dismiss()
+        }
     }
 
-    // MARK: - Formatting Helpers
+    // MARK: - Formatting
 
-    /// Format duration as "Xh Ym" or "Xm".
+    private var automaticWorkoutTitle: String {
+        viewModel.workout?.displayTitle ?? "Workout"
+    }
+
+    private var normalizedWorkoutTitle: String? {
+        let trimmed = workoutTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private var normalizedNotes: String? {
+        let trimmed = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private var resolvedWorkoutTitle: String {
+        normalizedWorkoutTitle ?? automaticWorkoutTitle
+    }
+
+    private var effortSliderBinding: Binding<Double> {
+        Binding(
+            get: { selectedEffort ?? 5 },
+            set: { selectedEffort = $0.rounded() }
+        )
+    }
+
+    private var effortValueLabel: String {
+        guard let selectedEffort else { return "Optional" }
+        return "\(Int(selectedEffort))/10"
+    }
+
+    private var weightUnitLabel: String {
+        viewModel.unitPreference == .imperial ? "lbs" : "kg"
+    }
+
+    private func exercisesForFeedback(summary: WorkoutSummaryData) -> [ExerciseSummary] {
+        summary.exerciseSummaries.filter { viewModel.exerciseIdsWithPredictions.contains($0.id) }
+    }
+
+    private func sectionHeading(title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.textPrimary)
+
+            Text(subtitle)
+                .font(.caption)
+                .foregroundColor(.textSecondary)
+        }
+    }
+
+    private func sectionCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            content()
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.border, lineWidth: 1)
+        }
+    }
+
+    private func displayWeight(_ kg: Double) -> Double {
+        viewModel.unitPreference == .imperial ? UnitConversion.kgToLbs(kg) : kg
+    }
+
     private func formatDuration(_ interval: TimeInterval) -> String {
         let total = Int(interval)
         let hours = total / 3600
@@ -378,19 +783,20 @@ struct WorkoutSummarySheet: View {
         return "\(minutes)m"
     }
 
-    /// Format volume with thousands separator and "kg" suffix.
     private func formatVolume(_ volume: Double) -> String {
-        if volume == 0 { return "0 kg" }
+        let convertedVolume = displayWeight(volume)
+        if convertedVolume == 0 { return "0 \(weightUnitLabel)" }
+
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.maximumFractionDigits = 0
-        let formatted = formatter.string(from: NSNumber(value: volume)) ?? "\(Int(volume))"
-        return "\(formatted) kg"
+        let formatted = formatter.string(from: NSNumber(value: convertedVolume)) ?? "\(Int(convertedVolume))"
+        return "\(formatted) \(weightUnitLabel)"
     }
 
-    /// Format weight using locale-aware decimal separator.
     private func formatWeight(_ weight: Double) -> String {
-        "\(UnitConversion.formatWeight(weight)) kg"
+        let convertedWeight = displayWeight(weight)
+        return "\(UnitConversion.formatWeight(convertedWeight)) \(weightUnitLabel)"
     }
 }
 

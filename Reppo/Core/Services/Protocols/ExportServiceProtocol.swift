@@ -42,6 +42,7 @@ struct WorkoutHistoryArchive: Codable, Sendable {
     let workouts: [WorkoutHistoryArchiveWorkout]
     let exercises: [WorkoutHistoryArchiveExercise]
     let sets: [WorkoutHistoryArchiveSet]
+    let fatigueObservations: [WorkoutHistoryArchiveFatigueObservation]?
 }
 
 struct WorkoutHistoryArchiveWorkout: Codable, Sendable {
@@ -74,8 +75,27 @@ struct WorkoutHistoryArchiveExercise: Codable, Sendable {
     let defaultRestTime: Int?
     let fatigueRate: Double?
     let recoveryConstant: Double?
+    let fatigueLearningSessionCount: Int?
+    let fatigueLearningCumulativeError: Double?
     let createdAt: Date
     let updatedAt: Date
+}
+
+struct WorkoutHistoryArchiveFatigueObservation: Codable, Sendable {
+    let id: UUID
+    let exerciseId: UUID
+    let workoutId: UUID
+    let setIndex: Int
+    let predictedEffectiveE1RM: Double
+    let actualE1RM: Double
+    let normalizedError: Double
+    let baseE1RM: Double
+    let prescribedWeight: Double
+    let actualWeight: Double
+    let actualReps: Int
+    let actualRIR: Double
+    let restDurationSeconds: Int?
+    let createdAt: Date
 }
 
 struct WorkoutHistoryArchiveSet: Codable, Sendable {

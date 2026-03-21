@@ -47,7 +47,13 @@ actor WorkoutService: WorkoutServiceProtocol {
     }
 
     /// Finish an active workout — set status, endTime, calculate duration, store title/notes/RPE.
-    func finishWorkout(_ workoutId: UUID, title: String? = nil, notes: String? = nil, perceivedEffort: Double? = nil) async throws {
+    func finishWorkout(
+        _ workoutId: UUID,
+        title: String? = nil,
+        notes: String? = nil,
+        perceivedEffort: Double? = nil,
+        durationSecondsOverride: Int? = nil
+    ) async throws {
         guard let workout = try await workoutRepo.fetch(byId: workoutId) else {
             throw WorkoutServiceError.workoutNotFound(workoutId)
         }
@@ -60,7 +66,9 @@ actor WorkoutService: WorkoutServiceProtocol {
         workout.endTime = Date()
 
         // Calculate duration in seconds (specdoc S6.2)
-        if let startTime = workout.startTime, let endTime = workout.endTime {
+        if let durationSecondsOverride {
+            workout.duration = max(0, durationSecondsOverride)
+        } else if let startTime = workout.startTime, let endTime = workout.endTime {
             workout.duration = Int(endTime.timeIntervalSince(startTime))
         }
 

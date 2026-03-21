@@ -63,14 +63,9 @@ struct ExerciseListView: View {
             ToolbarItem(placement: .cancellationAction) {
                 Button(mode == .addToWorkout ? "Cancel" : "Close") { dismiss() }
             }
-            // [+ New] button for creating exercises (T033)
+            // "Add New" button for creating exercises (T033)
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showCreateSheet = true
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 16, weight: .semibold))
-                }
+                Button("Add New") { showCreateSheet = true }
             }
         }
         .safeAreaInset(edge: .bottom) {

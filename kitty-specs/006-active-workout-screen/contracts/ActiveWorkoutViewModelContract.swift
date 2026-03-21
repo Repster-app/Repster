@@ -38,8 +38,11 @@ protocol ActiveWorkoutViewModelContract {
     /// Rest timer state
     var restTimer: RestTimerState { get }
 
-    /// Elapsed workout time in seconds
+    /// Elapsed workout time in seconds, excluding paused time
     var elapsedTime: TimeInterval { get }
+
+    /// Whether the workout clock is currently paused.
+    var isWorkoutPaused: Bool { get }
 
     /// Controls for sheet presentation
     var showFinishSheet: Bool { get set }
@@ -92,8 +95,16 @@ protocol ActiveWorkoutViewModelContract {
     /// Add seconds to the running timer (+30s button).
     func addTime(_ seconds: Int)
 
+    /// Toggle the rest timer between running and paused.
+    func toggleRestTimerPause()
+
     /// Dismiss the rest timer.
     func dismissTimer()
+
+    // MARK: - Workout Clock
+
+    /// Toggle the workout clock between paused and running.
+    func toggleWorkoutPause()
 
     // MARK: - Finish Workout
 
@@ -108,8 +119,15 @@ enum RestTimerState: Equatable {
     case idle
     /// Timer counting down: remaining seconds and total seconds
     case running(remaining: Int, total: Int)
+    /// Timer is paused with remaining time preserved.
+    case paused(remaining: Int, total: Int, source: RestTimerPauseSource)
     /// Timer has reached zero
     case finished
+}
+
+enum RestTimerPauseSource: Equatable {
+    case manual
+    case workout
 }
 
 // MARK: - Summary Data (for WorkoutSummarySheet)

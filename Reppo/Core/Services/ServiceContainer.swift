@@ -25,6 +25,7 @@ final class ServiceContainer {
     let workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol
     let templateService: any TemplateServiceProtocol
     let loadPrescriptionService: any LoadPrescriptionServiceProtocol
+    let fatigueLearningService: FatigueLearningService
     let healthProfileRepo: any HealthProfileRepositoryProtocol
 
     init(repositoryContainer: RepositoryContainer) {
@@ -112,6 +113,7 @@ final class ServiceContainer {
             workoutRepo: repositoryContainer.workoutRepository,
             exerciseRepo: repositoryContainer.exerciseRepository,
             setRepo: repositoryContainer.setRepository,
+            fatigueObservationRepo: repositoryContainer.fatigueObservationRepository,
             statsService: statsService,
             prService: prService,
             modelContainer: repositoryContainer.modelContainer
@@ -133,6 +135,12 @@ final class ServiceContainer {
             healthProfileRepository: repositoryContainer.healthProfileRepository
         )
 
+        // 13. FatigueLearningService — depends on repos only
+        let fatigueLearningService = FatigueLearningService(
+            observationRepo: repositoryContainer.fatigueObservationRepository,
+            exerciseRepo: repositoryContainer.exerciseRepository
+        )
+
         self.prService = prService
         self.statsService = statsService
         self.setService = setService
@@ -145,6 +153,7 @@ final class ServiceContainer {
         self.workoutHistoryBackupService = workoutHistoryBackupService
         self.templateService = templateService
         self.loadPrescriptionService = loadPrescriptionService
+        self.fatigueLearningService = fatigueLearningService
         self.healthProfileRepo = repositoryContainer.healthProfileRepository
     }
 }

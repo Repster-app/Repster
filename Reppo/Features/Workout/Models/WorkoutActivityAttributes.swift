@@ -37,8 +37,21 @@ struct WorkoutActivityAttributes: ActivityAttributes {
         /// Display name of the set type ("Working", "Warm-up", etc.).
         var setTypeLabel: String
 
+        /// Reference date used for the workout elapsed timer while the workout is active.
+        /// This shifts forward across pause/resume cycles so the timer excludes paused time.
+        var elapsedTimerReferenceDate: Date
+
+        /// Whether the workout clock is currently paused.
+        var isWorkoutPaused: Bool
+
+        /// Frozen elapsed workout seconds used while paused.
+        var pausedElapsedSeconds: Int
+
         /// Whether the rest timer is currently counting down.
         var isRestTimerRunning: Bool
+
+        /// Whether the rest timer is currently paused while the workout keeps running.
+        var isRestTimerPaused: Bool
 
         /// Rest timer end date — used with `Text(timerInterval:countsDown:true)`
         /// for zero-cost countdown rendering. Nil when no timer is active.
@@ -46,6 +59,9 @@ struct WorkoutActivityAttributes: ActivityAttributes {
 
         /// Total rest timer duration in seconds (for progress bar width calculation).
         var restTimerTotalSeconds: Int
+
+        /// Current rest timer remaining seconds. Used to freeze the timer while paused.
+        var restTimerRemainingSeconds: Int?
 
         /// Whether the rest timer has finished (shows "Rest complete" message).
         var isRestTimerFinished: Bool

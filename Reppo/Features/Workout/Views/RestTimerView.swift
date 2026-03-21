@@ -30,6 +30,9 @@ struct RestTimerView: View {
     /// Called when the user sets an exact duration via the edit button.
     let onSetDuration: (Int) -> Void
 
+    /// Called when the user toggles the rest timer between running and paused.
+    let onTogglePause: () -> Void
+
     /// Called when the user dismisses the timer.
     let onDismiss: () -> Void
 
@@ -45,7 +48,10 @@ struct RestTimerView: View {
             EmptyView()
 
         case .running(let remaining, let total):
-            timerContent(remaining: remaining, total: total)
+            timerContent(remaining: remaining, total: total, pauseSource: nil)
+
+        case .paused(let remaining, let total, let source):
+            timerContent(remaining: remaining, total: total, pauseSource: source)
 
         case .finished:
             if presentationMode == .compact {
@@ -59,9 +65,13 @@ struct RestTimerView: View {
     // MARK: - Running State
 
     /// Countdown display with progress ring, time, adjustment buttons, and dismiss.
-    private func timerContent(remaining: Int, total: Int) -> some View {
+    private func timerContent(
+        remaining: Int,
+        total: Int,
+        pauseSource: RestTimerPauseSource?
+    ) -> some View {
         VStack(spacing: presentationMode == .full ? 8 : 0) {
-            timerHeader(remaining: remaining, total: total)
+            timerHeader(remaining: remaining, total: total, pauseSource: pauseSource)
 
             if presentationMode == .full {
                 HStack(spacing: 6) {
@@ -102,8 +112,24 @@ struct RestTimerView: View {
         }
     }
 
-    private func timerHeader(remaining: Int, total: Int) -> some View {
-        HStack(spacing: 16) {
+    private func timerHeader(
+        remaining: Int,
+        total: Int,
+        pauseSource: RestTimerPauseSource?
+    ) -> some View {
+        let pauseButtonEnabled = pauseSource != .workout
+        let pauseButtonIcon = pauseSource == .manual ? "play.fill" : "pause.fill"
+        let pauseButtonLabel: String
+        switch pauseSource {
+        case .manual:
+            pauseButtonLabel = "Resume rest timer"
+        case .workout:
+            pauseButtonLabel = "Rest timer paused with workout"
+        case .none:
+            pauseButtonLabel = "Pause rest timer"
+        }
+
+        return HStack(spacing: 16) {
             ZStack {
                 Circle()
                     .stroke(Color.bgSubtle, lineWidth: 4)
@@ -122,11 +148,24 @@ struct RestTimerView: View {
 
             Spacer()
 
-            Button(action: onDismiss) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.textTertiary)
-                    .frame(width: 36, height: 36)
+            HStack(spacing: 4) {
+                Button(action: onTogglePause) {
+                    Image(systemName: pauseButtonIcon)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(pauseButtonEnabled ? .textTertiary : .textTertiary.opacity(0.45))
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(.plain)
+                .disabled(!pauseButtonEnabled)
+                .accessibilityLabel(pauseButtonLabel)
+
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.textTertiary)
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -189,23 +228,25 @@ struct RestTimerView: View {
                 onAddTime: { _ in },
                 onSubtractTime: { _ in },
                 onSetDuration: { _ in },
+                onTogglePause: {},
                 onDismiss: {}
             )
         }
     }
 }
 
-#Preview("Running - 0:05") {
+#Preview("Paused - Manual") {
     ZStack {
         Color.bg.ignoresSafeArea()
         VStack {
             Spacer()
             RestTimerView(
-                state: .running(remaining: 5, total: 90),
+                state: .paused(remaining: 45, total: 90, source: .manual),
                 presentationMode: .full,
                 onAddTime: { _ in },
                 onSubtractTime: { _ in },
                 onSetDuration: { _ in },
+                onTogglePause: {},
                 onDismiss: {}
             )
         }
@@ -223,6 +264,7 @@ struct RestTimerView: View {
                 onAddTime: { _ in },
                 onSubtractTime: { _ in },
                 onSetDuration: { _ in },
+                onTogglePause: {},
                 onDismiss: {}
             )
         }

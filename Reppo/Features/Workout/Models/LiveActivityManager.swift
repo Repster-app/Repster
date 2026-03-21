@@ -63,9 +63,14 @@ final class LiveActivityManager {
                     currentSetNumber: currentSetNumber,
                     totalSets: totalSets,
                     setTypeLabel: setTypeLabel,
+                    elapsedTimerReferenceDate: startTime,
+                    isWorkoutPaused: false,
+                    pausedElapsedSeconds: 0,
                     isRestTimerRunning: false,
+                    isRestTimerPaused: false,
                     restTimerEndDate: nil,
                     restTimerTotalSeconds: 0,
+                    restTimerRemainingSeconds: nil,
                     isRestTimerFinished: false
                 )
                 print("[LiveActivityManager] Recovered existing activity: \(existing.id)")
@@ -80,9 +85,14 @@ final class LiveActivityManager {
                 currentSetNumber: currentSetNumber,
                 totalSets: totalSets,
                 setTypeLabel: setTypeLabel,
+                elapsedTimerReferenceDate: startTime,
+                isWorkoutPaused: false,
+                pausedElapsedSeconds: 0,
                 isRestTimerRunning: false,
+                isRestTimerPaused: false,
                 restTimerEndDate: nil,
                 restTimerTotalSeconds: 0,
+                restTimerRemainingSeconds: nil,
                 isRestTimerFinished: false
             )
             return
@@ -99,9 +109,14 @@ final class LiveActivityManager {
             currentSetNumber: currentSetNumber,
             totalSets: totalSets,
             setTypeLabel: setTypeLabel,
+            elapsedTimerReferenceDate: startTime,
+            isWorkoutPaused: false,
+            pausedElapsedSeconds: 0,
             isRestTimerRunning: false,
+            isRestTimerPaused: false,
             restTimerEndDate: nil,
             restTimerTotalSeconds: 0,
+            restTimerRemainingSeconds: nil,
             isRestTimerFinished: false
         )
 
@@ -137,9 +152,14 @@ final class LiveActivityManager {
         currentSetNumber: Int,
         totalSets: Int,
         setTypeLabel: String,
+        elapsedTimerReferenceDate: Date,
+        isWorkoutPaused: Bool,
+        pausedElapsedSeconds: Int,
         isRestTimerRunning: Bool,
+        isRestTimerPaused: Bool,
         restTimerEndDate: Date?,
         restTimerTotalSeconds: Int,
+        restTimerRemainingSeconds: Int?,
         isRestTimerFinished: Bool
     ) {
         guard let activity = currentActivity else { return }
@@ -149,9 +169,14 @@ final class LiveActivityManager {
             currentSetNumber: currentSetNumber,
             totalSets: totalSets,
             setTypeLabel: setTypeLabel,
+            elapsedTimerReferenceDate: elapsedTimerReferenceDate,
+            isWorkoutPaused: isWorkoutPaused,
+            pausedElapsedSeconds: pausedElapsedSeconds,
             isRestTimerRunning: isRestTimerRunning,
+            isRestTimerPaused: isRestTimerPaused,
             restTimerEndDate: restTimerEndDate,
             restTimerTotalSeconds: restTimerTotalSeconds,
+            restTimerRemainingSeconds: restTimerRemainingSeconds,
             isRestTimerFinished: isRestTimerFinished
         )
 
@@ -174,9 +199,14 @@ final class LiveActivityManager {
             currentSetNumber: 0,
             totalSets: 0,
             setTypeLabel: "",
+            elapsedTimerReferenceDate: Date(),
+            isWorkoutPaused: false,
+            pausedElapsedSeconds: 0,
             isRestTimerRunning: false,
+            isRestTimerPaused: false,
             restTimerEndDate: nil,
             restTimerTotalSeconds: 0,
+            restTimerRemainingSeconds: nil,
             isRestTimerFinished: false
         )
 
@@ -207,9 +237,14 @@ final class LiveActivityManager {
                             currentSetNumber: 0,
                             totalSets: 0,
                             setTypeLabel: "",
+                            elapsedTimerReferenceDate: Date(),
+                            isWorkoutPaused: false,
+                            pausedElapsedSeconds: 0,
                             isRestTimerRunning: false,
+                            isRestTimerPaused: false,
                             restTimerEndDate: nil,
                             restTimerTotalSeconds: 0,
+                            restTimerRemainingSeconds: nil,
                             isRestTimerFinished: false
                         ),
                         staleDate: nil

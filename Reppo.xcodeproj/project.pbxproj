@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FL0001 /* FatigueObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1001 /* FatigueObservation.swift */; };
+		FL0002 /* FatigueObservationRepositoryProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1002 /* FatigueObservationRepositoryProtocol.swift */; };
+		FL0003 /* FatigueObservationRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1003 /* FatigueObservationRepository.swift */; };
+		FL0004 /* FatigueLearningService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1004 /* FatigueLearningService.swift */; };
+		FL0005 /* FatigueLearningServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1005 /* FatigueLearningServiceTests.swift */; };
+		FL0006 /* FatigueLearningAdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1006 /* FatigueLearningAdminView.swift */; };
 		0823BF912F5D608400A513BE /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0823BF902F5D608400A513BE /* WidgetKit.framework */; };
 		0823BF932F5D608400A513BE /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0823BF922F5D608400A513BE /* SwiftUI.framework */; };
 		0823BFA02F5D608500A513BE /* WorkoutLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0823BF8E2F5D608400A513BE /* WorkoutLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -245,6 +251,12 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		FL1001 /* FatigueObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueObservation.swift; sourceTree = "<group>"; };
+		FL1002 /* FatigueObservationRepositoryProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueObservationRepositoryProtocol.swift; sourceTree = "<group>"; };
+		FL1003 /* FatigueObservationRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueObservationRepository.swift; sourceTree = "<group>"; };
+		FL1004 /* FatigueLearningService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningService.swift; sourceTree = "<group>"; };
+		FL1005 /* FatigueLearningServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningServiceTests.swift; sourceTree = "<group>"; };
+		FL1006 /* FatigueLearningAdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningAdminView.swift; sourceTree = "<group>"; };
 		0823BF8E2F5D608400A513BE /* WorkoutLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WorkoutLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		0823BF902F5D608400A513BE /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		0823BF922F5D608400A513BE /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
@@ -522,6 +534,7 @@
 				TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */,
 				TT2004 /* ChartDataServiceTests.swift */,
 				TT2005 /* WorkoutHistoryBackupTests.swift */,
+				FL1005 /* FatigueLearningServiceTests.swift */,
 			);
 			path = ReppoTests;
 			sourceTree = "<group>";
@@ -769,6 +782,7 @@
 				D30018 /* Components */,
 				BJ0005 /* SettingsView.swift */,
 				BW0004 /* PrescriptionSettingsView.swift */,
+				FL1006 /* FatigueLearningAdminView.swift */,
 				BJ0009 /* RebuildStatsView.swift */,
 				BJ0011 /* BodyweightLogView.swift */,
 				BJ0014 /* ImportView.swift */,
@@ -954,6 +968,7 @@
 				B70003 /* ServiceContainer.swift */,
 				BM0004 /* SeedService.swift */,
 				BT0007 /* TemplateService.swift */,
+				FL1004 /* FatigueLearningService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -972,6 +987,7 @@
 				B60005 /* ProgramRepository.swift */,
 				B60006 /* RepositoryContainer.swift */,
 				BT0005 /* TemplateRepository.swift */,
+				FL1003 /* FatigueObservationRepository.swift */,
 			);
 			path = Repositories;
 			sourceTree = "<group>";
@@ -1003,6 +1019,7 @@
 				BT0001 /* WorkoutTemplate.swift */,
 				BT0002 /* TemplateExercise.swift */,
 				BT0003 /* TemplateSet.swift */,
+				FL1001 /* FatigueObservation.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -1045,6 +1062,7 @@
 				B40008 /* ProgramRepositoryProtocol.swift */,
 				B40009 /* SetSortOrder.swift */,
 				BT0004 /* TemplateRepositoryProtocol.swift */,
+				FL1002 /* FatigueObservationRepositoryProtocol.swift */,
 			);
 			path = Protocols;
 			sourceTree = "<group>";
@@ -1527,6 +1545,11 @@
 				AT0010 /* TemplateListSheet.swift in Sources */,
 				AT0011 /* CreateEditTemplateView.swift in Sources */,
 				AT0012 /* TemplateCardView.swift in Sources */,
+				FL0001 /* FatigueObservation.swift in Sources */,
+				FL0002 /* FatigueObservationRepositoryProtocol.swift in Sources */,
+				FL0003 /* FatigueObservationRepository.swift in Sources */,
+				FL0004 /* FatigueLearningService.swift in Sources */,
+				FL0006 /* FatigueLearningAdminView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1537,6 +1560,7 @@
 				TT0001 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift in Sources */,
 				TT0003 /* ChartDataServiceTests.swift in Sources */,
 				TT0004 /* WorkoutHistoryBackupTests.swift in Sources */,
+				FL0005 /* FatigueLearningServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

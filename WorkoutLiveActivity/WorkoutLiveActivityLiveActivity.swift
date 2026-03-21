@@ -43,15 +43,7 @@ struct WorkoutLiveActivityWidget: Widget {
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     VStack(alignment: .trailing, spacing: 2) {
-                        // Elapsed time — counts up from workout start
-                        Text(
-                            context.attributes.workoutStartTime,
-                            style: .timer
-                        )
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                        elapsedWorkoutTimeText(context: context, font: .caption2)
 
                         // Set progress
                         Text("Set \(context.state.currentSetNumber)/\(context.state.totalSets)")
@@ -102,11 +94,7 @@ struct WorkoutLiveActivityWidget: Widget {
 
                 Spacer()
 
-                // Elapsed time — uses timer text style for zero-cost updates
-                Text(context.attributes.workoutStartTime, style: .timer)
-                    .font(.subheadline.monospacedDigit())
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
+                elapsedWorkoutTimeText(context: context, font: .subheadline)
             }
 
             // Row 2: Exercise name + set progress
@@ -143,7 +131,43 @@ struct WorkoutLiveActivityWidget: Widget {
     private func restTimerSection(
         context: ActivityViewContext<WorkoutActivityAttributes>
     ) -> some View {
-        if context.state.isRestTimerRunning, let endDate = context.state.restTimerEndDate {
+        if context.state.isWorkoutPaused {
+            HStack(spacing: 8) {
+                Image(systemName: "pause.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if let remaining = context.state.restTimerRemainingSeconds {
+                    Text("\(formatTime(remaining)) rest paused")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Workout paused")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+        } else if context.state.isRestTimerPaused {
+            HStack(spacing: 8) {
+                Image(systemName: "pause.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if let remaining = context.state.restTimerRemainingSeconds {
+                    Text("\(formatTime(remaining)) rest paused")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Rest paused")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+        } else if context.state.isRestTimerRunning, let endDate = context.state.restTimerEndDate {
             // Active rest timer — countdown only (no progress bar)
             HStack(spacing: 6) {
                 Image(systemName: "timer")
@@ -202,7 +226,19 @@ struct WorkoutLiveActivityWidget: Widget {
     private func compactTrailingContent(
         context: ActivityViewContext<WorkoutActivityAttributes>
     ) -> some View {
-        if context.state.isRestTimerRunning, let endDate = context.state.restTimerEndDate {
+        if context.state.isWorkoutPaused {
+            Text(formatElapsed(context.state.pausedElapsedSeconds))
+                .font(.caption2.monospacedDigit())
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 32)
+        } else if context.state.isRestTimerPaused, let remaining = context.state.restTimerRemainingSeconds {
+            Text(formatTime(remaining))
+                .font(.caption2.monospacedDigit())
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 32)
+        } else if context.state.isRestTimerRunning, let endDate = context.state.restTimerEndDate {
             // Show countdown
             Text(timerInterval: Date.now...endDate, countsDown: true)
                 .font(.caption2.monospacedDigit())
@@ -215,6 +251,45 @@ struct WorkoutLiveActivityWidget: Widget {
                 .font(.caption2.monospacedDigit())
                 .fontWeight(.semibold)
         }
+    }
+
+    @ViewBuilder
+    private func elapsedWorkoutTimeText(
+        context: ActivityViewContext<WorkoutActivityAttributes>,
+        font: Font
+    ) -> some View {
+        if context.state.isWorkoutPaused {
+            HStack(spacing: 4) {
+                Text(formatElapsed(context.state.pausedElapsedSeconds))
+                Image(systemName: "pause.fill")
+                    .font(.caption2)
+            }
+            .font(font.monospacedDigit())
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.tail)
+        } else {
+            Text(context.state.elapsedTimerReferenceDate, style: .timer)
+                .font(font.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+    }
+
+    private func formatElapsed(_ seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        let remainingSeconds = seconds % 60
+
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, remainingSeconds)
+        }
+        return String(format: "%d:%02d", minutes, remainingSeconds)
+    }
+
+    private func formatTime(_ seconds: Int) -> String {
+        String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 
 }

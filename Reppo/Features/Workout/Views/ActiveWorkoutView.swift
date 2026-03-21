@@ -22,7 +22,7 @@ enum ActiveWorkoutBottomAccessoryLayout {
         switch state {
         case .idle:
             return nil
-        case .running:
+        case .running, .paused:
             return isKeyboardVisible ? .compact : .full
         case .finished:
             return isKeyboardVisible ? nil : .full
@@ -77,7 +77,8 @@ struct ActiveWorkoutView: View {
             prService: services.prService,
             healthProfileRepo: services.healthProfileRepo,
             settingsService: services.settingsService,
-            loadPrescriptionService: services.loadPrescriptionService
+            loadPrescriptionService: services.loadPrescriptionService,
+            fatigueLearningService: services.fatigueLearningService
         ))
         self.services = services
     }
@@ -273,6 +274,7 @@ struct ActiveWorkoutView: View {
                     onAddTime: { viewModel.addTime($0) },
                     onSubtractTime: { viewModel.subtractTime($0) },
                     onSetDuration: { viewModel.setTimerDuration($0) },
+                    onTogglePause: { viewModel.toggleRestTimerPause() },
                     onDismiss: { viewModel.dismissTimer() }
                 )
                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -324,7 +326,11 @@ struct ActiveWorkoutView: View {
             Spacer()
 
             // Elapsed timer (T024)
-            ElapsedTimerView(startTime: viewModel.workout?.startTime)
+            ElapsedTimerView(
+                elapsedTime: viewModel.workout == nil ? nil : viewModel.elapsedTime,
+                isPaused: viewModel.isWorkoutPaused,
+                onTap: { viewModel.toggleWorkoutPause() }
+            )
 
             Spacer()
 

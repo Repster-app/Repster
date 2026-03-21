@@ -23,6 +23,24 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         XCTAssertEqual(mode, .compact)
     }
 
+    func testPausedTimerUsesFullPresentationWhenKeyboardHidden() {
+        let mode = ActiveWorkoutBottomAccessoryLayout.timerPresentationMode(
+            for: .paused(remaining: 90, total: 120, source: .manual),
+            isKeyboardVisible: false
+        )
+
+        XCTAssertEqual(mode, .full)
+    }
+
+    func testPausedTimerUsesCompactPresentationWhenKeyboardVisible() {
+        let mode = ActiveWorkoutBottomAccessoryLayout.timerPresentationMode(
+            for: .paused(remaining: 90, total: 120, source: .manual),
+            isKeyboardVisible: true
+        )
+
+        XCTAssertEqual(mode, .compact)
+    }
+
     func testFinishedTimerUsesFullPresentationWhenKeyboardHidden() {
         let mode = ActiveWorkoutBottomAccessoryLayout.timerPresentationMode(
             for: .finished,
@@ -39,6 +57,480 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         )
 
         XCTAssertNil(mode)
+    }
+
+    func testFinishWorkoutForwardsSummaryMetadataAndMarksWorkoutFinished() async throws {
+        let workoutService = WorkoutServiceStub()
+        let profile = HealthProfile()
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: workoutService,
+            setService: SetServiceStub(),
+            exerciseService: ExerciseServiceStub(),
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+
+        let workoutId = UUID()
+        viewModel.workout = Workout(
+            id: workoutId,
+            date: Date(),
+            startTime: Date().addingTimeInterval(-900),
+            status: .inProgress
+        )
+        viewModel.exercises = [makeExercise(name: "Back Squat")]
+        viewModel.setsByExercise = [viewModel.exercises[0].id: [makeSet(exerciseId: viewModel.exercises[0].id, order: 1, reps: 5)]]
+
+        await viewModel.finishWorkout(
+            title: "Leg Day",
+            notes: "Strong session",
+            perceivedEffort: 8
+        )
+
+        XCTAssertEqual(workoutService.lastFinishedWorkoutId, workoutId)
+        XCTAssertEqual(workoutService.lastFinishTitle, "Leg Day")
+        XCTAssertEqual(workoutService.lastFinishNotes, "Strong session")
+        XCTAssertEqual(workoutService.lastFinishPerceivedEffort, 8)
+        XCTAssertGreaterThanOrEqual(workoutService.lastFinishDurationSecondsOverride ?? 0, 899)
+        XCTAssertTrue(viewModel.isWorkoutFinished)
+        XCTAssertNil(viewModel.workout)
+        XCTAssertTrue(viewModel.exercises.isEmpty)
+        XCTAssertTrue(viewModel.setsByExercise.isEmpty)
+    }
+
+    func testLoadActiveWorkoutRestoresPausedElapsedTimeForMatchingWorkout() async throws {
+        clearActiveWorkoutSessionDefaults()
+        defer { clearActiveWorkoutSessionDefaults() }
+
+        let workoutId = UUID()
+        let workoutService = WorkoutServiceStub()
+        workoutService.activeWorkout = Workout(
+            id: workoutId,
+            date: Date(),
+            startTime: Date().addingTimeInterval(-900),
+            status: .inProgress
+        )
+        let profile = HealthProfile()
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: workoutService,
+            setService: SetServiceStub(),
+            exerciseService: ExerciseServiceStub(),
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+
+        UserDefaults.standard.set(
+            workoutId.uuidString,
+            forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockWorkoutId
+        )
+        UserDefaults.standard.set(
+            123.0,
+            forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockAccumulatedElapsedSeconds
+        )
+        UserDefaults.standard.set(
+            true,
+            forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockIsPaused
+        )
+
+        await viewModel.loadActiveWorkout()
+
+        XCTAssertTrue(viewModel.isWorkoutPaused)
+        XCTAssertEqual(Int(viewModel.elapsedTime), 123)
+        XCTAssertEqual(Int(try XCTUnwrap(viewModel.computeSummary()).duration), 123)
+    }
+
+    func testLoadActiveWorkoutIgnoresStalePersistedPausedState() async throws {
+        clearActiveWorkoutSessionDefaults()
+        defer { clearActiveWorkoutSessionDefaults() }
+
+        let workout = Workout(
+            id: UUID(),
+            date: Date(),
+            startTime: Date().addingTimeInterval(-5),
+            status: .inProgress
+        )
+        let workoutService = WorkoutServiceStub()
+        workoutService.activeWorkout = workout
+        let profile = HealthProfile()
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: workoutService,
+            setService: SetServiceStub(),
+            exerciseService: ExerciseServiceStub(),
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+
+        UserDefaults.standard.set(
+            UUID().uuidString,
+            forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockWorkoutId
+        )
+        UserDefaults.standard.set(
+            500.0,
+            forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockAccumulatedElapsedSeconds
+        )
+        UserDefaults.standard.set(
+            true,
+            forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockIsPaused
+        )
+
+        await viewModel.loadActiveWorkout()
+
+        XCTAssertFalse(viewModel.isWorkoutPaused)
+        XCTAssertGreaterThanOrEqual(Int(viewModel.elapsedTime), 4)
+        XCTAssertLessThan(Int(viewModel.elapsedTime), 10)
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockWorkoutId),
+            workout.id.uuidString
+        )
+    }
+
+    func testFinishWorkoutUsesPausedDurationOverrideWhenRestoredFromPersistence() async throws {
+        clearActiveWorkoutSessionDefaults()
+        defer { clearActiveWorkoutSessionDefaults() }
+
+        let workoutId = UUID()
+        let workoutService = WorkoutServiceStub()
+        workoutService.activeWorkout = Workout(
+            id: workoutId,
+            date: Date(),
+            startTime: Date().addingTimeInterval(-900),
+            status: .inProgress
+        )
+        let profile = HealthProfile()
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: workoutService,
+            setService: SetServiceStub(),
+            exerciseService: ExerciseServiceStub(),
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+
+        UserDefaults.standard.set(
+            workoutId.uuidString,
+            forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockWorkoutId
+        )
+        UserDefaults.standard.set(
+            187.0,
+            forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockAccumulatedElapsedSeconds
+        )
+        UserDefaults.standard.set(
+            true,
+            forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockIsPaused
+        )
+
+        await viewModel.loadActiveWorkout()
+        await viewModel.finishWorkout(title: nil, notes: nil, perceivedEffort: nil)
+
+        XCTAssertEqual(workoutService.lastFinishDurationSecondsOverride, 187)
+    }
+
+    func testPausingWorkoutFreezesAndResumesRestTimer() async throws {
+        clearActiveWorkoutSessionDefaults()
+        defer { clearActiveWorkoutSessionDefaults() }
+
+        let profile = HealthProfile()
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: WorkoutServiceStub(),
+            setService: SetServiceStub(),
+            exerciseService: ExerciseServiceStub(),
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+
+        viewModel.workout = Workout(
+            id: UUID(),
+            date: Date(),
+            startTime: Date().addingTimeInterval(-30),
+            status: .inProgress
+        )
+
+        viewModel.startRestTimer(duration: 4)
+        try await Task.sleep(for: .milliseconds(1100))
+
+        viewModel.toggleWorkoutPause()
+        XCTAssertTrue(viewModel.isWorkoutPaused)
+
+        let pausedRemaining: Int
+        switch viewModel.restTimer {
+        case .paused(let remaining, _, let source):
+            XCTAssertEqual(source, .workout)
+            pausedRemaining = remaining
+        default:
+            return XCTFail("Expected paused rest timer to remain visible")
+        }
+
+        try await Task.sleep(for: .milliseconds(1100))
+
+        switch viewModel.restTimer {
+        case .paused(let remaining, _, let source):
+            XCTAssertEqual(source, .workout)
+            XCTAssertEqual(remaining, pausedRemaining)
+        default:
+            XCTFail("Expected paused timer state to remain paused")
+        }
+
+        viewModel.toggleWorkoutPause()
+        try await Task.sleep(for: .milliseconds(1100))
+
+        switch viewModel.restTimer {
+        case .running(let remaining, _):
+            XCTAssertLessThan(remaining, pausedRemaining)
+        case .finished:
+            XCTAssertLessThan(0, pausedRemaining)
+        default:
+            XCTFail("Expected rest timer to resume after unpausing workout")
+        }
+    }
+
+    func testManualRestPauseFreezesAndResumesWithoutPausingWorkout() async throws {
+        clearActiveWorkoutSessionDefaults()
+        defer { clearActiveWorkoutSessionDefaults() }
+
+        let profile = HealthProfile()
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: WorkoutServiceStub(),
+            setService: SetServiceStub(),
+            exerciseService: ExerciseServiceStub(),
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+
+        viewModel.workout = Workout(
+            id: UUID(),
+            date: Date(),
+            startTime: Date().addingTimeInterval(-30),
+            status: .inProgress
+        )
+
+        viewModel.startRestTimer(duration: 4)
+        try await Task.sleep(for: .milliseconds(1100))
+
+        viewModel.toggleRestTimerPause()
+        XCTAssertFalse(viewModel.isWorkoutPaused)
+
+        let pausedRemaining: Int
+        switch viewModel.restTimer {
+        case .paused(let remaining, _, let source):
+            XCTAssertEqual(source, .manual)
+            pausedRemaining = remaining
+        default:
+            return XCTFail("Expected manually paused rest timer")
+        }
+
+        try await Task.sleep(for: .milliseconds(1100))
+
+        switch viewModel.restTimer {
+        case .paused(let remaining, _, let source):
+            XCTAssertEqual(source, .manual)
+            XCTAssertEqual(remaining, pausedRemaining)
+        default:
+            XCTFail("Expected manually paused rest timer to stay frozen")
+        }
+
+        viewModel.toggleRestTimerPause()
+        try await Task.sleep(for: .milliseconds(1100))
+
+        switch viewModel.restTimer {
+        case .running(let remaining, _):
+            XCTAssertLessThan(remaining, pausedRemaining)
+        case .finished:
+            XCTAssertLessThan(0, pausedRemaining)
+        default:
+            XCTFail("Expected rest timer to resume after manual pause toggle")
+        }
+    }
+
+    func testLoadActiveWorkoutRestoresManualPausedRestTimerForMatchingWorkout() async throws {
+        clearActiveWorkoutSessionDefaults()
+        defer { clearActiveWorkoutSessionDefaults() }
+
+        let workoutId = UUID()
+        let workoutService = WorkoutServiceStub()
+        workoutService.activeWorkout = Workout(
+            id: workoutId,
+            date: Date(),
+            startTime: Date().addingTimeInterval(-900),
+            status: .inProgress
+        )
+        let profile = HealthProfile()
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: workoutService,
+            setService: SetServiceStub(),
+            exerciseService: ExerciseServiceStub(),
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+
+        UserDefaults.standard.set(
+            workoutId.uuidString,
+            forKey: ActiveWorkoutSessionDefaultsKeys.restTimerWorkoutId
+        )
+        UserDefaults.standard.set(
+            180,
+            forKey: ActiveWorkoutSessionDefaultsKeys.restTimerTotalDuration
+        )
+        UserDefaults.standard.set(
+            75,
+            forKey: ActiveWorkoutSessionDefaultsKeys.restTimerRemainingDuration
+        )
+        UserDefaults.standard.set(
+            true,
+            forKey: ActiveWorkoutSessionDefaultsKeys.restTimerIsPaused
+        )
+        UserDefaults.standard.set(
+            RestTimerPauseSource.manual.rawValue,
+            forKey: ActiveWorkoutSessionDefaultsKeys.restTimerPauseSource
+        )
+
+        await viewModel.loadActiveWorkout()
+
+        switch viewModel.restTimer {
+        case .paused(let remaining, let total, let source):
+            XCTAssertEqual(remaining, 75)
+            XCTAssertEqual(total, 180)
+            XCTAssertEqual(source, .manual)
+        default:
+            XCTFail("Expected manual paused timer to restore for matching workout")
+        }
+    }
+
+    func testLoadActiveWorkoutClearsStaleManualPausedRestTimerState() async throws {
+        clearActiveWorkoutSessionDefaults()
+        defer { clearActiveWorkoutSessionDefaults() }
+
+        let workout = Workout(
+            id: UUID(),
+            date: Date(),
+            startTime: Date().addingTimeInterval(-10),
+            status: .inProgress
+        )
+        let workoutService = WorkoutServiceStub()
+        workoutService.activeWorkout = workout
+        let profile = HealthProfile()
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: workoutService,
+            setService: SetServiceStub(),
+            exerciseService: ExerciseServiceStub(),
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+
+        UserDefaults.standard.set(
+            UUID().uuidString,
+            forKey: ActiveWorkoutSessionDefaultsKeys.restTimerWorkoutId
+        )
+        UserDefaults.standard.set(
+            120,
+            forKey: ActiveWorkoutSessionDefaultsKeys.restTimerTotalDuration
+        )
+        UserDefaults.standard.set(
+            50,
+            forKey: ActiveWorkoutSessionDefaultsKeys.restTimerRemainingDuration
+        )
+        UserDefaults.standard.set(
+            true,
+            forKey: ActiveWorkoutSessionDefaultsKeys.restTimerIsPaused
+        )
+        UserDefaults.standard.set(
+            RestTimerPauseSource.manual.rawValue,
+            forKey: ActiveWorkoutSessionDefaultsKeys.restTimerPauseSource
+        )
+
+        await viewModel.loadActiveWorkout()
+
+        XCTAssertEqual(viewModel.restTimer, .idle)
+        XCTAssertNil(UserDefaults.standard.string(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerWorkoutId))
+    }
+
+    func testManualRestPauseStaysPausedAcrossWorkoutPauseAndResume() async throws {
+        clearActiveWorkoutSessionDefaults()
+        defer { clearActiveWorkoutSessionDefaults() }
+
+        let profile = HealthProfile()
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: WorkoutServiceStub(),
+            setService: SetServiceStub(),
+            exerciseService: ExerciseServiceStub(),
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+
+        viewModel.workout = Workout(
+            id: UUID(),
+            date: Date(),
+            startTime: Date().addingTimeInterval(-30),
+            status: .inProgress
+        )
+
+        viewModel.startRestTimer(duration: 5)
+        try await Task.sleep(for: .milliseconds(1100))
+        viewModel.toggleRestTimerPause()
+
+        let manuallyPausedRemaining: Int
+        switch viewModel.restTimer {
+        case .paused(let remaining, _, let source):
+            XCTAssertEqual(source, .manual)
+            manuallyPausedRemaining = remaining
+        default:
+            return XCTFail("Expected manual paused timer before workout pause")
+        }
+
+        viewModel.toggleWorkoutPause()
+        XCTAssertTrue(viewModel.isWorkoutPaused)
+
+        switch viewModel.restTimer {
+        case .paused(let remaining, _, let source):
+            XCTAssertEqual(source, .manual)
+            XCTAssertEqual(remaining, manuallyPausedRemaining)
+        default:
+            XCTFail("Expected manual paused timer to remain manual during workout pause")
+        }
+
+        viewModel.toggleWorkoutPause()
+        XCTAssertFalse(viewModel.isWorkoutPaused)
+
+        switch viewModel.restTimer {
+        case .paused(let remaining, _, let source):
+            XCTAssertEqual(source, .manual)
+            XCTAssertEqual(remaining, manuallyPausedRemaining)
+        default:
+            XCTFail("Expected manual paused timer to stay paused after workout resume")
+        }
     }
 
     func testCreateEditExerciseViewModelNormalizesPrimaryGroupAndDefaultsSecondaryMusclesOnCreate() async throws {
@@ -237,6 +729,47 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         XCTAssertEqual(context.viewModel.weightSuggestionData?.suggestions.first?.targetReps, 12)
     }
 
+    func testAddExercisesSelectsFirstNewlyAddedExercise() async throws {
+        let profile = HealthProfile()
+        let workout = Workout(startTime: Date())
+        let existingExercise = makeExercise(name: "Existing")
+        let firstAddedExercise = makeExercise(name: "First Added")
+        let secondAddedExercise = makeExercise(name: "Second Added")
+        let exerciseService = ExerciseServiceStub()
+        exerciseService.fetchedExercises[firstAddedExercise.id] = firstAddedExercise
+        exerciseService.fetchedExercises[secondAddedExercise.id] = secondAddedExercise
+
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: WorkoutServiceStub(),
+            setService: SetServiceStub(),
+            exerciseService: exerciseService,
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+
+        viewModel.workout = workout
+        viewModel.exercises = [existingExercise]
+        viewModel.selectedExerciseIndex = 0
+        viewModel.setsByExercise = [
+            existingExercise.id: [makeSet(exerciseId: existingExercise.id, order: 1, reps: 8)]
+        ]
+
+        await viewModel.addExercises([firstAddedExercise.id, secondAddedExercise.id])
+
+        XCTAssertEqual(
+            viewModel.exercises.map(\.id),
+            [existingExercise.id, firstAddedExercise.id, secondAddedExercise.id]
+        )
+        XCTAssertEqual(viewModel.selectedExerciseIndex, 1)
+        XCTAssertEqual(viewModel.currentExercise?.id, firstAddedExercise.id)
+        XCTAssertEqual(viewModel.setsByExercise[firstAddedExercise.id]?.count, 1)
+        XCTAssertEqual(viewModel.setsByExercise[secondAddedExercise.id]?.count, 1)
+    }
+
     func testAddSetTriggersImmediateSilentRefreshForCurrentExercise() async throws {
         let loadPrescriptionService = LoadPrescriptionServiceSpy()
         let setService = SetServiceStub()
@@ -311,7 +844,8 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             prService: PRServiceStub(),
             healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
             settingsService: SettingsServiceStub(profile: profile),
-            loadPrescriptionService: loadPrescriptionService
+            loadPrescriptionService: loadPrescriptionService,
+            fatigueLearningService: makeStubFatigueLearningService()
         )
 
         viewModel.exercises = [exercise]
@@ -1341,7 +1875,8 @@ final class WorkoutHistoryBackupServiceTests: XCTestCase {
             exportedAt: Date(),
             workouts: [],
             exercises: [],
-            sets: []
+            sets: [],
+            fatigueObservations: nil
         )
         let invalidData = try encodeBackupArchive(invalidArchive)
 
@@ -1366,6 +1901,7 @@ final class WorkoutHistoryBackupServiceTests: XCTestCase {
             PerformanceRecord.self,
             BodyweightEntry.self,
             HealthProfile.self,
+            FatigueObservation.self,
             configurations: configuration
         )
 
@@ -1376,6 +1912,7 @@ final class WorkoutHistoryBackupServiceTests: XCTestCase {
         let performanceRecordRepo = PerformanceRecordRepository(modelContainer: container)
         let bodyweightRepo = BodyweightEntryRepository(modelContainer: container)
         let healthProfileRepo = HealthProfileRepository(modelContainer: container)
+        let fatigueObservationRepo = FatigueObservationRepository(modelContainer: container)
 
         let statsService = StatsService(
             exerciseStatsRepository: exerciseStatsRepo,
@@ -1394,6 +1931,7 @@ final class WorkoutHistoryBackupServiceTests: XCTestCase {
             workoutRepo: workoutRepo,
             exerciseRepo: exerciseRepo,
             setRepo: setRepo,
+            fatigueObservationRepo: fatigueObservationRepo,
             statsService: statsService,
             prService: prService,
             modelContainer: container
@@ -1793,14 +2331,30 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
 }
 
 private final class WorkoutServiceStub: @unchecked Sendable, WorkoutServiceProtocol {
+    var activeWorkout: Workout?
+    var lastFinishedWorkoutId: UUID?
+    var lastFinishTitle: String?
+    var lastFinishNotes: String?
+    var lastFinishPerceivedEffort: Double?
+    var lastFinishDurationSecondsOverride: Int?
+    var finishCallCount = 0
+
     func startWorkout() async throws -> Workout { Workout(startTime: Date()) }
-    func finishWorkout(_ workoutId: UUID, title: String?, notes: String?, perceivedEffort: Double?) async throws {
-        let _ = workoutId
-        let _ = title
-        let _ = notes
-        let _ = perceivedEffort
+    func finishWorkout(
+        _ workoutId: UUID,
+        title: String?,
+        notes: String?,
+        perceivedEffort: Double?,
+        durationSecondsOverride: Int?
+    ) async throws {
+        finishCallCount += 1
+        lastFinishedWorkoutId = workoutId
+        lastFinishTitle = title
+        lastFinishNotes = notes
+        lastFinishPerceivedEffort = perceivedEffort
+        lastFinishDurationSecondsOverride = durationSecondsOverride
     }
-    func getActiveWorkout() async throws -> Workout? { nil }
+    func getActiveWorkout() async throws -> Workout? { activeWorkout }
     func fetchWorkout(_ workoutId: UUID) async throws -> Workout? {
         let _ = workoutId
         return nil
@@ -1827,6 +2381,7 @@ private final class WorkoutServiceStub: @unchecked Sendable, WorkoutServiceProto
 private final class ExerciseServiceStub: @unchecked Sendable, ExerciseServiceProtocol {
     var createdExercises: [Exercise] = []
     var updatedExercises: [Exercise] = []
+    var fetchedExercises: [UUID: Exercise] = [:]
     var hasSets = false
 
     func createExercise(_ exercise: Exercise) async throws {
@@ -1837,8 +2392,7 @@ private final class ExerciseServiceStub: @unchecked Sendable, ExerciseServicePro
         let _ = originalTrackingType
     }
     func fetchExercise(_ exerciseId: UUID) async throws -> Exercise? {
-        let _ = exerciseId
-        return nil
+        fetchedExercises[exerciseId]
     }
     func fetchAllExercises() async throws -> [Exercise] { [] }
     func searchExercises(name query: String) async throws -> [Exercise] {
@@ -2423,4 +2977,48 @@ private extension NSLock {
         defer { unlock() }
         return body()
     }
+}
+
+private final class FatigueObservationRepositoryStub: @unchecked Sendable, FatigueObservationRepositoryProtocol {
+    func save(_ observation: FatigueObservation) async throws {}
+    func fetchObservations(for workoutId: UUID) async throws -> [FatigueObservation] {
+        let _ = workoutId
+        return []
+    }
+    func fetchObservations(exerciseId: UUID, limit: Int?) async throws -> [FatigueObservation] {
+        let _ = exerciseId
+        let _ = limit
+        return []
+    }
+    func distinctWorkoutCount(exerciseId: UUID) async throws -> Int {
+        let _ = exerciseId
+        return 0
+    }
+    @discardableResult
+    func pruneObservations(exerciseId: UUID, keepRecentSessions: Int) async throws -> Int {
+        let _ = exerciseId
+        let _ = keepRecentSessions
+        return 0
+    }
+}
+
+private func clearActiveWorkoutSessionDefaults() {
+    let defaults = UserDefaults.standard
+    defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockWorkoutId)
+    defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockAccumulatedElapsedSeconds)
+    defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockLastResumedAt)
+    defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockIsPaused)
+    defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerWorkoutId)
+    defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerStartDate)
+    defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerTotalDuration)
+    defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerRemainingDuration)
+    defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerIsPaused)
+    defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerPauseSource)
+}
+
+private func makeStubFatigueLearningService() -> FatigueLearningService {
+    FatigueLearningService(
+        observationRepo: FatigueObservationRepositoryStub(),
+        exerciseRepo: ImportExerciseRepositoryStub()
+    )
 }

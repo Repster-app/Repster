@@ -37,14 +37,34 @@ struct ExerciseSummary: Identifiable {
 
 // MARK: - Rest Timer State
 
+enum RestTimerPauseSource: String, Equatable {
+    case manual
+    case workout
+}
+
 /// Represents the state of the rest timer between sets.
 enum RestTimerState: Equatable {
     /// No timer running.
     case idle
     /// Timer counting down: remaining seconds and total seconds.
     case running(remaining: Int, total: Int)
+    /// Timer is frozen with remaining time preserved.
+    case paused(remaining: Int, total: Int, source: RestTimerPauseSource)
     /// Timer has reached zero.
     case finished
+}
+
+enum ActiveWorkoutSessionDefaultsKeys {
+    static let workoutClockWorkoutId = "activeWorkoutClockWorkoutId"
+    static let workoutClockAccumulatedElapsedSeconds = "activeWorkoutClockAccumulatedElapsedSeconds"
+    static let workoutClockLastResumedAt = "activeWorkoutClockLastResumedAt"
+    static let workoutClockIsPaused = "activeWorkoutClockIsPaused"
+    static let restTimerWorkoutId = "activeWorkoutRestTimerWorkoutId"
+    static let restTimerStartDate = "restTimerStartDate"
+    static let restTimerTotalDuration = "restTimerTotalDuration"
+    static let restTimerRemainingDuration = "activeWorkoutRestTimerRemainingDuration"
+    static let restTimerIsPaused = "activeWorkoutRestTimerIsPaused"
+    static let restTimerPauseSource = "activeWorkoutRestTimerPauseSource"
 }
 
 // MARK: - ActiveWorkoutViewModel
@@ -68,6 +88,15 @@ final class ActiveWorkoutViewModel {
     private let healthProfileRepo: any HealthProfileRepositoryProtocol
     private let settingsService: any SettingsServiceProtocol
     private let loadPrescriptionService: any LoadPrescriptionServiceProtocol
+    let fatigueLearningService: FatigueLearningService
+
+    /// Snapshots of suggestion predictions captured before set completion,
+    /// keyed by set ID. Used by adaptive fatigue learning to compute prediction errors.
+    private var predictionSnapshots: [UUID: PredictionSnapshot] = [:]
+
+    /// Exercise IDs that had at least one prediction snapshot recorded during this workout.
+    /// Used by WorkoutSummarySheet to show fatigue feedback options.
+    private(set) var exerciseIdsWithPredictions: Set<UUID> = []
 
     /// Live Activity manager for Lock Screen / Dynamic Island updates.
     private let liveActivityManager = LiveActivityManager()
@@ -109,10 +138,13 @@ final class ActiveWorkoutViewModel {
     /// Rest timer state between sets.
     var restTimer: RestTimerState = .idle
 
+    /// Whether the workout clock is currently paused.
+    var isWorkoutPaused: Bool = false
+
     /// Whether the workout has been finished (triggers dismiss of active workout screen).
     var isWorkoutFinished: Bool = false
 
-    /// Elapsed workout time in seconds (updated by a timer in the View layer).
+    /// Elapsed workout time in seconds, excluding paused time.
     var elapsedTime: TimeInterval = 0
 
     // MARK: - Sub-Tab State (WP06 T026/T027)
@@ -167,6 +199,17 @@ final class ActiveWorkoutViewModel {
     /// Monotonic generation used to drop stale suggestion refresh completions.
     private var suggestionRefreshGeneration: UInt64 = 0
 
+    // MARK: - Workout Clock Internals
+
+    /// Elapsed workout seconds accumulated before the current active run segment.
+    private var accumulatedElapsedSeconds: TimeInterval = 0
+
+    /// Start date of the current active run segment. Nil while paused.
+    private var lastWorkoutResumedAt: Date?
+
+    /// Combine subscription for the workout elapsed clock updates.
+    private var workoutTimerSubscription: AnyCancellable?
+
     // MARK: - Timer Internals
 
     /// Combine subscription for the 1-second timer tick.
@@ -204,7 +247,8 @@ final class ActiveWorkoutViewModel {
         prService: any PRServiceProtocol,
         healthProfileRepo: any HealthProfileRepositoryProtocol,
         settingsService: any SettingsServiceProtocol,
-        loadPrescriptionService: any LoadPrescriptionServiceProtocol
+        loadPrescriptionService: any LoadPrescriptionServiceProtocol,
+        fatigueLearningService: FatigueLearningService
     ) {
         self.workoutService = workoutService
         self.setService = setService
@@ -214,6 +258,7 @@ final class ActiveWorkoutViewModel {
         self.healthProfileRepo = healthProfileRepo
         self.settingsService = settingsService
         self.loadPrescriptionService = loadPrescriptionService
+        self.fatigueLearningService = fatigueLearningService
     }
 
     // MARK: - Lifecycle (T007)
@@ -229,6 +274,20 @@ final class ActiveWorkoutViewModel {
         do {
             // 1. Check for existing active workout
             guard let active = try await workoutService.getActiveWorkout() else {
+                clearPersistedWorkoutClockState()
+                clearPersistedRestTimerState()
+                timerSubscription?.cancel()
+                timerSubscription = nil
+                workoutTimerSubscription?.cancel()
+                workoutTimerSubscription = nil
+                workout = nil
+                exercises = []
+                setsByExercise = [:]
+                restTimer = .idle
+                isWorkoutPaused = false
+                accumulatedElapsedSeconds = 0
+                lastWorkoutResumedAt = nil
+                elapsedTime = 0
                 return // No active workout — screen shouldn't be shown
             }
             self.workout = active
@@ -278,21 +337,10 @@ final class ActiveWorkoutViewModel {
                 self.restTimerAlertMode = profile.restTimerAlert ?? "both"
             }
 
-            // 8. Restore persisted rest timer (survives view dismissal)
-            if let savedStartDate = UserDefaults.standard.object(forKey: "restTimerStartDate") as? Date {
-                let savedDuration = UserDefaults.standard.integer(forKey: "restTimerTotalDuration")
-                if savedDuration > 0 {
-                    let elapsed = Int(Date().timeIntervalSince(savedStartDate))
-                    let remaining = savedDuration - elapsed
-                    if remaining > 0 {
-                        startRestTimer(duration: remaining)
-                    } else {
-                        restTimer = .finished
-                        UserDefaults.standard.removeObject(forKey: "restTimerStartDate")
-                        UserDefaults.standard.removeObject(forKey: "restTimerTotalDuration")
-                    }
-                }
-            }
+            // 8. Restore persisted workout clock and rest timer state (survives view dismissal).
+            restoreWorkoutClockState(for: active)
+            restoreRestTimerState(for: active)
+            updateLiveActivityState()
 
         } catch {
             print("[ActiveWorkoutViewModel] Failed to load active workout: \(error)")
@@ -313,6 +361,20 @@ final class ActiveWorkoutViewModel {
         distanceMeters: Double?
     ) async {
         do {
+            // 0. Snapshot the current suggestion prediction for fatigue learning
+            //    (must be captured before marking the set as completed)
+            if let suggestion = weightSuggestionData?.suggestion(for: set.id) {
+                predictionSnapshots[set.id] = PredictionSnapshot(
+                    effectiveE1RM: suggestion.diagnostics.effectiveE1RM,
+                    baseE1RM: suggestion.diagnostics.baseE1RM,
+                    prescribedWeight: suggestion.suggestedWeight,
+                    formula: E1RMFormula(rawValue:
+                        (try? await healthProfileRepo.fetchOrCreate().e1RMFormula) ?? "epley"
+                    ) ?? .epley
+                )
+                exerciseIdsWithPredictions.insert(set.exerciseId)
+            }
+
             // 1. Update the set object with input values
             set.weight = weight
             set.reps = reps
@@ -337,7 +399,31 @@ final class ActiveWorkoutViewModel {
                 setsByExercise[set.exerciseId] = sets
             }
 
-            // 5. Start rest timer: warmup sets use warmup rest time, working sets use default.
+            // 5. Record fatigue learning observation (non-blocking)
+            if let snapshot = predictionSnapshots.removeValue(forKey: set.id),
+               let actualWeight = set.effectiveWeight ?? set.weight,
+               let actualReps = set.reps,
+               set.setType != .warmup {
+                // Compute set index: count of completed working sets for this exercise before this one
+                let completedWorkingSetCount = setsByExercise[set.exerciseId]?
+                    .filter { $0.completed && $0.setType != .warmup && $0.id != set.id }
+                    .count ?? 0
+
+                Task {
+                    try? await fatigueLearningService.recordObservation(
+                        exerciseId: set.exerciseId,
+                        workoutId: set.workoutId,
+                        setIndex: completedWorkingSetCount,
+                        prediction: snapshot,
+                        actualWeight: actualWeight,
+                        actualReps: actualReps,
+                        actualRIR: set.rir,
+                        restDurationSeconds: set.restDurationSeconds
+                    )
+                }
+            }
+
+            // 6. Start rest timer: warmup sets use warmup rest time, working sets use default.
             // Note: startRestTimer() already calls updateLiveActivityState(),
             // so we only push a separate update if NO timer starts.
             let restTime: Int?
@@ -352,7 +438,7 @@ final class ActiveWorkoutViewModel {
                 updateLiveActivityState()
             }
 
-            // 6. Invalidate PR, history, and suggestion caches, then reload
+            // 7. Invalidate PR, history, and suggestion caches, then reload
             prsLoadedForExerciseId = nil
             historyLoadedForExerciseId = nil
             if currentExercise?.id == set.exerciseId {
@@ -544,8 +630,11 @@ final class ActiveWorkoutViewModel {
     /// Add exercises to the workout from the picker sheet.
     ///
     /// For each exercise, fetches the Exercise object, creates an initial empty set,
-    /// and switches to the newly added exercise tab.
+    /// and switches to the first newly added exercise tab.
     func addExercises(_ exerciseIds: [UUID]) async {
+        let firstAddedIndex = exercises.count
+        var addedExerciseCount = 0
+
         for exerciseId in exerciseIds {
             do {
                 guard let exercise = try await exerciseService.fetchExercise(exerciseId) else {
@@ -558,15 +647,16 @@ final class ActiveWorkoutViewModel {
                 // Initialize with an empty working set
                 setsByExercise[exerciseId] = []
                 await addSet(for: exerciseId)
+                addedExerciseCount += 1
 
             } catch {
                 print("[ActiveWorkoutViewModel] Failed to add exercise \(exerciseId): \(error)")
             }
         }
 
-        // Switch to the last added exercise
-        if !exercises.isEmpty {
-            selectedExerciseIndex = exercises.count - 1
+        // Switch to the first newly added exercise so the user starts at the front of the new block.
+        if addedExerciseCount > 0 {
+            selectedExerciseIndex = firstAddedIndex
         }
 
         // Update Live Activity (exercise and set counts changed)
@@ -630,75 +720,254 @@ final class ActiveWorkoutViewModel {
         }
     }
 
-    // MARK: - Rest Timer (T027, T028)
+    // MARK: - Workout Clock
 
-    /// Start or restart the rest timer with a given duration in seconds.
-    ///
-    /// Cancels any existing timer, stores the start timestamp for background
-    /// recalculation, and starts a 1-second Combine tick.
-    func startRestTimer(duration: Int) {
-        // Cancel any existing timer
-        timerSubscription?.cancel()
+    /// Toggle the workout clock between paused and running states.
+    func toggleWorkoutPause() {
+        guard workout != nil else { return }
 
-        // Store start time for background recalculation
-        timerStartDate = Date()
-        timerTotalDuration = duration
-        restTimer = .running(remaining: duration, total: duration)
+        if isWorkoutPaused {
+            resumeWorkoutClock()
+        } else {
+            pauseWorkoutClock()
+        }
+    }
 
-        // Persist timer state so it survives view dismissal
-        UserDefaults.standard.set(timerStartDate, forKey: "restTimerStartDate")
-        UserDefaults.standard.set(timerTotalDuration, forKey: "restTimerTotalDuration")
+    func currentElapsedTime(referenceDate: Date = Date()) -> TimeInterval {
+        let runningSegment: TimeInterval
+        if !isWorkoutPaused, let lastWorkoutResumedAt {
+            runningSegment = max(0, referenceDate.timeIntervalSince(lastWorkoutResumedAt))
+        } else {
+            runningSegment = 0
+        }
+        return max(0, accumulatedElapsedSeconds + runningSegment)
+    }
 
-        // Start 1-second tick via Timer.publish
-        timerSubscription = Timer.publish(every: 1, on: .main, in: .common)
+    private func restoreWorkoutClockState(for workout: Workout, referenceDate: Date = Date()) {
+        let defaults = UserDefaults.standard
+        let workoutId = workout.id.uuidString
+        let persistedWorkoutId = defaults.string(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockWorkoutId)
+
+        guard persistedWorkoutId == workoutId else {
+            clearPersistedWorkoutClockState()
+            initializeWorkoutClockState(from: workout.startTime ?? referenceDate, referenceDate: referenceDate)
+            return
+        }
+
+        accumulatedElapsedSeconds = max(
+            0,
+            defaults.double(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockAccumulatedElapsedSeconds)
+        )
+        isWorkoutPaused = defaults.bool(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockIsPaused)
+
+        if isWorkoutPaused {
+            lastWorkoutResumedAt = nil
+            stopWorkoutClockTicker()
+        } else {
+            lastWorkoutResumedAt = (
+                defaults.object(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockLastResumedAt) as? Date
+            ) ?? workout.startTime ?? referenceDate
+            startWorkoutClockTicker()
+        }
+
+        refreshElapsedTime(referenceDate: referenceDate)
+        persistWorkoutClockState()
+    }
+
+    private func initializeWorkoutClockState(from startTime: Date, referenceDate: Date = Date()) {
+        accumulatedElapsedSeconds = 0
+        isWorkoutPaused = false
+        lastWorkoutResumedAt = startTime
+        refreshElapsedTime(referenceDate: referenceDate)
+        startWorkoutClockTicker()
+        persistWorkoutClockState()
+    }
+
+    private func pauseWorkoutClock(referenceDate: Date = Date()) {
+        ensureWorkoutClockInitialized(referenceDate: referenceDate)
+        accumulatedElapsedSeconds = currentElapsedTime(referenceDate: referenceDate)
+        isWorkoutPaused = true
+        lastWorkoutResumedAt = nil
+        stopWorkoutClockTicker()
+        refreshElapsedTime(referenceDate: referenceDate)
+        pauseRestTimerIfNeeded(referenceDate: referenceDate, source: .workout)
+        persistWorkoutClockState()
+        updateLiveActivityState()
+    }
+
+    private func resumeWorkoutClock(referenceDate: Date = Date()) {
+        ensureWorkoutClockInitialized(referenceDate: referenceDate)
+        isWorkoutPaused = false
+        lastWorkoutResumedAt = referenceDate
+        startWorkoutClockTicker()
+        refreshElapsedTime(referenceDate: referenceDate)
+        resumeRestTimerIfNeeded(referenceDate: referenceDate)
+        persistWorkoutClockState()
+        updateLiveActivityState()
+    }
+
+    private func ensureWorkoutClockInitialized(referenceDate: Date = Date()) {
+        if lastWorkoutResumedAt == nil, elapsedTime == 0, accumulatedElapsedSeconds == 0, let workout {
+            initializeWorkoutClockState(from: workout.startTime ?? referenceDate, referenceDate: referenceDate)
+        }
+    }
+
+    private func startWorkoutClockTicker() {
+        workoutTimerSubscription?.cancel()
+        guard !isWorkoutPaused else { return }
+
+        workoutTimerSubscription = Timer.publish(every: 1, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
                 Task { @MainActor in
-                    self?.timerTick()
+                    self?.refreshElapsedTime()
                 }
             }
+    }
 
-        // Schedule local notification for background alert
-        scheduleRestTimerNotification(seconds: duration)
+    private func stopWorkoutClockTicker() {
+        workoutTimerSubscription?.cancel()
+        workoutTimerSubscription = nil
+    }
 
-        // Update Live Activity (timer started with new end date)
-        updateLiveActivityState()
+    private func refreshElapsedTime(referenceDate: Date = Date()) {
+        elapsedTime = currentElapsedTime(referenceDate: referenceDate)
+    }
+
+    private func persistWorkoutClockState() {
+        let defaults = UserDefaults.standard
+        guard let workout else {
+            clearPersistedWorkoutClockState()
+            return
+        }
+
+        defaults.set(workout.id.uuidString, forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockWorkoutId)
+        defaults.set(
+            accumulatedElapsedSeconds,
+            forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockAccumulatedElapsedSeconds
+        )
+        defaults.set(isWorkoutPaused, forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockIsPaused)
+
+        if let lastWorkoutResumedAt, !isWorkoutPaused {
+            defaults.set(lastWorkoutResumedAt, forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockLastResumedAt)
+        } else {
+            defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockLastResumedAt)
+        }
+    }
+
+    private func clearPersistedWorkoutClockState() {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockWorkoutId)
+        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockAccumulatedElapsedSeconds)
+        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockLastResumedAt)
+        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockIsPaused)
+    }
+
+    // MARK: - Rest Timer (T027, T028)
+
+    /// Start or restart the rest timer with a given duration in seconds.
+    func startRestTimer(duration: Int) {
+        guard duration > 0 else { return }
+
+        if isWorkoutPaused {
+            setPausedRestTimer(
+                remaining: duration,
+                total: duration,
+                source: .workout
+            )
+        } else {
+            startRestTimer(remaining: duration, total: duration)
+        }
     }
 
     /// Add seconds to the running timer (+30s button).
     func addTime(_ seconds: Int) {
-        guard case .running(let remaining, let total) = restTimer else { return }
-        let newTotal = total + seconds
-        let newRemaining = remaining + seconds
-        timerTotalDuration = newTotal
-        restTimer = .running(remaining: newRemaining, total: newTotal)
+        switch restTimer {
+        case .running(let remaining, let total):
+            let newTotal = total + seconds
+            let newRemaining = remaining + seconds
+            timerTotalDuration = newTotal
+            restTimer = .running(remaining: newRemaining, total: newTotal)
+            persistRunningRestTimerState(remaining: newRemaining, total: newTotal)
+            scheduleRestTimerNotification(seconds: newRemaining)
+            updateLiveActivityState()
 
-        // Re-schedule background notification with updated remaining time
-        scheduleRestTimerNotification(seconds: newRemaining)
+        case .paused(let remaining, let total, let source):
+            let newTotal = total + seconds
+            let newRemaining = remaining + seconds
+            setPausedRestTimer(
+                remaining: newRemaining,
+                total: newTotal,
+                source: source
+            )
 
-        // Update Live Activity (timer end date changed)
-        updateLiveActivityState()
+        case .idle, .finished:
+            return
+        }
     }
 
     /// Subtract seconds from the running timer (-15s, -30s buttons). Clamps to 1 second minimum.
     func subtractTime(_ seconds: Int) {
-        guard case .running(let remaining, let total) = restTimer else { return }
-        let newRemaining = max(1, remaining - seconds)
-        let newTotal = max(1, total - seconds)
-        timerTotalDuration = newTotal
-        restTimer = .running(remaining: newRemaining, total: newTotal)
+        switch restTimer {
+        case .running(let remaining, let total):
+            let newRemaining = max(1, remaining - seconds)
+            let newTotal = max(1, total - seconds)
+            timerTotalDuration = newTotal
+            restTimer = .running(remaining: newRemaining, total: newTotal)
+            persistRunningRestTimerState(remaining: newRemaining, total: newTotal)
+            scheduleRestTimerNotification(seconds: newRemaining)
+            updateLiveActivityState()
 
-        // Re-schedule background notification with updated remaining time
-        scheduleRestTimerNotification(seconds: newRemaining)
+        case .paused(let remaining, let total, let source):
+            let newRemaining = max(1, remaining - seconds)
+            let newTotal = max(1, total - seconds)
+            setPausedRestTimer(
+                remaining: newRemaining,
+                total: newTotal,
+                source: source
+            )
 
-        // Update Live Activity (timer end date changed)
-        updateLiveActivityState()
+        case .idle, .finished:
+            return
+        }
     }
 
     /// Set the timer to an exact duration in seconds.
     func setTimerDuration(_ seconds: Int) {
         guard seconds > 0 else { return }
-        startRestTimer(duration: seconds)
+
+        if case .paused(_, _, let source) = restTimer {
+            setPausedRestTimer(
+                remaining: seconds,
+                total: seconds,
+                source: source
+            )
+        } else if isWorkoutPaused {
+            setPausedRestTimer(
+                remaining: seconds,
+                total: seconds,
+                source: .workout
+            )
+        } else {
+            startRestTimer(remaining: seconds, total: seconds)
+        }
+    }
+
+    /// Toggle the rest timer between running and manually paused.
+    func toggleRestTimerPause() {
+        guard !isWorkoutPaused else { return }
+
+        switch restTimer {
+        case .running:
+            pauseRestTimerIfNeeded(referenceDate: Date(), source: .manual)
+
+        case .paused(let remaining, let total, let source):
+            guard source == .manual else { return }
+            startRestTimer(remaining: remaining, total: total)
+
+        case .idle, .finished:
+            return
+        }
     }
 
     /// Dismiss the rest timer and cancel the Combine subscription.
@@ -706,16 +975,11 @@ final class ActiveWorkoutViewModel {
         timerSubscription?.cancel()
         timerSubscription = nil
         timerStartDate = nil
+        timerTotalDuration = 0
         restTimer = .idle
 
-        // Clear persisted timer state
-        UserDefaults.standard.removeObject(forKey: "restTimerStartDate")
-        UserDefaults.standard.removeObject(forKey: "restTimerTotalDuration")
-
-        // Cancel background notification
+        clearPersistedRestTimerState()
         cancelRestTimerNotification()
-
-        // Update Live Activity (timer dismissed)
         updateLiveActivityState()
     }
 
@@ -724,25 +988,38 @@ final class ActiveWorkoutViewModel {
     /// Uses the stored start timestamp to compute how much time has actually
     /// elapsed, avoiding drift from suspended Timer.publish ticks.
     func recalculateTimerAfterBackground() {
-        guard case .running = restTimer,
-              let startDate = timerStartDate else { return }
+        let referenceDate = Date()
+        refreshElapsedTime(referenceDate: referenceDate)
 
-        let elapsed = Int(Date().timeIntervalSince(startDate))
+        if isWorkoutPaused {
+            updateLiveActivityState()
+            return
+        }
+
+        guard case .running = restTimer,
+              let startDate = timerStartDate else {
+            updateLiveActivityState()
+            return
+        }
+
+        let elapsed = Int(referenceDate.timeIntervalSince(startDate))
         let remaining = timerTotalDuration - elapsed
 
         if remaining <= 0 {
             restTimer = .finished
             timerSubscription?.cancel()
             timerSubscription = nil
+            timerStartDate = nil
             captureRestDurationOnLastCompletedSet()
+            clearPersistedRestTimerState()
             // Don't fire the in-app alert here — the background notification
             // already alerted the user while the app was suspended.
             cancelRestTimerNotification()
         } else {
             restTimer = .running(remaining: remaining, total: timerTotalDuration)
+            persistRunningRestTimerState(remaining: remaining, total: timerTotalDuration)
         }
 
-        // Update Live Activity with corrected timer state after background return
         updateLiveActivityState()
     }
 
@@ -753,17 +1030,182 @@ final class ActiveWorkoutViewModel {
             restTimer = .finished
             timerSubscription?.cancel()
             timerSubscription = nil
-            // Clear persisted timer state
-            UserDefaults.standard.removeObject(forKey: "restTimerStartDate")
-            UserDefaults.standard.removeObject(forKey: "restTimerTotalDuration")
+            timerStartDate = nil
             captureRestDurationOnLastCompletedSet()
+            clearPersistedRestTimerState()
             fireTimerAlert()
             // Update Live Activity only on state transition to .finished
             // (NOT every tick — countdown is rendered by ActivityKit's timer text style)
             updateLiveActivityState()
         } else {
-            restTimer = .running(remaining: remaining - 1, total: total)
+            let newRemaining = remaining - 1
+            restTimer = .running(remaining: newRemaining, total: total)
+            persistRunningRestTimerState(remaining: newRemaining, total: total)
         }
+    }
+
+    private func startRestTimer(remaining: Int, total: Int, referenceDate: Date = Date()) {
+        guard remaining > 0, total > 0 else { return }
+
+        timerSubscription?.cancel()
+
+        let elapsedBeforeResume = max(0, total - remaining)
+        timerStartDate = referenceDate.addingTimeInterval(TimeInterval(-elapsedBeforeResume))
+        timerTotalDuration = total
+        restTimer = .running(remaining: remaining, total: total)
+
+        persistRunningRestTimerState(remaining: remaining, total: total)
+
+        timerSubscription = Timer.publish(every: 1, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    self?.timerTick()
+                }
+            }
+
+        scheduleRestTimerNotification(seconds: remaining)
+        updateLiveActivityState()
+    }
+
+    private func setPausedRestTimer(
+        remaining: Int,
+        total: Int,
+        source: RestTimerPauseSource
+    ) {
+        timerSubscription?.cancel()
+        timerSubscription = nil
+        timerStartDate = nil
+        timerTotalDuration = total
+        restTimer = .paused(remaining: remaining, total: total, source: source)
+        persistPausedRestTimerState(remaining: remaining, total: total, source: source)
+        cancelRestTimerNotification()
+        updateLiveActivityState()
+    }
+
+    private func pauseRestTimerIfNeeded(
+        referenceDate: Date = Date(),
+        source: RestTimerPauseSource
+    ) {
+        guard case .running(let stateRemaining, let total) = restTimer else { return }
+
+        let remaining: Int
+        if let timerStartDate {
+            let elapsed = Int(referenceDate.timeIntervalSince(timerStartDate))
+            remaining = max(1, timerTotalDuration - elapsed)
+        } else {
+            remaining = stateRemaining
+        }
+
+        setPausedRestTimer(remaining: remaining, total: total, source: source)
+    }
+
+    private func resumeRestTimerIfNeeded(referenceDate: Date = Date()) {
+        guard case .paused(let remaining, let total, let source) = restTimer,
+              source == .workout,
+              !isWorkoutPaused else { return }
+        startRestTimer(remaining: remaining, total: total, referenceDate: referenceDate)
+    }
+
+    private func restoreRestTimerState(for workout: Workout, referenceDate: Date = Date()) {
+        let defaults = UserDefaults.standard
+        let persistedWorkoutId = defaults.string(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerWorkoutId)
+
+        guard persistedWorkoutId == workout.id.uuidString else {
+            clearPersistedRestTimerState()
+            return
+        }
+
+        let savedTotal = defaults.integer(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerTotalDuration)
+        guard savedTotal > 0 else {
+            clearPersistedRestTimerState()
+            return
+        }
+
+        timerTotalDuration = savedTotal
+
+        if defaults.bool(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerIsPaused) {
+            let savedRemaining = max(
+                1,
+                defaults.integer(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerRemainingDuration)
+            )
+            let savedSourceRaw = defaults.string(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerPauseSource)
+            let savedSource = RestTimerPauseSource(rawValue: savedSourceRaw ?? "") ?? (
+                isWorkoutPaused ? .workout : .manual
+            )
+            if savedSource == .workout, !isWorkoutPaused {
+                startRestTimer(remaining: savedRemaining, total: savedTotal, referenceDate: referenceDate)
+            } else {
+                restTimer = .paused(remaining: savedRemaining, total: savedTotal, source: savedSource)
+                timerStartDate = nil
+                timerSubscription?.cancel()
+                timerSubscription = nil
+                cancelRestTimerNotification()
+            }
+            return
+        }
+
+        guard let savedStartDate = defaults.object(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerStartDate) as? Date else {
+            clearPersistedRestTimerState()
+            return
+        }
+
+        let elapsed = Int(referenceDate.timeIntervalSince(savedStartDate))
+        let remaining = savedTotal - elapsed
+        if remaining > 0 {
+            startRestTimer(remaining: remaining, total: savedTotal, referenceDate: referenceDate)
+        } else {
+            restTimer = .finished
+            timerStartDate = nil
+            timerSubscription?.cancel()
+            timerSubscription = nil
+            clearPersistedRestTimerState()
+        }
+    }
+
+    private func persistRunningRestTimerState(remaining: Int, total: Int) {
+        let defaults = UserDefaults.standard
+        guard let workout, let timerStartDate else {
+            clearPersistedRestTimerState()
+            return
+        }
+
+        defaults.set(workout.id.uuidString, forKey: ActiveWorkoutSessionDefaultsKeys.restTimerWorkoutId)
+        defaults.set(timerStartDate, forKey: ActiveWorkoutSessionDefaultsKeys.restTimerStartDate)
+        defaults.set(total, forKey: ActiveWorkoutSessionDefaultsKeys.restTimerTotalDuration)
+        defaults.set(remaining, forKey: ActiveWorkoutSessionDefaultsKeys.restTimerRemainingDuration)
+        defaults.set(false, forKey: ActiveWorkoutSessionDefaultsKeys.restTimerIsPaused)
+        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerPauseSource)
+    }
+
+    private func persistPausedRestTimerState(
+        remaining: Int,
+        total: Int,
+        source: RestTimerPauseSource
+    ) {
+        let defaults = UserDefaults.standard
+        guard let workout else {
+            clearPersistedRestTimerState()
+            return
+        }
+
+        defaults.set(workout.id.uuidString, forKey: ActiveWorkoutSessionDefaultsKeys.restTimerWorkoutId)
+        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerStartDate)
+        defaults.set(total, forKey: ActiveWorkoutSessionDefaultsKeys.restTimerTotalDuration)
+        defaults.set(remaining, forKey: ActiveWorkoutSessionDefaultsKeys.restTimerRemainingDuration)
+        defaults.set(true, forKey: ActiveWorkoutSessionDefaultsKeys.restTimerIsPaused)
+        defaults.set(source.rawValue, forKey: ActiveWorkoutSessionDefaultsKeys.restTimerPauseSource)
+    }
+
+    private func clearPersistedRestTimerState() {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerWorkoutId)
+        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerStartDate)
+        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerTotalDuration)
+        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerRemainingDuration)
+        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerIsPaused)
+        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerPauseSource)
+        cancelRestTimerNotification()
     }
 
     /// Capture the rest timer's total duration onto the most recently completed set
@@ -834,23 +1276,33 @@ final class ActiveWorkoutViewModel {
         let totalSets = sets.count
         let nextIncompleteSet = sets.first { !$0.completed }
         let setTypeLabel = nextIncompleteSet?.setType.displayName ?? "Working"
+        let referenceDate = Date()
+        let pausedElapsedSeconds = Int(currentElapsedTime(referenceDate: referenceDate))
+        let elapsedTimerReferenceDate = referenceDate.addingTimeInterval(-TimeInterval(pausedElapsedSeconds))
 
         var isRestTimerRunning = false
+        var isRestTimerPaused = false
         var restTimerEndDate: Date? = nil
         var restTimerTotalSeconds = 0
+        var restTimerRemainingSeconds: Int? = nil
         var isRestTimerFinished = false
 
         switch restTimer {
         case .idle:
             break
-        case .running(_, let total):
-            isRestTimerRunning = true
+        case .running(let remaining, let total):
+            isRestTimerRunning = !isWorkoutPaused
             // Use the fixed start time + total duration for a stable end date.
             // This avoids flicker — each push won't shift the countdown.
-            if let startDate = timerStartDate {
+            if let startDate = timerStartDate, !isWorkoutPaused {
                 restTimerEndDate = startDate.addingTimeInterval(TimeInterval(timerTotalDuration))
             }
             restTimerTotalSeconds = total
+            restTimerRemainingSeconds = remaining
+        case .paused(let remaining, let total, _):
+            isRestTimerPaused = true
+            restTimerTotalSeconds = total
+            restTimerRemainingSeconds = remaining
         case .finished:
             isRestTimerFinished = true
         }
@@ -860,9 +1312,14 @@ final class ActiveWorkoutViewModel {
             currentSetNumber: currentSetNumber,
             totalSets: totalSets,
             setTypeLabel: setTypeLabel,
+            elapsedTimerReferenceDate: elapsedTimerReferenceDate,
+            isWorkoutPaused: isWorkoutPaused,
+            pausedElapsedSeconds: pausedElapsedSeconds,
             isRestTimerRunning: isRestTimerRunning,
+            isRestTimerPaused: isRestTimerPaused,
             restTimerEndDate: restTimerEndDate,
             restTimerTotalSeconds: restTimerTotalSeconds,
+            restTimerRemainingSeconds: restTimerRemainingSeconds,
             isRestTimerFinished: isRestTimerFinished
         )
     }
@@ -1120,9 +1577,9 @@ final class ActiveWorkoutViewModel {
     /// Uses local ViewModel data (not database) — the sets are already loaded.
     func computeSummary() -> WorkoutSummaryData? {
         guard let workout else { return nil }
-
-        let startTime = workout.startTime ?? Date()
-        let duration = Date().timeIntervalSince(startTime)
+        let referenceDate = Date()
+        ensureWorkoutClockInitialized(referenceDate: referenceDate)
+        let duration = currentElapsedTime(referenceDate: referenceDate)
 
         var totalSets = 0
         var totalVolume: Double = 0
@@ -1178,19 +1635,33 @@ final class ActiveWorkoutViewModel {
     /// isWorkoutFinished to trigger navigation dismissal.
     func finishWorkout(title: String?, notes: String?, perceivedEffort: Double?) async {
         guard let workout else { return }
+        let referenceDate = Date()
+        ensureWorkoutClockInitialized(referenceDate: referenceDate)
+        let durationSeconds = Int(currentElapsedTime(referenceDate: referenceDate))
 
         do {
             try await workoutService.finishWorkout(
                 workout.id,
                 title: title,
                 notes: notes,
-                perceivedEffort: perceivedEffort
+                perceivedEffort: perceivedEffort,
+                durationSecondsOverride: durationSeconds
             )
+
+            // Run adaptive fatigue learning before clearing local state
+            await fatigueLearningService.processSessionEnd(workoutId: workout.id)
+
+            stopWorkoutClockTicker()
+            clearPersistedWorkoutClockState()
 
             // Clear local state
             self.workout = nil
             self.exercises = []
             self.setsByExercise = [:]
+            self.isWorkoutPaused = false
+            self.accumulatedElapsedSeconds = 0
+            self.lastWorkoutResumedAt = nil
+            self.elapsedTime = 0
             dismissTimer()
 
             // End Live Activity (workout completed)
@@ -1215,10 +1686,17 @@ final class ActiveWorkoutViewModel {
         do {
             try await workoutService.deleteWorkout(workout.id)
 
+            stopWorkoutClockTicker()
+            clearPersistedWorkoutClockState()
+
             // Clear local state
             self.workout = nil
             self.exercises = []
             self.setsByExercise = [:]
+            self.isWorkoutPaused = false
+            self.accumulatedElapsedSeconds = 0
+            self.lastWorkoutResumedAt = nil
+            self.elapsedTime = 0
             dismissTimer()
 
             // End Live Activity (workout discarded)
