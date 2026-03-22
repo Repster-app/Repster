@@ -17,7 +17,7 @@ enum MainTab: Int, CaseIterable {
 // MARK: - Exercise List
 
 /// Determines how the Exercise List behaves.
-/// - `.browse`: Standalone screen from FAB. Tap card body -> detail. Tap selection circle -> toggle.
+/// - `.browse`: Standalone screen from FAB. Tap card body -> start flow. Tap trailing info -> detail/manage.
 /// - `.addToWorkout`: Sheet from Active Workout. Tap anywhere toggles selection. "Add (N)" button.
 enum ExerciseListMode {
     case browse
@@ -35,10 +35,12 @@ enum ExerciseListSortOrder: String, CaseIterable {
 ///
 /// Values are stored in lowercase to match existing persisted exercise data.
 enum ExercisePrimaryGroup: String, CaseIterable, Identifiable {
+    case abs
     case back
     case biceps
+    case cardio
     case chest
-    case core
+    case forearms
     case legs
     case shoulders
     case triceps
@@ -47,46 +49,19 @@ enum ExercisePrimaryGroup: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     var displayName: String {
-        switch self {
-        case .fullBody:
-            return "Full Body"
-        default:
-            return rawValue.capitalized
-        }
+        ExerciseMuscleGroupCatalog.displayName(for: rawValue)
     }
 
     static func normalizedValue(_ rawValue: String?) -> String? {
-        guard let rawValue else { return nil }
-
-        let normalized = rawValue
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-
-        return normalized.isEmpty ? nil : normalized
+        ExerciseMuscleGroupCatalog.normalizedValue(rawValue)
     }
 
     static func options(including currentValue: String?) -> [String] {
-        let supportedValues = allCases.map(\.rawValue)
-
-        guard let currentValue = normalizedValue(currentValue),
-              !supportedValues.contains(currentValue) else {
-            return supportedValues
-        }
-
-        return supportedValues + [currentValue]
+        ExerciseMuscleGroupCatalog.supportedValues(including: currentValue)
     }
 
     static func displayName(for rawValue: String) -> String {
-        let normalized = normalizedValue(rawValue) ?? rawValue
-
-        if let group = allCases.first(where: { $0.rawValue == normalized }) {
-            return group.displayName
-        }
-
-        return normalized
-            .split(separator: " ")
-            .map { $0.capitalized }
-            .joined(separator: " ")
+        ExerciseMuscleGroupCatalog.displayName(for: rawValue)
     }
 }
 

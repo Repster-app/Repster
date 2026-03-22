@@ -119,6 +119,139 @@ struct TemplateArchiveSet: Codable, Sendable {
     let orderInExercise: Int
 }
 
+/// Lightweight exercise library export for ChatGPT-assisted template generation.
+struct AITemplateContextArchive: Codable, Sendable {
+    static let currentVersion = 1
+
+    let version: Int
+    let exportedAt: Date
+    let exercises: [AITemplateContextExercise]
+}
+
+struct AITemplateContextExercise: Codable, Sendable {
+    let exerciseId: UUID
+    let exerciseName: String
+    let equipmentType: EquipmentType
+    let trackingType: TrackingType
+    let primaryMuscle: String?
+    let secondaryMuscles: [String]
+    let movementPattern: MovementPattern?
+    let unilateral: Bool
+    let bilateralLoadFactor: Double?
+    let bodyweightFactor: Double
+    let weightIncrement: Double?
+    let defaultRestTime: Int?
+    let fatigueRate: Double?
+    let recoveryConstant: Double?
+    let stats: AITemplateContextExerciseStats
+}
+
+struct AITemplateContextExerciseStats: Codable, Sendable {
+    let totalWorkouts: Int
+    let totalSets: Int
+    let lastPerformedDate: Date?
+    let bestE1RM: Double
+    let maxWeight: Double
+}
+
+/// AI-authored draft format that mirrors template structure while using user-friendly grouping keys.
+struct AITemplateDraft: Codable, Sendable {
+    static let currentVersion = 1
+
+    let version: Int
+    let templateName: String
+    let notes: String?
+    let exercises: [AITemplateDraftExercise]
+}
+
+struct AITemplateDraftExercise: Codable, Sendable {
+    let exerciseId: UUID
+    let exerciseName: String
+    let equipmentType: EquipmentType
+    let trackingType: TrackingType
+    let primaryMuscle: String?
+    let secondaryMuscles: [String]
+    let movementPattern: MovementPattern?
+    let unilateral: Bool
+    let bilateralLoadFactor: Double?
+    let bodyweightFactor: Double
+    let weightIncrement: Double?
+    let defaultRestTime: Int?
+    let fatigueRate: Double?
+    let recoveryConstant: Double?
+    let orderInTemplate: Int
+    let supersetGroupKey: String?
+    let restTimeSeconds: Int?
+    let notes: String?
+    let sets: [TemplateArchiveSet]
+}
+
+enum TemplateImportSource: String, Sendable {
+    case templateArchive
+    case aiTemplateDraft
+}
+
+enum TemplateExerciseMatchMethod: String, Sendable {
+    case exerciseId
+    case normalizedName
+    case manualMapping
+    case createNew
+}
+
+struct TemplateImportMatchedExercise: Identifiable, Sendable {
+    let id: UUID
+    let name: String
+    let method: TemplateExerciseMatchMethod
+}
+
+struct TemplateImportExercisePreview: Identifiable, Sendable {
+    let id: UUID
+    let proposedExerciseId: UUID
+    let exercise: TemplateArchiveExerciseMetadata
+    let orderInTemplate: Int
+    let supersetGroupKey: String?
+    let restTimeSeconds: Int?
+    let notes: String?
+    let sets: [TemplateArchiveSet]
+    let matchedExercise: TemplateImportMatchedExercise?
+}
+
+struct TemplateImportPreview: Sendable {
+    let source: TemplateImportSource
+    let templateName: String
+    let notes: String?
+    let exercises: [TemplateImportExercisePreview]
+
+    var unresolvedExercises: [TemplateImportExercisePreview] {
+        exercises.filter { $0.matchedExercise == nil }
+    }
+
+    var resolvedExercises: [TemplateImportExercisePreview] {
+        exercises.filter { $0.matchedExercise != nil }
+    }
+}
+
+enum TemplateImportResolutionAction: String, Sendable {
+    case mapToExisting
+    case createNew
+}
+
+struct TemplateImportExerciseResolution: Sendable {
+    let previewExerciseId: UUID
+    let action: TemplateImportResolutionAction
+    let existingExerciseId: UUID?
+
+    init(
+        previewExerciseId: UUID,
+        action: TemplateImportResolutionAction,
+        existingExerciseId: UUID? = nil
+    ) {
+        self.previewExerciseId = previewExerciseId
+        self.action = action
+        self.existingExerciseId = existingExerciseId
+    }
+}
+
 /// TemplateService owns all template operations.
 ///
 /// Responsibilities:
@@ -166,6 +299,20 @@ protocol TemplateServiceProtocol: Sendable {
     /// Export a single template as a versioned archive payload.
     func exportTemplate(_ templateId: UUID) async throws -> Data
 
+    /// Export the user's current exercise library plus lightweight exercise stats for AI prompt helpers.
+    func exportAITemplateContext() async throws -> Data
+
+    /// Preview a template import without mutating stored templates or exercises.
+    /// Supports both native `.reppotemplate` archives and AI-authored JSON drafts.
+    func previewTemplateImport(data: Data) async throws -> TemplateImportPreview
+
+    /// Finalize a previewed template import after all unresolved exercises have explicit resolutions.
+    func finalizeTemplateImport(
+        _ preview: TemplateImportPreview,
+        resolutions: [TemplateImportExerciseResolution]
+    ) async throws -> UUID
+
     /// Import a single template archive and return the created template ID.
+    /// This convenience path only succeeds when every exercise resolves automatically.
     func importTemplate(data: Data) async throws -> UUID
 }

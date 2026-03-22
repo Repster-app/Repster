@@ -309,7 +309,10 @@ actor StatsService: StatsServiceProtocol {
     /// Loads sets for one exercise — acceptable for this rare operation.
     private func recomputeMaxWeight(for exerciseId: UUID) async throws -> Double {
         let allSets = try await setRepo.fetchSets(for: exerciseId, limit: nil)
-        return allSets.compactMap(\.effectiveWeight).max() ?? 0
+        return allSets
+            .filter { $0.hasData }
+            .compactMap(\.effectiveWeight)
+            .max() ?? 0
     }
 
     /// Compute the e1RM trend slope over the last 60 days using linear regression.

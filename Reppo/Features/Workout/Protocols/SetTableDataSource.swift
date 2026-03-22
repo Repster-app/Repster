@@ -14,6 +14,40 @@ enum SetDraftField: Sendable {
     case rir
 }
 
+struct SetCompletionInput: Sendable {
+    let weight: Double?
+    let reps: Int?
+    let durationSeconds: Int?
+    let distanceMeters: Double?
+    let rir: Double?
+    let leftReps: Int?
+    let rightReps: Int?
+    let leftRIR: Double?
+    let rightRIR: Double?
+
+    init(
+        weight: Double? = nil,
+        reps: Int? = nil,
+        durationSeconds: Int? = nil,
+        distanceMeters: Double? = nil,
+        rir: Double? = nil,
+        leftReps: Int? = nil,
+        rightReps: Int? = nil,
+        leftRIR: Double? = nil,
+        rightRIR: Double? = nil
+    ) {
+        self.weight = weight
+        self.reps = reps
+        self.durationSeconds = durationSeconds
+        self.distanceMeters = distanceMeters
+        self.rir = rir
+        self.leftReps = leftReps
+        self.rightReps = rightReps
+        self.leftRIR = leftRIR
+        self.rightRIR = rightRIR
+    }
+}
+
 /// Data source protocol for set table and exercise tab strip components.
 ///
 /// Conforming types provide exercise/set state and handle user actions
@@ -44,13 +78,7 @@ protocol SetTableDataSource: AnyObject, Observable {
     ///
     /// For new sets: persists via SetService.save().
     /// For existing sets: persists via SetService.edit().
-    func completeSet(
-        _ set: WorkoutSet,
-        weight: Double?,
-        reps: Int?,
-        durationSeconds: Int?,
-        distanceMeters: Double?
-    ) async
+    func completeSet(_ set: WorkoutSet, input: SetCompletionInput) async
 
     /// Add a new working set for the given exercise.
     func addSet(for exerciseId: UUID) async

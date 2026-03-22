@@ -225,7 +225,7 @@ actor SetRepository: SetRepositoryProtocol {
         }
 
         let totalSets = sets.count
-        let totalReps = sets.reduce(0) { $0 + ($1.reps ?? 0) }
+        let totalReps = sets.reduce(0) { $0 + $1.statsReps }
         let totalVolume = sets.reduce(0.0) { $0 + ($1.volume ?? 0.0) }
         let maxWeight = sets.reduce(0.0) { max($0, $1.effectiveWeight ?? 0.0) }
         let lastPerformedDate = sets.reduce(nil as Date?) { latest, set in

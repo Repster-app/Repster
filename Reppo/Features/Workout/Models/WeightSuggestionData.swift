@@ -227,8 +227,8 @@ enum SuggestionCoordinator {
             .map { set in
                 SessionSetContext(
                     weight: set.effectiveWeight ?? set.weight ?? 0,
-                    reps: set.reps ?? 0,
-                    rir: set.rir,
+                    reps: set.prReps,
+                    rir: set.performanceRIR,
                     completedAt: set.completedAt,
                     completed: true,
                     setType: set.setType,
@@ -358,8 +358,8 @@ enum SuggestionCoordinator {
             .sorted { $0.orderInExercise < $1.orderInExercise }
             .map { set in
                 let weight = set.effectiveWeight ?? set.weight ?? 0
-                let reps = set.reps ?? 0
-                let rir = set.rir ?? -1
+                let reps = set.prReps
+                let rir = set.performanceRIR ?? -1
                 let completedAt = Int(set.completedAt?.timeIntervalSince1970 ?? 0)
                 return [
                     set.id.uuidString,

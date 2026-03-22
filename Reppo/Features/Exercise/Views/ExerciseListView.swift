@@ -1,6 +1,6 @@
 // ExerciseListView.swift
 // Main exercise list screen with dual mode support (browse / addToWorkout).
-// Browse mode: single-tap to start workout with that exercise.
+// Browse mode: single-tap to start workout with that exercise; trailing info opens detail.
 // addToWorkout mode: multi-select, then "Add (N)" button.
 // Composes: search bar, MuscleFilterStrip, SortOptionMenu, ExerciseCardView list.
 // Spec: FR-001–FR-005, User Stories 1 & 2
@@ -134,18 +134,31 @@ struct ExerciseListView: View {
         let isSelected = viewModel.selectedExerciseIds.contains(exercise.id)
 
         if mode == .browse {
-            // Browse mode: single tap → start workout with this exercise
-            Button {
-                onExercisesSelected?([exercise.id])
-            } label: {
-                ExerciseCardView(
-                    exercise: exercise,
-                    stats: stats,
-                    isSelected: false,
-                    mode: mode
-                )
+            HStack(spacing: 8) {
+                Button {
+                    onExercisesSelected?([exercise.id])
+                } label: {
+                    ExerciseCardView(
+                        exercise: exercise,
+                        stats: stats,
+                        isSelected: false,
+                        mode: mode
+                    )
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    ExerciseDetailView(exerciseId: exercise.id, services: services)
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(Color.textSecondary)
+                        .frame(width: 44, height: 44)
+                        .background(Color.bgCard)
+                        .cornerRadius(10)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         } else {
             // addToWorkout mode: multi-select toggle
             Button {

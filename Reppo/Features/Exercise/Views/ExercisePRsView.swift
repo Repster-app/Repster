@@ -9,6 +9,7 @@ import SwiftUI
 struct ExercisePRsView: View {
 
     let prTable: [PRTableEntry]
+    var isPerSide: Bool = false
 
     // MARK: - Body
 
@@ -18,6 +19,10 @@ struct ExercisePRsView: View {
         } else {
             ScrollView {
                 VStack(spacing: 0) {
+                    if isPerSide {
+                        perSideHint
+                    }
+
                     headerRow
 
                     Divider().background(Color.border)
@@ -34,6 +39,21 @@ struct ExercisePRsView: View {
     }
 
     // MARK: - Header Row
+
+    private var perSideHint: some View {
+        HStack {
+            Text("PRs use the stronger side and are shown per side.")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color.textSecondary)
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color.bgCard)
+        .cornerRadius(10)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+    }
 
     private var headerRow: some View {
         HStack {

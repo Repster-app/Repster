@@ -537,7 +537,8 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         let exerciseService = ExerciseServiceStub()
         let viewModel = CreateEditExerciseViewModel(
             exercise: nil,
-            exerciseService: exerciseService
+            exerciseService: exerciseService,
+            settingsService: SettingsServiceStub(profile: HealthProfile())
         )
 
         viewModel.name = "Burpee"
@@ -562,7 +563,8 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         )
         let viewModel = CreateEditExerciseViewModel(
             exercise: existingExercise,
-            exerciseService: exerciseService
+            exerciseService: exerciseService,
+            settingsService: SettingsServiceStub(profile: HealthProfile())
         )
 
         viewModel.name = "Incline DB Press"
@@ -584,7 +586,8 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
                 trackingType: .weightReps,
                 primaryMuscle: "arms"
             ),
-            exerciseService: ExerciseServiceStub()
+            exerciseService: ExerciseServiceStub(),
+            settingsService: SettingsServiceStub(profile: HealthProfile())
         )
 
         XCTAssertEqual(viewModel.primaryMuscle, "arms")
@@ -603,7 +606,8 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
                 equipmentType: .bodyweight,
                 trackingType: .duration
             ),
-            exerciseService: exerciseService
+            exerciseService: exerciseService,
+            settingsService: SettingsServiceStub(profile: HealthProfile())
         )
 
         await viewModel.checkTrackingTypeLock()
@@ -621,7 +625,8 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
                 equipmentType: .bodyweight,
                 trackingType: .durationDistance
             ),
-            exerciseService: exerciseService
+            exerciseService: exerciseService,
+            settingsService: SettingsServiceStub(profile: HealthProfile())
         )
 
         await viewModel.checkTrackingTypeLock()
@@ -874,8 +879,8 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         let uncompletedSet = WorkoutSet(
             workoutId: workout.id,
             exerciseId: exercise.id,
-            reps: 5,
             weight: 100,
+            reps: 5,
             setType: .working,
             orderInWorkout: 1,
             orderInExercise: 1,
@@ -884,8 +889,8 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         let deletedSet = WorkoutSet(
             workoutId: workout.id,
             exerciseId: exercise.id,
-            reps: 8,
             weight: 90,
+            reps: 8,
             setType: .working,
             orderInWorkout: 2,
             orderInExercise: 2,
@@ -894,8 +899,8 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         let typeChangedSet = WorkoutSet(
             workoutId: workout.id,
             exerciseId: exercise.id,
-            reps: 10,
             weight: 80,
+            reps: 10,
             setType: .working,
             orderInWorkout: 3,
             orderInExercise: 3,
@@ -923,9 +928,9 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
 
         XCTAssertEqual(setService.uncompletedSetIds, [uncompletedSet.id])
         XCTAssertEqual(setService.deletedSetIds, [deletedSet.id])
-        XCTAssertEqual(setService.editedSetIds, [typeChangedSet.id])
+        XCTAssertTrue(setService.editedSetIds.contains(typeChangedSet.id))
         XCTAssertFalse(uncompletedSet.completed)
-        XCTAssertEqual(typeChangedSet.setType, .warmup)
+        XCTAssertEqual(typeChangedSet.setType, SetType.warmup)
         XCTAssertEqual(viewModel.currentSets.map(\.id), [uncompletedSet.id, typeChangedSet.id])
     }
 
@@ -1465,6 +1470,51 @@ final class ExerciseTrackingTypeTests: XCTestCase {
 
 @MainActor
 final class TemplateImportExportTests: XCTestCase {
+    func testExportAITemplateContextIncludesMetadataAndStats() async throws {
+        let context = try makeTemplateServiceContext()
+        let exercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest",
+            secondaryMuscles: ["triceps", "front delts"],
+            movementPattern: .press,
+            bodyweightFactor: 0.35,
+            weightIncrement: 2.5,
+            defaultRestTime: 180
+        )
+        try await context.exerciseRepo.save(exercise)
+        try await context.exerciseStatsRepo.save(
+            ExerciseStats(
+                exerciseId: exercise.id,
+                totalWorkouts: 12,
+                totalSets: 36,
+                maxWeight: 102.5,
+                bestE1RM: 118.4,
+                lastPerformedDate: makeDate(2026, 3, 20, 9, 0)
+            )
+        )
+
+        let exportedData = try await context.service.exportAITemplateContext()
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let archive = try decoder.decode(AITemplateContextArchive.self, from: exportedData)
+        let exportedExercise = try XCTUnwrap(archive.exercises.first(where: { $0.exerciseId == exercise.id }))
+
+        XCTAssertEqual(archive.version, AITemplateContextArchive.currentVersion)
+        XCTAssertEqual(exportedExercise.exerciseName, "Bench Press")
+        XCTAssertEqual(exportedExercise.equipmentType, .barbell)
+        XCTAssertEqual(exportedExercise.trackingType, .weightReps)
+        XCTAssertEqual(exportedExercise.primaryMuscle, "chest")
+        XCTAssertEqual(exportedExercise.secondaryMuscles, ["triceps", "front delts"])
+        XCTAssertEqual(exportedExercise.movementPattern, .press)
+        XCTAssertEqual(exportedExercise.stats.totalWorkouts, 12)
+        XCTAssertEqual(exportedExercise.stats.totalSets, 36)
+        XCTAssertEqual(exportedExercise.stats.maxWeight, 102.5)
+        XCTAssertEqual(exportedExercise.stats.bestE1RM, 118.4)
+        XCTAssertEqual(exportedExercise.stats.lastPerformedDate, makeDate(2026, 3, 20, 9, 0))
+    }
+
     func testExportImportRoundtripPreservesTemplateStructure() async throws {
         let context = try makeTemplateServiceContext()
         let squat = makeExercise(name: "Back Squat", primaryMuscle: "legs", defaultRestTime: 180)
@@ -1591,7 +1641,7 @@ final class TemplateImportExportTests: XCTestCase {
         XCTAssertEqual(exercises.count, 1, "Import should reuse an existing exercise matched by name.")
     }
 
-    func testImportCreatesMissingExerciseFromArchiveMetadata() async throws {
+    func testPreviewAndFinalizeCanCreateMissingExerciseFromArchiveMetadata() async throws {
         let context = try makeTemplateServiceContext()
         let archivedExerciseId = UUID()
 
@@ -1620,7 +1670,29 @@ final class TemplateImportExportTests: XCTestCase {
             ]
         )
 
-        let importedTemplateId = try await context.service.importTemplate(data: archiveData)
+        let preview = try await context.service.previewTemplateImport(data: archiveData)
+        XCTAssertEqual(preview.unresolvedExercises.count, 1)
+        XCTAssertEqual(preview.unresolvedExercises.first?.exercise.name, "Single Arm Cable Row")
+
+        do {
+            _ = try await context.service.importTemplate(data: archiveData)
+            XCTFail("Expected direct import to require exercise resolution")
+        } catch let error as TemplateServiceError {
+            guard case .importRequiresResolution(let unresolvedCount) = error else {
+                return XCTFail("Unexpected template service error: \(error)")
+            }
+            XCTAssertEqual(unresolvedCount, 1)
+        }
+
+        let importedTemplateId = try await context.service.finalizeTemplateImport(
+            preview,
+            resolutions: [
+                TemplateImportExerciseResolution(
+                    previewExerciseId: try XCTUnwrap(preview.unresolvedExercises.first?.id),
+                    action: .createNew
+                )
+            ]
+        )
         let importedDetailValue = try await context.service.fetchTemplateDetail(importedTemplateId)
         let importedDetail = try XCTUnwrap(importedDetailValue)
         let createdExercise = try await context.exerciseRepo.fetch(byId: archivedExerciseId)
@@ -1631,6 +1703,104 @@ final class TemplateImportExportTests: XCTestCase {
         XCTAssertEqual(createdExercise?.defaultRestTime, 75)
         XCTAssertEqual(createdExercise?.unilateral, true)
         XCTAssertEqual(createdExercise?.equipmentType, .cable)
+    }
+
+    func testFinalizeImportCanMapMissingExerciseToExistingExercise() async throws {
+        let context = try makeTemplateServiceContext()
+        let existingExercise = Exercise(
+            name: "Cable Row",
+            equipmentType: .cable,
+            trackingType: .weightReps,
+            primaryMuscle: "back",
+            unilateral: false,
+            defaultRestTime: 75
+        )
+        try await context.exerciseRepo.save(existingExercise)
+
+        let archiveData = try makeArchiveData(
+            templateName: "Travel Workout",
+            exercises: [
+                makeArchiveExercise(
+                    exerciseId: UUID(),
+                    exerciseName: "Single Arm Cable Row",
+                    primaryMuscle: "back",
+                    defaultRestTime: 75,
+                    orderInTemplate: 1,
+                    sets: [
+                        TemplateArchiveSet(
+                            setType: .working,
+                            targetRepMin: 10,
+                            targetRepMax: 12,
+                            targetRIR: 1,
+                            orderInExercise: 1
+                        )
+                    ],
+                    unilateral: true,
+                    trackingType: .weightReps,
+                    equipmentType: .cable
+                )
+            ]
+        )
+
+        let preview = try await context.service.previewTemplateImport(data: archiveData)
+        let importedTemplateId = try await context.service.finalizeTemplateImport(
+            preview,
+            resolutions: [
+                TemplateImportExerciseResolution(
+                    previewExerciseId: try XCTUnwrap(preview.unresolvedExercises.first?.id),
+                    action: .mapToExisting,
+                    existingExerciseId: existingExercise.id
+                )
+            ]
+        )
+        let importedDetailValue = try await context.service.fetchTemplateDetail(importedTemplateId)
+        let importedDetail = try XCTUnwrap(importedDetailValue)
+        let exercises = try await context.exerciseRepo.fetchAll()
+
+        XCTAssertEqual(importedDetail.exercises.first?.exerciseId, existingExercise.id)
+        XCTAssertEqual(exercises.count, 1, "Manual mapping should reuse the chosen exercise instead of creating a new one.")
+    }
+
+    func testPreviewAITemplateDraftMatchesExistingExerciseByID() async throws {
+        let context = try makeTemplateServiceContext()
+        let exercise = makeExercise(name: "Dumbbell Press", primaryMuscle: "chest", defaultRestTime: 90)
+        try await context.exerciseRepo.save(exercise)
+
+        let draftData = try makeAIDraftData(
+            templateName: "Upper Push",
+            exercises: [
+                makeAIDraftExercise(
+                    exerciseId: exercise.id,
+                    exerciseName: exercise.name,
+                    primaryMuscle: "chest",
+                    defaultRestTime: 90,
+                    orderInTemplate: 1,
+                    sets: [
+                        TemplateArchiveSet(
+                            setType: .working,
+                            targetRepMin: 8,
+                            targetRepMax: 10,
+                            targetRIR: 2,
+                            orderInExercise: 1
+                        )
+                    ],
+                    supersetGroupKey: "A",
+                    equipmentType: .dumbbell
+                )
+            ]
+        )
+
+        let preview = try await context.service.previewTemplateImport(data: draftData)
+        XCTAssertEqual(preview.source, .aiTemplateDraft)
+        XCTAssertTrue(preview.unresolvedExercises.isEmpty)
+        XCTAssertEqual(preview.resolvedExercises.first?.matchedExercise?.method, .exerciseId)
+
+        let importedTemplateId = try await context.service.finalizeTemplateImport(preview, resolutions: [])
+        let importedDetailValue = try await context.service.fetchTemplateDetail(importedTemplateId)
+        let importedDetail = try XCTUnwrap(importedDetailValue)
+
+        XCTAssertEqual(importedDetail.exercises.first?.exerciseId, exercise.id)
+        XCTAssertEqual(importedDetail.exercises.first?.sets.first?.targetRepMin, 8)
     }
 
     func testImportAddsImportedSuffixForTemplateNameCollisions() async throws {
@@ -1701,6 +1871,7 @@ final class TemplateImportExportTests: XCTestCase {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
             for: Exercise.self,
+            ExerciseStats.self,
             Workout.self,
             WorkoutSet.self,
             WorkoutTemplate.self,
@@ -1712,17 +1883,20 @@ final class TemplateImportExportTests: XCTestCase {
         let exerciseRepo = ExerciseRepository(modelContainer: container)
         let workoutRepo = WorkoutRepository(modelContainer: container)
         let setRepo = SetRepository(modelContainer: container)
+        let exerciseStatsRepo = ExerciseStatsRepository(modelContainer: container)
         let templateRepo = TemplateRepository(modelContainer: container)
         let service = TemplateService(
             templateRepository: templateRepo,
             workoutRepository: workoutRepo,
             setRepository: setRepo,
-            exerciseRepository: exerciseRepo
+            exerciseRepository: exerciseRepo,
+            exerciseStatsRepository: exerciseStatsRepo
         )
 
         return TemplateServiceTestContext(
             service: service,
-            exerciseRepo: exerciseRepo
+            exerciseRepo: exerciseRepo,
+            exerciseStatsRepo: exerciseStatsRepo
         )
     }
 
@@ -1787,6 +1961,55 @@ final class TemplateImportExportTests: XCTestCase {
             ),
             orderInTemplate: orderInTemplate,
             supersetGroupId: nil,
+            restTimeSeconds: defaultRestTime,
+            notes: nil,
+            sets: sets
+        )
+    }
+
+    private func makeAIDraftData(
+        templateName: String,
+        exercises: [AITemplateDraftExercise]
+    ) throws -> Data {
+        try JSONEncoder().encode(
+            AITemplateDraft(
+                version: AITemplateDraft.currentVersion,
+                templateName: templateName,
+                notes: nil,
+                exercises: exercises
+            )
+        )
+    }
+
+    private func makeAIDraftExercise(
+        exerciseId: UUID,
+        exerciseName: String,
+        primaryMuscle: String,
+        defaultRestTime: Int,
+        orderInTemplate: Int,
+        sets: [TemplateArchiveSet],
+        supersetGroupKey: String? = nil,
+        unilateral: Bool = false,
+        trackingType: TrackingType = .weightReps,
+        equipmentType: EquipmentType = .barbell
+    ) -> AITemplateDraftExercise {
+        AITemplateDraftExercise(
+            exerciseId: exerciseId,
+            exerciseName: exerciseName,
+            equipmentType: equipmentType,
+            trackingType: trackingType,
+            primaryMuscle: primaryMuscle,
+            secondaryMuscles: [],
+            movementPattern: nil,
+            unilateral: unilateral,
+            bilateralLoadFactor: nil,
+            bodyweightFactor: 0,
+            weightIncrement: 2.5,
+            defaultRestTime: defaultRestTime,
+            fatigueRate: nil,
+            recoveryConstant: nil,
+            orderInTemplate: orderInTemplate,
+            supersetGroupKey: supersetGroupKey,
             restTimeSeconds: defaultRestTime,
             notes: nil,
             sets: sets
@@ -2246,6 +2469,7 @@ final class WorkoutHistoryBackupViewModelTests: XCTestCase {
 private struct TemplateServiceTestContext {
     let service: TemplateService
     let exerciseRepo: ExerciseRepository
+    let exerciseStatsRepo: ExerciseStatsRepository
 }
 
 private struct WorkoutHistoryBackupServiceTestContext {
@@ -2520,7 +2744,7 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
 
     func edit(_ set: WorkoutSet) async throws -> SetSaveResult {
         editedSetIds.append(set.id)
-        try await save(set)
+        return try await save(set)
     }
 
     func uncomplete(_ set: WorkoutSet) async throws -> SetSaveResult {

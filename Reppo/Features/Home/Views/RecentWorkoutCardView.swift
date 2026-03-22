@@ -39,7 +39,7 @@ struct RecentWorkoutCardView: View {
                             Circle()
                                 .fill(MuscleGroupColors.color(for: muscle))
                                 .frame(width: 4, height: 4)
-                            Text(muscle.capitalized)
+                            Text(ExercisePrimaryGroup.displayName(for: muscle))
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundStyle(Color.textSecondary)
                                 .lineLimit(1)

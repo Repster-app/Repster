@@ -23,6 +23,8 @@
 		TT0002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = TT2003 /* XCTest.framework */; };
 		TT0003 /* ChartDataServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2004 /* ChartDataServiceTests.swift */; };
 		TT0004 /* WorkoutHistoryBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2005 /* WorkoutHistoryBackupTests.swift */; };
+		TT0005 /* SetServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2006 /* SetServiceTests.swift */; };
+		TT0006 /* WorkoutSetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2007 /* WorkoutSetTests.swift */; };
 		A10001 /* TrackingType.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001 /* TrackingType.swift */; };
 		A10002 /* SetType.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002 /* SetType.swift */; };
 		A10003 /* EquipmentType.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10003 /* EquipmentType.swift */; };
@@ -194,6 +196,8 @@
 		AW0005 /* WeightSuggestionData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0005 /* WeightSuggestionData.swift */; };
 		AW0006 /* WeightSuggestionCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0006 /* WeightSuggestionCardView.swift */; };
 		AW0007 /* WeightSuggestionModuleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0007 /* WeightSuggestionModuleView.swift */; };
+		AX0001 /* ExerciseMuscleGroupCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BX0001 /* ExerciseMuscleGroupCatalog.swift */; };
+		AX0002 /* WorkoutSetPerformanceFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BX0002 /* WorkoutSetPerformanceFormatter.swift */; };
 		ZA0001 /* TrendLineCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZB0001 /* TrendLineCalculator.swift */; };
 		ZA0002 /* ChartsTabViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZB0002 /* ChartsTabViewModel.swift */; };
 		ZA0003 /* BreakdownTabViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZB0003 /* BreakdownTabViewModel.swift */; };
@@ -266,6 +270,8 @@
 		TT2003 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 		TT2004 /* ChartDataServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartDataServiceTests.swift; sourceTree = "<group>"; };
 		TT2005 /* WorkoutHistoryBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutHistoryBackupTests.swift; sourceTree = "<group>"; };
+		TT2006 /* SetServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetServiceTests.swift; sourceTree = "<group>"; };
+		TT2007 /* WorkoutSetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSetTests.swift; sourceTree = "<group>"; };
 		B10001 /* TrackingType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingType.swift; sourceTree = "<group>"; };
 		B10002 /* SetType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetType.swift; sourceTree = "<group>"; };
 		B10003 /* EquipmentType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentType.swift; sourceTree = "<group>"; };
@@ -439,6 +445,8 @@
 		BW0005 /* WeightSuggestionData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightSuggestionData.swift; sourceTree = "<group>"; };
 		BW0006 /* WeightSuggestionCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightSuggestionCardView.swift; sourceTree = "<group>"; };
 		BW0007 /* WeightSuggestionModuleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightSuggestionModuleView.swift; sourceTree = "<group>"; };
+		BX0001 /* ExerciseMuscleGroupCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMuscleGroupCatalog.swift; sourceTree = "<group>"; };
+		BX0002 /* WorkoutSetPerformanceFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSetPerformanceFormatter.swift; sourceTree = "<group>"; };
 		ZB0001 /* TrendLineCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendLineCalculator.swift; sourceTree = "<group>"; };
 		ZB0002 /* ChartsTabViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartsTabViewModel.swift; sourceTree = "<group>"; };
 		ZB0003 /* BreakdownTabViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreakdownTabViewModel.swift; sourceTree = "<group>"; };
@@ -532,6 +540,8 @@
 				TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */,
 				TT2004 /* ChartDataServiceTests.swift */,
 				TT2005 /* WorkoutHistoryBackupTests.swift */,
+				TT2006 /* SetServiceTests.swift */,
+				TT2007 /* WorkoutSetTests.swift */,
 				FL1005 /* FatigueLearningServiceTests.swift */,
 			);
 			path = ReppoTests;
@@ -582,6 +592,7 @@
 				D40001 /* Services */,
 				D40002 /* Repositories */,
 				D40003 /* Extensions */,
+				D40004 /* Formatting */,
 				DL0001 /* Utilities */,
 				DM0001 /* Seeding */,
 			);
@@ -804,6 +815,7 @@
 			isa = PBXGroup;
 			children = (
 				BD0001 /* ExerciseEnums.swift */,
+				BX0001 /* ExerciseMuscleGroupCatalog.swift */,
 				BG0001 /* ExerciseModels.swift */,
 			);
 			path = Models;
@@ -997,6 +1009,14 @@
 				BH0003 /* MuscleGroupColors.swift */,
 			);
 			path = Extensions;
+			sourceTree = "<group>";
+		};
+		D40004 /* Formatting */ = {
+			isa = PBXGroup;
+			children = (
+				BX0002 /* WorkoutSetPerformanceFormatter.swift */,
+			);
+			path = Formatting;
 			sourceTree = "<group>";
 		};
 		D50001 /* Models */ = {
@@ -1422,6 +1442,7 @@
 				AC0021 /* SetTableDataSource.swift in Sources */,
 				AC0022 /* EditWorkoutViewModel.swift in Sources */,
 				AD0001 /* ExerciseEnums.swift in Sources */,
+				AX0001 /* ExerciseMuscleGroupCatalog.swift in Sources */,
 				AD0002 /* TabPlaceholderViews.swift in Sources */,
 				AG0001 /* ExerciseModels.swift in Sources */,
 				AG0002 /* ExerciseDetailViewModel.swift in Sources */,
@@ -1492,6 +1513,7 @@
 				AW0005 /* WeightSuggestionData.swift in Sources */,
 				AW0006 /* WeightSuggestionCardView.swift in Sources */,
 				AW0007 /* WeightSuggestionModuleView.swift in Sources */,
+				AX0002 /* WorkoutSetPerformanceFormatter.swift in Sources */,
 				AJ0004 /* SettingsViewModel.swift in Sources */,
 				AJ0005 /* SettingsView.swift in Sources */,
 				AJ0006 /* UnitPickerSheet.swift in Sources */,
@@ -1556,6 +1578,8 @@
 				TT0001 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift in Sources */,
 				TT0003 /* ChartDataServiceTests.swift in Sources */,
 				TT0004 /* WorkoutHistoryBackupTests.swift in Sources */,
+				TT0005 /* SetServiceTests.swift in Sources */,
+				TT0006 /* WorkoutSetTests.swift in Sources */,
 				FL0005 /* FatigueLearningServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -168,7 +168,7 @@ struct ActiveWorkoutView: View {
                 if let exercise = viewModel.currentExercise {
                     ExerciseSettingsSheet(
                         exercise: exercise,
-                        exerciseService: services.exerciseService
+                        services: services
                     )
                 }
             }
@@ -209,14 +209,21 @@ struct ActiveWorkoutView: View {
 
         case .history:
             // Exercise history from past workouts (T026)
-            ExerciseHistoryView(historyWorkouts: viewModel.subTabHistory)
+            ExerciseHistoryView(
+                historyWorkouts: viewModel.subTabHistory,
+                exercise: viewModel.currentExercise
+            )
                 .task(id: viewModel.currentExercise?.id) {
                     await viewModel.loadHistoryForCurrentExercise()
                 }
 
         case .prs:
             // Exercise PR table — reuses ExercisePRsView from ExerciseDetailView
-            ExercisePRsView(prTable: viewModel.subTabPRTable)
+            ExercisePRsView(
+                prTable: viewModel.subTabPRTable,
+                isPerSide: viewModel.currentExercise?.unilateral == true
+                    && viewModel.currentExercise?.supportsUnilateralLogging == true
+            )
                 .task(id: viewModel.currentExercise?.id) {
                     await viewModel.loadPRsForCurrentExercise()
                 }

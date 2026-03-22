@@ -107,18 +107,9 @@ final class EditWorkoutViewModel {
     ///
     /// For new sets (added during this edit session): calls setService.save().
     /// For existing sets: calls setService.edit().
-    func completeSet(
-        _ set: WorkoutSet,
-        weight: Double?,
-        reps: Int?,
-        durationSeconds: Int?,
-        distanceMeters: Double?
-    ) async {
+    func completeSet(_ set: WorkoutSet, input: SetCompletionInput) async {
         // Update set values
-        set.weight = weight
-        set.reps = reps
-        set.durationSeconds = durationSeconds
-        set.distanceMeters = distanceMeters
+        applyCompletionInput(input, to: set)
         set.completed = true
         set.completedAt = Date()
         set.updatedAt = Date()
@@ -374,6 +365,28 @@ final class EditWorkoutViewModel {
     func markSetDirty(_ set: WorkoutSet, field: SetDraftField) {
         let _ = field
         dirtySetIds.insert(set.id)
+    }
+
+    private func applyCompletionInput(_ input: SetCompletionInput, to set: WorkoutSet) {
+        let exercise = exercises.first { $0.id == set.exerciseId }
+
+        set.weight = input.weight
+        set.durationSeconds = input.durationSeconds
+        set.distanceMeters = input.distanceMeters
+        set.leftReps = input.leftReps
+        set.rightReps = input.rightReps
+        set.leftRIR = input.leftRIR
+        set.rightRIR = input.rightRIR
+
+        if exercise?.supportsUnilateralLogging == true, exercise?.unilateral == true {
+            set.reps = input.reps
+            set.rir = input.rir
+            set.syncDerivedPerformanceFields(for: exercise)
+        } else {
+            set.reps = input.reps
+            set.rir = input.rir
+            set.side = nil
+        }
     }
 
     /// Save all sets that have been edited via text fields but not yet persisted.

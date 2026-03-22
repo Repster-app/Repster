@@ -71,7 +71,7 @@ struct TemplateCardView: View {
                         if !visibleMuscleGroups.isEmpty {
                             HStack(spacing: 4) {
                                 ForEach(visibleMuscleGroups, id: \.self) { muscle in
-                                    muscleTag(muscle.capitalized)
+                                    muscleTag(ExercisePrimaryGroup.displayName(for: muscle))
                                 }
 
                                 if hiddenMuscleGroupCount > 0 {

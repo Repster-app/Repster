@@ -17,26 +17,29 @@ struct ExerciseSettingsSheet: View {
     // MARK: - State
 
     let exercise: Exercise
-    let exerciseService: any ExerciseServiceProtocol
+    let services: ServiceContainer
 
     @Environment(\.dismiss) private var dismiss
 
-    @State private var restTimeSeconds: Int
-    @State private var weightIncrement: Double
+    @State private var restTimeSeconds: Int?
+    @State private var weightIncrement: Double?
+    @State private var appDefaultRestTime: Int?
+    @State private var appDefaultIncrement: Double?
     @State private var isSaving: Bool = false
+    @State private var showFullSettings: Bool = false
 
     // MARK: - Available Increments
 
     private static let weightIncrements: [Double] = [0.5, 1.0, 1.25, 2.0, 2.5, 5.0, 10.0]
-    private static let restTimeOptions: [Int] = [0, 30, 45, 60, 90, 120, 150, 180, 210, 240, 300]
+    private static let restTimeOptions: [Int] = [30, 45, 60, 90, 120, 150, 180, 210, 240, 300]
 
     // MARK: - Init
 
-    init(exercise: Exercise, exerciseService: any ExerciseServiceProtocol) {
+    init(exercise: Exercise, services: ServiceContainer) {
         self.exercise = exercise
-        self.exerciseService = exerciseService
-        _restTimeSeconds = State(initialValue: exercise.defaultRestTime ?? 0)
-        _weightIncrement = State(initialValue: exercise.weightIncrement ?? 2.5)
+        self.services = services
+        _restTimeSeconds = State(initialValue: exercise.defaultRestTime)
+        _weightIncrement = State(initialValue: exercise.weightIncrement)
     }
 
     // MARK: - Body
@@ -44,44 +47,33 @@ struct ExerciseSettingsSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                // Exercise name header
-                Section {
-                    HStack {
-                        Image(systemName: "dumbbell")
-                            .foregroundColor(.accent)
-                        Text(exercise.name)
-                            .font(.headline)
-                            .foregroundColor(.textPrimary)
-                    }
-                }
-
-                // Rest Time
-                Section("Rest Timer") {
+                Section("Rest Time") {
                     Picker("Default Rest Time", selection: $restTimeSeconds) {
-                        Text("Not Set").tag(0)
-                        ForEach(Self.restTimeOptions.filter { $0 > 0 }, id: \.self) { seconds in
-                            Text(formatRestTime(seconds)).tag(seconds)
+                        Text("App Default (\(formatRestTime(appDefaultRestTime)))")
+                            .tag(Optional<Int>.none)
+                        ForEach(Self.restTimeOptions, id: \.self) { seconds in
+                            Text(formatRestTime(seconds)).tag(Optional(seconds))
                         }
                     }
                     .foregroundColor(.textPrimary)
-
-                    Text("Automatically starts a rest timer when you complete a set")
-                        .font(.caption)
-                        .foregroundColor(.textTertiary)
                 }
 
-                // Weight Increment
                 Section("Weight Increment") {
                     Picker("Increment", selection: $weightIncrement) {
+                        Text("App Default (\(formatIncrement(appDefaultIncrement)))")
+                            .tag(Optional<Double>.none)
                         ForEach(Self.weightIncrements, id: \.self) { increment in
-                            Text(formatIncrement(increment)).tag(increment)
+                            Text(formatIncrement(increment)).tag(Optional(increment))
                         }
                     }
                     .foregroundColor(.textPrimary)
+                }
 
-                    Text("Used for rounding smart weight suggestions and manual adjustments")
-                        .font(.caption)
-                        .foregroundColor(.textTertiary)
+                Section("More") {
+                    Button("More Exercise Settings") {
+                        showFullSettings = true
+                    }
+                    .foregroundColor(.accent)
                 }
             }
             .scrollContentBackground(.hidden)
@@ -106,8 +98,17 @@ struct ExerciseSettingsSheet: View {
                     .disabled(isSaving)
                 }
             }
+            .task {
+                await loadDefaults()
+            }
         }
         .presentationDetents([.medium])
+        .sheet(isPresented: $showFullSettings) {
+            CreateEditExerciseSheet(
+                exercise: exercise,
+                services: services
+            )
+        }
     }
 
     // MARK: - Save
@@ -117,12 +118,12 @@ struct ExerciseSettingsSheet: View {
         defer { isSaving = false }
 
         // Update exercise model directly
-        exercise.defaultRestTime = restTimeSeconds > 0 ? restTimeSeconds : nil
+        exercise.defaultRestTime = restTimeSeconds
         exercise.weightIncrement = weightIncrement
         exercise.updatedAt = Date()
 
         do {
-            try await exerciseService.updateExercise(exercise, originalTrackingType: exercise.trackingType)
+            try await services.exerciseService.updateExercise(exercise, originalTrackingType: exercise.trackingType)
         } catch {
             print("[ExerciseSettingsSheet] Failed to save: \(error)")
         }
@@ -130,9 +131,16 @@ struct ExerciseSettingsSheet: View {
         dismiss()
     }
 
+    private func loadDefaults() async {
+        guard let profile = try? await services.settingsService.fetchSettings() else { return }
+        appDefaultRestTime = profile.defaultRestTimeSeconds
+        appDefaultIncrement = profile.prescriptionDefaultIncrement
+    }
+
     // MARK: - Formatters
 
-    private func formatRestTime(_ seconds: Int) -> String {
+    private func formatRestTime(_ seconds: Int?) -> String {
+        guard let seconds else { return "Not Set" }
         let minutes = seconds / 60
         let secs = seconds % 60
         if secs == 0 {
@@ -141,7 +149,8 @@ struct ExerciseSettingsSheet: View {
         return "\(minutes)m \(secs)s"
     }
 
-    private func formatIncrement(_ value: Double) -> String {
+    private func formatIncrement(_ value: Double?) -> String {
+        guard let value else { return "Not Set" }
         if value.truncatingRemainder(dividingBy: 1) == 0 {
             return String(format: "%.0f kg", value)
         }

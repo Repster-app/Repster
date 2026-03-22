@@ -182,6 +182,9 @@ final class ExercisesTabViewModel {
               let index = selectedDataIndex,
               index >= 0, index < firstSeries.points.count else { return nil }
         let point = firstSeries.points[index]
+        if let detailLabel = point.detailLabel {
+            return detailLabel
+        }
         guard let weight = point.topWeight, let reps = point.topReps else { return nil }
         if weight == weight.rounded() && weight == Double(Int(weight)) {
             return "\(Int(weight)) kg \u{00D7} \(reps) reps"

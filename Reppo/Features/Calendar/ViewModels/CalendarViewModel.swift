@@ -124,7 +124,8 @@ final class CalendarViewModel {
                 let exerciseIds = try await setService.fetchExerciseIds(for: workout.id)
                 for exerciseId in exerciseIds {
                     let exercise = try await cachedExercise(exerciseId)
-                    if let muscle = exercise?.primaryMuscle?.lowercased(), !muscleGroups.contains(muscle) {
+                    if let muscle = ExercisePrimaryGroup.normalizedValue(exercise?.primaryMuscle),
+                       !muscleGroups.contains(muscle) {
                         muscleGroups.append(muscle)
                     }
                 }

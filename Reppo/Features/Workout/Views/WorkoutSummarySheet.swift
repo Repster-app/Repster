@@ -174,15 +174,9 @@ struct WorkoutSummarySheet: View {
 
     private func recapHero(summary: WorkoutSummaryData) -> some View {
         VStack(spacing: 10) {
-            Text(summary.date, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day())
-                .font(.subheadline)
-                .foregroundColor(.textSecondary)
-                .frame(maxWidth: .infinity)
-                .multilineTextAlignment(.center)
-
             sectionCard {
                 VStack(alignment: .leading, spacing: 14) {
-                    summaryTitleSection
+                    summaryTitleSection(summary: summary)
 
                     HStack(spacing: 10) {
                         compactSummaryMetric(
@@ -233,7 +227,7 @@ struct WorkoutSummarySheet: View {
 
     // MARK: - Title
 
-    private var summaryTitleSection: some View {
+    private func summaryTitleSection(summary: WorkoutSummaryData) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -248,9 +242,18 @@ struct WorkoutSummarySheet: View {
             } label: {
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Workout title")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.textSecondary)
+                        HStack(spacing: 8) {
+                            Text("Workout title")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.textSecondary)
+
+                            Spacer(minLength: 8)
+
+                            Text(summaryDateLabel(summary.date))
+                                .font(.caption)
+                                .foregroundColor(.textSecondary)
+                                .lineLimit(1)
+                        }
 
                         Text(resolvedWorkoutTitle)
                             .font(.system(size: 18, weight: .semibold))
@@ -334,41 +337,46 @@ struct WorkoutSummarySheet: View {
 
     private var effortSection: some View {
         sectionCard {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .center, spacing: 12) {
-                    Text("How hard did it feel?")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.textPrimary)
+            HStack(spacing: 12) {
+                Text("How hard did it feel?")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.textPrimary)
 
-                    Spacer()
+                Spacer()
 
-                    Text(effortValueLabel)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(selectedEffort == nil ? .textSecondary : .textPrimary)
-                        .padding(.horizontal, 10)
-                        .frame(height: 28)
-                        .background(Color.bgInput)
-                        .clipShape(Capsule())
-                }
-
-                if selectedEffort != nil {
+                Menu {
                     Button("Clear") {
                         selectedEffort = nil
                     }
-                    .font(.caption)
-                    .foregroundColor(.textSecondary)
-                }
 
-                Slider(value: effortSliderBinding, in: 1...10, step: 1)
-                    .tint(.accent)
+                    Divider()
 
-                HStack {
-                    Text("Easy")
-                    Spacer()
-                    Text("Max")
+                    ForEach(1...10, id: \.self) { effort in
+                        Button {
+                            selectedEffort = Double(effort)
+                        } label: {
+                            if selectedEffort == Double(effort) {
+                                Label("\(effort)/10", systemImage: "checkmark")
+                            } else {
+                                Text("\(effort)/10")
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(effortValueLabel)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(selectedEffort == nil ? .textSecondary : .textPrimary)
+
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.textSecondary)
+                    }
+                    .padding(.horizontal, 10)
+                    .frame(height: 32)
+                    .background(Color.bgInput)
+                    .clipShape(Capsule())
                 }
-                .font(.caption)
-                .foregroundColor(.textTertiary)
             }
         }
     }
@@ -378,10 +386,17 @@ struct WorkoutSummarySheet: View {
     private func exerciseRecapSection(summary: WorkoutSummaryData) -> some View {
         return sectionCard {
             VStack(alignment: .leading, spacing: 14) {
-                sectionHeading(
-                    title: "Exercises",
-                    subtitle: "\(summary.exerciseSummaries.count) logged"
-                )
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text("Exercises")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.textPrimary)
+
+                    Spacer()
+
+                    Text("\(summary.exerciseSummaries.count) logged")
+                        .font(.caption)
+                        .foregroundColor(.textSecondary)
+                }
 
                 VStack(spacing: 0) {
                     ForEach(Array(summary.exerciseSummaries.enumerated()), id: \.element.id) { index, exercise in
@@ -719,16 +734,13 @@ struct WorkoutSummarySheet: View {
         normalizedWorkoutTitle ?? automaticWorkoutTitle
     }
 
-    private var effortSliderBinding: Binding<Double> {
-        Binding(
-            get: { selectedEffort ?? 5 },
-            set: { selectedEffort = $0.rounded() }
-        )
-    }
-
     private var effortValueLabel: String {
         guard let selectedEffort else { return "Optional" }
         return "\(Int(selectedEffort))/10"
+    }
+
+    private func summaryDateLabel(_ date: Date) -> String {
+        date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
     }
 
     private var weightUnitLabel: String {

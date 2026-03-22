@@ -12,6 +12,7 @@ final class CreateEditExerciseViewModel {
     // MARK: - Dependencies
 
     private let exerciseService: any ExerciseServiceProtocol
+    private let settingsService: any SettingsServiceProtocol
     private let existingExercise: Exercise?
 
     // MARK: - Form Fields
@@ -36,6 +37,8 @@ final class CreateEditExerciseViewModel {
     var isSaving: Bool = false
     var showError: Bool = false
     var errorMessage: String = ""
+    var appDefaultRestTime: Int? = nil
+    var appDefaultWeightIncrement: Double? = nil
 
     // MARK: - Computed
 
@@ -59,10 +62,27 @@ final class CreateEditExerciseViewModel {
         return ExercisePrimaryGroup.displayName(for: primaryMuscle)
     }
 
+    var supportsUnilateral: Bool {
+        trackingType == .weightReps || trackingType == .weightRepsDuration
+    }
+
+    var defaultRestTimeDisplay: String {
+        formatSeconds(appDefaultRestTime)
+    }
+
+    var defaultIncrementDisplay: String {
+        formatIncrement(appDefaultWeightIncrement)
+    }
+
     // MARK: - Init
 
-    init(exercise: Exercise?, exerciseService: any ExerciseServiceProtocol) {
+    init(
+        exercise: Exercise?,
+        exerciseService: any ExerciseServiceProtocol,
+        settingsService: any SettingsServiceProtocol
+    ) {
         self.exerciseService = exerciseService
+        self.settingsService = settingsService
         self.existingExercise = exercise
         self.isEditing = exercise != nil
 
@@ -88,6 +108,12 @@ final class CreateEditExerciseViewModel {
         isTrackingTypeLocked = (try? await exerciseService.exerciseHasLoggedSetData(exercise.id)) ?? false
     }
 
+    func loadDefaults() async {
+        guard let profile = try? await settingsService.fetchSettings() else { return }
+        appDefaultRestTime = profile.defaultRestTimeSeconds
+        appDefaultWeightIncrement = profile.prescriptionDefaultIncrement
+    }
+
     // MARK: - Save
 
     func save() async throws {
@@ -98,6 +124,7 @@ final class CreateEditExerciseViewModel {
 
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         let muscle = ExercisePrimaryGroup.normalizedValue(primaryMuscle)
+        let resolvedUnilateral = supportsUnilateral ? self.unilateral : false
 
         if isEditing, let existing = existingExercise {
             let originalTrackingType = existing.trackingType
@@ -109,7 +136,7 @@ final class CreateEditExerciseViewModel {
             existing.primaryMuscle = muscle
             existing.secondaryMuscles = secondaryMuscles
             existing.movementPattern = movementPattern
-            existing.unilateral = unilateral
+            existing.unilateral = resolvedUnilateral
             existing.bilateralLoadFactor = bilateralLoadFactor
             existing.bodyweightFactor = bodyweightFactor
             existing.weightIncrement = weightIncrement
@@ -125,7 +152,7 @@ final class CreateEditExerciseViewModel {
                 primaryMuscle: muscle,
                 secondaryMuscles: secondaryMuscles,
                 movementPattern: movementPattern,
-                unilateral: unilateral,
+                unilateral: resolvedUnilateral,
                 bilateralLoadFactor: bilateralLoadFactor,
                 bodyweightFactor: bodyweightFactor,
                 weightIncrement: weightIncrement,
@@ -133,5 +160,29 @@ final class CreateEditExerciseViewModel {
             )
             try await exerciseService.createExercise(exercise)
         }
+    }
+
+    private func formatSeconds(_ seconds: Int?) -> String {
+        guard let seconds else { return "Not Set" }
+        if seconds == 0 {
+            return "0 sec"
+        }
+        let minutes = seconds / 60
+        let remainder = seconds % 60
+        if minutes > 0, remainder > 0 {
+            return "\(minutes)m \(remainder)s"
+        }
+        if minutes > 0 {
+            return "\(minutes)m"
+        }
+        return "\(seconds) sec"
+    }
+
+    private func formatIncrement(_ value: Double?) -> String {
+        guard let value else { return "Not Set" }
+        if value.truncatingRemainder(dividingBy: 1) == 0 {
+            return String(format: "%.0f kg", value)
+        }
+        return String(format: "%.2f kg", value)
     }
 }

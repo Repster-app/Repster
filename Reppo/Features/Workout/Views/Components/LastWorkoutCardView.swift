@@ -57,22 +57,9 @@ struct LastWorkoutCardView: View {
     // MARK: - Formatting
 
     private var formattedTopSets: String {
-        info.topSets.map { set -> String in
-            // Use raw weight/reps for unit-aware formatting; fall back to formattedLabel for non-weight variants.
-            if let reps = set.reps, reps > 0 {
-                return "\(formatWeight(set.weight))×\(reps)"
-            }
-            return set.formattedLabel
-        }
-        .joined(separator: ", ")
-    }
-
-    private func formatWeight(_ kg: Double) -> String {
-        let value = unitPreference == .imperial ? UnitConversion.kgToLbs(kg) : kg
-        if value == value.rounded() && value == Double(Int(value)) {
-            return "\(Int(value))"
-        }
-        return String(format: "%.1f", value)
+        info.topSets
+            .map(\.formattedLabel)
+            .joined(separator: ", ")
     }
 }
 

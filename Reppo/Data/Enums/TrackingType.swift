@@ -12,7 +12,7 @@ enum TrackingType: String, Codable, CaseIterable {
         switch self {
         case .weightReps:         return "Weight & Reps"
         case .duration:           return "Duration"
-        case .durationDistance:   return "Duration & Distance"
+        case .durationDistance:   return "Distance & Duration"
         case .weightDistance:     return "Weight & Distance"
         case .weightRepsDuration: return "Weight, Reps & Duration"
         case .custom:             return "Custom"

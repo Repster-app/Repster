@@ -23,7 +23,8 @@ struct CreateEditExerciseSheet: View {
     ) {
         self._viewModel = State(initialValue: CreateEditExerciseViewModel(
             exercise: exercise,
-            exerciseService: services.exerciseService
+            exerciseService: services.exerciseService,
+            settingsService: services.settingsService
         ))
         self.onSave = onSave
     }
@@ -72,6 +73,7 @@ struct CreateEditExerciseSheet: View {
             }
             .task {
                 await viewModel.checkTrackingTypeLock()
+                await viewModel.loadDefaults()
             }
         }
     }
@@ -140,6 +142,13 @@ struct CreateEditExerciseSheet: View {
     private var advancedSection: some View {
         Section("Advanced") {
             Toggle("Unilateral", isOn: $viewModel.unilateral)
+                .disabled(!viewModel.supportsUnilateral)
+
+            if !viewModel.supportsUnilateral {
+                Text("Unilateral logging is only available for rep-based tracking types.")
+                    .font(.caption)
+                    .foregroundStyle(Color.textTertiary)
+            }
 
             HStack {
                 Text("Bodyweight Factor")
@@ -151,24 +160,22 @@ struct CreateEditExerciseSheet: View {
                     .frame(width: 60)
             }
 
-            HStack {
-                Text("Weight Increment")
-                Spacer()
-                TextField("kg", value: $viewModel.weightIncrement,
-                          format: .number)
-                    .keyboardType(.decimalPad)
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: 60)
+            Picker("Weight Increment", selection: $viewModel.weightIncrement) {
+                Text("App Default (\(viewModel.defaultIncrementDisplay))")
+                    .tag(Optional<Double>.none)
+                ForEach(weightIncrementOptions, id: \.self) { increment in
+                    Text(formatIncrement(increment))
+                        .tag(Optional(increment))
+                }
             }
 
-            HStack {
-                Text("Default Rest (sec)")
-                Spacer()
-                TextField("sec", value: $viewModel.defaultRestTime,
-                          format: .number)
-                    .keyboardType(.numberPad)
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: 60)
+            Picker("Default Rest", selection: $viewModel.defaultRestTime) {
+                Text("App Default (\(viewModel.defaultRestTimeDisplay))")
+                    .tag(Optional<Int>.none)
+                ForEach(restTimeOptions, id: \.self) { seconds in
+                    Text(formatRestTime(seconds))
+                        .tag(Optional(seconds))
+                }
             }
         }
     }
@@ -184,5 +191,32 @@ struct CreateEditExerciseSheet: View {
             .font(.caption)
             .foregroundStyle(Color.textTertiary)
         }
+    }
+
+    private var weightIncrementOptions: [Double] {
+        [0.5, 1.0, 1.25, 2.0, 2.5, 5.0, 10.0]
+    }
+
+    private var restTimeOptions: [Int] {
+        [30, 45, 60, 90, 120, 150, 180, 210, 240, 300]
+    }
+
+    private func formatIncrement(_ value: Double) -> String {
+        if value.truncatingRemainder(dividingBy: 1) == 0 {
+            return String(format: "%.0f kg", value)
+        }
+        return String(format: "%.2f kg", value)
+    }
+
+    private func formatRestTime(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        let remainder = seconds % 60
+        if minutes > 0, remainder > 0 {
+            return "\(minutes)m \(remainder)s"
+        }
+        if minutes > 0 {
+            return "\(minutes)m"
+        }
+        return "\(seconds) sec"
     }
 }

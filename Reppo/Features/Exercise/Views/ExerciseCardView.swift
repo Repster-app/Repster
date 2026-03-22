@@ -21,22 +21,11 @@ struct ExerciseCardView: View {
                 .frame(width: 10, height: 10)
 
             // Center: Exercise info
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(exercise.name)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.textPrimary)
                     .lineLimit(1)
-
-                HStack(spacing: 6) {
-                    if let muscle = exercise.primaryMuscle {
-                        Text(muscle.capitalized)
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color.textTertiary)
-                    }
-                    Text(exercise.equipmentType.displayName)
-                        .font(.system(size: 11))
-                        .foregroundStyle(Color.textTertiary)
-                }
 
                 if let lastDate = stats?.lastPerformedDate {
                     Text(lastDate, style: .date)

@@ -9,6 +9,7 @@ import SwiftUI
 struct ExerciseHistoryView: View {
 
     let historyWorkouts: [WorkoutHistoryGroup]
+    let exercise: Exercise?
 
     // MARK: - Body
 
@@ -56,6 +57,7 @@ struct ExerciseHistoryView: View {
     private func setRow(_ set: WorkoutSet, index: Int, siblings: [WorkoutSet]) -> some View {
         let hasNote = set.notes != nil && !(set.notes?.isEmpty ?? true)
         let isWarmup = set.setType == .warmup
+        let display = WorkoutSetPerformanceFormatter.display(for: set, exercise: exercise)
 
         return HStack(spacing: 8) {
             // Set number with note indicator and set type badge
@@ -79,20 +81,23 @@ struct ExerciseHistoryView: View {
             }
             .frame(width: 24)
 
-            if let performanceLabel = formattedPerformanceLabel(for: set) {
+            if let performanceLabel = display.performanceLabel {
                 Text(performanceLabel)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Color.textPrimary)
             }
 
-            // RIR display (color-coded)
-            if let rir = set.rir {
-                Text("RIR \(rir >= 5 ? "5+" : "\(Int(rir))")")
+            if let rirLabel = display.rirLabel {
+                Text(rirLabel)
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.rirColor(for: rir))
+                    .foregroundStyle(display.isPerSide ? Color.textSecondary : Color.rirColor(for: set.rir))
                     .padding(.horizontal, 5)
                     .padding(.vertical, 2)
-                    .background(Color.rirColor(for: rir).opacity(0.10))
+                    .background(
+                        display.isPerSide
+                            ? Color.bgInput
+                            : Color.rirColor(for: set.rir).opacity(0.10)
+                    )
                     .cornerRadius(4)
             }
 
@@ -126,41 +131,5 @@ struct ExerciseHistoryView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d, yyyy"
         return formatter.string(from: date)
-    }
-
-    private func formatWeight(_ weight: Double) -> String {
-        "\(UnitConversion.formatWeight(weight)) kg"
-    }
-
-    private func formatDistance(_ meters: Double) -> String {
-        if meters >= 1000 {
-            return String(format: "%.2f km", meters / 1000)
-        }
-        if meters == meters.rounded() {
-            return String(format: "%.0f m", meters)
-        }
-        return String(format: "%.1f m", meters)
-    }
-
-    private func formattedPerformanceLabel(for set: WorkoutSet) -> String? {
-        if let weight = set.weight, let reps = set.reps, reps > 0 {
-            let weightLabel = weight > 0 ? formatWeight(weight) : "BW"
-            return "\(weightLabel) × \(reps)"
-        }
-        if let weight = set.weight, weight > 0,
-           let distance = set.distanceMeters, distance > 0 {
-            return "\(formatWeight(weight)) • \(formatDistance(distance))"
-        }
-        if let duration = set.durationSeconds, duration > 0,
-           let distance = set.distanceMeters, distance > 0 {
-            return "\(UnitConversion.formatDuration(duration)) • \(formatDistance(distance))"
-        }
-        if let duration = set.durationSeconds, duration > 0 {
-            return UnitConversion.formatDuration(duration)
-        }
-        if let distance = set.distanceMeters, distance > 0 {
-            return formatDistance(distance)
-        }
-        return nil
     }
 }

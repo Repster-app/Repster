@@ -10,6 +10,8 @@ import SwiftUI
 enum SetRowInputField: Hashable {
     case weight
     case reps
+    case leftReps
+    case rightReps
     case duration
     case distance
 }

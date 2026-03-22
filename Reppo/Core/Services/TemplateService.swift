@@ -1,18 +1,66 @@
 // TemplateService.swift
-// Workout template management: CRUD, start workout from template, save workout as template.
-// Uses TemplateRepository for template data, plus WorkoutRepository/SetRepository/ExerciseRepository
-// for cross-entity operations (start workout, save from workout).
+// Workout template management: CRUD, start workout from template, save from workout,
+// and reviewed import/export flows for both native archives and AI-generated drafts.
 
 import Foundation
 
-enum TemplateServiceError: Error {
+enum TemplateServiceError: Error, LocalizedError {
     case templateNotFound(UUID)
     case workoutNotFound(UUID)
     case exerciseNotFound(UUID)
     case invalidTemplateArchiveVersion(Int)
+    case invalidAITemplateContextVersion(Int)
+    case invalidAITemplateDraftVersion(Int)
+    case invalidTemplateImportPayload
+    case importRequiresResolution(Int)
+    case missingImportResolution(String)
+    case invalidImportResolution(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .templateNotFound:
+            return "Template not found."
+        case .workoutNotFound:
+            return "Workout not found."
+        case .exerciseNotFound:
+            return "Exercise not found."
+        case .invalidTemplateArchiveVersion(let version):
+            return "Unsupported template archive version: \(version)."
+        case .invalidAITemplateContextVersion(let version):
+            return "Unsupported AI template context version: \(version)."
+        case .invalidAITemplateDraftVersion(let version):
+            return "Unsupported AI template draft version: \(version)."
+        case .invalidTemplateImportPayload:
+            return "The selected JSON is not a supported Reppo template archive or AI template draft."
+        case .importRequiresResolution(let count):
+            return "This import has \(count) exercise reference(s) that need review before it can be saved."
+        case .missingImportResolution(let exerciseName):
+            return "Choose how to resolve \"\(exerciseName)\" before importing."
+        case .invalidImportResolution(let exerciseName):
+            return "The selected resolution for \"\(exerciseName)\" is no longer valid."
+        }
+    }
 }
 
 actor TemplateService: TemplateServiceProtocol {
+
+    private struct ImportedTemplateDocument {
+        let source: TemplateImportSource
+        let templateName: String
+        let notes: String?
+        let exercises: [ImportedTemplateExercise]
+    }
+
+    private struct ImportedTemplateExercise {
+        let previewId: UUID
+        let proposedExerciseId: UUID
+        let exercise: TemplateArchiveExerciseMetadata
+        let orderInTemplate: Int
+        let supersetGroupKey: String?
+        let restTimeSeconds: Int?
+        let notes: String?
+        let sets: [TemplateArchiveSet]
+    }
 
     // MARK: - Dependencies
 
@@ -20,17 +68,20 @@ actor TemplateService: TemplateServiceProtocol {
     private let workoutRepo: WorkoutRepositoryProtocol
     private let setRepo: SetRepositoryProtocol
     private let exerciseRepo: ExerciseRepositoryProtocol
+    private let exerciseStatsRepo: ExerciseStatsRepositoryProtocol
 
     init(
         templateRepository: TemplateRepositoryProtocol,
         workoutRepository: WorkoutRepositoryProtocol,
         setRepository: SetRepositoryProtocol,
-        exerciseRepository: ExerciseRepositoryProtocol
+        exerciseRepository: ExerciseRepositoryProtocol,
+        exerciseStatsRepository: ExerciseStatsRepositoryProtocol
     ) {
         self.templateRepo = templateRepository
         self.workoutRepo = workoutRepository
         self.setRepo = setRepository
         self.exerciseRepo = exerciseRepository
+        self.exerciseStatsRepo = exerciseStatsRepository
     }
 
     // MARK: - Template CRUD
@@ -49,9 +100,8 @@ actor TemplateService: TemplateServiceProtocol {
                 let sets = try await templateRepo.fetchTemplateSets(for: templateExercise.id)
                 totalSets += sets.count
 
-                // Look up exercise for muscle group
                 if let exercise = try await exerciseRepo.fetch(byId: templateExercise.exerciseId),
-                   let muscle = exercise.primaryMuscle?.lowercased(),
+                   let muscle = ExercisePrimaryGroup.normalizedValue(exercise.primaryMuscle),
                    !muscleGroups.contains(muscle) {
                     muscleGroups.append(muscle)
                 }
@@ -69,7 +119,6 @@ actor TemplateService: TemplateServiceProtocol {
             ))
         }
 
-        // Sort by lastUsedAt (most recent first), then createdAt for never-used templates
         return summaries.sorted { a, b in
             let aDate = a.lastUsedAt ?? .distantPast
             let bDate = b.lastUsedAt ?? .distantPast
@@ -88,35 +137,36 @@ actor TemplateService: TemplateServiceProtocol {
         var totalSets = 0
         var muscleGroups: [String] = []
 
-        for te in templateExercises {
-            let sets = try await templateRepo.fetchTemplateSets(for: te.id)
+        for templateExercise in templateExercises {
+            let sets = try await templateRepo.fetchTemplateSets(for: templateExercise.id)
             totalSets += sets.count
 
-            let exercise = try await exerciseRepo.fetch(byId: te.exerciseId)
+            let exercise = try await exerciseRepo.fetch(byId: templateExercise.exerciseId)
             let exerciseName = exercise?.name ?? "Unknown Exercise"
             let primaryMuscle = exercise?.primaryMuscle
 
-            if let muscle = primaryMuscle?.lowercased(), !muscleGroups.contains(muscle) {
+            if let muscle = ExercisePrimaryGroup.normalizedValue(primaryMuscle),
+               !muscleGroups.contains(muscle) {
                 muscleGroups.append(muscle)
             }
 
             exerciseDetails.append(TemplateExerciseDetail(
-                id: te.id,
-                exerciseId: te.exerciseId,
+                id: templateExercise.id,
+                exerciseId: templateExercise.exerciseId,
                 exerciseName: exerciseName,
                 primaryMuscle: primaryMuscle,
-                orderInTemplate: te.orderInTemplate,
-                supersetGroupId: te.supersetGroupId,
-                restTimeSeconds: te.restTimeSeconds,
-                notes: te.notes,
-                sets: sets.map { s in
+                orderInTemplate: templateExercise.orderInTemplate,
+                supersetGroupId: templateExercise.supersetGroupId,
+                restTimeSeconds: templateExercise.restTimeSeconds,
+                notes: templateExercise.notes,
+                sets: sets.map { set in
                     TemplateSetDetail(
-                        id: s.id,
-                        setType: s.setType,
-                        targetRepMin: s.targetRepMin,
-                        targetRepMax: s.targetRepMax,
-                        targetRIR: s.targetRIR,
-                        orderInExercise: s.orderInExercise
+                        id: set.id,
+                        setType: set.setType,
+                        targetRepMin: set.targetRepMin,
+                        targetRepMax: set.targetRepMax,
+                        targetRIR: set.targetRIR,
+                        orderInExercise: set.orderInExercise
                     )
                 }
             ))
@@ -141,7 +191,7 @@ actor TemplateService: TemplateServiceProtocol {
         try await templateRepo.saveTemplate(template)
 
         for exerciseData in data.exercises {
-            let te = TemplateExercise(
+            let templateExercise = TemplateExercise(
                 templateId: template.id,
                 exerciseId: exerciseData.exerciseId,
                 orderInTemplate: exerciseData.orderInTemplate,
@@ -149,18 +199,18 @@ actor TemplateService: TemplateServiceProtocol {
                 restTimeSeconds: exerciseData.restTimeSeconds,
                 notes: exerciseData.notes
             )
-            try await templateRepo.saveTemplateExercise(te)
+            try await templateRepo.saveTemplateExercise(templateExercise)
 
             for setData in exerciseData.sets {
-                let ts = TemplateSet(
-                    templateExerciseId: te.id,
+                let templateSet = TemplateSet(
+                    templateExerciseId: templateExercise.id,
                     setType: setData.setType,
                     targetRepMin: setData.targetRepMin,
                     targetRepMax: setData.targetRepMax,
                     targetRIR: setData.targetRIR,
                     orderInExercise: setData.orderInExercise
                 )
-                try await templateRepo.saveTemplateSet(ts)
+                try await templateRepo.saveTemplateSet(templateSet)
             }
         }
 
@@ -172,18 +222,15 @@ actor TemplateService: TemplateServiceProtocol {
             throw TemplateServiceError.templateNotFound(templateId)
         }
 
-        // Update template metadata
         template.name = data.name
         template.notes = data.notes
         template.updatedAt = Date()
         try await templateRepo.saveTemplate(template)
 
-        // Delete all existing exercises and sets (cascade)
         try await templateRepo.deleteTemplateExercises(for: templateId)
 
-        // Re-create exercises and sets from the new data
         for exerciseData in data.exercises {
-            let te = TemplateExercise(
+            let templateExercise = TemplateExercise(
                 templateId: templateId,
                 exerciseId: exerciseData.exerciseId,
                 orderInTemplate: exerciseData.orderInTemplate,
@@ -191,18 +238,18 @@ actor TemplateService: TemplateServiceProtocol {
                 restTimeSeconds: exerciseData.restTimeSeconds,
                 notes: exerciseData.notes
             )
-            try await templateRepo.saveTemplateExercise(te)
+            try await templateRepo.saveTemplateExercise(templateExercise)
 
             for setData in exerciseData.sets {
-                let ts = TemplateSet(
-                    templateExerciseId: te.id,
+                let templateSet = TemplateSet(
+                    templateExerciseId: templateExercise.id,
                     setType: setData.setType,
                     targetRepMin: setData.targetRepMin,
                     targetRepMax: setData.targetRepMax,
                     targetRIR: setData.targetRIR,
                     orderInExercise: setData.orderInExercise
                 )
-                try await templateRepo.saveTemplateSet(ts)
+                try await templateRepo.saveTemplateSet(templateSet)
             }
         }
     }
@@ -212,10 +259,7 @@ actor TemplateService: TemplateServiceProtocol {
             throw TemplateServiceError.templateNotFound(templateId)
         }
 
-        // Delete exercises + sets (cascade)
         try await templateRepo.deleteTemplateExercises(for: templateId)
-
-        // Delete template itself
         try await templateRepo.deleteTemplate(template)
     }
 
@@ -226,7 +270,6 @@ actor TemplateService: TemplateServiceProtocol {
             throw TemplateServiceError.templateNotFound(templateId)
         }
 
-        // Create the workout
         let workout = Workout(
             date: Date(),
             startTime: Date(),
@@ -234,7 +277,6 @@ actor TemplateService: TemplateServiceProtocol {
         )
         try await workoutRepo.save(workout)
 
-        // Create WorkoutSets from template structure
         var globalSetOrder = 1
 
         for exerciseDetail in detail.exercises {
@@ -257,7 +299,6 @@ actor TemplateService: TemplateServiceProtocol {
             }
         }
 
-        // Update template's lastUsedAt
         if let template = try await templateRepo.fetchTemplate(byId: templateId) {
             template.lastUsedAt = Date()
             template.updatedAt = Date()
@@ -270,14 +311,12 @@ actor TemplateService: TemplateServiceProtocol {
     // MARK: - Save as Template from Workout
 
     func createTemplateFromWorkout(_ workoutId: UUID, name: String) async throws -> UUID {
-        guard let _ = try await workoutRepo.fetch(byId: workoutId) else {
+        guard try await workoutRepo.fetch(byId: workoutId) != nil else {
             throw TemplateServiceError.workoutNotFound(workoutId)
         }
 
-        // Fetch all sets for this workout, grouped by exercise
         let allSets = try await setRepo.fetchSets(for: workoutId)
 
-        // Group sets by exerciseId, preserving order
         var exerciseOrder: [UUID] = []
         var setsByExercise: [UUID: [WorkoutSet]] = [:]
 
@@ -289,40 +328,37 @@ actor TemplateService: TemplateServiceProtocol {
             setsByExercise[set.exerciseId]?.append(set)
         }
 
-        // Build template save data
-        var exercises: [TemplateSaveExercise] = []
-
-        for (order, exerciseId) in exerciseOrder.enumerated() {
+        let exercises: [TemplateSaveExercise] = exerciseOrder.enumerated().map { index, exerciseId in
             let exerciseSets = setsByExercise[exerciseId] ?? []
             let sortedSets = exerciseSets.sorted { $0.orderInExercise < $1.orderInExercise }
 
-            let templateSets: [TemplateSaveSet] = sortedSets.enumerated().map { index, workoutSet in
+            let templateSets = sortedSets.enumerated().map { setIndex, workoutSet in
                 TemplateSaveSet(
                     setType: workoutSet.setType,
                     targetRepMin: workoutSet.targetRepMin ?? workoutSet.reps,
                     targetRepMax: workoutSet.targetRepMax ?? workoutSet.reps,
                     targetRIR: workoutSet.targetRIR,
-                    orderInExercise: index + 1
+                    orderInExercise: setIndex + 1
                 )
             }
 
-            exercises.append(TemplateSaveExercise(
+            return TemplateSaveExercise(
                 exerciseId: exerciseId,
-                orderInTemplate: order + 1,
+                orderInTemplate: index + 1,
                 supersetGroupId: sortedSets.first?.supersetGroupId,
                 restTimeSeconds: nil,
                 notes: nil,
                 sets: templateSets
-            ))
+            )
         }
 
-        let saveData = TemplateSaveData(
-            name: name,
-            notes: nil,
-            exercises: exercises
+        return try await createTemplate(
+            TemplateSaveData(
+                name: name,
+                notes: nil,
+                exercises: exercises
+            )
         )
-
-        return try await createTemplate(saveData)
     }
 
     // MARK: - Import / Export
@@ -338,22 +374,7 @@ actor TemplateService: TemplateServiceProtocol {
             }
 
             return TemplateArchiveExercise(
-                exercise: TemplateArchiveExerciseMetadata(
-                    id: exercise.id,
-                    name: exercise.name,
-                    equipmentType: exercise.equipmentType,
-                    trackingType: exercise.trackingType,
-                    primaryMuscle: exercise.primaryMuscle,
-                    secondaryMuscles: exercise.secondaryMuscles,
-                    movementPattern: exercise.movementPattern,
-                    unilateral: exercise.unilateral,
-                    bilateralLoadFactor: exercise.bilateralLoadFactor,
-                    bodyweightFactor: exercise.bodyweightFactor,
-                    weightIncrement: exercise.weightIncrement,
-                    defaultRestTime: exercise.defaultRestTime,
-                    fatigueRate: exercise.fatigueRate,
-                    recoveryConstant: exercise.recoveryConstant
-                ),
+                exercise: archiveMetadata(from: exercise),
                 orderInTemplate: exerciseDetail.orderInTemplate,
                 supersetGroupId: exerciseDetail.supersetGroupId,
                 restTimeSeconds: exerciseDetail.restTimeSeconds,
@@ -385,89 +406,318 @@ actor TemplateService: TemplateServiceProtocol {
         return try encoder.encode(archive)
     }
 
-    func importTemplate(data: Data) async throws -> UUID {
-        let archive = try JSONDecoder().decode(TemplateArchive.self, from: data)
-        guard archive.version == TemplateArchive.currentVersion else {
-            throw TemplateServiceError.invalidTemplateArchiveVersion(archive.version)
-        }
+    func exportAITemplateContext() async throws -> Data {
+        let exercises = try await exerciseRepo.fetchAll()
+        let stats = try await exerciseStatsRepo.fetchAll()
+        let statsByExerciseId = Dictionary(uniqueKeysWithValues: stats.map { ($0.exerciseId, $0) })
 
-        let templateName = try await uniqueImportedTemplateName(for: archive.template.name)
-        let exercises = try await archive.exercises
-            .sorted(by: { $0.orderInTemplate < $1.orderInTemplate })
-            .mapAsync { archivedExercise in
-                let resolvedExercise = try await resolveExercise(for: archivedExercise.exercise)
-                return TemplateSaveExercise(
-                    exerciseId: resolvedExercise.id,
-                    orderInTemplate: archivedExercise.orderInTemplate,
-                    supersetGroupId: archivedExercise.supersetGroupId,
-                    restTimeSeconds: archivedExercise.restTimeSeconds,
-                    notes: archivedExercise.notes,
-                    sets: archivedExercise.sets
-                        .sorted(by: { $0.orderInExercise < $1.orderInExercise })
-                        .map { set in
-                            TemplateSaveSet(
-                                setType: set.setType,
-                                targetRepMin: set.targetRepMin,
-                                targetRepMax: set.targetRepMax,
-                                targetRIR: set.targetRIR,
-                                orderInExercise: set.orderInExercise
-                            )
-                        }
+        let archive = AITemplateContextArchive(
+            version: AITemplateContextArchive.currentVersion,
+            exportedAt: Date(),
+            exercises: exercises.map { exercise in
+                let exerciseStats = statsByExerciseId[exercise.id]
+                return AITemplateContextExercise(
+                    exerciseId: exercise.id,
+                    exerciseName: exercise.name,
+                    equipmentType: exercise.equipmentType,
+                    trackingType: exercise.trackingType,
+                    primaryMuscle: exercise.primaryMuscle,
+                    secondaryMuscles: exercise.secondaryMuscles,
+                    movementPattern: exercise.movementPattern,
+                    unilateral: exercise.unilateral,
+                    bilateralLoadFactor: exercise.bilateralLoadFactor,
+                    bodyweightFactor: exercise.bodyweightFactor,
+                    weightIncrement: exercise.weightIncrement,
+                    defaultRestTime: exercise.defaultRestTime,
+                    fatigueRate: exercise.fatigueRate,
+                    recoveryConstant: exercise.recoveryConstant,
+                    stats: AITemplateContextExerciseStats(
+                        totalWorkouts: exerciseStats?.totalWorkouts ?? 0,
+                        totalSets: exerciseStats?.totalSets ?? 0,
+                        lastPerformedDate: exerciseStats?.lastPerformedDate,
+                        bestE1RM: exerciseStats?.bestE1RM ?? 0,
+                        maxWeight: exerciseStats?.maxWeight ?? 0
+                    )
                 )
             }
+        )
 
-        let saveData = TemplateSaveData(
-            name: templateName,
-            notes: archive.template.notes,
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        return try encoder.encode(archive)
+    }
+
+    func previewTemplateImport(data: Data) async throws -> TemplateImportPreview {
+        let importedDocument = try parseImportedTemplateDocument(data: data)
+        let allExercises = try await exerciseRepo.fetchAll()
+
+        let exercises = importedDocument.exercises.map { importedExercise in
+            TemplateImportExercisePreview(
+                id: importedExercise.previewId,
+                proposedExerciseId: importedExercise.proposedExerciseId,
+                exercise: importedExercise.exercise,
+                orderInTemplate: importedExercise.orderInTemplate,
+                supersetGroupKey: importedExercise.supersetGroupKey,
+                restTimeSeconds: importedExercise.restTimeSeconds,
+                notes: importedExercise.notes,
+                sets: importedExercise.sets.sorted(by: { $0.orderInExercise < $1.orderInExercise }),
+                matchedExercise: resolveExistingMatch(for: importedExercise.exercise, from: allExercises)
+            )
+        }
+        .sorted(by: { $0.orderInTemplate < $1.orderInTemplate })
+
+        return TemplateImportPreview(
+            source: importedDocument.source,
+            templateName: importedDocument.templateName,
+            notes: importedDocument.notes,
             exercises: exercises
         )
-        return try await createTemplate(saveData)
+    }
+
+    func finalizeTemplateImport(
+        _ preview: TemplateImportPreview,
+        resolutions: [TemplateImportExerciseResolution]
+    ) async throws -> UUID {
+        let resolutionByPreviewId = Dictionary(uniqueKeysWithValues: resolutions.map { ($0.previewExerciseId, $0) })
+        let templateName = try await uniqueImportedTemplateName(for: preview.templateName)
+
+        var supersetGroupIds: [String: UUID] = [:]
+        var createdExerciseIdsByProposedId: [UUID: UUID] = [:]
+        var exercises: [TemplateSaveExercise] = []
+
+        for previewExercise in preview.exercises.sorted(by: { $0.orderInTemplate < $1.orderInTemplate }) {
+            let resolvedExerciseId: UUID
+
+            if let matchedExercise = previewExercise.matchedExercise {
+                resolvedExerciseId = matchedExercise.id
+            } else {
+                guard let resolution = resolutionByPreviewId[previewExercise.id] else {
+                    throw TemplateServiceError.missingImportResolution(previewExercise.exercise.name)
+                }
+
+                switch resolution.action {
+                case .mapToExisting:
+                    guard let existingExerciseId = resolution.existingExerciseId,
+                          let existingExercise = try await exerciseRepo.fetch(byId: existingExerciseId) else {
+                        throw TemplateServiceError.invalidImportResolution(previewExercise.exercise.name)
+                    }
+                    resolvedExerciseId = existingExercise.id
+
+                case .createNew:
+                    if let previouslyCreatedId = createdExerciseIdsByProposedId[previewExercise.proposedExerciseId] {
+                        resolvedExerciseId = previouslyCreatedId
+                    } else {
+                        let newExercise = makeExercise(from: previewExercise.exercise)
+                        if try await exerciseRepo.fetch(byId: newExercise.id) != nil {
+                            newExercise.id = UUID()
+                        }
+                        try await exerciseRepo.save(newExercise)
+                        createdExerciseIdsByProposedId[previewExercise.proposedExerciseId] = newExercise.id
+                        resolvedExerciseId = newExercise.id
+                    }
+                }
+            }
+
+            let supersetGroupId = normalizedGroupKey(previewExercise.supersetGroupKey).map { groupKey in
+                if let existingGroupId = supersetGroupIds[groupKey] {
+                    return existingGroupId
+                }
+                let newGroupId = UUID()
+                supersetGroupIds[groupKey] = newGroupId
+                return newGroupId
+            }
+
+            let sets = previewExercise.sets
+                .sorted(by: { $0.orderInExercise < $1.orderInExercise })
+                .map { set in
+                    TemplateSaveSet(
+                        setType: set.setType,
+                        targetRepMin: set.targetRepMin,
+                        targetRepMax: set.targetRepMax,
+                        targetRIR: set.targetRIR,
+                        orderInExercise: set.orderInExercise
+                    )
+                }
+
+            exercises.append(
+                TemplateSaveExercise(
+                    exerciseId: resolvedExerciseId,
+                    orderInTemplate: previewExercise.orderInTemplate,
+                    supersetGroupId: supersetGroupId,
+                    restTimeSeconds: previewExercise.restTimeSeconds,
+                    notes: previewExercise.notes,
+                    sets: sets
+                )
+            )
+        }
+
+        return try await createTemplate(
+            TemplateSaveData(
+                name: templateName,
+                notes: preview.notes,
+                exercises: exercises
+            )
+        )
+    }
+
+    func importTemplate(data: Data) async throws -> UUID {
+        let preview = try await previewTemplateImport(data: data)
+        guard preview.unresolvedExercises.isEmpty else {
+            throw TemplateServiceError.importRequiresResolution(preview.unresolvedExercises.count)
+        }
+        return try await finalizeTemplateImport(preview, resolutions: [])
     }
 
     // MARK: - Helpers
 
-    private func resolveExercise(for archivedExercise: TemplateArchiveExerciseMetadata) async throws -> Exercise {
-        if let existingById = try await exerciseRepo.fetch(byId: archivedExercise.id) {
-            return existingById
+    private func archiveMetadata(from exercise: Exercise) -> TemplateArchiveExerciseMetadata {
+        TemplateArchiveExerciseMetadata(
+            id: exercise.id,
+            name: exercise.name,
+            equipmentType: exercise.equipmentType,
+            trackingType: exercise.trackingType,
+            primaryMuscle: exercise.primaryMuscle,
+            secondaryMuscles: exercise.secondaryMuscles,
+            movementPattern: exercise.movementPattern,
+            unilateral: exercise.unilateral,
+            bilateralLoadFactor: exercise.bilateralLoadFactor,
+            bodyweightFactor: exercise.bodyweightFactor,
+            weightIncrement: exercise.weightIncrement,
+            defaultRestTime: exercise.defaultRestTime,
+            fatigueRate: exercise.fatigueRate,
+            recoveryConstant: exercise.recoveryConstant
+        )
+    }
+
+    private func makeExercise(from metadata: TemplateArchiveExerciseMetadata) -> Exercise {
+        Exercise(
+            id: metadata.id,
+            name: metadata.name,
+            equipmentType: metadata.equipmentType,
+            trackingType: metadata.trackingType,
+            primaryMuscle: metadata.primaryMuscle,
+            secondaryMuscles: metadata.secondaryMuscles,
+            movementPattern: metadata.movementPattern,
+            unilateral: metadata.unilateral,
+            bilateralLoadFactor: metadata.bilateralLoadFactor,
+            bodyweightFactor: metadata.bodyweightFactor,
+            weightIncrement: metadata.weightIncrement,
+            defaultRestTime: metadata.defaultRestTime,
+            fatigueRate: metadata.fatigueRate,
+            recoveryConstant: metadata.recoveryConstant
+        )
+    }
+
+    private func resolveExistingMatch(
+        for archivedExercise: TemplateArchiveExerciseMetadata,
+        from allExercises: [Exercise]
+    ) -> TemplateImportMatchedExercise? {
+        if let existingById = allExercises.first(where: { $0.id == archivedExercise.id }) {
+            return TemplateImportMatchedExercise(
+                id: existingById.id,
+                name: existingById.name,
+                method: .exerciseId
+            )
         }
 
         let normalizedArchivedName = normalizeName(archivedExercise.name)
-        let allExercises = try await exerciseRepo.fetchAll()
         if let existingByName = allExercises.first(where: {
             normalizeName($0.name) == normalizedArchivedName
         }) {
-            return existingByName
+            return TemplateImportMatchedExercise(
+                id: existingByName.id,
+                name: existingByName.name,
+                method: .normalizedName
+            )
         }
 
-        let newExercise = Exercise(
-            id: archivedExercise.id,
-            name: archivedExercise.name,
-            equipmentType: archivedExercise.equipmentType,
-            trackingType: archivedExercise.trackingType,
-            primaryMuscle: archivedExercise.primaryMuscle,
-            secondaryMuscles: archivedExercise.secondaryMuscles,
-            movementPattern: archivedExercise.movementPattern,
-            unilateral: archivedExercise.unilateral,
-            bilateralLoadFactor: archivedExercise.bilateralLoadFactor,
-            bodyweightFactor: archivedExercise.bodyweightFactor,
-            weightIncrement: archivedExercise.weightIncrement,
-            defaultRestTime: archivedExercise.defaultRestTime,
-            fatigueRate: archivedExercise.fatigueRate,
-            recoveryConstant: archivedExercise.recoveryConstant
-        )
-        try await exerciseRepo.save(newExercise)
-        return newExercise
+        return nil
+    }
+
+    private func parseImportedTemplateDocument(data: Data) throws -> ImportedTemplateDocument {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        if let archive = try? decoder.decode(TemplateArchive.self, from: data) {
+            guard archive.version == TemplateArchive.currentVersion else {
+                throw TemplateServiceError.invalidTemplateArchiveVersion(archive.version)
+            }
+
+            return ImportedTemplateDocument(
+                source: .templateArchive,
+                templateName: archive.template.name,
+                notes: archive.template.notes,
+                exercises: archive.exercises.map { archivedExercise in
+                    ImportedTemplateExercise(
+                        previewId: UUID(),
+                        proposedExerciseId: archivedExercise.exercise.id,
+                        exercise: archivedExercise.exercise,
+                        orderInTemplate: archivedExercise.orderInTemplate,
+                        supersetGroupKey: archivedExercise.supersetGroupId?.uuidString,
+                        restTimeSeconds: archivedExercise.restTimeSeconds,
+                        notes: archivedExercise.notes,
+                        sets: archivedExercise.sets
+                    )
+                }
+            )
+        }
+
+        if let draft = try? decoder.decode(AITemplateDraft.self, from: data) {
+            guard draft.version == AITemplateDraft.currentVersion else {
+                throw TemplateServiceError.invalidAITemplateDraftVersion(draft.version)
+            }
+
+            return ImportedTemplateDocument(
+                source: .aiTemplateDraft,
+                templateName: draft.templateName,
+                notes: draft.notes,
+                exercises: draft.exercises.map { draftExercise in
+                    ImportedTemplateExercise(
+                        previewId: UUID(),
+                        proposedExerciseId: draftExercise.exerciseId,
+                        exercise: TemplateArchiveExerciseMetadata(
+                            id: draftExercise.exerciseId,
+                            name: draftExercise.exerciseName,
+                            equipmentType: draftExercise.equipmentType,
+                            trackingType: draftExercise.trackingType,
+                            primaryMuscle: draftExercise.primaryMuscle,
+                            secondaryMuscles: draftExercise.secondaryMuscles,
+                            movementPattern: draftExercise.movementPattern,
+                            unilateral: draftExercise.unilateral,
+                            bilateralLoadFactor: draftExercise.bilateralLoadFactor,
+                            bodyweightFactor: draftExercise.bodyweightFactor,
+                            weightIncrement: draftExercise.weightIncrement,
+                            defaultRestTime: draftExercise.defaultRestTime,
+                            fatigueRate: draftExercise.fatigueRate,
+                            recoveryConstant: draftExercise.recoveryConstant
+                        ),
+                        orderInTemplate: draftExercise.orderInTemplate,
+                        supersetGroupKey: draftExercise.supersetGroupKey,
+                        restTimeSeconds: draftExercise.restTimeSeconds,
+                        notes: draftExercise.notes,
+                        sets: draftExercise.sets
+                    )
+                }
+            )
+        }
+
+        if let context = try? decoder.decode(AITemplateContextArchive.self, from: data),
+           context.version != AITemplateContextArchive.currentVersion {
+            throw TemplateServiceError.invalidAITemplateContextVersion(context.version)
+        }
+
+        throw TemplateServiceError.invalidTemplateImportPayload
     }
 
     private func uniqueImportedTemplateName(for proposedName: String) async throws -> String {
-        let baseName = proposedName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? "Imported Template"
-            : proposedName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedName = proposedName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let baseName = trimmedName.isEmpty ? "Imported Template" : trimmedName
+
         let existingTemplates = try await templateRepo.fetchAllTemplates()
         let existingNames = Set(existingTemplates.map { normalizeName($0.name) })
-        let normalizedBaseName = normalizeName(baseName)
 
-        if !existingNames.contains(normalizedBaseName) {
+        if !existingNames.contains(normalizeName(baseName)) {
             return baseName
         }
 
@@ -484,6 +734,12 @@ actor TemplateService: TemplateServiceProtocol {
             }
             index += 1
         }
+    }
+
+    private func normalizedGroupKey(_ groupKey: String?) -> String? {
+        guard let groupKey else { return nil }
+        let normalized = groupKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalized.isEmpty ? nil : normalized
     }
 
     private func normalizeName(_ name: String) -> String {

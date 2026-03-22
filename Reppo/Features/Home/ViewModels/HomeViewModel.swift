@@ -209,7 +209,7 @@ final class HomeViewModel {
                         let exerciseIds = try await setService.fetchExerciseIds(for: workout.id)
                         for exerciseId in exerciseIds {
                             if let exercise = try await cachedExercise(exerciseId),
-                               let muscle = exercise.primaryMuscle?.lowercased(),
+                               let muscle = ExercisePrimaryGroup.normalizedValue(exercise.primaryMuscle),
                                !dayMuscleGroups.contains(muscle) {
                                 dayMuscleGroups.append(muscle)
                                 if dayMuscleGroups.count >= 3 { break }
@@ -268,16 +268,18 @@ final class HomeViewModel {
                 let exerciseName: String
                 if let exercise = try await cachedExercise(record.exerciseId) {
                     exerciseName = exercise.name
+                    let isPerSide = exercise.unilateral && exercise.supportsUnilateralLogging
+                    prs.append(RecentPR(
+                        id: record.exerciseId,
+                        exerciseName: exerciseName,
+                        weight: record.value,
+                        reps: record.reps ?? 1,
+                        date: record.date,
+                        isPerSide: isPerSide
+                    ))
                 } else {
                     continue
                 }
-                prs.append(RecentPR(
-                    id: record.exerciseId,
-                    exerciseName: exerciseName,
-                    weight: record.value,
-                    reps: record.reps ?? 1,
-                    date: record.date
-                ))
             }
 
             recentPRs = prs
@@ -307,7 +309,7 @@ final class HomeViewModel {
                 var muscleGroups: [String] = []
                 for exerciseId in exerciseIds {
                     if let exercise = try await cachedExercise(exerciseId),
-                       let muscle = exercise.primaryMuscle?.lowercased(),
+                       let muscle = ExercisePrimaryGroup.normalizedValue(exercise.primaryMuscle),
                        !muscleGroups.contains(muscle) {
                         muscleGroups.append(muscle)
                     }

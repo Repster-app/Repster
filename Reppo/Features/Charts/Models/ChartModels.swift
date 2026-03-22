@@ -194,13 +194,23 @@ struct ExerciseProgressPoint: Identifiable {
     let topWeight: Double?
     /// Reps from the best set (for display under chart data point).
     let topReps: Int?
+    /// Formatter-backed detail label for the representative top set.
+    let detailLabel: String?
 
-    init(date: Date, value: Double, workoutId: UUID?, topWeight: Double? = nil, topReps: Int? = nil) {
+    init(
+        date: Date,
+        value: Double,
+        workoutId: UUID?,
+        topWeight: Double? = nil,
+        topReps: Int? = nil,
+        detailLabel: String? = nil
+    ) {
         self.date = date
         self.value = value
         self.workoutId = workoutId
         self.topWeight = topWeight
         self.topReps = topReps
+        self.detailLabel = detailLabel
     }
 }
 

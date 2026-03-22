@@ -150,9 +150,9 @@ struct SetTableView: View {
                     .frame(maxWidth: .infinity)
 
             case .durationDistance:
-                Text("TIME")
-                    .frame(maxWidth: .infinity)
                 Text("DIST")
+                    .frame(maxWidth: .infinity)
+                Text("TIME")
                     .frame(maxWidth: .infinity)
 
             case .weightDistance:
@@ -263,9 +263,13 @@ private struct SetRowWrapper: View {
     // Independent text state per row
     @State private var weightText: String
     @State private var repsText: String
+    @State private var leftRepsText: String
+    @State private var rightRepsText: String
     @State private var durationText: String
     @State private var distanceText: String
     @State private var rirValue: Double?
+    @State private var leftRIRValue: Double?
+    @State private var rightRIRValue: Double?
 
     // Note editor state
     @State private var showNoteAlert: Bool = false
@@ -292,9 +296,13 @@ private struct SetRowWrapper: View {
         // Initialize text from model values
         _weightText = State(initialValue: set.weight.map { Self.formatWeight($0) } ?? "")
         _repsText = State(initialValue: Self.repsTextValue(for: set))
-        _durationText = State(initialValue: set.durationSeconds.map { "\($0)" } ?? "")
+        _leftRepsText = State(initialValue: set.leftReps.map(String.init) ?? "")
+        _rightRepsText = State(initialValue: set.rightReps.map(String.init) ?? "")
+        _durationText = State(initialValue: set.durationSeconds.map(Self.formatDurationForInput) ?? "")
         _distanceText = State(initialValue: set.distanceMeters.map { Self.formatDistance($0) } ?? "")
         _rirValue = State(initialValue: set.rir)
+        _leftRIRValue = State(initialValue: set.leftRIR)
+        _rightRIRValue = State(initialValue: set.rightRIR)
     }
 
     var body: some View {
@@ -305,9 +313,13 @@ private struct SetRowWrapper: View {
                 setNumber: setNumber,
                 weightText: $weightText,
                 repsText: $repsText,
+                leftRepsText: $leftRepsText,
+                rightRepsText: $rightRepsText,
                 durationText: $durationText,
                 distanceText: $distanceText,
                 rirValue: $rirValue,
+                leftRIRValue: $leftRIRValue,
+                rightRIRValue: $rightRIRValue,
                 targetRIR: set.targetRIR,
                 repsPlaceholder: Self.repsPlaceholder(for: set),
                 onComplete: {
@@ -315,19 +327,12 @@ private struct SetRowWrapper: View {
                     Task {
                         if set.completed {
                             await dataSource.uncompleteSet(set)
-                        } else {
-                            let parsedReps = RepsTargetInputParser.parse(repsText)
-                            guard !parsedReps.blocksCompletion else { return }
-                            await dataSource.completeSet(
-                                set,
-                                weight: UnitConversion.parseDecimal(weightText),
-                                reps: parsedReps.completionReps,
-                                durationSeconds: Int(durationText),
-                                distanceMeters: UnitConversion.parseDecimal(distanceText)
-                            )
+                        } else if let input = completionInput(for: exercise) {
+                            await dataSource.completeSet(set, input: input)
                         }
                     }
                 },
+                canCompleteSet: { completionInput(for: exercise) != nil },
                 onDelete: {
                     Task {
                         await dataSource.deleteSet(set)
@@ -371,9 +376,21 @@ private struct SetRowWrapper: View {
                     }
                 }
             }
+            .onChange(of: leftRepsText) { _, newValue in
+                handleFieldEdit(field: .reps) {
+                    set.leftReps = Self.singleRepsValue(from: newValue)
+                    syncDerivedSetFields(for: exercise)
+                }
+            }
+            .onChange(of: rightRepsText) { _, newValue in
+                handleFieldEdit(field: .reps) {
+                    set.rightReps = Self.singleRepsValue(from: newValue)
+                    syncDerivedSetFields(for: exercise)
+                }
+            }
             .onChange(of: durationText) { _, newValue in
                 handleFieldEdit(field: .duration) {
-                    set.durationSeconds = Int(newValue)
+                    set.durationSeconds = Self.durationSecondsValue(from: newValue)
                 }
             }
             .onChange(of: distanceText) { _, newValue in
@@ -384,6 +401,18 @@ private struct SetRowWrapper: View {
             .onChange(of: rirValue) { _, newValue in
                 handleFieldEdit(field: .rir) {
                     set.rir = newValue
+                }
+            }
+            .onChange(of: leftRIRValue) { _, newValue in
+                handleFieldEdit(field: .rir) {
+                    set.leftRIR = newValue
+                    syncDerivedSetFields(for: exercise)
+                }
+            }
+            .onChange(of: rightRIRValue) { _, newValue in
+                handleFieldEdit(field: .rir) {
+                    set.rightRIR = newValue
+                    syncDerivedSetFields(for: exercise)
                 }
             }
             .alert("Set Note", isPresented: $showNoteAlert) {
@@ -427,6 +456,54 @@ private struct SetRowWrapper: View {
         }
     }
 
+    private func completionInput(for exercise: Exercise) -> SetCompletionInput? {
+        if exercise.supportsUnilateralLogging, exercise.unilateral {
+            let leftReps = Self.singleRepsValue(from: leftRepsText)
+            let rightReps = Self.singleRepsValue(from: rightRepsText)
+            let durationSeconds = Self.durationSecondsValue(from: durationText)
+
+            if !leftRepsText.isEmpty && leftReps == nil {
+                return nil
+            }
+            if !rightRepsText.isEmpty && rightReps == nil {
+                return nil
+            }
+            if !durationText.isEmpty && durationSeconds == nil {
+                return nil
+            }
+
+            return SetCompletionInput(
+                weight: UnitConversion.parseDecimal(weightText),
+                durationSeconds: durationSeconds,
+                distanceMeters: UnitConversion.parseDecimal(distanceText),
+                leftReps: leftReps,
+                rightReps: rightReps,
+                leftRIR: leftRIRValue,
+                rightRIR: rightRIRValue
+            )
+        }
+
+        let parsedReps = RepsTargetInputParser.parse(repsText)
+        guard !parsedReps.blocksCompletion else { return nil }
+        let durationSeconds = Self.durationSecondsValue(from: durationText)
+        if !durationText.isEmpty && durationSeconds == nil {
+            return nil
+        }
+
+        return SetCompletionInput(
+            weight: UnitConversion.parseDecimal(weightText),
+            reps: parsedReps.completionReps,
+            durationSeconds: durationSeconds,
+            distanceMeters: UnitConversion.parseDecimal(distanceText),
+            rir: rirValue
+        )
+    }
+
+    private func syncDerivedSetFields(for exercise: Exercise) {
+        guard exercise.supportsUnilateralLogging, exercise.unilateral else { return }
+        set.syncDerivedPerformanceFields(for: exercise)
+    }
+
     // MARK: - Formatters
 
     /// Format weight for display using locale-aware decimal separator.
@@ -439,6 +516,39 @@ private struct SetRowWrapper: View {
         UnitConversion.formatWeight(value)
     }
 
+    private static func formatDurationForInput(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        let remainder = seconds % 60
+        return String(format: "%d:%02d", minutes, remainder)
+    }
+
+    private static func durationSecondsValue(from text: String) -> Int? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let seconds = Int(trimmed), seconds >= 0 {
+            return seconds
+        }
+
+        let parts = trimmed.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 2 else { return nil }
+
+        let minutesText = String(parts[0]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let secondsText = String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard
+            !minutesText.isEmpty,
+            !secondsText.isEmpty,
+            let minutes = Int(minutesText),
+            let seconds = Int(secondsText),
+            minutes >= 0,
+            (0..<60).contains(seconds)
+        else {
+            return nil
+        }
+
+        return (minutes * 60) + seconds
+    }
+
     private static func repsTextValue(for set: WorkoutSet) -> String {
         if let reps = set.reps {
             return "\(reps)"
@@ -447,6 +557,15 @@ private struct SetRowWrapper: View {
             return "\(draftRange.lowerBound)-\(draftRange.upperBound)"
         }
         return ""
+    }
+
+    private static func singleRepsValue(from text: String) -> Int? {
+        switch RepsTargetInputParser.parse(text) {
+        case let .single(reps):
+            return reps
+        case .empty, .range, .invalid:
+            return nil
+        }
     }
 
     /// Compute the reps placeholder from template target rep range.
@@ -481,6 +600,8 @@ private struct SetRowWrapper: View {
 final class SetEntryKeyboardContext {
     let ownerSetID: UUID
     let trackingType: TrackingType
+    let equipmentType: EquipmentType
+    let inputOrder: [SetRowInputField]
     /// Tracked focused field — updated directly by the keyboard overlay on Prev/Next.
     /// Use this instead of getFocusedField() for rendering decisions.
     var trackedField: SetRowInputField?
@@ -493,6 +614,7 @@ final class SetEntryKeyboardContext {
     let getSuggestedWeight: () -> Double?
     let getWeightIncrement: () -> Double
     let onCompleteSet: (() -> Void)?
+    let canCompleteSet: () -> Bool
     let canMovePrevious: () -> Bool
     let canMoveNext: () -> Bool
     let movePrevious: () -> Void
@@ -502,6 +624,8 @@ final class SetEntryKeyboardContext {
     init(
         ownerSetID: UUID,
         trackingType: TrackingType,
+        equipmentType: EquipmentType,
+        inputOrder: [SetRowInputField],
         activeField: SetRowInputField? = nil,
         getFocusedField: @escaping () -> SetRowInputField?,
         setFocusedField: @escaping (SetRowInputField?) -> Void,
@@ -512,6 +636,7 @@ final class SetEntryKeyboardContext {
         getSuggestedWeight: @escaping () -> Double?,
         getWeightIncrement: @escaping () -> Double = { 2.5 },
         onCompleteSet: (() -> Void)? = nil,
+        canCompleteSet: @escaping () -> Bool = { true },
         canMovePrevious: @escaping () -> Bool,
         canMoveNext: @escaping () -> Bool,
         movePrevious: @escaping () -> Void,
@@ -520,6 +645,8 @@ final class SetEntryKeyboardContext {
     ) {
         self.ownerSetID = ownerSetID
         self.trackingType = trackingType
+        self.equipmentType = equipmentType
+        self.inputOrder = inputOrder
         self.getFocusedField = getFocusedField
         self.setFocusedField = setFocusedField
         self.getFieldValue = getFieldValue
@@ -529,6 +656,7 @@ final class SetEntryKeyboardContext {
         self.getSuggestedWeight = getSuggestedWeight
         self.getWeightIncrement = getWeightIncrement
         self.onCompleteSet = onCompleteSet
+        self.canCompleteSet = canCompleteSet
         self.canMovePrevious = canMovePrevious
         self.canMoveNext = canMoveNext
         self.movePrevious = movePrevious
@@ -631,7 +759,7 @@ struct SetEntryKeyboardOverlay: View {
                     .padding(.horizontal, 12)
                     .padding(.bottom, 10)
                 }
-            } else {
+            } else if shouldShowWeightHelper(for: context) {
                 Text(weightHelperText(context))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.textSecondary)
@@ -665,14 +793,16 @@ struct SetEntryKeyboardOverlay: View {
         let focusedField = context.trackedField
         let decimalAllowed = allowsDecimal(focusedField)
         let isRepsField = focusedField == .reps
+        let isDurationField = focusedField == .duration
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
             ForEach(keys, id: \.self) { key in
                 let isDecimalKey = key == "."
+                let showColon = isDecimalKey && isDurationField
                 // D6: Show dash key on reps field instead of disabled decimal
                 let showDash = isDecimalKey && isRepsField
-                let keyDisabled = isDecimalKey && !decimalAllowed && !isRepsField
-                let keyLabel = showDash ? "-" : (keyDisabled ? "•" : key)
-                let effectiveKey = showDash ? "-" : key
+                let keyDisabled = isDecimalKey && !decimalAllowed && !isRepsField && !isDurationField
+                let keyLabel = showColon ? ":" : (showDash ? "-" : (keyDisabled ? "•" : key))
+                let effectiveKey = showColon ? ":" : (showDash ? "-" : key)
                 Button {
                     handleKey(effectiveKey, context: context)
                 } label: {
@@ -696,11 +826,13 @@ struct SetEntryKeyboardOverlay: View {
     private func actionRail(for context: SetEntryKeyboardContext) -> some View {
         let focusedField = context.trackedField
         let onWeightField = focusedField == .weight
-        let canGoPrev = canMovePreviousInOverlay(context)
-        let canGoNext = canMoveNextInOverlay(context)
+        let canGoPrev = context.canMovePrevious()
+        let canGoNext = context.canMoveNext()
         let suggestedWeight = context.getSuggestedWeight()
-
         let increment = context.getWeightIncrement()
+        let canNudgeWeight = focusedField == .weight
+        let canNudgeReps = focusedField == .reps || focusedField == .leftReps || focusedField == .rightReps
+        let canNudgeActiveField = canNudgeWeight || canNudgeReps
 
         return VStack(spacing: 6) {
             // D1: Keyboard-dismiss icon instead of "Hide" text
@@ -724,41 +856,41 @@ struct SetEntryKeyboardOverlay: View {
             .buttonStyle(.plain)
 
             // D2: Wand icon + weight value in blue for smart suggestion
-            if onWeightField {
-                Button {
-                    applySuggestedWeight(context)
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "wand.and.stars")
+            Button {
+                applySuggestedWeight(context)
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "wand.and.stars")
+                        .font(.system(size: 13, weight: .semibold))
+                    if let weight = suggestedWeight {
+                        Text("\(UnitConversion.formatWeight(weight)) kg")
                             .font(.system(size: 13, weight: .semibold))
-                        if let weight = suggestedWeight {
-                            Text("\(UnitConversion.formatWeight(weight)) kg")
-                                .font(.system(size: 13, weight: .semibold))
-                        }
                     }
-                    .foregroundColor(suggestedWeight == nil ? .textTertiary : .white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-                    .background(suggestedWeight == nil ? Color.bgInput : Color.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
-                .buttonStyle(.plain)
-                .disabled(suggestedWeight == nil)
+                .foregroundColor(suggestedWeight == nil ? .textTertiary : .white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(suggestedWeight == nil ? Color.bgInput : Color.accent)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
             }
+            .buttonStyle(.plain)
+            .disabled(!onWeightField || suggestedWeight == nil)
+            .opacity(onWeightField ? 1 : 0)
+            .accessibilityHidden(!onWeightField)
 
             // D3: +/- with exercise increment; D5: +1/-1 for reps (replaces F/P)
             HStack(spacing: 8) {
-                railOptionButton(title: "−", selected: false) {
-                    if onWeightField {
+                railOptionButton(title: "−", selected: false, disabled: !canNudgeActiveField) {
+                    if canNudgeWeight {
                         nudgeWeight(context, delta: -increment)
-                    } else {
+                    } else if canNudgeReps {
                         nudgeReps(context, delta: -1)
                     }
                 }
-                railOptionButton(title: "+", selected: false) {
-                    if onWeightField {
+                railOptionButton(title: "+", selected: false, disabled: !canNudgeActiveField) {
+                    if canNudgeWeight {
                         nudgeWeight(context, delta: increment)
-                    } else {
+                    } else if canNudgeReps {
                         nudgeReps(context, delta: 1)
                     }
                 }
@@ -769,26 +901,24 @@ struct SetEntryKeyboardOverlay: View {
                     if rirMode {
                         rirMode = false
                     } else {
-                        moveToPreviousField(context)
+                        context.movePrevious()
+                        context.trackedField = context.getFocusedField()
                     }
                     refreshTick += 1
                     manager.show(context)
                 }
                 railNavButton(title: "Next", disabled: !canGoNext) {
-                    if canMoveToNextField(context) {
-                        moveToNextField(context)
+                    if canGoNext {
+                        context.moveNext()
+                        context.trackedField = context.getFocusedField()
                     }
                     refreshTick += 1
                     manager.show(context)
                 }
             }
 
-            // D5: Done marks set complete when weight + reps + RIR are filled
             Button {
-                let weightFilled = !context.getFieldValue(.weight).isEmpty
-                let repsFilled = !context.getFieldValue(.reps).isEmpty
-                let rirFilled = context.getRIRValue() != nil
-                if weightFilled && repsFilled && rirFilled {
+                if context.canCompleteSet() {
                     context.onCompleteSet?()
                 }
                 rirMode = false
@@ -804,6 +934,7 @@ struct SetEntryKeyboardOverlay: View {
                     .clipShape(RoundedRectangle(cornerRadius: 16))
             }
             .buttonStyle(.plain)
+            .disabled(!context.canCompleteSet())
         }
         .frame(width: 108)
         .id(refreshTick)
@@ -827,14 +958,14 @@ struct SetEntryKeyboardOverlay: View {
         .disabled(disabled)
     }
 
-    private func railOptionButton(title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+    private func railOptionButton(title: String, selected: Bool, disabled: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 24, weight: .semibold))
-                .foregroundColor(selected ? .black.opacity(0.9) : .textPrimary)
+                .foregroundColor(disabled ? .textTertiary : (selected ? .black.opacity(0.9) : .textPrimary))
                 .frame(maxWidth: .infinity)
                 .frame(height: 48)
-                .background(selected ? Color.white.opacity(0.85) : Color.bgHover)
+                .background(disabled ? Color.bgInput : (selected ? Color.white.opacity(0.85) : Color.bgHover))
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
@@ -842,6 +973,7 @@ struct SetEntryKeyboardOverlay: View {
                 )
         }
         .buttonStyle(.plain)
+        .disabled(disabled)
     }
 
     private func railNavButton(title: String, disabled: Bool, action: @escaping () -> Void) -> some View {
@@ -882,6 +1014,14 @@ struct SetEntryKeyboardOverlay: View {
             return
         }
 
+        if key == ":" {
+            guard field == .duration, !value.contains(":") else { return }
+            context.setFieldValue(field, value.isEmpty ? "0:" : value + ":")
+            refreshTick += 1
+            manager.refresh()
+            return
+        }
+
         // D6: Dash key for rep ranges (e.g. "8-12"), only one dash allowed
         if key == "-" {
             guard field == .reps, !value.contains("-"), !value.isEmpty else { return }
@@ -907,20 +1047,11 @@ struct SetEntryKeyboardOverlay: View {
         switch field {
         case .weight: return "Weight"
         case .reps: return "Reps"
+        case .leftReps: return "Left Reps"
+        case .rightReps: return "Right Reps"
         case .duration: return "Duration"
         case .distance: return "Distance"
         case .none: return "Input"
-        }
-    }
-
-    private func canEnterRIRMode(_ context: SetEntryKeyboardContext) -> Bool {
-        guard let field = context.trackedField else { return false }
-        guard field == .reps else { return false }
-        switch context.trackingType {
-        case .weightReps, .weightRepsDuration, .custom:
-            return true
-        case .duration, .durationDistance, .weightDistance:
-            return false
         }
     }
 
@@ -931,36 +1062,25 @@ struct SetEntryKeyboardOverlay: View {
         return context.trackedField == .reps
     }
 
-    private func orderedInputs(for trackingType: TrackingType) -> [SetRowInputField] {
-        switch trackingType {
-        case .weightReps, .custom:
-            return [.weight, .reps]
-        case .duration:
-            return [.duration]
-        case .durationDistance:
-            return [.duration, .distance]
-        case .weightDistance:
-            return [.weight, .distance]
-        case .weightRepsDuration:
-            return [.weight, .reps, .duration]
-        }
+    private func shouldShowWeightHelper(for context: SetEntryKeyboardContext) -> Bool {
+        context.trackedField == .weight && context.equipmentType == .barbell
     }
 
     private func canMoveToPreviousField(_ context: SetEntryKeyboardContext) -> Bool {
         guard let focused = context.trackedField else { return false }
-        guard let index = orderedInputs(for: context.trackingType).firstIndex(of: focused) else { return false }
+        guard let index = context.inputOrder.firstIndex(of: focused) else { return false }
         return index > 0
     }
 
     private func canMoveToNextField(_ context: SetEntryKeyboardContext) -> Bool {
         guard let focused = context.trackedField else { return false }
-        guard let index = orderedInputs(for: context.trackingType).firstIndex(of: focused) else { return false }
-        return index < orderedInputs(for: context.trackingType).count - 1
+        guard let index = context.inputOrder.firstIndex(of: focused) else { return false }
+        return index < context.inputOrder.count - 1
     }
 
     /// Move to previous field, updating trackedField and syncing with SetRowView.
     private func moveToPreviousField(_ context: SetEntryKeyboardContext) {
-        let ordered = orderedInputs(for: context.trackingType)
+        let ordered = context.inputOrder
         guard let current = context.trackedField,
               let idx = ordered.firstIndex(of: current),
               idx - 1 >= 0 else { return }
@@ -971,7 +1091,7 @@ struct SetEntryKeyboardOverlay: View {
 
     /// Move to next field, updating trackedField and syncing with SetRowView.
     private func moveToNextField(_ context: SetEntryKeyboardContext) {
-        let ordered = orderedInputs(for: context.trackingType)
+        let ordered = context.inputOrder
         guard let current = context.trackedField,
               let idx = ordered.firstIndex(of: current),
               idx + 1 < ordered.count else { return }
@@ -1007,12 +1127,15 @@ struct SetEntryKeyboardOverlay: View {
     }
 
     private func nudgeReps(_ context: SetEntryKeyboardContext, delta: Int) {
-        let raw = context.getFieldValue(.reps)
+        guard let field = context.trackedField else { return }
+        guard field == .reps || field == .leftReps || field == .rightReps else { return }
+
+        let raw = context.getFieldValue(field)
         // If reps contains a dash (rep range like "8-12"), don't nudge
         guard !raw.contains("-") else { return }
         let current = Int(raw) ?? 0
         let next = max(0, current + delta)
-        context.setFieldValue(.reps, next == 0 ? "" : String(next))
+        context.setFieldValue(field, next == 0 ? "" : String(next))
         refreshTick += 1
         manager.refresh()
     }
@@ -1088,9 +1211,13 @@ struct SetEntryKeyboardOverlay: View {
                 setNumber: 1,
                 weightText: .constant("40"),
                 repsText: .constant("10"),
+                leftRepsText: .constant(""),
+                rightRepsText: .constant(""),
                 durationText: .constant(""),
                 distanceText: .constant(""),
                 rirValue: .constant(nil),
+                leftRIRValue: .constant(nil),
+                rightRIRValue: .constant(nil),
                 onComplete: {},
                 onDelete: {},
                 onChangeSetType: { _ in },
@@ -1115,9 +1242,13 @@ struct SetEntryKeyboardOverlay: View {
                 setNumber: 1,
                 weightText: .constant("80"),
                 repsText: .constant("8"),
+                leftRepsText: .constant(""),
+                rightRepsText: .constant(""),
                 durationText: .constant(""),
                 distanceText: .constant(""),
                 rirValue: .constant(0),
+                leftRIRValue: .constant(nil),
+                rightRIRValue: .constant(nil),
                 onComplete: {},
                 onDelete: {},
                 onChangeSetType: { _ in },
@@ -1140,9 +1271,13 @@ struct SetEntryKeyboardOverlay: View {
                 setNumber: 2,
                 weightText: .constant(""),
                 repsText: .constant(""),
+                leftRepsText: .constant(""),
+                rightRepsText: .constant(""),
                 durationText: .constant(""),
                 distanceText: .constant(""),
                 rirValue: .constant(nil),
+                leftRIRValue: .constant(nil),
+                rightRIRValue: .constant(nil),
                 onComplete: {},
                 onDelete: {},
                 onChangeSetType: { _ in },

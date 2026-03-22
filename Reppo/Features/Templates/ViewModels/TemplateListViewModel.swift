@@ -50,6 +50,21 @@ final class TemplateListViewModel {
         try await templateService.exportTemplate(templateId)
     }
 
+    func exportAITemplateContext() async throws -> Data {
+        try await templateService.exportAITemplateContext()
+    }
+
+    func previewTemplateImport(data: Data) async throws -> TemplateImportPreview {
+        try await templateService.previewTemplateImport(data: data)
+    }
+
+    func finalizeTemplateImport(
+        _ preview: TemplateImportPreview,
+        resolutions: [TemplateImportExerciseResolution]
+    ) async throws -> UUID {
+        try await templateService.finalizeTemplateImport(preview, resolutions: resolutions)
+    }
+
     func importTemplate(data: Data) async throws -> UUID {
         try await templateService.importTemplate(data: data)
     }

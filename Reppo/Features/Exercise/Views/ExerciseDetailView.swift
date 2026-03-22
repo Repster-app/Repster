@@ -126,7 +126,7 @@ struct ExerciseDetailView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     if let muscle = exercise.primaryMuscle {
-                        Text(muscle.capitalized)
+                        Text(ExercisePrimaryGroup.displayName(for: muscle))
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(Color.accent)
                     }
@@ -184,9 +184,12 @@ struct ExerciseDetailView: View {
     private var tabContent: some View {
         switch selectedTab {
         case .history:
-            ExerciseHistoryView(historyWorkouts: viewModel.historyWorkouts)
+            ExerciseHistoryView(historyWorkouts: viewModel.historyWorkouts, exercise: viewModel.exercise)
         case .prs:
-            ExercisePRsView(prTable: viewModel.prTable)
+            ExercisePRsView(
+                prTable: viewModel.prTable,
+                isPerSide: viewModel.exercise?.unilateral == true && viewModel.exercise?.supportsUnilateralLogging == true
+            )
         case .charts:
             if let exercise = viewModel.exercise {
                 EmbeddedExerciseChartView(

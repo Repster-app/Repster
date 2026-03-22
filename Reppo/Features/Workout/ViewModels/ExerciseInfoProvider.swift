@@ -8,6 +8,7 @@ enum ExerciseInfoProvider {
 
     static func compute(
         currentSets: [WorkoutSet],
+        exercise: Exercise,
         exerciseId: UUID,
         currentWorkoutId: UUID,
         trackingType: TrackingType,
@@ -37,13 +38,13 @@ enum ExerciseInfoProvider {
             : (nil, nil)
 
         // Step 4: Compute Last Workout info
-        let lastWorkoutInfo = computeLastWorkout(historicalSets: historicalSets)
+        let lastWorkoutInfo = computeLastWorkout(historicalSets: historicalSets, exercise: exercise)
 
         // Step 5: Compute Estimated Reps info
         let estimatedRepsInfo: EstimatedRepsInfo?
         if supportsE1RM, let bestE1RM = bestAvailableE1RM, bestE1RM > 0 {
             let targetReps = currentSets
-                .last(where: { $0.setType == .working && $0.hasData })?.reps ?? 8
+                .last(where: { $0.setType == .working && $0.hasData })?.prReps ?? 8
 
             let rawEstimated = formula.reverseCalculate(e1RM: bestE1RM, reps: targetReps)
             let snapped = snap(rawEstimated, to: weightIncrement ?? 2.5)
@@ -78,8 +79,8 @@ enum ExerciseInfoProvider {
         let sessionContext: [SessionSetContext] = completedWorking.map { set in
             SessionSetContext(
                 weight: set.effectiveWeight ?? set.weight ?? 0,
-                reps: set.reps ?? 0,
-                rir: set.rir,
+                reps: set.prReps,
+                rir: set.performanceRIR,
                 completedAt: set.completedAt,
                 completed: true,
                 setType: set.setType,
@@ -100,14 +101,14 @@ enum ExerciseInfoProvider {
 
         let currentE1RM = baseEstimate.value
         var bestSetWeight = bestToday?.effectiveWeight ?? 0
-        var bestSetReps = bestToday?.reps ?? 0
+        var bestSetReps = bestToday?.prReps ?? 0
 
         if bestToday == nil {
             let bestHistoricalSet = historicalSets
                 .filter { $0.setType == .working && $0.hasData && $0.e1RM != nil }
                 .max(by: { ($0.e1RM ?? 0) < ($1.e1RM ?? 0) })
             bestSetWeight = bestHistoricalSet?.effectiveWeight ?? 0
-            bestSetReps = bestHistoricalSet?.reps ?? 0
+            bestSetReps = bestHistoricalSet?.prReps ?? 0
         }
 
         guard let currentE1RM else { return (nil, nil) }
@@ -167,7 +168,7 @@ enum ExerciseInfoProvider {
 
     // MARK: - Last Workout Computation
 
-    private static func computeLastWorkout(historicalSets: [WorkoutSet]) -> LastWorkoutInfo? {
+    private static func computeLastWorkout(historicalSets: [WorkoutSet], exercise: Exercise) -> LastWorkoutInfo? {
         let grouped = Dictionary(grouping: historicalSets) { $0.workoutId }
         let sortedGroups = grouped.values.sorted { group1, group2 in
             let date1 = group1.first?.date ?? .distantPast
@@ -184,10 +185,10 @@ enum ExerciseInfoProvider {
         let topSets = workingSets.prefix(2).map { set -> TopSet in
             return TopSet(
                 weight: set.effectiveWeight ?? 0,
-                reps: set.reps,
+                reps: set.prReps == 0 ? nil : set.prReps,
                 durationSeconds: set.durationSeconds,
                 distanceMeters: set.distanceMeters,
-                formattedLabel: formatTopSetLabel(set)
+                formattedLabel: formatTopSetLabel(set, exercise: exercise)
             )
         }
 
@@ -230,7 +231,7 @@ enum ExerciseInfoProvider {
 
     private static func topSetPriority(for set: WorkoutSet) -> (rank: Int, primaryMetric: Double, secondaryMetric: Double) {
         let weight = set.effectiveWeight ?? set.weight ?? 0
-        let reps = Double(set.reps ?? 0)
+        let reps = Double(set.prReps)
         let duration = Double(set.durationSeconds ?? 0)
         let distance = set.distanceMeters ?? 0
 
@@ -249,34 +250,8 @@ enum ExerciseInfoProvider {
         return (0, duration, 0)
     }
 
-    private static func formatTopSetLabel(_ set: WorkoutSet) -> String {
-        if let ew = set.effectiveWeight, let reps = set.reps, reps > 0 {
-            return "\(formatWeight(ew))×\(reps)"
-        }
-        if let ew = set.effectiveWeight, ew > 0, let distance = set.distanceMeters, distance > 0 {
-            return "\(formatWeight(ew)) • \(formatDistance(distance))"
-        }
-        if let duration = set.durationSeconds, duration > 0,
-           let distance = set.distanceMeters, distance > 0 {
-            return "\(UnitConversion.formatDuration(duration)) • \(formatDistance(distance))"
-        }
-        if let duration = set.durationSeconds, duration > 0 {
-            return UnitConversion.formatDuration(duration)
-        }
-        if let distance = set.distanceMeters, distance > 0 {
-            return formatDistance(distance)
-        }
-        return "--"
-    }
-
-    private static func formatWeight(_ kg: Double) -> String {
-        if kg.truncatingRemainder(dividingBy: 1) == 0 {
-            return String(format: "%.0f", kg)
-        }
-        let formatter = NumberFormatter()
-        formatter.minimumFractionDigits = 1
-        formatter.maximumFractionDigits = 2
-        return formatter.string(from: NSNumber(value: kg)) ?? String(format: "%.2f", kg)
+    private static func formatTopSetLabel(_ set: WorkoutSet, exercise: Exercise) -> String {
+        WorkoutSetPerformanceFormatter.performanceLabel(for: set, exercise: exercise) ?? "--"
     }
 
     private static func formatDistance(_ meters: Double) -> String {

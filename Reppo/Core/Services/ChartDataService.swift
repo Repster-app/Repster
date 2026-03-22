@@ -61,6 +61,14 @@ actor ChartDataService: ChartDataServiceProtocol {
         return Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0) })
     }
 
+    private nonisolated func normalizedMuscleGroup(_ rawValue: String?) -> String? {
+        ExercisePrimaryGroup.normalizedValue(rawValue)
+    }
+
+    private nonisolated func displayedMuscleGroup(_ rawValue: String?) -> String {
+        ExercisePrimaryGroup.displayName(for: normalizedMuscleGroup(rawValue) ?? "other")
+    }
+
     // MARK: - Breakdown Tab (016-charts-tab-v2 WP06, T113)
 
     func fetchBreakdownData(metric: BreakdownMetric, timeRange: BreakdownTimeRange) async throws -> [BreakdownDataPoint] {
@@ -80,7 +88,7 @@ actor ChartDataService: ChartDataServiceProtocol {
             let key: String
             switch metric.groupBy {
             case .category:
-                key = exercise.primaryMuscle?.lowercased() ?? "other"
+                key = displayedMuscleGroup(exercise.primaryMuscle)
             case .exercise:
                 key = exercise.name
             }
@@ -93,16 +101,16 @@ actor ChartDataService: ChartDataServiceProtocol {
             let value: Double
             switch metric.aggregateType {
             case .volume:
-                value = sets.reduce(0) { $0 + (($1.effectiveWeight ?? 0) * Double($1.reps ?? 0)) }
+                value = sets.reduce(0) { $0 + (($1.effectiveWeight ?? 0) * Double($1.totalReps)) }
             case .sets:
                 value = Double(sets.count)
             case .reps:
-                value = sets.reduce(0) { $0 + Double($1.reps ?? 0) }
+                value = sets.reduce(0) { $0 + Double($1.totalReps) }
             case .workouts:
                 value = Double(Swift.Set(sets.map { $0.workoutId }).count)
             }
             if value > 0 {
-                results.append((label: label.capitalized, value: value))
+                results.append((label: label, value: value))
             }
         }
 
@@ -131,9 +139,9 @@ actor ChartDataService: ChartDataServiceProtocol {
         let allSets = try await setRepository.fetchChartSets(from: startDate, to: endDate)
         let eligible = chartEligibleSets(allSets)
 
-        let totalVolume = eligible.reduce(0.0) { $0 + (($1.effectiveWeight ?? 0) * Double($1.reps ?? 0)) }
+        let totalVolume = eligible.reduce(0.0) { $0 + (($1.effectiveWeight ?? 0) * Double($1.totalReps)) }
         let totalSets = eligible.count
-        let totalReps = eligible.reduce(0) { $0 + ($1.reps ?? 0) }
+        let totalReps = eligible.reduce(0) { $0 + $1.totalReps }
         let totalWorkouts = Swift.Set(eligible.map { $0.workoutId }).count
 
         return BreakdownSummary(
@@ -167,7 +175,7 @@ actor ChartDataService: ChartDataServiceProtocol {
             let cache = try await fetchExerciseLookup()
             allSets = allSets.filter { set in
                 guard let ex = cache[set.exerciseId] else { return false }
-                return ex.primaryMuscle?.lowercased() == categoryName.lowercased()
+                return normalizedMuscleGroup(ex.primaryMuscle) == normalizedMuscleGroup(categoryName)
             }
         }
 
@@ -266,11 +274,11 @@ actor ChartDataService: ChartDataServiceProtocol {
     private func computeWorkoutsMetric(_ metric: WorkoutsMetric, for sets: [ChartSetData]) -> Double {
         switch metric {
         case .volume:
-            return sets.reduce(0) { $0 + (($1.effectiveWeight ?? 0) * Double($1.reps ?? 0)) }
+            return sets.reduce(0) { $0 + (($1.effectiveWeight ?? 0) * Double($1.totalReps)) }
         case .sets:
             return Double(sets.count)
         case .reps:
-            return sets.reduce(0) { $0 + Double($1.reps ?? 0) }
+            return sets.reduce(0) { $0 + Double($1.totalReps) }
         case .workouts:
             return Double(Swift.Set(sets.map { $0.workoutId }).count)
         case .distance:
@@ -284,8 +292,10 @@ actor ChartDataService: ChartDataServiceProtocol {
 
     func fetchAvailableCategories() async throws -> [String] {
         let allExercises = try await exerciseRepository.fetchAllChartExercises()
-        let categories = Swift.Set(allExercises.compactMap { $0.primaryMuscle?.lowercased() })
-        return categories.sorted().map { $0.capitalized }
+        let orderedValues = ExerciseMuscleGroupCatalog.orderedValues(
+            from: allExercises.compactMap(\.primaryMuscle)
+        )
+        return orderedValues.map { ExercisePrimaryGroup.displayName(for: $0) }
     }
 
     func fetchPerformedExercises() async throws -> [(id: UUID, name: String)] {
@@ -337,7 +347,10 @@ actor ChartDataService: ChartDataServiceProtocol {
                                 value: value,
                                 workoutId: workoutId,
                                 topWeight: bestSet?.effectiveWeight,
-                                topReps: bestSet?.reps
+                                topReps: bestSet?.prReps,
+                                detailLabel: bestSet.flatMap {
+                                    WorkoutSetPerformanceFormatter.performanceLabel(for: $0, exercise: exercise)
+                                }
                             ))
                         }
                     }
@@ -371,16 +384,16 @@ actor ChartDataService: ChartDataServiceProtocol {
         case .maxWeight:
             return sets.compactMap { $0.effectiveWeight }.filter { $0 > 0 }.max()
         case .maxReps:
-            return sets.compactMap { $0.reps }.map { Double($0) }.max()
+            return sets.map { Double($0.prReps) }.max()
         case .maxVolume:
-            return sets.map { ($0.effectiveWeight ?? 0) * Double($0.reps ?? 0) }.max()
+            return sets.map { ($0.effectiveWeight ?? 0) * Double($0.totalReps) }.max()
         case .maxWeightForReps:
             return sets.compactMap { $0.effectiveWeight }.filter { $0 > 0 }.max()
         case .workoutVolume:
-            let vol = sets.reduce(0.0) { $0 + (($1.effectiveWeight ?? 0) * Double($1.reps ?? 0)) }
+            let vol = sets.reduce(0.0) { $0 + (($1.effectiveWeight ?? 0) * Double($1.totalReps)) }
             return vol > 0 ? vol : nil
         case .workoutReps:
-            let total = sets.reduce(0.0) { $0 + Double($1.reps ?? 0) }
+            let total = sets.reduce(0.0) { $0 + Double($1.totalReps) }
             return total > 0 ? total : nil
         case .personalRecords:
             return sets.filter { $0.cachedPRStatus == .current }.compactMap { $0.effectiveWeight }.max()
@@ -407,11 +420,11 @@ actor ChartDataService: ChartDataServiceProtocol {
         case .maxWeight, .maxWeightForReps, .personalRecords:
             return sets.max(by: { ($0.effectiveWeight ?? 0) < ($1.effectiveWeight ?? 0) })
         case .maxReps:
-            return sets.max(by: { ($0.reps ?? 0) < ($1.reps ?? 0) })
+            return sets.max(by: { $0.prReps < $1.prReps })
         case .maxVolume:
             return sets.max(by: {
-                (($0.effectiveWeight ?? 0) * Double($0.reps ?? 0)) <
-                (($1.effectiveWeight ?? 0) * Double($1.reps ?? 0))
+                (($0.effectiveWeight ?? 0) * Double($0.totalReps)) <
+                (($1.effectiveWeight ?? 0) * Double($1.totalReps))
             })
         case .workoutVolume, .workoutReps:
             // Aggregate metrics — show the heaviest set as representative

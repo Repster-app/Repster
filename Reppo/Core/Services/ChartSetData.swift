@@ -8,6 +8,10 @@ struct ChartSetData: Sendable, Equatable {
     let weight: Double?
     let effectiveWeight: Double?
     let reps: Int?
+    let prReps: Int
+    let totalReps: Int
+    let leftReps: Int?
+    let rightReps: Int?
     let durationSeconds: Int?
     let distanceMeters: Double?
     let e1RM: Double?
@@ -15,14 +19,15 @@ struct ChartSetData: Sendable, Equatable {
     let cachedPRStatus: CachedPRStatus?
 
     var hasData: Bool {
-        ((weight ?? 0) > 0 && (reps ?? 0) > 0) ||
+        ((weight ?? 0) > 0 && prReps > 0) ||
+        totalReps > 0 ||
         (durationSeconds ?? 0) > 0 ||
         (distanceMeters ?? 0) > 0
     }
 
     var volume: Double? {
-        guard let ew = effectiveWeight, let r = reps, r > 0 else { return nil }
-        return ew * Double(r)
+        guard let ew = effectiveWeight, totalReps > 0 else { return nil }
+        return ew * Double(totalReps)
     }
 
     init(from set: WorkoutSet) {
@@ -33,6 +38,10 @@ struct ChartSetData: Sendable, Equatable {
         self.weight = set.weight
         self.effectiveWeight = set.effectiveWeight
         self.reps = set.reps
+        self.prReps = set.prReps
+        self.totalReps = set.totalReps
+        self.leftReps = set.leftReps
+        self.rightReps = set.rightReps
         self.durationSeconds = set.durationSeconds
         self.distanceMeters = set.distanceMeters
         self.e1RM = set.e1RM
@@ -45,11 +54,23 @@ struct ChartExerciseData: Sendable, Equatable {
     let id: UUID
     let name: String
     let primaryMuscle: String?
+    let equipmentType: EquipmentType
+    let bodyweightFactor: Double
+    let unilateral: Bool
+    let trackingType: TrackingType
 
     init(from exercise: Exercise) {
         self.id = exercise.id
         self.name = exercise.name
         self.primaryMuscle = exercise.primaryMuscle
+        self.equipmentType = exercise.equipmentType
+        self.bodyweightFactor = exercise.bodyweightFactor
+        self.unilateral = exercise.unilateral
+        self.trackingType = exercise.trackingType
+    }
+
+    var isBodyweightStyleExercise: Bool {
+        equipmentType == .bodyweight || bodyweightFactor > 0
     }
 }
 

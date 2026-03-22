@@ -13,7 +13,7 @@ struct MuscleFilterStrip: View {
         WrappingHStack(spacing: 6, lineSpacing: 6) {
             ForEach(muscleGroups, id: \.self) { muscle in
                 MuscleFilterPill(
-                    title: muscle,
+                    title: ExercisePrimaryGroup.displayName(for: muscle),
                     isSelected: selectedFilters.contains(muscle),
                     color: MuscleGroupColors.color(for: muscle),
                     action: { toggleFilter(muscle) }
@@ -46,7 +46,7 @@ private struct MuscleFilterPill: View {
                 Circle()
                     .fill(color)
                     .frame(width: 8, height: 8)
-                Text(title.capitalized)
+                Text(title)
                     .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(isSelected ? .white : Color.textTertiary)
             }

@@ -374,7 +374,7 @@ struct ContentView: View {
                 var muscleGroups: [String] = []
                 for exerciseId in exerciseIds {
                     if let exercise = try await services.exerciseService.fetchExercise(exerciseId),
-                       let muscle = exercise.primaryMuscle?.lowercased(),
+                       let muscle = ExercisePrimaryGroup.normalizedValue(exercise.primaryMuscle),
                        !muscleGroups.contains(muscle) {
                         muscleGroups.append(muscle)
                     }

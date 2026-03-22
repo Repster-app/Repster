@@ -9,6 +9,7 @@ struct RecentPR: Identifiable {
     let weight: Double
     let reps: Int
     let date: Date
+    let isPerSide: Bool
 }
 
 struct RecentPRsView: View {
@@ -46,6 +47,12 @@ struct RecentPRsView: View {
                 Text("\(formattedWeight(pr.weight)) x \(pr.reps) reps")
                     .font(.system(size: 12))
                     .foregroundStyle(Color.textSecondary)
+
+                if pr.isPerSide {
+                    Text("Per side")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.textTertiary)
+                }
             }
 
             Spacer()

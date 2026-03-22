@@ -148,12 +148,16 @@ struct WorkoutHistoryArchiveSet: Codable, Sendable {
     let weight: Double?
     let effectiveWeight: Double?
     let reps: Int?
+    let leftReps: Int?
+    let rightReps: Int?
     let durationSeconds: Int?
     let distanceMeters: Double?
     let e1RM: Double?
     let e1RMFormulaVersion: String?
     let rpe: Double?
     let rir: Double?
+    let leftRIR: Double?
+    let rightRIR: Double?
     let setType: SetType
     let pauseDuration: Int?
     let side: Side?

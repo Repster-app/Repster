@@ -357,7 +357,7 @@ struct ExerciseSelectionSheet: View {
                 selectedExercises.append((
                     id: exercise.id,
                     name: exercise.name,
-                    category: exercise.primaryMuscle?.capitalized ?? ""
+                    category: exercise.primaryMuscle.map(ExercisePrimaryGroup.displayName(for:)) ?? ""
                 ))
             }
         }
@@ -370,7 +370,7 @@ struct ExerciseSelectionSheet: View {
                 newSelection.append((
                     id: exercise.id,
                     name: exercise.name,
-                    category: exercise.primaryMuscle?.capitalized ?? ""
+                    category: exercise.primaryMuscle.map(ExercisePrimaryGroup.displayName(for:)) ?? ""
                 ))
             }
         }

@@ -70,7 +70,7 @@ enum RIROption: CaseIterable, Identifiable {
 /// Columns adapt to the exercise's `trackingType`:
 /// - `.weightReps` → weight + reps
 /// - `.duration` → duration only
-/// - `.durationDistance` → duration + distance
+/// - `.durationDistance` → distance + duration
 /// - `.weightDistance` → weight + distance
 /// - `.weightRepsDuration` → weight + reps + duration
 ///
@@ -97,6 +97,12 @@ struct SetRowView: View {
     /// Text binding for the reps input field.
     @Binding var repsText: String
 
+    /// Text binding for the left reps input field when unilateral logging is enabled.
+    @Binding var leftRepsText: String
+
+    /// Text binding for the right reps input field when unilateral logging is enabled.
+    @Binding var rightRepsText: String
+
     /// Text binding for the duration input field.
     @Binding var durationText: String
 
@@ -105,6 +111,12 @@ struct SetRowView: View {
 
     /// Binding for the RIR value (nil = not set, 0-5 = RIR value).
     @Binding var rirValue: Double?
+
+    /// Binding for the left-side RIR value when unilateral logging is enabled.
+    @Binding var leftRIRValue: Double?
+
+    /// Binding for the right-side RIR value when unilateral logging is enabled.
+    @Binding var rightRIRValue: Double?
 
     // MARK: - Template Targets
 
@@ -118,6 +130,9 @@ struct SetRowView: View {
 
     /// Called when the completion checkbox is tapped.
     let onComplete: () -> Void
+
+    /// Returns whether the current draft state can be completed from the custom keyboard.
+    var canCompleteSet: () -> Bool = { true }
 
     /// Called when "Delete Set" is chosen from the context menu.
     let onDelete: () -> Void
@@ -170,7 +185,7 @@ struct SetRowView: View {
             .frame(width: 40)
         }
         .padding(.horizontal, 8)
-        .frame(height: 52)
+        .frame(height: rowHeight)
         .background(rowBackground)
         .opacity(set.setType == .warmup ? 0.5 : 1.0)
         .overlay {
@@ -241,11 +256,20 @@ struct SetRowView: View {
     /// When a target RIR is set from a template and no actual RIR has been chosen,
     /// the target is shown as a dimmed hint with its color.
     private var rirPicker: some View {
+        if isUnilateralLogging {
+            return AnyView(
+                VStack(spacing: 6) {
+                    unilateralRIRControl(title: "L", value: $leftRIRValue)
+                    unilateralRIRControl(title: "R", value: $rightRIRValue)
+                }
+            )
+        }
+
         let currentOption = RIROption.from(doubleValue: rirValue)
         let targetOption: RIROption? = targetRIR.map { RIROption.from(doubleValue: Double($0)) }
         let showTarget = currentOption == .none && targetOption != nil && targetOption != RIROption.none
 
-        return Menu {
+        return AnyView(Menu {
             ForEach(RIROption.allCases) { option in
                 Button {
                     rirValue = option.doubleValue
@@ -278,7 +302,7 @@ struct SetRowView: View {
                     .stroke(rirBorderColor(for: showTarget ? .none : currentOption), lineWidth: 1)
             )
             .cornerRadius(7)
-        }
+        })
     }
 
     /// Background color for the RIR cell based on selected option.
@@ -304,32 +328,36 @@ struct SetRowView: View {
     private var inputFields: some View {
         switch exercise.trackingType {
         case .weightReps:
-            SetInputField(
-                value: $weightText,
-                placeholder: "0",
-                keyboardType: .decimalPad,
-                isCompleted: set.completed,
-                isActiveOverride: focusedInput == .weight,
-                isCustomEntry: true,
-                onCustomTap: { activateCustomKeyboard(for: .weight) }
-            )
-            .frame(maxWidth: .infinity)
+            if isUnilateralLogging {
+                unilateralWeightAndRepsFields
+            } else {
+                SetInputField(
+                    value: $weightText,
+                    placeholder: "0",
+                    keyboardType: .decimalPad,
+                    isCompleted: set.completed,
+                    isActiveOverride: focusedInput == .weight,
+                    isCustomEntry: true,
+                    onCustomTap: { activateCustomKeyboard(for: .weight) }
+                )
+                .frame(maxWidth: .infinity)
 
-            SetInputField(
-                value: $repsText,
-                placeholder: repsPlaceholder,
-                keyboardType: .numberPad,
-                isCompleted: set.completed,
-                isActiveOverride: focusedInput == .reps,
-                isCustomEntry: true,
-                onCustomTap: { activateCustomKeyboard(for: .reps) }
-            )
-            .frame(maxWidth: .infinity)
+                SetInputField(
+                    value: $repsText,
+                    placeholder: repsPlaceholder,
+                    keyboardType: .numberPad,
+                    isCompleted: set.completed,
+                    isActiveOverride: focusedInput == .reps,
+                    isCustomEntry: true,
+                    onCustomTap: { activateCustomKeyboard(for: .reps) }
+                )
+                .frame(maxWidth: .infinity)
+            }
 
         case .duration:
             SetInputField(
                 value: $durationText,
-                placeholder: "0:00",
+                placeholder: "MM:SS",
                 keyboardType: .numberPad,
                 isCompleted: set.completed,
                 isActiveOverride: focusedInput == .duration,
@@ -340,17 +368,6 @@ struct SetRowView: View {
 
         case .durationDistance:
             SetInputField(
-                value: $durationText,
-                placeholder: "0:00",
-                keyboardType: .numberPad,
-                isCompleted: set.completed,
-                isActiveOverride: focusedInput == .duration,
-                isCustomEntry: true,
-                onCustomTap: { activateCustomKeyboard(for: .duration) }
-            )
-            .frame(maxWidth: .infinity)
-
-            SetInputField(
                 value: $distanceText,
                 placeholder: "0",
                 keyboardType: .decimalPad,
@@ -358,6 +375,17 @@ struct SetRowView: View {
                 isActiveOverride: focusedInput == .distance,
                 isCustomEntry: true,
                 onCustomTap: { activateCustomKeyboard(for: .distance) }
+            )
+            .frame(maxWidth: .infinity)
+
+            SetInputField(
+                value: $durationText,
+                placeholder: "MM:SS",
+                keyboardType: .numberPad,
+                isCompleted: set.completed,
+                isActiveOverride: focusedInput == .duration,
+                isCustomEntry: true,
+                onCustomTap: { activateCustomKeyboard(for: .duration) }
             )
             .frame(maxWidth: .infinity)
 
@@ -385,38 +413,53 @@ struct SetRowView: View {
             .frame(maxWidth: .infinity)
 
         case .weightRepsDuration:
-            SetInputField(
-                value: $weightText,
-                placeholder: "0",
-                keyboardType: .decimalPad,
-                isCompleted: set.completed,
-                isActiveOverride: focusedInput == .weight,
-                isCustomEntry: true,
-                onCustomTap: { activateCustomKeyboard(for: .weight) }
-            )
-            .frame(maxWidth: .infinity)
+            if isUnilateralLogging {
+                unilateralWeightAndRepsFields
 
-            SetInputField(
-                value: $repsText,
-                placeholder: repsPlaceholder,
-                keyboardType: .numberPad,
-                isCompleted: set.completed,
-                isActiveOverride: focusedInput == .reps,
-                isCustomEntry: true,
-                onCustomTap: { activateCustomKeyboard(for: .reps) }
-            )
-            .frame(maxWidth: .infinity)
+                SetInputField(
+                    value: $durationText,
+                    placeholder: "MM:SS",
+                    keyboardType: .numberPad,
+                    isCompleted: set.completed,
+                    isActiveOverride: focusedInput == .duration,
+                    isCustomEntry: true,
+                    onCustomTap: { activateCustomKeyboard(for: .duration) }
+                )
+                .frame(maxWidth: .infinity)
+            } else {
+                SetInputField(
+                    value: $weightText,
+                    placeholder: "0",
+                    keyboardType: .decimalPad,
+                    isCompleted: set.completed,
+                    isActiveOverride: focusedInput == .weight,
+                    isCustomEntry: true,
+                    onCustomTap: { activateCustomKeyboard(for: .weight) }
+                )
+                .frame(maxWidth: .infinity)
 
-            SetInputField(
-                value: $durationText,
-                placeholder: "0:00",
-                keyboardType: .numberPad,
-                isCompleted: set.completed,
-                isActiveOverride: focusedInput == .duration,
-                isCustomEntry: true,
-                onCustomTap: { activateCustomKeyboard(for: .duration) }
-            )
-            .frame(maxWidth: .infinity)
+                SetInputField(
+                    value: $repsText,
+                    placeholder: repsPlaceholder,
+                    keyboardType: .numberPad,
+                    isCompleted: set.completed,
+                    isActiveOverride: focusedInput == .reps,
+                    isCustomEntry: true,
+                    onCustomTap: { activateCustomKeyboard(for: .reps) }
+                )
+                .frame(maxWidth: .infinity)
+
+                SetInputField(
+                    value: $durationText,
+                    placeholder: "MM:SS",
+                    keyboardType: .numberPad,
+                    isCompleted: set.completed,
+                    isActiveOverride: focusedInput == .duration,
+                    isCustomEntry: true,
+                    onCustomTap: { activateCustomKeyboard(for: .duration) }
+                )
+                .frame(maxWidth: .infinity)
+            }
 
         case .custom:
             // Fallback: same as weightReps
@@ -469,6 +512,14 @@ struct SetRowView: View {
         !set.completed && focusedInput != nil
     }
 
+    private var isUnilateralLogging: Bool {
+        exercise.unilateral && exercise.supportsUnilateralLogging
+    }
+
+    private var rowHeight: CGFloat {
+        isUnilateralLogging ? 86 : 52
+    }
+
     @ViewBuilder
     private var setBadge: some View {
         let badge = SetNumberBadge(
@@ -495,14 +546,20 @@ struct SetRowView: View {
     private var orderedInputs: [SetRowInputField] {
         switch exercise.trackingType {
         case .weightReps, .custom:
+            if isUnilateralLogging {
+                return [.weight, .leftReps, .rightReps]
+            }
             return [.weight, .reps]
         case .duration:
             return [.duration]
         case .durationDistance:
-            return [.duration, .distance]
+            return [.distance, .duration]
         case .weightDistance:
             return [.weight, .distance]
         case .weightRepsDuration:
+            if isUnilateralLogging {
+                return [.weight, .leftReps, .rightReps, .duration]
+            }
             return [.weight, .reps, .duration]
         }
     }
@@ -556,6 +613,8 @@ struct SetRowView: View {
         let focusBinding = $focusedInput
         let weightBinding = $weightText
         let repsBinding = $repsText
+        let leftRepsBinding = $leftRepsText
+        let rightRepsBinding = $rightRepsText
         let durationBinding = $durationText
         let distanceBinding = $distanceText
         let rirBinding = $rirValue
@@ -563,6 +622,8 @@ struct SetRowView: View {
         return SetEntryKeyboardContext(
             ownerSetID: setID,
             trackingType: trackingType,
+            equipmentType: exercise.equipmentType,
+            inputOrder: orderedInputs,
             activeField: activeField,
             getFocusedField: { focusBinding.wrappedValue },
             setFocusedField: { focusBinding.wrappedValue = $0 },
@@ -572,6 +633,10 @@ struct SetRowView: View {
                     return weightBinding.wrappedValue
                 case .reps:
                     return repsBinding.wrappedValue
+                case .leftReps:
+                    return leftRepsBinding.wrappedValue
+                case .rightReps:
+                    return rightRepsBinding.wrappedValue
                 case .duration:
                     return durationBinding.wrappedValue
                 case .distance:
@@ -584,6 +649,10 @@ struct SetRowView: View {
                     weightBinding.wrappedValue = newValue
                 case .reps:
                     repsBinding.wrappedValue = newValue
+                case .leftReps:
+                    leftRepsBinding.wrappedValue = newValue
+                case .rightReps:
+                    rightRepsBinding.wrappedValue = newValue
                 case .duration:
                     durationBinding.wrappedValue = newValue
                 case .distance:
@@ -595,12 +664,102 @@ struct SetRowView: View {
             getSuggestedWeight: { suggestedWeight },
             getWeightIncrement: { exercise.weightIncrement ?? 2.5 },
             onCompleteSet: { if !set.completed { onComplete() } },
+            canCompleteSet: canCompleteSet,
             canMovePrevious: { canMoveToPreviousInput },
             canMoveNext: { canMoveToNextInput },
             movePrevious: { focusPreviousInput() },
             moveNext: { focusNextInput() },
             dismiss: { focusBinding.wrappedValue = nil }
         )
+    }
+
+    @ViewBuilder
+    private var unilateralWeightAndRepsFields: some View {
+        SetInputField(
+            value: $weightText,
+            placeholder: "0",
+            keyboardType: .decimalPad,
+            isCompleted: set.completed,
+            isActiveOverride: focusedInput == .weight,
+            isCustomEntry: true,
+            onCustomTap: { activateCustomKeyboard(for: .weight) }
+        )
+        .frame(maxWidth: .infinity)
+
+        VStack(spacing: 6) {
+            unilateralSideInput(
+                title: "L",
+                repsText: $leftRepsText,
+                focusedField: .leftReps
+            )
+
+            unilateralSideInput(
+                title: "R",
+                repsText: $rightRepsText,
+                focusedField: .rightReps
+            )
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func unilateralSideInput(
+        title: String,
+        repsText: Binding<String>,
+        focusedField: SetRowInputField
+    ) -> some View {
+        HStack(spacing: 8) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Color.textTertiary)
+                .frame(width: 10, alignment: .leading)
+
+            SetInputField(
+                value: repsText,
+                placeholder: repsPlaceholder,
+                keyboardType: .numberPad,
+                isCompleted: set.completed,
+                isActiveOverride: focusedInput == focusedField,
+                isCustomEntry: true,
+                onCustomTap: { activateCustomKeyboard(for: focusedField) }
+                )
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func unilateralRIRControl(title: String, value: Binding<Double?>) -> some View {
+        let currentOption = RIROption.from(doubleValue: value.wrappedValue)
+
+        return Menu {
+            ForEach(RIROption.allCases) { option in
+                Button {
+                    value.wrappedValue = option.doubleValue
+                } label: {
+                    HStack {
+                        Text(option.displayName)
+                        if option == currentOption {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Text(title)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.textTertiary)
+
+                Text(currentOption.displayName)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(currentOption.color)
+            }
+            .frame(width: 36, height: 32)
+            .background(rirBackground(for: currentOption))
+            .overlay(
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(rirBorderColor(for: currentOption), lineWidth: 1)
+            )
+            .cornerRadius(7)
+        }
     }
 }
 
@@ -628,9 +787,13 @@ struct SetRowView: View {
                 setNumber: 1,
                 weightText: .constant("85"),
                 repsText: .constant("8"),
+                leftRepsText: .constant(""),
+                rightRepsText: .constant(""),
                 durationText: .constant(""),
                 distanceText: .constant(""),
                 rirValue: .constant(0),
+                leftRIRValue: .constant(nil),
+                rightRIRValue: .constant(nil),
                 onComplete: {},
                 onDelete: {},
                 onChangeSetType: { _ in },
@@ -654,9 +817,13 @@ struct SetRowView: View {
                 setNumber: 2,
                 weightText: .constant("80"),
                 repsText: .constant("8"),
+                leftRepsText: .constant(""),
+                rightRepsText: .constant(""),
                 durationText: .constant(""),
                 distanceText: .constant(""),
                 rirValue: .constant(2),
+                leftRIRValue: .constant(nil),
+                rightRIRValue: .constant(nil),
                 onComplete: {},
                 onDelete: {},
                 onChangeSetType: { _ in },
@@ -678,9 +845,13 @@ struct SetRowView: View {
                 setNumber: 3,
                 weightText: .constant(""),
                 repsText: .constant(""),
+                leftRepsText: .constant(""),
+                rightRepsText: .constant(""),
                 durationText: .constant(""),
                 distanceText: .constant(""),
                 rirValue: .constant(nil),
+                leftRIRValue: .constant(nil),
+                rightRIRValue: .constant(nil),
                 onComplete: {},
                 onDelete: {},
                 onChangeSetType: { _ in },

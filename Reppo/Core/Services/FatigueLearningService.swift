@@ -25,6 +25,15 @@ struct FatigueLearningCaptureResult {
     let observation: FatigueObservation?
 }
 
+struct FatigueLearningSetSnapshot: Sendable {
+    let completed: Bool
+    let setType: SetType
+    let actualWeight: Double?
+    let actualReps: Int?
+    let actualRIR: Double?
+    let restDurationSeconds: Int?
+}
+
 enum AppliedFatigueRateSource: String, Sendable {
     case exerciseOverride
     case globalLearned
@@ -251,6 +260,36 @@ actor FatigueLearningService {
     func removeCapturedSetData(setId: UUID) async throws {
         try await observationRepo.deleteObservation(for: setId)
         try await auditRepo.deleteAudit(for: setId)
+    }
+
+    func capturedSetDataNeedsInvalidation(
+        setId: UUID,
+        workoutId: UUID,
+        exerciseId: UUID,
+        previous: FatigueLearningSetSnapshot,
+        current: FatigueLearningSetSnapshot
+    ) async throws -> Bool {
+        let hasObservation = try await observationRepo
+            .fetchObservations(for: workoutId)
+            .contains { $0.setId == setId }
+        let hasAudit = try await auditRepo
+            .fetchAudits(workoutId: workoutId, exerciseId: exerciseId)
+            .contains { $0.setId == setId }
+
+        guard hasObservation || hasAudit else {
+            return false
+        }
+
+        guard current.completed else {
+            return true
+        }
+
+        return previous.completed != current.completed
+            || previous.setType != current.setType
+            || previous.actualWeight != current.actualWeight
+            || previous.actualReps != current.actualReps
+            || previous.actualRIR != current.actualRIR
+            || previous.restDurationSeconds != current.restDurationSeconds
     }
 
     func removeCapturedWorkoutData(workoutId: UUID) async throws {

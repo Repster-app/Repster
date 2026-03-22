@@ -84,49 +84,45 @@ struct CalendarExerciseCard: View {
         if workoutSet.modelContext == nil {
             EmptyView()
         } else {
-        let isWarmup = workoutSet.setType == .warmup
-        let hasNote = workoutSet.notes != nil && !(workoutSet.notes?.isEmpty ?? true)
+            let isWarmup = workoutSet.setType == .warmup
+            let hasNote = workoutSet.notes != nil && !(workoutSet.notes?.isEmpty ?? true)
+            let display = WorkoutSetPerformanceFormatter.display(for: workoutSet, exercise: exercise)
 
-        HStack {
-            // Set number with optional note dot
-            ZStack(alignment: .topTrailing) {
-                Text("\(index)")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.textSecondary)
+            HStack {
+                // Set number with optional note dot
+                ZStack(alignment: .topTrailing) {
+                    Text("\(index)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.textSecondary)
 
-                if hasNote {
-                    Circle()
-                        .fill(Color.orange)
-                        .frame(width: 5, height: 5)
-                        .offset(x: 4, y: -2)
+                    if hasNote {
+                        Circle()
+                            .fill(Color.orange)
+                            .frame(width: 5, height: 5)
+                            .offset(x: 4, y: -2)
+                    }
                 }
+                .frame(width: 32, alignment: .leading)
+
+                Text(formatWeight(workoutSet))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+
+                repsView(for: display)
+                    .frame(width: 44, alignment: .center)
+
+                rirView(for: display, set: workoutSet)
+                    .frame(width: 32, alignment: .center)
+
+                Color.clear
+                    .frame(width: 44, height: 1)
+                    .overlay(alignment: .trailing) {
+                        PRBadgeView(status: CachedPRStatus.effectiveStatus(for: workoutSet, among: displaySets))
+                    }
             }
-            .frame(width: 32, alignment: .leading)
-
-            Text(formatWeight(workoutSet))
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.textPrimary)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-
-            Text(formatReps(workoutSet))
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.textPrimary)
-                .frame(width: 44, alignment: .center)
-
-            // RIR value (color-coded)
-            Text(formatRIR(workoutSet))
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.rirColor(for: workoutSet.rir))
-                .frame(width: 32, alignment: .center)
-
-            Color.clear
-                .frame(width: 44, height: 1)
-                .overlay(alignment: .trailing) {
-                    PRBadgeView(status: CachedPRStatus.effectiveStatus(for: workoutSet, among: displaySets))
-                }
-        }
-        .padding(.vertical, 4)
-        .opacity(isWarmup ? 0.45 : 1.0)
+            .padding(.vertical, 4)
+            .opacity(isWarmup ? 0.45 : 1.0)
         }
     }
 
@@ -137,13 +133,41 @@ struct CalendarExerciseCard: View {
         return "\(UnitConversion.formatWeight(weight)) kg"
     }
 
-    private func formatReps(_ set: WorkoutSet) -> String {
-        guard let reps = set.reps else { return "—" }
-        return "\(reps)"
+    @ViewBuilder
+    private func repsView(for display: WorkoutSetDisplayText) -> some View {
+        if !display.sideRepsLabels.isEmpty {
+            VStack(spacing: 1) {
+                ForEach(display.sideRepsLabels, id: \.self) { label in
+                    Text(label)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color.textPrimary)
+                        .lineLimit(1)
+                        .multilineTextAlignment(.center)
+                }
+            }
+        } else {
+            Text(display.repsLabel ?? "—")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.textPrimary)
+        }
     }
 
-    private func formatRIR(_ set: WorkoutSet) -> String {
-        guard let rir = set.rir else { return "—" }
-        return rir >= 5 ? "5+" : "\(Int(rir))"
+    @ViewBuilder
+    private func rirView(for display: WorkoutSetDisplayText, set: WorkoutSet) -> some View {
+        if !display.sideRIRLabels.isEmpty {
+            VStack(spacing: 1) {
+                ForEach(display.sideRIRLabels, id: \.self) { label in
+                    Text(label)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color.textSecondary)
+                        .lineLimit(1)
+                        .multilineTextAlignment(.center)
+                }
+            }
+        } else {
+            Text(display.rirLabel?.replacingOccurrences(of: "RIR ", with: "") ?? "—")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.rirColor(for: set.rir))
+        }
     }
 }

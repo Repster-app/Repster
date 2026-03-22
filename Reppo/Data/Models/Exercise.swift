@@ -80,3 +80,13 @@ final class Exercise {
 }
 
 extension Exercise: @unchecked Sendable {}
+
+extension Exercise {
+    var supportsUnilateralLogging: Bool {
+        trackingType == .weightReps || trackingType == .weightRepsDuration
+    }
+
+    var isBodyweightStyleExercise: Bool {
+        equipmentType == .bodyweight || bodyweightFactor > 0
+    }
+}

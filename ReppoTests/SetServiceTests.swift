@@ -103,6 +103,55 @@ final class SetServiceTests: XCTestCase {
         XCTAssertEqual(archive.fatigueLearningAudits?.map(\.setId) ?? [], [untouched.set.id])
     }
 
+    func testExportBackupPreservesUnilateralFields() async throws {
+        let context = try makeContext()
+        let exercise = Exercise(
+            name: "Split Squat",
+            equipmentType: .dumbbell,
+            trackingType: .weightReps,
+            primaryMuscle: "quads",
+            unilateral: true
+        )
+        let workoutDate = makeDate(2026, 3, 22, 11, 30)
+        let workout = Workout(
+            date: workoutDate,
+            title: "Unilateral Session",
+            startTime: workoutDate,
+            endTime: workoutDate.addingTimeInterval(1_800),
+            duration: 1_800,
+            status: .completed
+        )
+        let set = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            date: workoutDate,
+            completedAt: workoutDate.addingTimeInterval(240),
+            weight: 20,
+            leftReps: 10,
+            rightReps: 8,
+            leftRIR: 2,
+            rightRIR: 3,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+        set.syncDerivedPerformanceFields(for: exercise)
+
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(workout)
+        _ = try await context.setService.save(set)
+
+        let archive = try decodeBackupArchive(try await context.backupService.exportBackup())
+        let archivedSet = try XCTUnwrap(archive.sets.first(where: { $0.id == set.id }))
+
+        XCTAssertEqual(archivedSet.leftReps, 10)
+        XCTAssertEqual(archivedSet.rightReps, 8)
+        XCTAssertEqual(archivedSet.leftRIR, 2)
+        XCTAssertEqual(archivedSet.rightRIR, 3)
+        XCTAssertEqual(archivedSet.reps, 10)
+    }
+
     private func makeContext() throws -> SetServiceTestContext {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(

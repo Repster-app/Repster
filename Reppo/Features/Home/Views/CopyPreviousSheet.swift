@@ -93,7 +93,7 @@ struct CopyPreviousSheet: View {
             if !workout.muscleGroups.isEmpty {
                 HStack(spacing: 6) {
                     ForEach(workout.muscleGroups, id: \.self) { muscle in
-                        Text(muscle.capitalized)
+                        Text(ExercisePrimaryGroup.displayName(for: muscle))
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(Color.textSecondary)
                             .padding(.horizontal, 8)

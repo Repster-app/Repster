@@ -55,7 +55,13 @@ struct EmbeddedExerciseChartView: View {
                 let vm = ExercisesTabViewModel(
                     chartDataService: chartDataService,
                     exerciseService: exerciseService,
-                    preselectedExercise: (id: exerciseId, name: exerciseName, category: exerciseCategory)
+                    preselectedExercise: (
+                        id: exerciseId,
+                        name: exerciseName,
+                        category: exerciseCategory.isEmpty
+                            ? ""
+                            : ExercisePrimaryGroup.displayName(for: exerciseCategory)
+                    )
                 )
                 viewModel = vm
                 Task { await vm.loadData() }

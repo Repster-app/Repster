@@ -72,9 +72,9 @@ final class ExerciseListViewModel {
             allExercises = try await exerciseService.fetchAllExercises()
             allExerciseStats = try await statsService.fetchAllStats()
 
-            availableMuscleGroups = Array(
-                Set(allExercises.compactMap { $0.primaryMuscle?.lowercased() })
-            ).sorted()
+            availableMuscleGroups = ExerciseMuscleGroupCatalog.orderedValues(
+                from: allExercises.compactMap(\.primaryMuscle)
+            )
 
             applyFiltersAndSort()
         } catch {
@@ -121,7 +121,7 @@ final class ExerciseListViewModel {
         // Muscle filter (case-insensitive: filters are stored lowercase)
         if !selectedMuscleFilters.isEmpty {
             result = result.filter {
-                guard let muscle = $0.primaryMuscle?.lowercased() else { return false }
+                guard let muscle = ExercisePrimaryGroup.normalizedValue($0.primaryMuscle) else { return false }
                 return selectedMuscleFilters.contains(muscle)
             }
         }

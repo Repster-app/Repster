@@ -40,6 +40,8 @@ actor SetService: SetServiceProtocol {
     // MARK: - SetServiceProtocol
 
     func save(_ set: WorkoutSet) async throws -> SetSaveResult {
+        set.syncDerivedPerformanceFields(for: try await exerciseRepo.fetch(byId: set.exerciseId))
+
         // 1. Compute effectiveWeight (specdoc S5.4)
         let effectiveWeight = try await computeEffectiveWeight(
             weight: set.weight,
@@ -58,12 +60,13 @@ actor SetService: SetServiceProtocol {
 
         // 2. Persist immediately (FR-012)
         try await setRepo.save(set)
+        set.markFatigueLearningSnapshotPersisted(effectiveWeightOverride: effectiveWeight)
 
         // 3. PR evaluation (FR-002)
         let prResult = try await prService.evaluate(
             setId: set.id,
             exerciseId: set.exerciseId,
-            reps: set.reps ?? 0,
+            reps: set.prReps,
             effectiveWeight: effectiveWeight ?? 0,
             workoutId: set.workoutId,
             setType: set.setType,
@@ -76,7 +79,7 @@ actor SetService: SetServiceProtocol {
         try await statsService.updateStats(
             for: set.exerciseId,
             event: .save(
-                reps: set.reps ?? 0,
+                reps: set.statsReps,
                 effectiveWeight: effectiveWeight ?? 0,
                 setType: set.setType,
                 hasData: set.hasData,
@@ -93,11 +96,14 @@ actor SetService: SetServiceProtocol {
     }
 
     func edit(_ set: WorkoutSet) async throws -> SetSaveResult {
+        set.syncDerivedPerformanceFields(for: try await exerciseRepo.fetch(byId: set.exerciseId))
+
         // 1. Capture old values BEFORE changes (for stats delta)
         guard let oldSet = try await setRepo.fetch(byId: set.id) else {
             throw SetServiceError.setNotFound(set.id)
         }
-        let oldReps = oldSet.reps ?? 0
+        let previousFatigueSnapshot = set.persistedFatigueSnapshot ?? oldSet.fatigueLearningSnapshot()
+        let oldReps = oldSet.statsReps
         let oldEffectiveWeight = oldSet.effectiveWeight ?? 0
         let oldSetType = oldSet.setType
         let oldHasData = oldSet.hasData
@@ -129,7 +135,7 @@ actor SetService: SetServiceProtocol {
         let prResult = try await prService.evaluateAfterEdit(
             setId: set.id,
             exerciseId: set.exerciseId,
-            reps: set.reps ?? 0,
+            reps: set.prReps,
             effectiveWeight: newEffectiveWeight ?? 0,
             workoutId: set.workoutId,
             setType: set.setType,
@@ -147,7 +153,7 @@ actor SetService: SetServiceProtocol {
                 oldEffectiveWeight: oldEffectiveWeight,
                 oldSetType: oldSetType,
                 oldHasData: oldHasData,
-                newReps: set.reps ?? 0,
+                newReps: set.statsReps,
                 newEffectiveWeight: newEffectiveWeight ?? 0,
                 newSetType: set.setType,
                 newHasData: set.hasData,
@@ -156,9 +162,17 @@ actor SetService: SetServiceProtocol {
             )
         )
 
-        if shouldInvalidateFatigueCapture(previous: oldSet, updated: set) {
+        let currentFatigueSnapshot = set.fatigueLearningSnapshot(effectiveWeightOverride: newEffectiveWeight)
+        if try await fatigueLearningService.capturedSetDataNeedsInvalidation(
+            setId: set.id,
+            workoutId: set.workoutId,
+            exerciseId: set.exerciseId,
+            previous: previousFatigueSnapshot,
+            current: currentFatigueSnapshot
+        ) {
             try await fatigueLearningService.removeCapturedSetData(setId: set.id)
         }
+        set.persistedFatigueSnapshot = currentFatigueSnapshot
 
         return SetSaveResult(
             setId: set.id,
@@ -171,7 +185,8 @@ actor SetService: SetServiceProtocol {
         // 1. Capture old values BEFORE mutation (same pattern as delete)
         let setId = set.id
         let exerciseId = set.exerciseId
-        let reps = set.reps ?? 0
+        let reps = set.statsReps
+        let prReps = set.prReps
         let effectiveWeight = set.effectiveWeight ?? 0
         let setType = set.setType
         let hasData = set.hasData
@@ -187,13 +202,14 @@ actor SetService: SetServiceProtocol {
 
         // 3. Persist (flat save — no PR/stats pipeline)
         try await setRepo.save(set)
+        set.markFatigueLearningSnapshotPersisted(effectiveWeightOverride: effectiveWeight)
 
         // 4. PR demotion — same as delete path
         // handleDeletion is a no-op if this set wasn't the PR owner
         let prResult = try await prService.handleDeletion(
             setId: setId,
             exerciseId: exerciseId,
-            reps: reps,
+            reps: prReps,
             cachedPRStatus: cachedPRStatus
         )
 
@@ -223,7 +239,8 @@ actor SetService: SetServiceProtocol {
         // 1. Capture values before deletion
         let setId = set.id
         let exerciseId = set.exerciseId
-        let reps = set.reps ?? 0
+        let reps = set.statsReps
+        let prReps = set.prReps
         let effectiveWeight = set.effectiveWeight ?? 0
         let setType = set.setType
         let hasData = set.hasData
@@ -238,7 +255,7 @@ actor SetService: SetServiceProtocol {
         _ = try await prService.handleDeletion(
             setId: setId,
             exerciseId: exerciseId,
-            reps: reps,
+            reps: prReps,
             cachedPRStatus: cachedPRStatus
         )
 
@@ -261,7 +278,9 @@ actor SetService: SetServiceProtocol {
     // MARK: - Fetch (006: Active Workout Screen)
 
     func fetchSets(for workoutId: UUID) async throws -> [WorkoutSet] {
-        return try await setRepo.fetchSets(for: workoutId)
+        let sets = try await setRepo.fetchSets(for: workoutId)
+        sets.forEach { $0.markFatigueLearningSnapshotPersisted() }
+        return sets
     }
 
     func fetchExerciseIds(for workoutId: UUID) async throws -> Swift.Set<UUID> {
@@ -271,7 +290,9 @@ actor SetService: SetServiceProtocol {
     // MARK: - Fetch by Exercise (007: Exercise List + Detail)
 
     func fetchSets(for exerciseId: UUID, limit: Int?) async throws -> [WorkoutSet] {
-        try await setRepo.fetchSets(for: exerciseId, limit: limit)
+        let sets = try await setRepo.fetchSets(for: exerciseId, limit: limit)
+        sets.forEach { $0.markFatigueLearningSnapshotPersisted() }
+        return sets
     }
 
     // MARK: - Helpers
@@ -306,17 +327,5 @@ actor SetService: SetServiceProtocol {
         }
 
         return weight + (bodyweight * exercise.bodyweightFactor)
-    }
-
-    private func shouldInvalidateFatigueCapture(previous: WorkoutSet, updated: WorkoutSet) -> Bool {
-        guard previous.completed else { return false }
-
-        return previous.setType != updated.setType
-            || previous.weight != updated.weight
-            || previous.reps != updated.reps
-            || previous.rir != updated.rir
-            || previous.exerciseId != updated.exerciseId
-            || previous.workoutId != updated.workoutId
-            || previous.restDurationSeconds != updated.restDurationSeconds
     }
 }

@@ -349,13 +349,7 @@ final class ActiveWorkoutViewModel {
     ///
     /// Persists via SetService.save() (triggers PR + stats pipeline),
     /// updates local state with results, and starts the rest timer.
-    func completeSet(
-        _ set: WorkoutSet,
-        weight: Double?,
-        reps: Int?,
-        durationSeconds: Int?,
-        distanceMeters: Double?
-    ) async {
+    func completeSet(_ set: WorkoutSet, input: SetCompletionInput) async {
         do {
             // 0. Capture the current suggestion state before the set leaves the pending list.
             let suggestionState = weightSuggestionData?.rowState(for: set.id)
@@ -374,10 +368,7 @@ final class ActiveWorkoutViewModel {
             }
 
             // 1. Update the set object with input values
-            set.weight = weight
-            set.reps = reps
-            set.durationSeconds = durationSeconds
-            set.distanceMeters = distanceMeters
+            applyCompletionInput(input, to: set)
             set.completed = true
             set.completedAt = Date()
             set.updatedAt = Date()
@@ -1410,6 +1401,7 @@ final class ActiveWorkoutViewModel {
 
             let data = try await ExerciseInfoProvider.compute(
                 currentSets: currentSets,
+                exercise: exercise,
                 exerciseId: exercise.id,
                 currentWorkoutId: workout.id,
                 trackingType: exercise.trackingType,
@@ -1600,7 +1592,7 @@ final class ActiveWorkoutViewModel {
 
             // Best weight and reps in this exercise
             let bestWeight = completedSets.compactMap(\.effectiveWeight).max()
-            let bestReps = completedSets.compactMap(\.reps).max()
+            let bestReps = completedSets.map(\.prReps).max()
 
             // PRs hit (cachedPRStatus == .current)
             let exercisePRs = sets.filter { $0.cachedPRStatus == .current }.count
@@ -1814,6 +1806,28 @@ extension ActiveWorkoutViewModel: SetTableDataSource {
             }
         } catch {
             print("[ActiveWorkoutViewModel] Failed to update set note: \(error)")
+        }
+    }
+
+    private func applyCompletionInput(_ input: SetCompletionInput, to set: WorkoutSet) {
+        let exercise = exercises.first { $0.id == set.exerciseId }
+
+        set.weight = input.weight
+        set.durationSeconds = input.durationSeconds
+        set.distanceMeters = input.distanceMeters
+        set.leftReps = input.leftReps
+        set.rightReps = input.rightReps
+        set.leftRIR = input.leftRIR
+        set.rightRIR = input.rightRIR
+
+        if exercise?.supportsUnilateralLogging == true, exercise?.unilateral == true {
+            set.reps = input.reps
+            set.rir = input.rir
+            set.syncDerivedPerformanceFields(for: exercise)
+        } else {
+            set.reps = input.reps
+            set.rir = input.rir
+            set.side = nil
         }
     }
 }
