@@ -178,7 +178,7 @@ struct CreateEditExerciseSheet: View {
     private var trackingTypeLockNotice: some View {
         Section {
             Label(
-                "Tracking type cannot be changed because this exercise has recorded sets.",
+                "Tracking type cannot be changed because this exercise has logged data.",
                 systemImage: "lock.fill"
             )
             .font(.caption)

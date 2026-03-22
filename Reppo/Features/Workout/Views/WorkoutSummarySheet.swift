@@ -92,7 +92,7 @@ struct WorkoutSummarySheet: View {
                         notesSection
                         effortSection
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, 14)
                     .padding(.top, 16)
                     .padding(.bottom, 28)
                 }
@@ -159,7 +159,7 @@ struct WorkoutSummarySheet: View {
             Color.clear
                 .frame(width: 72, height: 1)
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
         .padding(.top, 12)
         .padding(.bottom, 16)
         .background(Color.bg)
@@ -394,8 +394,6 @@ struct WorkoutSummarySheet: View {
                         }
                     }
                 }
-                .background(Color.bgInput.opacity(0.75))
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
         }
     }
@@ -419,7 +417,6 @@ struct WorkoutSummarySheet: View {
                 exercisePRTag(isVisible: exercise.hadPR)
             }
         }
-        .padding(.horizontal, 14)
         .padding(.vertical, 12)
     }
 
@@ -629,7 +626,7 @@ struct WorkoutSummarySheet: View {
             }
             .buttonStyle(.plain)
             .disabled(isSaving || isDiscarding)
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 16)
             .padding(.top, 12)
             .padding(.bottom, 12)
         }
@@ -758,7 +755,7 @@ struct WorkoutSummarySheet: View {
         VStack(alignment: .leading, spacing: 0) {
             content()
         }
-        .padding(16)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.bgCard)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))

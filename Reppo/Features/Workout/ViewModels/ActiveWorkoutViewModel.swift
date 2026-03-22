@@ -90,10 +90,6 @@ final class ActiveWorkoutViewModel {
     private let loadPrescriptionService: any LoadPrescriptionServiceProtocol
     let fatigueLearningService: FatigueLearningService
 
-    /// Snapshots of suggestion predictions captured before set completion,
-    /// keyed by set ID. Used by adaptive fatigue learning to compute prediction errors.
-    private var predictionSnapshots: [UUID: PredictionSnapshot] = [:]
-
     /// Exercise IDs that had at least one prediction snapshot recorded during this workout.
     /// Used by WorkoutSummarySheet to show fatigue feedback options.
     private(set) var exerciseIdsWithPredictions: Set<UUID> = []
@@ -361,18 +357,20 @@ final class ActiveWorkoutViewModel {
         distanceMeters: Double?
     ) async {
         do {
-            // 0. Snapshot the current suggestion prediction for fatigue learning
-            //    (must be captured before marking the set as completed)
-            if let suggestion = weightSuggestionData?.suggestion(for: set.id) {
-                predictionSnapshots[set.id] = PredictionSnapshot(
+            // 0. Capture the current suggestion state before the set leaves the pending list.
+            let suggestionState = weightSuggestionData?.rowState(for: set.id)
+            let predictionSnapshot: PredictionSnapshot?
+            if let suggestion = suggestionState?.suggestion {
+                let formulaRawValue = (try? await healthProfileRepo.fetchOrCreate().e1RMFormula) ?? "epley"
+                predictionSnapshot = PredictionSnapshot(
                     effectiveE1RM: suggestion.diagnostics.effectiveE1RM,
                     baseE1RM: suggestion.diagnostics.baseE1RM,
                     prescribedWeight: suggestion.suggestedWeight,
-                    formula: E1RMFormula(rawValue:
-                        (try? await healthProfileRepo.fetchOrCreate().e1RMFormula) ?? "epley"
-                    ) ?? .epley
+                    formula: E1RMFormula(rawValue: formulaRawValue) ?? .epley
                 )
                 exerciseIdsWithPredictions.insert(set.exerciseId)
+            } else {
+                predictionSnapshot = nil
             }
 
             // 1. Update the set object with input values
@@ -399,28 +397,28 @@ final class ActiveWorkoutViewModel {
                 setsByExercise[set.exerciseId] = sets
             }
 
-            // 5. Record fatigue learning observation (non-blocking)
-            if let snapshot = predictionSnapshots.removeValue(forKey: set.id),
-               let actualWeight = set.effectiveWeight ?? set.weight,
-               let actualReps = set.reps,
-               set.setType != .warmup {
-                // Compute set index: count of completed working sets for this exercise before this one
-                let completedWorkingSetCount = setsByExercise[set.exerciseId]?
-                    .filter { $0.completed && $0.setType != .warmup && $0.id != set.id }
-                    .count ?? 0
+            // 5. Record fatigue learning capture deterministically for every completed set.
+            let completedWorkingSetCount = setsByExercise[set.exerciseId]?
+                .filter { $0.completed && $0.setType != .warmup && $0.id != set.id }
+                .count ?? 0
 
-                Task {
-                    try? await fatigueLearningService.recordObservation(
-                        exerciseId: set.exerciseId,
-                        workoutId: set.workoutId,
-                        setIndex: completedWorkingSetCount,
-                        prediction: snapshot,
-                        actualWeight: actualWeight,
-                        actualReps: actualReps,
-                        actualRIR: set.rir,
-                        restDurationSeconds: set.restDurationSeconds
-                    )
-                }
+            do {
+                _ = try await fatigueLearningService.captureCompletedSet(
+                    setId: set.id,
+                    exerciseId: set.exerciseId,
+                    workoutId: set.workoutId,
+                    visibleSetNumber: set.orderInExercise,
+                    setType: set.setType,
+                    priorCompletedWorkingSetCount: completedWorkingSetCount,
+                    suggestionUnavailableReason: suggestionState?.unavailableReason,
+                    prediction: predictionSnapshot,
+                    actualWeight: set.effectiveWeight ?? set.weight,
+                    actualReps: set.reps,
+                    actualRIR: set.rir,
+                    restDurationSeconds: set.restDurationSeconds
+                )
+            } catch {
+                print("[ActiveWorkoutViewModel] Failed to capture fatigue learning for set \(set.id): \(error)")
             }
 
             // 6. Start rest timer: warmup sets use warmup rest time, working sets use default.
@@ -478,6 +476,7 @@ final class ActiveWorkoutViewModel {
             if currentExercise?.id == exerciseId {
                 requestWeightSuggestionRefresh(mode: .preserveExisting, invalidateCache: true)
             }
+
         } catch {
             // Revert on failure
             set.completed = oldCompleted

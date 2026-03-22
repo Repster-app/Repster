@@ -83,8 +83,8 @@ struct ExerciseInfoSectionView: View {
                 ),
                 lastWorkoutInfo: LastWorkoutInfo(
                     topSets: [
-                        TopSet(weight: 85, reps: 8, durationSeconds: nil, formattedLabel: "85×8"),
-                        TopSet(weight: 80, reps: 8, durationSeconds: nil, formattedLabel: "80×8")
+                        TopSet(weight: 85, reps: 8, durationSeconds: nil, distanceMeters: nil, formattedLabel: "85×8"),
+                        TopSet(weight: 80, reps: 8, durationSeconds: nil, distanceMeters: nil, formattedLabel: "80×8")
                     ],
                     daysAgo: 9,
                     relativeTimeLabel: "9 days ago"
@@ -103,7 +103,7 @@ struct ExerciseInfoSectionView: View {
     }
 }
 
-#Preview("Duration Exercise") {
+#Preview("Duration + Distance Exercise") {
     ZStack {
         Color.bg.ignoresSafeArea()
         ExerciseInfoSectionView(
@@ -111,13 +111,13 @@ struct ExerciseInfoSectionView: View {
                 e1RMInfo: nil,
                 lastWorkoutInfo: LastWorkoutInfo(
                     topSets: [
-                        TopSet(weight: 0, reps: nil, durationSeconds: 150, formattedLabel: "2m 30s")
+                        TopSet(weight: 0, reps: nil, durationSeconds: 150, distanceMeters: 400, formattedLabel: "2m 30s • 400 m")
                     ],
                     daysAgo: 3,
                     relativeTimeLabel: "3 days ago"
                 ),
                 estimatedRepsInfo: nil,
-                trackingType: .duration
+                trackingType: .durationDistance
             ),
             unitPreference: .metric,
             isLoading: false

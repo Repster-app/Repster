@@ -279,6 +279,8 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
         XCTAssertEqual(restoreResult.workoutsRestored, 2)
         XCTAssertEqual(restoreResult.exercisesUpserted, 1)
         XCTAssertEqual(restoreResult.setsRestored, 2)
+        XCTAssertEqual(restoreResult.skippedFatigueObservations, 0)
+        XCTAssertEqual(restoreResult.skippedFatigueLearningAudits, 0)
         XCTAssertEqual(restoredWorkouts.count, 2)
         XCTAssertFalse(restoredWorkouts.contains(where: { $0.id == replacementWorkoutId }))
         XCTAssertEqual(restoredWorkouts.filter { Calendar.current.isDate($0.date, inSameDayAs: firstWorkoutDate) }.count, 2)
@@ -295,6 +297,363 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
         XCTAssertEqual(records.count, 1)
     }
 
+    func testBackupRoundTripPreservesFatigueLearningAuditsAndGlobalProfileLearning() async throws {
+        let context = try makeBackupServiceContext()
+        let exercise = Exercise(
+            name: "Lat Pulldown",
+            equipmentType: .machinePin,
+            trackingType: .weightReps,
+            defaultRestTime: 150
+        )
+        try await context.exerciseRepo.save(exercise)
+
+        let workoutDate = makeDate(2026, 3, 20, 17, 0)
+        let workout = Workout(
+            date: workoutDate,
+            title: "Pull Day",
+            startTime: workoutDate,
+            endTime: makeDate(2026, 3, 20, 18, 0),
+            duration: 3600,
+            status: .completed
+        )
+        try await context.workoutRepo.save(workout)
+
+        let set = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            date: workoutDate,
+            completedAt: makeDate(2026, 3, 20, 17, 20),
+            weight: 80,
+            effectiveWeight: 80,
+            reps: 8,
+            rir: 0,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true,
+            createdAt: makeDate(2026, 3, 20, 17, 10),
+            updatedAt: makeDate(2026, 3, 20, 17, 20),
+            restDurationSeconds: 150
+        )
+        try await context.setRepo.save(set)
+
+        let profile = try await context.healthProfileRepo.fetchOrCreate()
+        profile.prescriptionLearnedFatigueRate = 0.047
+        profile.prescriptionFatigueLearningSessionCount = 3
+        profile.prescriptionFatigueLearningCumulativeError = -0.012
+        try await context.healthProfileRepo.save(profile)
+
+        let learningContext = ModelContext(context.modelContainer)
+        learningContext.insert(
+            FatigueObservation(
+                exerciseId: exercise.id,
+                workoutId: workout.id,
+                setId: set.id,
+                setIndex: 1,
+                predictedEffectiveE1RM: 120,
+                actualE1RM: 126,
+                normalizedError: -0.04,
+                baseE1RM: 130,
+                prescribedWeight: 77.5,
+                actualWeight: 80,
+                actualReps: 8,
+                actualRIR: 0,
+                restDurationSeconds: 150,
+                createdAt: makeDate(2026, 3, 20, 17, 20)
+            )
+        )
+        learningContext.insert(
+            FatigueLearningSetAudit(
+                workoutId: workout.id,
+                exerciseId: exercise.id,
+                setId: set.id,
+                visibleSetNumber: 2,
+                setType: .working,
+                status: .used,
+                predictedEffectiveE1RM: 120,
+                baseE1RM: 130,
+                prescribedWeight: 77.5,
+                actualWeight: 80,
+                actualReps: 8,
+                actualRIR: 0,
+                deviationFraction: 0.0323,
+                normalizedError: -0.04,
+                createdAt: makeDate(2026, 3, 20, 17, 20)
+            )
+        )
+        try learningContext.save()
+
+        let backupData = try await context.service.exportBackup()
+        let archive = try decodeBackupArchive(backupData)
+
+        XCTAssertEqual(archive.fatigueObservations?.count, 1)
+        XCTAssertEqual(archive.fatigueLearningAudits?.count, 1)
+        XCTAssertEqual(archive.healthProfileLearning?.prescriptionLearnedFatigueRate ?? 0, 0.047, accuracy: 0.0001)
+        XCTAssertEqual(archive.healthProfileLearning?.prescriptionFatigueLearningSessionCount, 3)
+
+        let restoredContext = try makeBackupServiceContext()
+        let restoreResult = try await restoredContext.service.restoreBackup(data: backupData)
+
+        let restoredProfile = try await restoredContext.healthProfileRepo.fetchOrCreate()
+        let verificationContext = ModelContext(restoredContext.modelContainer)
+        let restoredObservations = try verificationContext.fetch(FetchDescriptor<FatigueObservation>())
+        let restoredAudits = try verificationContext.fetch(FetchDescriptor<FatigueLearningSetAudit>())
+
+        XCTAssertEqual(restoreResult.skippedFatigueObservations, 0)
+        XCTAssertEqual(restoreResult.skippedFatigueLearningAudits, 0)
+        XCTAssertEqual(restoredProfile.prescriptionLearnedFatigueRate ?? 0, 0.047, accuracy: 0.0001)
+        XCTAssertEqual(restoredProfile.prescriptionFatigueLearningSessionCount, 3)
+        XCTAssertEqual(restoredProfile.prescriptionFatigueLearningCumulativeError ?? 0, -0.012, accuracy: 0.0001)
+        XCTAssertEqual(restoredObservations.count, 1)
+        XCTAssertEqual(restoredObservations.first?.setId, set.id)
+        XCTAssertEqual(restoredAudits.count, 1)
+        XCTAssertEqual(restoredAudits.first?.status, .used)
+        XCTAssertEqual(restoredAudits.first?.setId, set.id)
+    }
+
+    func testExportBackupSkipsOrphanedFatigueLearningRows() async throws {
+        let context = try makeBackupServiceContext()
+        let exercise = Exercise(
+            name: "Incline Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps
+        )
+        let workoutDate = makeDate(2026, 3, 21, 9, 0)
+        let workout = Workout(
+            date: workoutDate,
+            title: "Push Day",
+            startTime: workoutDate,
+            endTime: makeDate(2026, 3, 21, 10, 0),
+            duration: 3600,
+            status: .completed
+        )
+        let set = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            date: workoutDate,
+            completedAt: makeDate(2026, 3, 21, 9, 20),
+            weight: 70,
+            effectiveWeight: 70,
+            reps: 8,
+            rir: 1,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(workout)
+        try await context.setRepo.save(set)
+        let learningContext = ModelContext(context.modelContainer)
+        let validRecords = try insertLearningRecords(
+            into: learningContext,
+            exerciseId: exercise.id,
+            workoutId: workout.id,
+            setId: set.id,
+            createdAt: makeDate(2026, 3, 21, 9, 20)
+        )
+        learningContext.insert(
+            FatigueObservation(
+                exerciseId: exercise.id,
+                workoutId: UUID(),
+                setId: UUID(),
+                setIndex: 2,
+                predictedEffectiveE1RM: 125,
+                actualE1RM: 120,
+                normalizedError: 0.04,
+                baseE1RM: 130,
+                prescribedWeight: 72.5,
+                actualWeight: 70,
+                actualReps: 8,
+                actualRIR: 1,
+                createdAt: makeDate(2026, 3, 21, 9, 35)
+            )
+        )
+        learningContext.insert(
+            FatigueLearningSetAudit(
+                workoutId: workout.id,
+                exerciseId: exercise.id,
+                setId: UUID(),
+                visibleSetNumber: 3,
+                setType: .working,
+                status: .used,
+                predictedEffectiveE1RM: 125,
+                baseE1RM: 130,
+                prescribedWeight: 72.5,
+                actualWeight: 70,
+                actualReps: 8,
+                actualRIR: 1,
+                deviationFraction: 0.03,
+                normalizedError: -0.02,
+                createdAt: makeDate(2026, 3, 21, 9, 35)
+            )
+        )
+        try learningContext.save()
+
+        let backupData = try await context.service.exportBackup()
+        let archive = try decodeBackupArchive(backupData)
+
+        XCTAssertEqual(archive.fatigueObservations?.map(\.id), [validRecords.observation.id])
+        XCTAssertEqual(archive.fatigueLearningAudits?.map(\.id), [validRecords.audit.id])
+    }
+
+    func testRestoreBackupSkipsOrphanedFatigueLearningRowsAndReturnsWarningCounts() async throws {
+        let context = try makeBackupServiceContext()
+        let exercise = Exercise(
+            name: "Row",
+            equipmentType: .cable,
+            trackingType: .weightReps
+        )
+        let workoutDate = makeDate(2026, 3, 22, 8, 0)
+        let workout = Workout(
+            date: workoutDate,
+            title: "Back Day",
+            startTime: workoutDate,
+            endTime: makeDate(2026, 3, 22, 9, 0),
+            duration: 3600,
+            status: .completed
+        )
+        let set = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            date: workoutDate,
+            completedAt: makeDate(2026, 3, 22, 8, 15),
+            weight: 65,
+            effectiveWeight: 65,
+            reps: 10,
+            rir: 0,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(workout)
+        try await context.setRepo.save(set)
+        let learningContext = ModelContext(context.modelContainer)
+        let validRecords = try insertLearningRecords(
+            into: learningContext,
+            exerciseId: exercise.id,
+            workoutId: workout.id,
+            setId: set.id,
+            createdAt: makeDate(2026, 3, 22, 8, 15)
+        )
+        try learningContext.save()
+
+        let backupData = try await context.service.exportBackup()
+        let archive = try decodeBackupArchive(backupData)
+        let orphanObservation = WorkoutHistoryArchiveFatigueObservation(
+            id: UUID(),
+            exerciseId: exercise.id,
+            workoutId: workout.id,
+            setId: UUID(),
+            setIndex: 2,
+            predictedEffectiveE1RM: 118,
+            actualE1RM: 115,
+            normalizedError: 0.02,
+            baseE1RM: 120,
+            prescribedWeight: 67.5,
+            actualWeight: 65,
+            actualReps: 10,
+            actualRIR: 0,
+            restDurationSeconds: 150,
+            createdAt: makeDate(2026, 3, 22, 8, 25)
+        )
+        let orphanAudit = WorkoutHistoryArchiveFatigueLearningSetAudit(
+            id: UUID(),
+            workoutId: UUID(),
+            exerciseId: exercise.id,
+            setId: set.id,
+            visibleSetNumber: 2,
+            setType: .working,
+            status: .used,
+            suggestionUnavailableReasonRawValue: nil,
+            predictedEffectiveE1RM: 118,
+            baseE1RM: 120,
+            prescribedWeight: 67.5,
+            actualWeight: 65,
+            actualReps: 10,
+            actualRIR: 0,
+            deviationFraction: 0.01,
+            normalizedError: -0.01,
+            createdAt: makeDate(2026, 3, 22, 8, 25)
+        )
+        let mutatedArchive = WorkoutHistoryArchive(
+            version: archive.version,
+            exportedAt: archive.exportedAt,
+            workouts: archive.workouts,
+            exercises: archive.exercises,
+            sets: archive.sets,
+            fatigueObservations: (archive.fatigueObservations ?? []) + [orphanObservation],
+            fatigueLearningAudits: (archive.fatigueLearningAudits ?? []) + [orphanAudit],
+            healthProfileLearning: archive.healthProfileLearning
+        )
+
+        let restoredContext = try makeBackupServiceContext()
+        let restoreResult = try await restoredContext.service.restoreBackup(data: try encodeBackupArchive(mutatedArchive))
+        let verificationContext = ModelContext(restoredContext.modelContainer)
+        let restoredObservations = try verificationContext.fetch(FetchDescriptor<FatigueObservation>())
+        let restoredAudits = try verificationContext.fetch(FetchDescriptor<FatigueLearningSetAudit>())
+
+        XCTAssertEqual(restoreResult.workoutsRestored, 1)
+        XCTAssertEqual(restoreResult.exercisesUpserted, 1)
+        XCTAssertEqual(restoreResult.setsRestored, 1)
+        XCTAssertEqual(restoreResult.skippedFatigueObservations, 1)
+        XCTAssertEqual(restoreResult.skippedFatigueLearningAudits, 1)
+        XCTAssertTrue(restoreResult.hasSkippedLearningData)
+        XCTAssertNotNil(restoreResult.learningDataWarningMessage)
+        XCTAssertEqual(restoredObservations.map(\.id), [validRecords.observation.id])
+        XCTAssertEqual(restoredAudits.map(\.id), [validRecords.audit.id])
+    }
+
+    func testFatigueObservationRepositoryDeletesLegacyRowsWithoutStoredSetId() async throws {
+        let context = try makeBackupServiceContext()
+        let exercise = Exercise(
+            name: "Chest Press",
+            equipmentType: .machinePin,
+            trackingType: .weightReps
+        )
+        let workout = Workout(
+            date: makeDate(2026, 3, 20, 17, 0),
+            title: "Legacy Session",
+            startTime: makeDate(2026, 3, 20, 17, 0),
+            status: .completed
+        )
+
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(workout)
+
+        let observation = FatigueObservation(
+            id: UUID(),
+            exerciseId: exercise.id,
+            workoutId: workout.id,
+            setId: UUID(),
+            setIndex: 1,
+            predictedEffectiveE1RM: 120,
+            actualE1RM: 125,
+            normalizedError: -0.04,
+            baseE1RM: 130,
+            prescribedWeight: 80,
+            actualWeight: 82.5,
+            actualReps: 8,
+            actualRIR: 0,
+            createdAt: makeDate(2026, 3, 20, 17, 30)
+        )
+        observation.storedSetId = nil
+
+        let modelContext = ModelContext(context.modelContainer)
+        modelContext.insert(observation)
+        try modelContext.save()
+
+        let repo = FatigueObservationRepository(modelContainer: context.modelContainer)
+        try await repo.deleteObservation(for: observation.id)
+
+        let remaining = try modelContext.fetch(FetchDescriptor<FatigueObservation>())
+        XCTAssertTrue(remaining.isEmpty)
+    }
+
     func testRestoreBackupRejectsUnsupportedArchiveVersion() async throws {
         let context = try makeBackupServiceContext()
         let invalidArchive = WorkoutHistoryArchive(
@@ -303,7 +662,9 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             workouts: [],
             exercises: [],
             sets: [],
-            fatigueObservations: nil
+            fatigueObservations: nil,
+            fatigueLearningAudits: nil,
+            healthProfileLearning: nil
         )
         let invalidData = try encodeBackupArchive(invalidArchive)
 
@@ -316,6 +677,170 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             }
             XCTAssertEqual(version, 99)
         }
+    }
+
+    func testRestoreBackupRejectsArchiveWithSetReferencingMissingWorkout() async throws {
+        let context = try makeBackupServiceContext()
+        let exercise = Exercise(
+            name: "Split Squat",
+            equipmentType: .dumbbell,
+            trackingType: .weightReps
+        )
+        let workoutDate = makeDate(2026, 3, 23, 7, 0)
+        let workout = Workout(
+            date: workoutDate,
+            title: "Leg Day",
+            startTime: workoutDate,
+            endTime: makeDate(2026, 3, 23, 8, 0),
+            duration: 3600,
+            status: .completed
+        )
+        let set = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            date: workoutDate,
+            weight: 20,
+            effectiveWeight: 20,
+            reps: 10,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(workout)
+        try await context.setRepo.save(set)
+
+        let archive = try decodeBackupArchive(try await context.service.exportBackup())
+        let invalidArchive = WorkoutHistoryArchive(
+            version: archive.version,
+            exportedAt: archive.exportedAt,
+            workouts: [],
+            exercises: archive.exercises,
+            sets: archive.sets,
+            fatigueObservations: archive.fatigueObservations,
+            fatigueLearningAudits: archive.fatigueLearningAudits,
+            healthProfileLearning: archive.healthProfileLearning
+        )
+
+        do {
+            _ = try await context.service.restoreBackup(data: try encodeBackupArchive(invalidArchive))
+            XCTFail("Expected invalid archive to fail")
+        } catch let error as WorkoutHistoryBackupError {
+            guard case .invalidArchive(let message) = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+            XCTAssertTrue(message.contains("references a missing workout"))
+        }
+    }
+
+    func testWorkoutServiceDeleteWorkoutRemovesCapturedLearningData() async throws {
+        let context = try makeBackupServiceContext()
+        let exercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps
+        )
+        let workoutDate = makeDate(2026, 3, 24, 18, 0)
+        let workout = Workout(
+            date: workoutDate,
+            title: "Push",
+            startTime: workoutDate,
+            endTime: makeDate(2026, 3, 24, 19, 0),
+            duration: 3600,
+            status: .completed
+        )
+        let set = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            date: workoutDate,
+            weight: 100,
+            effectiveWeight: 100,
+            reps: 5,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(workout)
+        try await context.setRepo.save(set)
+        let learningContext = ModelContext(context.modelContainer)
+        _ = try insertLearningRecords(
+            into: learningContext,
+            exerciseId: exercise.id,
+            workoutId: workout.id,
+            setId: set.id,
+            createdAt: makeDate(2026, 3, 24, 18, 20)
+        )
+        try learningContext.save()
+
+        try await context.workoutService.deleteWorkout(workout.id)
+
+        let verificationContext = ModelContext(context.modelContainer)
+        let remainingWorkouts = try await context.workoutRepo.fetchAllWorkouts(limit: nil, offset: nil)
+        let remainingSets = try await context.setRepo.fetchSets(from: .distantPast, to: .distantFuture)
+        XCTAssertTrue(try verificationContext.fetch(FetchDescriptor<FatigueObservation>()).isEmpty)
+        XCTAssertTrue(try verificationContext.fetch(FetchDescriptor<FatigueLearningSetAudit>()).isEmpty)
+        XCTAssertTrue(remainingWorkouts.isEmpty)
+        XCTAssertTrue(remainingSets.isEmpty)
+    }
+
+    func testExerciseServiceDeleteExerciseRemovesCapturedLearningData() async throws {
+        let context = try makeBackupServiceContext()
+        let exercise = Exercise(
+            name: "Lat Pulldown",
+            equipmentType: .machinePin,
+            trackingType: .weightReps
+        )
+        let workoutDate = makeDate(2026, 3, 25, 17, 0)
+        let workout = Workout(
+            date: workoutDate,
+            title: "Pull",
+            startTime: workoutDate,
+            endTime: makeDate(2026, 3, 25, 18, 0),
+            duration: 3600,
+            status: .completed
+        )
+        let set = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            date: workoutDate,
+            weight: 75,
+            effectiveWeight: 75,
+            reps: 8,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(workout)
+        try await context.setRepo.save(set)
+        let learningContext = ModelContext(context.modelContainer)
+        _ = try insertLearningRecords(
+            into: learningContext,
+            exerciseId: exercise.id,
+            workoutId: workout.id,
+            setId: set.id,
+            createdAt: makeDate(2026, 3, 25, 17, 25)
+        )
+        try learningContext.save()
+
+        try await context.exerciseService.deleteExercise(exercise.id)
+
+        let verificationContext = ModelContext(context.modelContainer)
+        let deletedExercise = try await context.exerciseRepo.fetch(byId: exercise.id)
+        let remainingSets = try await context.setRepo.fetchSets(from: .distantPast, to: .distantFuture)
+        let survivingWorkout = try await context.workoutRepo.fetch(byId: workout.id)
+        XCTAssertTrue(try verificationContext.fetch(FetchDescriptor<FatigueObservation>()).isEmpty)
+        XCTAssertTrue(try verificationContext.fetch(FetchDescriptor<FatigueLearningSetAudit>()).isEmpty)
+        XCTAssertNil(deletedExercise)
+        XCTAssertTrue(remainingSets.isEmpty)
+        XCTAssertNotNil(survivingWorkout)
     }
 
     private func makeBackupServiceContext() throws -> WorkoutHistoryBackupArchiveTestContext {
@@ -332,6 +857,7 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             TemplateExercise.self,
             TemplateSet.self,
             FatigueObservation.self,
+            FatigueLearningSetAudit.self,
             configurations: configuration
         )
 
@@ -343,6 +869,7 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
         let bodyweightRepo = BodyweightEntryRepository(modelContainer: container)
         let healthProfileRepo = HealthProfileRepository(modelContainer: container)
         let fatigueObservationRepo = FatigueObservationRepository(modelContainer: container)
+        let fatigueLearningAuditRepo = FatigueLearningSetAuditRepository(modelContainer: container)
 
         let statsService = StatsService(
             exerciseStatsRepository: exerciseStatsRepo,
@@ -357,11 +884,34 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             healthProfileRepository: healthProfileRepo,
             exerciseRepository: exerciseRepo
         )
+        let fatigueLearningService = FatigueLearningService(
+            observationRepo: fatigueObservationRepo,
+            exerciseRepo: exerciseRepo,
+            healthProfileRepo: healthProfileRepo,
+            auditRepo: fatigueLearningAuditRepo
+        )
+        let workoutService = WorkoutService(
+            workoutRepository: workoutRepo,
+            setRepository: setRepo,
+            prService: prService,
+            statsService: statsService,
+            fatigueLearningService: fatigueLearningService
+        )
+        let exerciseService = ExerciseService(
+            exerciseRepository: exerciseRepo,
+            setRepository: setRepo,
+            exerciseStatsRepository: exerciseStatsRepo,
+            performanceRecordRepository: performanceRecordRepo,
+            prService: prService,
+            statsService: statsService,
+            fatigueLearningService: fatigueLearningService
+        )
         let service = WorkoutHistoryBackupService(
             workoutRepo: workoutRepo,
             exerciseRepo: exerciseRepo,
             setRepo: setRepo,
             fatigueObservationRepo: fatigueObservationRepo,
+            fatigueLearningAuditRepo: fatigueLearningAuditRepo,
             statsService: statsService,
             prService: prService,
             modelContainer: container
@@ -370,6 +920,8 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
         return WorkoutHistoryBackupArchiveTestContext(
             modelContainer: container,
             service: service,
+            workoutService: workoutService,
+            exerciseService: exerciseService,
             exerciseRepo: exerciseRepo,
             workoutRepo: workoutRepo,
             setRepo: setRepo,
@@ -390,6 +942,51 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         return try encoder.encode(archive)
+    }
+
+    private func insertLearningRecords(
+        into context: ModelContext,
+        exerciseId: UUID,
+        workoutId: UUID,
+        setId: UUID,
+        createdAt: Date
+    ) throws -> (observation: FatigueObservation, audit: FatigueLearningSetAudit) {
+        let observation = FatigueObservation(
+            exerciseId: exerciseId,
+            workoutId: workoutId,
+            setId: setId,
+            setIndex: 1,
+            predictedEffectiveE1RM: 120,
+            actualE1RM: 126,
+            normalizedError: -0.04,
+            baseE1RM: 130,
+            prescribedWeight: 77.5,
+            actualWeight: 80,
+            actualReps: 8,
+            actualRIR: 0,
+            restDurationSeconds: 150,
+            createdAt: createdAt
+        )
+        let audit = FatigueLearningSetAudit(
+            workoutId: workoutId,
+            exerciseId: exerciseId,
+            setId: setId,
+            visibleSetNumber: 2,
+            setType: .working,
+            status: .used,
+            predictedEffectiveE1RM: 120,
+            baseE1RM: 130,
+            prescribedWeight: 77.5,
+            actualWeight: 80,
+            actualReps: 8,
+            actualRIR: 0,
+            deviationFraction: 0.0323,
+            normalizedError: -0.04,
+            createdAt: createdAt
+        )
+        context.insert(observation)
+        context.insert(audit)
+        return (observation, audit)
     }
 
     private func makeDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int, _ minute: Int) -> Date {
@@ -460,6 +1057,32 @@ final class WorkoutHistoryBackupArchiveViewModelTests: XCTestCase {
 
         XCTAssertEqual(service.restoreCallCount, 1)
         XCTAssertEqual(viewModel.result?.workoutsRestored, 2)
+        XCTAssertNil(viewModel.errorMessage)
+    }
+
+    func testRestoreBackupViewModelCompletesWithWarningCountsAfterConfirmation() async throws {
+        let service = BackupServiceStub()
+        service.restoreResult = WorkoutHistoryRestoreResult(
+            workoutsRestored: 2,
+            exercisesUpserted: 1,
+            setsRestored: 3,
+            skippedFatigueObservations: 2,
+            skippedFatigueLearningAudits: 1,
+            duration: 0.4
+        )
+        let viewModel = RestoreBackupViewModel(workoutHistoryBackupService: service)
+        let fileURL = try makeBackupFileURL()
+
+        viewModel.handleFileSelected(.success(fileURL))
+        viewModel.performRestore()
+
+        try await waitUntilOnMainActor {
+            viewModel.state == .completed
+        }
+
+        XCTAssertEqual(viewModel.result?.skippedFatigueObservations, 2)
+        XCTAssertEqual(viewModel.result?.skippedFatigueLearningAudits, 1)
+        XCTAssertNotNil(viewModel.result?.learningDataWarningMessage)
         XCTAssertNil(viewModel.errorMessage)
     }
 
@@ -760,6 +1383,8 @@ final class ResetAppDataViewModelTests: XCTestCase {
 private struct WorkoutHistoryBackupArchiveTestContext {
     let modelContainer: ModelContainer
     let service: WorkoutHistoryBackupService
+    let workoutService: WorkoutService
+    let exerciseService: ExerciseService
     let exerciseRepo: ExerciseRepository
     let workoutRepo: WorkoutRepository
     let setRepo: SetRepository
@@ -795,6 +1420,8 @@ private final class BackupServiceStub: @unchecked Sendable, WorkoutHistoryBackup
         workoutsRestored: 2,
         exercisesUpserted: 1,
         setsRestored: 3,
+        skippedFatigueObservations: 0,
+        skippedFatigueLearningAudits: 0,
         duration: 0.4
     )
     var restoreCallCount = 0
@@ -913,6 +1540,7 @@ private func makeResetContext() throws -> SettingsResetTestContext {
         TemplateExercise.self,
         TemplateSet.self,
         FatigueObservation.self,
+        FatigueLearningSetAudit.self,
         configurations: configuration
     )
 

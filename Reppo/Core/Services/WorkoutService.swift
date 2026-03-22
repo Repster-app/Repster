@@ -13,17 +13,20 @@ actor WorkoutService: WorkoutServiceProtocol {
     private let setRepo: SetRepositoryProtocol
     private let prService: PRServiceProtocol
     private let statsService: StatsServiceProtocol
+    private let fatigueLearningService: FatigueLearningService
 
     init(
         workoutRepository: WorkoutRepositoryProtocol,
         setRepository: SetRepositoryProtocol,
         prService: PRServiceProtocol,
-        statsService: StatsServiceProtocol
+        statsService: StatsServiceProtocol,
+        fatigueLearningService: FatigueLearningService
     ) {
         self.workoutRepo = workoutRepository
         self.setRepo = setRepository
         self.prService = prService
         self.statsService = statsService
+        self.fatigueLearningService = fatigueLearningService
     }
 
     // MARK: - Workout Lifecycle (FR-001, FR-003, FR-004)
@@ -129,13 +132,16 @@ actor WorkoutService: WorkoutServiceProtocol {
         // 2. Get affected exerciseIds BEFORE deleting sets
         let affectedExerciseIds = try await setRepo.fetchExerciseIds(for: workoutId)
 
-        // 3. Bulk delete all sets for this workout
+        // 3. Remove fatigue learning rows tied to this workout before deleting core history.
+        try await fatigueLearningService.removeCapturedWorkoutData(workoutId: workoutId)
+
+        // 4. Bulk delete all sets for this workout
         try await setRepo.deleteSets(for: workoutId)
 
-        // 4. Delete the workout itself
+        // 5. Delete the workout itself
         try await workoutRepo.delete(workout)
 
-        // 5. Rebuild PRs + stats for each affected exercise
+        // 6. Rebuild PRs + stats for each affected exercise
         for exerciseId in affectedExerciseIds {
             try await prService.rebuild(for: exerciseId)
             try await statsService.rebuild(for: exerciseId)

@@ -3,12 +3,26 @@ import SwiftData
 
 actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
 
+    private struct ArchiveCoreReferences {
+        let workoutIds: Set<UUID>
+        let exerciseIds: Set<UUID>
+        let setsById: [UUID: WorkoutHistoryArchiveSet]
+    }
+
+    private struct SanitizedLearningArchiveData {
+        let observations: [WorkoutHistoryArchiveFatigueObservation]
+        let audits: [WorkoutHistoryArchiveFatigueLearningSetAudit]
+        let skippedObservationCount: Int
+        let skippedAuditCount: Int
+    }
+
     // MARK: - Dependencies
 
     private let workoutRepo: any WorkoutRepositoryProtocol
     private let exerciseRepo: any ExerciseRepositoryProtocol
     private let setRepo: any SetRepositoryProtocol
     private let fatigueObservationRepo: any FatigueObservationRepositoryProtocol
+    private let fatigueLearningAuditRepo: any FatigueLearningSetAuditRepositoryProtocol
     private let statsService: any StatsServiceProtocol
     private let prService: any PRServiceProtocol
     private let modelContainer: ModelContainer
@@ -20,6 +34,7 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
         exerciseRepo: any ExerciseRepositoryProtocol,
         setRepo: any SetRepositoryProtocol,
         fatigueObservationRepo: any FatigueObservationRepositoryProtocol,
+        fatigueLearningAuditRepo: any FatigueLearningSetAuditRepositoryProtocol,
         statsService: any StatsServiceProtocol,
         prService: any PRServiceProtocol,
         modelContainer: ModelContainer
@@ -28,6 +43,7 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
         self.exerciseRepo = exerciseRepo
         self.setRepo = setRepo
         self.fatigueObservationRepo = fatigueObservationRepo
+        self.fatigueLearningAuditRepo = fatigueLearningAuditRepo
         self.statsService = statsService
         self.prService = prService
         self.modelContainer = modelContainer
@@ -56,14 +72,36 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
         let observationContext = ModelContext(modelContainer)
         let allObservations = try observationContext.fetch(FetchDescriptor<FatigueObservation>())
             .sorted { $0.createdAt < $1.createdAt }
+        let allAudits = try observationContext.fetch(FetchDescriptor<FatigueLearningSetAudit>())
+            .sorted { lhs, rhs in
+                if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+                return lhs.visibleSetNumber < rhs.visibleSetNumber
+            }
+        let healthProfile = try observationContext.fetch(FetchDescriptor<HealthProfile>()).first
+
+        let archiveWorkouts = workouts.map(WorkoutHistoryArchiveWorkout.init)
+        let archiveExercises = exercises.map(WorkoutHistoryArchiveExercise.init)
+        let archiveSets = sortedSets.map(WorkoutHistoryArchiveSet.init)
+        let coreReferences = try validateCoreArchive(
+            workouts: archiveWorkouts,
+            exercises: archiveExercises,
+            sets: archiveSets
+        )
+        let sanitizedLearningData = sanitizeLearningData(
+            observations: allObservations.map(WorkoutHistoryArchiveFatigueObservation.init),
+            audits: allAudits.map(WorkoutHistoryArchiveFatigueLearningSetAudit.init),
+            coreReferences: coreReferences
+        )
 
         let archive = WorkoutHistoryArchive(
             version: WorkoutHistoryArchive.currentVersion,
             exportedAt: Date(),
-            workouts: workouts.map(WorkoutHistoryArchiveWorkout.init),
-            exercises: exercises.map(WorkoutHistoryArchiveExercise.init),
-            sets: sortedSets.map(WorkoutHistoryArchiveSet.init),
-            fatigueObservations: allObservations.map(WorkoutHistoryArchiveFatigueObservation.init)
+            workouts: archiveWorkouts,
+            exercises: archiveExercises,
+            sets: archiveSets,
+            fatigueObservations: sanitizedLearningData.observations,
+            fatigueLearningAudits: sanitizedLearningData.audits,
+            healthProfileLearning: healthProfile.map(WorkoutHistoryArchiveHealthProfileLearning.init)
         )
 
         let encoder = JSONEncoder()
@@ -89,7 +127,12 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
 
     func restoreBackup(data: Data) async throws -> WorkoutHistoryRestoreResult {
         let archive = try decodeArchive(data)
-        try validateArchive(archive)
+        let coreReferences = try validateCoreArchive(archive)
+        let sanitizedLearningData = sanitizeLearningData(
+            observations: archive.fatigueObservations ?? [],
+            audits: archive.fatigueLearningAudits ?? [],
+            coreReferences: coreReferences
+        )
 
         let start = Date()
         let context = ModelContext(modelContainer)
@@ -151,13 +194,27 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
         for obs in existingObservations {
             context.delete(obs)
         }
-        if let archivedObservations = archive.fatigueObservations {
-            for archivedObs in archivedObservations {
-                context.insert(archivedObs.makeModel())
-            }
+        for archivedObs in sanitizedLearningData.observations {
+            context.insert(archivedObs.makeModel())
+        }
+
+        let existingAudits = try context.fetch(FetchDescriptor<FatigueLearningSetAudit>())
+        for audit in existingAudits {
+            context.delete(audit)
+        }
+        for archivedAudit in sanitizedLearningData.audits {
+            context.insert(archivedAudit.makeModel())
         }
 
         try context.save()
+
+        if let healthProfileLearning = archive.healthProfileLearning {
+            let profileContext = ModelContext(modelContainer)
+            let profile = try fetchOrCreateHealthProfile(in: profileContext)
+            healthProfileLearning.apply(to: profile)
+            profile.updatedAt = Date()
+            try profileContext.save()
+        }
 
         try await statsService.rebuildAll()
         try await prService.rebuildAll()
@@ -166,6 +223,8 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
             workoutsRestored: archive.workouts.count,
             exercisesUpserted: archive.exercises.count,
             setsRestored: archive.sets.count,
+            skippedFatigueObservations: sanitizedLearningData.skippedObservationCount,
+            skippedFatigueLearningAudits: sanitizedLearningData.skippedAuditCount,
             duration: Date().timeIntervalSince(start)
         )
     }
@@ -198,23 +257,35 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
         return archive
     }
 
-    private nonisolated func validateArchive(_ archive: WorkoutHistoryArchive) throws {
-        let workoutIds = Set(archive.workouts.map(\.id))
-        guard workoutIds.count == archive.workouts.count else {
+    private nonisolated func validateCoreArchive(_ archive: WorkoutHistoryArchive) throws -> ArchiveCoreReferences {
+        try validateCoreArchive(
+            workouts: archive.workouts,
+            exercises: archive.exercises,
+            sets: archive.sets
+        )
+    }
+
+    private nonisolated func validateCoreArchive(
+        workouts: [WorkoutHistoryArchiveWorkout],
+        exercises: [WorkoutHistoryArchiveExercise],
+        sets: [WorkoutHistoryArchiveSet]
+    ) throws -> ArchiveCoreReferences {
+        let workoutIds = Set(workouts.map(\.id))
+        guard workoutIds.count == workouts.count else {
             throw WorkoutHistoryBackupError.invalidArchive("Duplicate workout IDs found.")
         }
 
-        let exerciseIds = Set(archive.exercises.map(\.id))
-        guard exerciseIds.count == archive.exercises.count else {
+        let exerciseIds = Set(exercises.map(\.id))
+        guard exerciseIds.count == exercises.count else {
             throw WorkoutHistoryBackupError.invalidArchive("Duplicate exercise IDs found.")
         }
 
-        let setIds = Set(archive.sets.map(\.id))
-        guard setIds.count == archive.sets.count else {
+        let setIds = Set(sets.map(\.id))
+        guard setIds.count == sets.count else {
             throw WorkoutHistoryBackupError.invalidArchive("Duplicate set IDs found.")
         }
 
-        for set in archive.sets {
+        for set in sets {
             guard workoutIds.contains(set.workoutId) else {
                 throw WorkoutHistoryBackupError.invalidArchive("Set \(set.id) references a missing workout.")
             }
@@ -222,6 +293,57 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
                 throw WorkoutHistoryBackupError.invalidArchive("Set \(set.id) references a missing exercise.")
             }
         }
+
+        return ArchiveCoreReferences(
+            workoutIds: workoutIds,
+            exerciseIds: exerciseIds,
+            setsById: Dictionary(uniqueKeysWithValues: sets.map { ($0.id, $0) })
+        )
+    }
+
+    private nonisolated func sanitizeLearningData(
+        observations: [WorkoutHistoryArchiveFatigueObservation],
+        audits: [WorkoutHistoryArchiveFatigueLearningSetAudit],
+        coreReferences: ArchiveCoreReferences
+    ) -> SanitizedLearningArchiveData {
+        let validObservations = observations.filter { observation in
+            guard coreReferences.workoutIds.contains(observation.workoutId),
+                  coreReferences.exerciseIds.contains(observation.exerciseId),
+                  let archivedSet = coreReferences.setsById[observation.setId] else {
+                return false
+            }
+
+            return archivedSet.workoutId == observation.workoutId
+                && archivedSet.exerciseId == observation.exerciseId
+        }
+
+        let validAudits = audits.filter { audit in
+            guard coreReferences.workoutIds.contains(audit.workoutId),
+                  coreReferences.exerciseIds.contains(audit.exerciseId),
+                  let archivedSet = coreReferences.setsById[audit.setId] else {
+                return false
+            }
+
+            return archivedSet.workoutId == audit.workoutId
+                && archivedSet.exerciseId == audit.exerciseId
+        }
+
+        return SanitizedLearningArchiveData(
+            observations: validObservations,
+            audits: validAudits,
+            skippedObservationCount: observations.count - validObservations.count,
+            skippedAuditCount: audits.count - validAudits.count
+        )
+    }
+
+    private func fetchOrCreateHealthProfile(in context: ModelContext) throws -> HealthProfile {
+        if let existing = try context.fetch(FetchDescriptor<HealthProfile>()).first {
+            return existing
+        }
+        let profile = HealthProfile()
+        context.insert(profile)
+        try context.save()
+        return profile
     }
 }
 
@@ -416,6 +538,7 @@ private extension WorkoutHistoryArchiveFatigueObservation {
             id: obs.id,
             exerciseId: obs.exerciseId,
             workoutId: obs.workoutId,
+            setId: obs.setId,
             setIndex: obs.setIndex,
             predictedEffectiveE1RM: obs.predictedEffectiveE1RM,
             actualE1RM: obs.actualE1RM,
@@ -435,6 +558,7 @@ private extension WorkoutHistoryArchiveFatigueObservation {
             id: id,
             exerciseId: exerciseId,
             workoutId: workoutId,
+            setId: setId,
             setIndex: setIndex,
             predictedEffectiveE1RM: predictedEffectiveE1RM,
             actualE1RM: actualE1RM,
@@ -447,5 +571,67 @@ private extension WorkoutHistoryArchiveFatigueObservation {
             restDurationSeconds: restDurationSeconds,
             createdAt: createdAt
         )
+    }
+}
+
+private extension WorkoutHistoryArchiveFatigueLearningSetAudit {
+    init(_ audit: FatigueLearningSetAudit) {
+        self.init(
+            id: audit.id,
+            workoutId: audit.workoutId,
+            exerciseId: audit.exerciseId,
+            setId: audit.setId,
+            visibleSetNumber: audit.visibleSetNumber,
+            setType: audit.setType,
+            status: audit.status,
+            suggestionUnavailableReasonRawValue: audit.suggestionUnavailableReasonRawValue,
+            predictedEffectiveE1RM: audit.predictedEffectiveE1RM,
+            baseE1RM: audit.baseE1RM,
+            prescribedWeight: audit.prescribedWeight,
+            actualWeight: audit.actualWeight,
+            actualReps: audit.actualReps,
+            actualRIR: audit.actualRIR,
+            deviationFraction: audit.deviationFraction,
+            normalizedError: audit.normalizedError,
+            createdAt: audit.createdAt
+        )
+    }
+
+    func makeModel() -> FatigueLearningSetAudit {
+        FatigueLearningSetAudit(
+            id: id,
+            workoutId: workoutId,
+            exerciseId: exerciseId,
+            setId: setId,
+            visibleSetNumber: visibleSetNumber,
+            setType: setType,
+            status: status,
+            suggestionUnavailableReason: suggestionUnavailableReasonRawValue.flatMap(SuggestionUnavailableReason.init(rawValue:)),
+            predictedEffectiveE1RM: predictedEffectiveE1RM,
+            baseE1RM: baseE1RM,
+            prescribedWeight: prescribedWeight,
+            actualWeight: actualWeight,
+            actualReps: actualReps,
+            actualRIR: actualRIR,
+            deviationFraction: deviationFraction,
+            normalizedError: normalizedError,
+            createdAt: createdAt
+        )
+    }
+}
+
+private extension WorkoutHistoryArchiveHealthProfileLearning {
+    init(_ profile: HealthProfile) {
+        self.init(
+            prescriptionLearnedFatigueRate: profile.prescriptionLearnedFatigueRate,
+            prescriptionFatigueLearningSessionCount: profile.prescriptionFatigueLearningSessionCount,
+            prescriptionFatigueLearningCumulativeError: profile.prescriptionFatigueLearningCumulativeError
+        )
+    }
+
+    func apply(to profile: HealthProfile) {
+        profile.prescriptionLearnedFatigueRate = prescriptionLearnedFatigueRate
+        profile.prescriptionFatigueLearningSessionCount = prescriptionFatigueLearningSessionCount
+        profile.prescriptionFatigueLearningCumulativeError = prescriptionFatigueLearningCumulativeError
     }
 }

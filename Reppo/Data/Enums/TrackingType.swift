@@ -3,6 +3,7 @@ import Foundation
 enum TrackingType: String, Codable, CaseIterable {
     case weightReps
     case duration
+    case durationDistance
     case weightDistance
     case weightRepsDuration
     case custom
@@ -11,6 +12,7 @@ enum TrackingType: String, Codable, CaseIterable {
         switch self {
         case .weightReps:         return "Weight & Reps"
         case .duration:           return "Duration"
+        case .durationDistance:   return "Duration & Distance"
         case .weightDistance:     return "Weight & Distance"
         case .weightRepsDuration: return "Weight, Reps & Duration"
         case .custom:             return "Custom"

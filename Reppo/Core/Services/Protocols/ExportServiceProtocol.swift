@@ -14,7 +14,18 @@ struct WorkoutHistoryRestoreResult: Sendable {
     let workoutsRestored: Int
     let exercisesUpserted: Int
     let setsRestored: Int
+    let skippedFatigueObservations: Int
+    let skippedFatigueLearningAudits: Int
     let duration: TimeInterval
+
+    var hasSkippedLearningData: Bool {
+        skippedFatigueObservations > 0 || skippedFatigueLearningAudits > 0
+    }
+
+    var learningDataWarningMessage: String? {
+        guard hasSkippedLearningData else { return nil }
+        return "Some fatigue learning data could not be restored. Skipped \(skippedFatigueObservations) observation(s) and \(skippedFatigueLearningAudits) audit record(s) because they referenced missing workout history."
+    }
 }
 
 enum WorkoutHistoryBackupError: Error, LocalizedError, Sendable {
@@ -43,6 +54,8 @@ struct WorkoutHistoryArchive: Codable, Sendable {
     let exercises: [WorkoutHistoryArchiveExercise]
     let sets: [WorkoutHistoryArchiveSet]
     let fatigueObservations: [WorkoutHistoryArchiveFatigueObservation]?
+    let fatigueLearningAudits: [WorkoutHistoryArchiveFatigueLearningSetAudit]?
+    let healthProfileLearning: WorkoutHistoryArchiveHealthProfileLearning?
 }
 
 struct WorkoutHistoryArchiveWorkout: Codable, Sendable {
@@ -85,6 +98,7 @@ struct WorkoutHistoryArchiveFatigueObservation: Codable, Sendable {
     let id: UUID
     let exerciseId: UUID
     let workoutId: UUID
+    let setId: UUID
     let setIndex: Int
     let predictedEffectiveE1RM: Double
     let actualE1RM: Double
@@ -96,6 +110,32 @@ struct WorkoutHistoryArchiveFatigueObservation: Codable, Sendable {
     let actualRIR: Double
     let restDurationSeconds: Int?
     let createdAt: Date
+}
+
+struct WorkoutHistoryArchiveFatigueLearningSetAudit: Codable, Sendable {
+    let id: UUID
+    let workoutId: UUID
+    let exerciseId: UUID
+    let setId: UUID
+    let visibleSetNumber: Int
+    let setType: SetType
+    let status: FatigueLearningAuditStatus
+    let suggestionUnavailableReasonRawValue: String?
+    let predictedEffectiveE1RM: Double?
+    let baseE1RM: Double?
+    let prescribedWeight: Double?
+    let actualWeight: Double?
+    let actualReps: Int?
+    let actualRIR: Double?
+    let deviationFraction: Double?
+    let normalizedError: Double?
+    let createdAt: Date
+}
+
+struct WorkoutHistoryArchiveHealthProfileLearning: Codable, Sendable {
+    let prescriptionLearnedFatigueRate: Double?
+    let prescriptionFatigueLearningSessionCount: Int?
+    let prescriptionFatigueLearningCumulativeError: Double?
 }
 
 struct WorkoutHistoryArchiveSet: Codable, Sendable {

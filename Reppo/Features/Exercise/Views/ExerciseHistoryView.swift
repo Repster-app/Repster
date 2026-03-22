@@ -79,25 +79,10 @@ struct ExerciseHistoryView: View {
             }
             .frame(width: 24)
 
-            // Show weight (including 0 kg for bodyweight exercises)
-            if let weight = set.weight {
-                Text(weight > 0 ? formatWeight(weight) : "BW")
+            if let performanceLabel = formattedPerformanceLabel(for: set) {
+                Text(performanceLabel)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Color.textPrimary)
-            }
-
-            // Show reps (including 0)
-            if let reps = set.reps {
-                Text("x \(reps)")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color.textSecondary)
-            }
-
-            // Duration display
-            if let duration = set.durationSeconds, duration > 0 {
-                Text(UnitConversion.formatDuration(duration))
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color.textSecondary)
             }
 
             // RIR display (color-coded)
@@ -145,5 +130,37 @@ struct ExerciseHistoryView: View {
 
     private func formatWeight(_ weight: Double) -> String {
         "\(UnitConversion.formatWeight(weight)) kg"
+    }
+
+    private func formatDistance(_ meters: Double) -> String {
+        if meters >= 1000 {
+            return String(format: "%.2f km", meters / 1000)
+        }
+        if meters == meters.rounded() {
+            return String(format: "%.0f m", meters)
+        }
+        return String(format: "%.1f m", meters)
+    }
+
+    private func formattedPerformanceLabel(for set: WorkoutSet) -> String? {
+        if let weight = set.weight, let reps = set.reps, reps > 0 {
+            let weightLabel = weight > 0 ? formatWeight(weight) : "BW"
+            return "\(weightLabel) × \(reps)"
+        }
+        if let weight = set.weight, weight > 0,
+           let distance = set.distanceMeters, distance > 0 {
+            return "\(formatWeight(weight)) • \(formatDistance(distance))"
+        }
+        if let duration = set.durationSeconds, duration > 0,
+           let distance = set.distanceMeters, distance > 0 {
+            return "\(UnitConversion.formatDuration(duration)) • \(formatDistance(distance))"
+        }
+        if let duration = set.durationSeconds, duration > 0 {
+            return UnitConversion.formatDuration(duration)
+        }
+        if let distance = set.distanceMeters, distance > 0 {
+            return formatDistance(distance)
+        }
+        return nil
     }
 }

@@ -409,7 +409,9 @@ enum SuggestionCoordinator {
                 "fresh\(profile.prescriptionFreshnessBonus ?? false)",
                 "freshPct\(signatureOptionalNumber(profile.prescriptionFreshnessBonusPercent))",
                 "fatigue\(profile.prescriptionFatigueModelingEnabled ?? true)",
-                "formula\(profile.e1RMFormula)"
+                "formula\(profile.e1RMFormula)",
+                "learnedRate\(signatureOptionalNumber(profile.prescriptionLearnedFatigueRate))",
+                "globalLearnSessions\(profile.prescriptionFatigueLearningSessionCount ?? 0)"
             ].joined(separator: ":")
         } else {
             profileSignature = "profile:unknown"
@@ -420,7 +422,10 @@ enum SuggestionCoordinator {
             exerciseSignature = [
                 exercise.id.uuidString,
                 "tracking\(exercise.trackingType.rawValue)",
-                "inc\(signatureOptionalNumber(exercise.weightIncrement))"
+                "inc\(signatureOptionalNumber(exercise.weightIncrement))",
+                "fatigueRate\(signatureOptionalNumber(exercise.fatigueRate))",
+                "recovery\(signatureOptionalNumber(exercise.recoveryConstant))",
+                "rest\(exercise.defaultRestTime ?? -1)"
             ].joined(separator: ":")
         } else {
             exerciseSignature = "exercise:missing"

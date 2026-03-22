@@ -92,7 +92,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         let freshnessEnabled = profile.prescriptionFreshnessBonus ?? false
         let freshnessPercent = profile.prescriptionFreshnessBonusPercent ?? 0.03
         let formula = E1RMFormula(rawValue: profile.e1RMFormula) ?? .epley
-        let baseFatigueRate = exercise.fatigueRate ?? 0.04
+        let baseFatigueRate = exercise.fatigueRate ?? profile.prescriptionLearnedFatigueRate ?? 0.04
         let recoveryConstant = exercise.recoveryConstant ?? profile.prescriptionDefaultRecoveryConstant ?? 180.0
 
         let baseEstimate = try await estimateBaseE1RM(

@@ -16,6 +16,7 @@ final class RepositoryContainer {
     let programRepository: ProgramRepository
     let templateRepository: TemplateRepository
     let fatigueObservationRepository: FatigueObservationRepository
+    let fatigueLearningSetAuditRepository: FatigueLearningSetAuditRepository
 
     init(modelContainer: ModelContainer) {
         self.modelContainer = modelContainer
@@ -29,5 +30,6 @@ final class RepositoryContainer {
         self.programRepository = ProgramRepository(modelContainer: modelContainer)
         self.templateRepository = TemplateRepository(modelContainer: modelContainer)
         self.fatigueObservationRepository = FatigueObservationRepository(modelContainer: modelContainer)
+        self.fatigueLearningSetAuditRepository = FatigueLearningSetAuditRepository(modelContainer: modelContainer)
     }
 }

@@ -592,6 +592,43 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         XCTAssertEqual(viewModel.primaryMuscleDisplayName, "Arms")
     }
 
+    func testCreateEditExerciseViewModelDoesNotLockTrackingTypeForPlaceholderSets() async {
+        let exerciseService = ExerciseServiceStub()
+        exerciseService.hasSets = true
+        exerciseService.hasLoggedSetData = false
+
+        let viewModel = CreateEditExerciseViewModel(
+            exercise: Exercise(
+                name: "Run",
+                equipmentType: .bodyweight,
+                trackingType: .duration
+            ),
+            exerciseService: exerciseService
+        )
+
+        await viewModel.checkTrackingTypeLock()
+
+        XCTAssertFalse(viewModel.isTrackingTypeLocked)
+    }
+
+    func testCreateEditExerciseViewModelLocksTrackingTypeAfterLoggedSetData() async {
+        let exerciseService = ExerciseServiceStub()
+        exerciseService.hasLoggedSetData = true
+
+        let viewModel = CreateEditExerciseViewModel(
+            exercise: Exercise(
+                name: "Run",
+                equipmentType: .bodyweight,
+                trackingType: .durationDistance
+            ),
+            exerciseService: exerciseService
+        )
+
+        await viewModel.checkTrackingTypeLock()
+
+        XCTAssertTrue(viewModel.isTrackingTypeLocked)
+    }
+
     func testWeightEditDoesNotTriggerSuggestionRefresh() async throws {
         let loadPrescriptionService = LoadPrescriptionServiceSpy()
         let context = makeContext(loadPrescriptionService: loadPrescriptionService)
@@ -823,6 +860,73 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
 
         XCTAssertEqual(loadPrescriptionService.lastRecordedTargetReps, [10])
         XCTAssertEqual(context.viewModel.suggestionState(for: context.pendingSet.id)?.target?.repRange, 8...12)
+    }
+
+    func testSetMutationFlowsStillSucceedThroughSetService() async throws {
+        let profile = HealthProfile()
+        let setService = SetServiceStub()
+        let exercise = makeExercise(name: "Bench Press")
+        let workout = Workout(
+            date: Date(),
+            startTime: Date(),
+            status: .inProgress
+        )
+        let uncompletedSet = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            reps: 5,
+            weight: 100,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+        let deletedSet = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            reps: 8,
+            weight: 90,
+            setType: .working,
+            orderInWorkout: 2,
+            orderInExercise: 2,
+            completed: true
+        )
+        let typeChangedSet = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            reps: 10,
+            weight: 80,
+            setType: .working,
+            orderInWorkout: 3,
+            orderInExercise: 3,
+            completed: true
+        )
+
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: WorkoutServiceStub(),
+            setService: setService,
+            exerciseService: ExerciseServiceStub(),
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+        viewModel.workout = workout
+        viewModel.exercises = [exercise]
+        viewModel.setsByExercise = [exercise.id: [uncompletedSet, deletedSet, typeChangedSet]]
+
+        await viewModel.uncompleteSet(uncompletedSet)
+        await viewModel.deleteSet(deletedSet)
+        await viewModel.changeSetType(typeChangedSet, to: .warmup)
+
+        XCTAssertEqual(setService.uncompletedSetIds, [uncompletedSet.id])
+        XCTAssertEqual(setService.deletedSetIds, [deletedSet.id])
+        XCTAssertEqual(setService.editedSetIds, [typeChangedSet.id])
+        XCTAssertFalse(uncompletedSet.completed)
+        XCTAssertEqual(typeChangedSet.setType, .warmup)
+        XCTAssertEqual(viewModel.currentSets.map(\.id), [uncompletedSet.id, typeChangedSet.id])
     }
 
     private func makeContext(
@@ -1278,6 +1382,84 @@ final class SmartSuggestionSettingsTests: XCTestCase {
 
         XCTAssertEqual(profile.prescriptionDefaultTargetReps, 8)
         XCTAssertEqual(profile.prescriptionDefaultTargetRIR, 2)
+    }
+}
+
+final class ExerciseTrackingTypeTests: XCTestCase {
+    func testExerciseServiceAllowsTrackingTypeChangeWhenNoSetsExist() async throws {
+        let context = try makeExerciseTrackingTypeServiceContext()
+        let exercise = Exercise(
+            name: "Treadmill",
+            equipmentType: .bodyweight,
+            trackingType: .duration
+        )
+        try await context.exerciseRepo.save(exercise)
+
+        exercise.trackingType = .durationDistance
+
+        try await context.service.updateExercise(exercise, originalTrackingType: .duration)
+
+        let persisted = try await context.exerciseRepo.fetch(byId: exercise.id)
+        XCTAssertEqual(persisted?.trackingType, .durationDistance)
+    }
+
+    func testExerciseServiceAllowsTrackingTypeChangeWhenOnlyPlaceholderSetsExist() async throws {
+        let context = try makeExerciseTrackingTypeServiceContext()
+        let exercise = Exercise(
+            name: "Treadmill",
+            equipmentType: .bodyweight,
+            trackingType: .duration
+        )
+        try await context.exerciseRepo.save(exercise)
+        try await context.setRepo.save(
+            WorkoutSet(
+                workoutId: UUID(),
+                exerciseId: exercise.id,
+                orderInWorkout: 1,
+                orderInExercise: 1,
+                completed: false
+            )
+        )
+
+        exercise.trackingType = .durationDistance
+
+        try await context.service.updateExercise(exercise, originalTrackingType: .duration)
+
+        let persisted = try await context.exerciseRepo.fetch(byId: exercise.id)
+        XCTAssertEqual(persisted?.trackingType, .durationDistance)
+    }
+
+    func testExerciseServiceRejectsTrackingTypeChangeWhenLoggedSetDataExists() async throws {
+        let context = try makeExerciseTrackingTypeServiceContext()
+        let exercise = Exercise(
+            name: "Treadmill",
+            equipmentType: .bodyweight,
+            trackingType: .duration
+        )
+        try await context.exerciseRepo.save(exercise)
+        try await context.setRepo.save(
+            WorkoutSet(
+                workoutId: UUID(),
+                exerciseId: exercise.id,
+                durationSeconds: 900,
+                distanceMeters: 2400,
+                orderInWorkout: 1,
+                orderInExercise: 1,
+                completed: true
+            )
+        )
+
+        exercise.trackingType = .durationDistance
+
+        do {
+            try await context.service.updateExercise(exercise, originalTrackingType: .duration)
+            XCTFail("Expected tracking type change to be rejected once logged data exists")
+        } catch let error as ExerciseServiceError {
+            guard case .trackingTypeImmutable(let exerciseId) = error else {
+                return XCTFail("Unexpected exercise service error: \(error)")
+            }
+            XCTAssertEqual(exerciseId, exercise.id)
+        }
     }
 }
 
@@ -1876,7 +2058,9 @@ final class WorkoutHistoryBackupServiceTests: XCTestCase {
             workouts: [],
             exercises: [],
             sets: [],
-            fatigueObservations: nil
+            fatigueObservations: nil,
+            fatigueLearningAudits: nil,
+            healthProfileLearning: nil
         )
         let invalidData = try encodeBackupArchive(invalidArchive)
 
@@ -1902,6 +2086,7 @@ final class WorkoutHistoryBackupServiceTests: XCTestCase {
             BodyweightEntry.self,
             HealthProfile.self,
             FatigueObservation.self,
+            FatigueLearningSetAudit.self,
             configurations: configuration
         )
 
@@ -1913,6 +2098,7 @@ final class WorkoutHistoryBackupServiceTests: XCTestCase {
         let bodyweightRepo = BodyweightEntryRepository(modelContainer: container)
         let healthProfileRepo = HealthProfileRepository(modelContainer: container)
         let fatigueObservationRepo = FatigueObservationRepository(modelContainer: container)
+        let fatigueLearningAuditRepo = FatigueLearningSetAuditRepository(modelContainer: container)
 
         let statsService = StatsService(
             exerciseStatsRepository: exerciseStatsRepo,
@@ -1932,6 +2118,7 @@ final class WorkoutHistoryBackupServiceTests: XCTestCase {
             exerciseRepo: exerciseRepo,
             setRepo: setRepo,
             fatigueObservationRepo: fatigueObservationRepo,
+            fatigueLearningAuditRepo: fatigueLearningAuditRepo,
             statsService: statsService,
             prService: prService,
             modelContainer: container
@@ -2021,6 +2208,32 @@ final class WorkoutHistoryBackupViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.errorMessage)
     }
 
+    func testRestoreBackupViewModelCompletesWithWarningCountsAfterConfirmation() async throws {
+        let service = WorkoutHistoryBackupServiceStub()
+        service.restoreResult = WorkoutHistoryRestoreResult(
+            workoutsRestored: 2,
+            exercisesUpserted: 1,
+            setsRestored: 3,
+            skippedFatigueObservations: 2,
+            skippedFatigueLearningAudits: 1,
+            duration: 0.4
+        )
+        let viewModel = RestoreBackupViewModel(workoutHistoryBackupService: service)
+        let fileURL = try makeBackupFileURL()
+
+        viewModel.handleFileSelected(.success(fileURL))
+        viewModel.performRestore()
+
+        try await waitUntilOnMainActor {
+            viewModel.state == .completed
+        }
+
+        XCTAssertEqual(viewModel.result?.skippedFatigueObservations, 2)
+        XCTAssertEqual(viewModel.result?.skippedFatigueLearningAudits, 1)
+        XCTAssertNotNil(viewModel.result?.learningDataWarningMessage)
+        XCTAssertNil(viewModel.errorMessage)
+    }
+
     private func makeBackupFileURL() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
@@ -2068,6 +2281,8 @@ private final class WorkoutHistoryBackupServiceStub: @unchecked Sendable, Workou
         workoutsRestored: 2,
         exercisesUpserted: 1,
         setsRestored: 3,
+        skippedFatigueObservations: 0,
+        skippedFatigueLearningAudits: 0,
         duration: 0.4
     )
     var restoreCallCount = 0
@@ -2291,6 +2506,10 @@ private final class HealthProfileRepositoryStub: @unchecked Sendable, HealthProf
 }
 
 private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
+    var editedSetIds: [UUID] = []
+    var uncompletedSetIds: [UUID] = []
+    var deletedSetIds: [UUID] = []
+
     func save(_ set: WorkoutSet) async throws -> SetSaveResult {
         SetSaveResult(
             setId: set.id,
@@ -2300,17 +2519,19 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
     }
 
     func edit(_ set: WorkoutSet) async throws -> SetSaveResult {
+        editedSetIds.append(set.id)
         try await save(set)
     }
 
     func uncomplete(_ set: WorkoutSet) async throws -> SetSaveResult {
+        uncompletedSetIds.append(set.id)
         set.completed = false
         set.completedAt = nil
         return try await save(set)
     }
 
     func delete(_ set: WorkoutSet) async throws {
-        let _ = set
+        deletedSetIds.append(set.id)
     }
 
     func fetchSets(for workoutId: UUID) async throws -> [WorkoutSet] {
@@ -2383,6 +2604,7 @@ private final class ExerciseServiceStub: @unchecked Sendable, ExerciseServicePro
     var updatedExercises: [Exercise] = []
     var fetchedExercises: [UUID: Exercise] = [:]
     var hasSets = false
+    var hasLoggedSetData = false
 
     func createExercise(_ exercise: Exercise) async throws {
         createdExercises.append(exercise)
@@ -2405,6 +2627,11 @@ private final class ExerciseServiceStub: @unchecked Sendable, ExerciseServicePro
     func exerciseHasSets(_ exerciseId: UUID) async throws -> Bool {
         let _ = exerciseId
         return hasSets
+    }
+
+    func exerciseHasLoggedSetData(_ exerciseId: UUID) async throws -> Bool {
+        let _ = exerciseId
+        return hasLoggedSetData
     }
 }
 
@@ -2589,6 +2816,10 @@ private final class ImportExerciseRepositoryStub: @unchecked Sendable, ExerciseR
         return []
     }
     func hasAssociatedSets(_ exerciseId: UUID) async throws -> Bool {
+        let _ = exerciseId
+        return false
+    }
+    func hasLoggedSetData(_ exerciseId: UUID) async throws -> Bool {
         let _ = exerciseId
         return false
     }
@@ -3017,7 +3248,9 @@ private extension NSLock {
 }
 
 private final class FatigueObservationRepositoryStub: @unchecked Sendable, FatigueObservationRepositoryProtocol {
-    func save(_ observation: FatigueObservation) async throws {}
+    func upsert(_ observation: FatigueObservation) async throws {
+        let _ = observation
+    }
     func fetchObservations(for workoutId: UUID) async throws -> [FatigueObservation] {
         let _ = workoutId
         return []
@@ -3031,12 +3264,56 @@ private final class FatigueObservationRepositoryStub: @unchecked Sendable, Fatig
         let _ = exerciseId
         return 0
     }
+    func deleteObservation(for setId: UUID) async throws {
+        let _ = setId
+    }
     @discardableResult
     func pruneObservations(exerciseId: UUID, keepRecentSessions: Int) async throws -> Int {
         let _ = exerciseId
         let _ = keepRecentSessions
         return 0
     }
+}
+
+private final class FatigueLearningSetAuditRepositoryStub: @unchecked Sendable, FatigueLearningSetAuditRepositoryProtocol {
+    func upsert(_ audit: FatigueLearningSetAudit) async throws {
+        let _ = audit
+    }
+
+    func fetchAudits(for workoutId: UUID) async throws -> [FatigueLearningSetAudit] {
+        let _ = workoutId
+        return []
+    }
+
+    func fetchAudits(workoutId: UUID, exerciseId: UUID) async throws -> [FatigueLearningSetAudit] {
+        let _ = workoutId
+        let _ = exerciseId
+        return []
+    }
+
+    func fetchAudits(exerciseId: UUID, limit: Int?) async throws -> [FatigueLearningSetAudit] {
+        let _ = exerciseId
+        let _ = limit
+        return []
+    }
+
+    func exerciseIdsWithAudits() async throws -> [UUID] {
+        []
+    }
+
+    func deleteAudit(for setId: UUID) async throws {
+        let _ = setId
+    }
+
+    func deleteAudits(workoutId: UUID) async throws {
+        let _ = workoutId
+    }
+
+    func deleteAudits(exerciseId: UUID) async throws {
+        let _ = exerciseId
+    }
+
+    func deleteAll() async throws {}
 }
 
 private func clearActiveWorkoutSessionDefaults() {
@@ -3056,6 +3333,60 @@ private func clearActiveWorkoutSessionDefaults() {
 private func makeStubFatigueLearningService() -> FatigueLearningService {
     FatigueLearningService(
         observationRepo: FatigueObservationRepositoryStub(),
-        exerciseRepo: ImportExerciseRepositoryStub()
+        exerciseRepo: ImportExerciseRepositoryStub(),
+        healthProfileRepo: HealthProfileRepositoryStub(profile: HealthProfile()),
+        auditRepo: FatigueLearningSetAuditRepositoryStub()
+    )
+}
+
+private struct ExerciseTrackingTypeServiceContext {
+    let service: ExerciseService
+    let exerciseRepo: ExerciseRepository
+    let setRepo: SetRepository
+}
+
+private func makeExerciseTrackingTypeServiceContext() throws -> ExerciseTrackingTypeServiceContext {
+    let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try ModelContainer(
+        for: Exercise.self,
+        WorkoutSet.self,
+        ExerciseStats.self,
+        PerformanceRecord.self,
+        HealthProfile.self,
+        configurations: configuration
+    )
+
+    let exerciseRepo = ExerciseRepository(modelContainer: container)
+    let setRepo = SetRepository(modelContainer: container)
+    let exerciseStatsRepo = ExerciseStatsRepository(modelContainer: container)
+    let performanceRecordRepo = PerformanceRecordRepository(modelContainer: container)
+    let healthProfileRepo = HealthProfileRepository(modelContainer: container)
+    let prService = PRService(
+        performanceRecordRepository: performanceRecordRepo,
+        setRepository: setRepo,
+        healthProfileRepository: healthProfileRepo,
+        exerciseRepository: exerciseRepo
+    )
+    let statsService = StatsService(
+        exerciseStatsRepository: exerciseStatsRepo,
+        setRepository: setRepo,
+        exerciseRepository: exerciseRepo,
+        healthProfileRepository: healthProfileRepo,
+        performanceRecordRepository: performanceRecordRepo
+    )
+    let service = ExerciseService(
+        exerciseRepository: exerciseRepo,
+        setRepository: setRepo,
+        exerciseStatsRepository: exerciseStatsRepo,
+        performanceRecordRepository: performanceRecordRepo,
+        prService: prService,
+        statsService: statsService,
+        fatigueLearningService: makeStubFatigueLearningService()
+    )
+
+    return ExerciseTrackingTypeServiceContext(
+        service: service,
+        exerciseRepo: exerciseRepo,
+        setRepo: setRepo
     )
 }

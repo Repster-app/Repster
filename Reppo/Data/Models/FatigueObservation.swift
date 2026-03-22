@@ -8,6 +8,13 @@ final class FatigueObservation {
     var id: UUID
     var exerciseId: UUID
     var workoutId: UUID
+    // Stored as optional so pre-existing databases can lightweight-migrate rows that never had a set ID.
+    var storedSetId: UUID?
+
+    var setId: UUID {
+        get { storedSetId ?? id }
+        set { storedSetId = newValue }
+    }
 
     /// 0-indexed position among completed working sets for this exercise in the session.
     var setIndex: Int
@@ -47,6 +54,7 @@ final class FatigueObservation {
         id: UUID = UUID(),
         exerciseId: UUID,
         workoutId: UUID,
+        setId: UUID,
         setIndex: Int,
         predictedEffectiveE1RM: Double,
         actualE1RM: Double,
@@ -62,6 +70,7 @@ final class FatigueObservation {
         self.id = id
         self.exerciseId = exerciseId
         self.workoutId = workoutId
+        self.storedSetId = setId
         self.setIndex = setIndex
         self.predictedEffectiveE1RM = predictedEffectiveE1RM
         self.actualE1RM = actualE1RM
@@ -75,3 +84,77 @@ final class FatigueObservation {
         self.createdAt = createdAt
     }
 }
+
+extension FatigueObservation: @unchecked Sendable {}
+
+@Model
+final class FatigueLearningSetAudit {
+    var id: UUID
+    var workoutId: UUID
+    var exerciseId: UUID
+    var setId: UUID
+    /// Visible row number within the exercise card as shown in the workout UI.
+    var visibleSetNumber: Int
+    var setType: SetType
+    var status: FatigueLearningAuditStatus
+    var suggestionUnavailableReasonRawValue: String?
+    var predictedEffectiveE1RM: Double?
+    var baseE1RM: Double?
+    var prescribedWeight: Double?
+    var actualWeight: Double?
+    var actualReps: Int?
+    var actualRIR: Double?
+    var deviationFraction: Double?
+    var normalizedError: Double?
+    var createdAt: Date
+
+    var suggestionUnavailableReason: SuggestionUnavailableReason? {
+        get {
+            guard let suggestionUnavailableReasonRawValue else { return nil }
+            return SuggestionUnavailableReason(rawValue: suggestionUnavailableReasonRawValue)
+        }
+        set {
+            suggestionUnavailableReasonRawValue = newValue?.rawValue
+        }
+    }
+
+    init(
+        id: UUID = UUID(),
+        workoutId: UUID,
+        exerciseId: UUID,
+        setId: UUID,
+        visibleSetNumber: Int,
+        setType: SetType,
+        status: FatigueLearningAuditStatus,
+        suggestionUnavailableReason: SuggestionUnavailableReason? = nil,
+        predictedEffectiveE1RM: Double? = nil,
+        baseE1RM: Double? = nil,
+        prescribedWeight: Double? = nil,
+        actualWeight: Double? = nil,
+        actualReps: Int? = nil,
+        actualRIR: Double? = nil,
+        deviationFraction: Double? = nil,
+        normalizedError: Double? = nil,
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.workoutId = workoutId
+        self.exerciseId = exerciseId
+        self.setId = setId
+        self.visibleSetNumber = visibleSetNumber
+        self.setType = setType
+        self.status = status
+        self.suggestionUnavailableReasonRawValue = suggestionUnavailableReason?.rawValue
+        self.predictedEffectiveE1RM = predictedEffectiveE1RM
+        self.baseE1RM = baseE1RM
+        self.prescribedWeight = prescribedWeight
+        self.actualWeight = actualWeight
+        self.actualReps = actualReps
+        self.actualRIR = actualRIR
+        self.deviationFraction = deviationFraction
+        self.normalizedError = normalizedError
+        self.createdAt = createdAt
+    }
+}
+
+extension FatigueLearningSetAudit: @unchecked Sendable {}

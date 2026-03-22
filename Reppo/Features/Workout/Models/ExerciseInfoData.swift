@@ -19,6 +19,7 @@ struct TopSet: Identifiable, Sendable {
     let weight: Double
     let reps: Int?
     let durationSeconds: Int?
+    let distanceMeters: Double?
     let formattedLabel: String
 }
 

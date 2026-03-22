@@ -53,4 +53,11 @@ actor ExerciseRepository: ExerciseRepositoryProtocol {
         descriptor.fetchLimit = 1
         return try !modelContext.fetch(descriptor).isEmpty
     }
+
+    func hasLoggedSetData(_ exerciseId: UUID) throws -> Bool {
+        let descriptor = FetchDescriptor<WorkoutSet>(
+            predicate: #Predicate { $0.exerciseId == exerciseId }
+        )
+        return try modelContext.fetch(descriptor).contains { $0.hasData }
+    }
 }

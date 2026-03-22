@@ -9,8 +9,8 @@ import Foundation
 /// Created once at app launch after RepositoryContainer, passed to views via SwiftUI environment.
 /// Services compose repositories — ServiceContainer takes RepositoryContainer in init.
 ///
-/// Initialization order: StatsService → PRService → SetService → BodyweightService → WorkoutService → ExerciseService
-/// (SetService depends on PRService + StatsService; WorkoutService and ExerciseService depend on PRService + StatsService)
+/// Initialization order: StatsService → PRService → BodyweightService → FatigueLearningService → SetService → WorkoutService → ExerciseService
+/// (SetService, WorkoutService, and ExerciseService depend on FatigueLearningService)
 @Observable
 final class ServiceContainer {
     let prService: any PRServiceProtocol
@@ -46,17 +46,7 @@ final class ServiceContainer {
             exerciseRepository: repositoryContainer.exerciseRepository
         )
 
-        // 3. SetService — depends on repos + PRService + StatsService
-        let setService = SetService(
-            setRepository: repositoryContainer.setRepository,
-            exerciseRepository: repositoryContainer.exerciseRepository,
-            bodyweightEntryRepository: repositoryContainer.bodyweightEntryRepository,
-            healthProfileRepository: repositoryContainer.healthProfileRepository,
-            prService: prService,
-            statsService: statsService
-        )
-
-        // 4. ChartDataService — depends on repos only
+        // 3. ChartDataService — depends on repos only
         let chartDataService = ChartDataService(
             setRepository: repositoryContainer.setRepository,
             workoutRepository: repositoryContainer.workoutRepository,
@@ -65,21 +55,41 @@ final class ServiceContainer {
             performanceRecordRepository: repositoryContainer.performanceRecordRepository
         )
 
-        // 5. BodyweightService — depends on repos only
+        // 4. BodyweightService — depends on repos only
         let bodyweightService = BodyweightService(
             bodyweightEntryRepository: repositoryContainer.bodyweightEntryRepository,
             healthProfileRepository: repositoryContainer.healthProfileRepository
         )
 
-        // 6. WorkoutService — depends on repos + PRService + StatsService
+        // 5. FatigueLearningService — depends on repos only
+        let fatigueLearningService = FatigueLearningService(
+            observationRepo: repositoryContainer.fatigueObservationRepository,
+            exerciseRepo: repositoryContainer.exerciseRepository,
+            healthProfileRepo: repositoryContainer.healthProfileRepository,
+            auditRepo: repositoryContainer.fatigueLearningSetAuditRepository
+        )
+
+        // 6. SetService — depends on repos + PRService + StatsService + FatigueLearningService
+        let setService = SetService(
+            setRepository: repositoryContainer.setRepository,
+            exerciseRepository: repositoryContainer.exerciseRepository,
+            bodyweightEntryRepository: repositoryContainer.bodyweightEntryRepository,
+            healthProfileRepository: repositoryContainer.healthProfileRepository,
+            prService: prService,
+            statsService: statsService,
+            fatigueLearningService: fatigueLearningService
+        )
+
+        // 7. WorkoutService — depends on repos + PRService + StatsService + FatigueLearningService
         let workoutService = WorkoutService(
             workoutRepository: repositoryContainer.workoutRepository,
             setRepository: repositoryContainer.setRepository,
             prService: prService,
-            statsService: statsService
+            statsService: statsService,
+            fatigueLearningService: fatigueLearningService
         )
 
-        // 7. SettingsService — depends on HealthProfileRepository + PRService + StatsService
+        // 8. SettingsService — depends on HealthProfileRepository + PRService + StatsService
         let settingsService = SettingsService(
             healthProfileRepository: repositoryContainer.healthProfileRepository,
             prService: prService,
@@ -87,17 +97,18 @@ final class ServiceContainer {
             modelContainer: repositoryContainer.modelContainer
         )
 
-        // 8. ExerciseService — depends on repos + PRService + StatsService
+        // 9. ExerciseService — depends on repos + PRService + StatsService + FatigueLearningService
         let exerciseService = ExerciseService(
             exerciseRepository: repositoryContainer.exerciseRepository,
             setRepository: repositoryContainer.setRepository,
             exerciseStatsRepository: repositoryContainer.exerciseStatsRepository,
             performanceRecordRepository: repositoryContainer.performanceRecordRepository,
             prService: prService,
-            statsService: statsService
+            statsService: statsService,
+            fatigueLearningService: fatigueLearningService
         )
 
-        // 9. ImportService — depends on repos + PRService + StatsService + ModelContainer
+        // 10. ImportService — depends on repos + PRService + StatsService + ModelContainer
         let importService = ImportService(
             exerciseRepo: repositoryContainer.exerciseRepository,
             workoutRepo: repositoryContainer.workoutRepository,
@@ -108,18 +119,19 @@ final class ServiceContainer {
             modelContainer: repositoryContainer.modelContainer
         )
 
-        // 10. WorkoutHistoryBackupService — archive export + restore
+        // 11. WorkoutHistoryBackupService — archive export + restore
         let workoutHistoryBackupService = WorkoutHistoryBackupService(
             workoutRepo: repositoryContainer.workoutRepository,
             exerciseRepo: repositoryContainer.exerciseRepository,
             setRepo: repositoryContainer.setRepository,
             fatigueObservationRepo: repositoryContainer.fatigueObservationRepository,
+            fatigueLearningAuditRepo: repositoryContainer.fatigueLearningSetAuditRepository,
             statsService: statsService,
             prService: prService,
             modelContainer: repositoryContainer.modelContainer
         )
 
-        // 11. TemplateService — depends on repos only
+        // 12. TemplateService — depends on repos only
         let templateService = TemplateService(
             templateRepository: repositoryContainer.templateRepository,
             workoutRepository: repositoryContainer.workoutRepository,
@@ -127,18 +139,12 @@ final class ServiceContainer {
             exerciseRepository: repositoryContainer.exerciseRepository
         )
 
-        // 12. LoadPrescriptionService — depends on repos only
+        // 13. LoadPrescriptionService — depends on repos only
         let loadPrescriptionService = LoadPrescriptionService(
             setRepository: repositoryContainer.setRepository,
             exerciseRepository: repositoryContainer.exerciseRepository,
             performanceRecordRepository: repositoryContainer.performanceRecordRepository,
             healthProfileRepository: repositoryContainer.healthProfileRepository
-        )
-
-        // 13. FatigueLearningService — depends on repos only
-        let fatigueLearningService = FatigueLearningService(
-            observationRepo: repositoryContainer.fatigueObservationRepository,
-            exerciseRepo: repositoryContainer.exerciseRepository
         )
 
         self.prService = prService

@@ -17,6 +17,7 @@ actor SetService: SetServiceProtocol {
     private let healthProfileRepo: HealthProfileRepositoryProtocol
     private let prService: PRServiceProtocol
     private let statsService: StatsServiceProtocol
+    private let fatigueLearningService: FatigueLearningService
 
     init(
         setRepository: SetRepositoryProtocol,
@@ -24,7 +25,8 @@ actor SetService: SetServiceProtocol {
         bodyweightEntryRepository: BodyweightEntryRepositoryProtocol,
         healthProfileRepository: HealthProfileRepositoryProtocol,
         prService: PRServiceProtocol,
-        statsService: StatsServiceProtocol
+        statsService: StatsServiceProtocol,
+        fatigueLearningService: FatigueLearningService
     ) {
         self.setRepo = setRepository
         self.exerciseRepo = exerciseRepository
@@ -32,6 +34,7 @@ actor SetService: SetServiceProtocol {
         self.healthProfileRepo = healthProfileRepository
         self.prService = prService
         self.statsService = statsService
+        self.fatigueLearningService = fatigueLearningService
     }
 
     // MARK: - SetServiceProtocol
@@ -153,6 +156,10 @@ actor SetService: SetServiceProtocol {
             )
         )
 
+        if shouldInvalidateFatigueCapture(previous: oldSet, updated: set) {
+            try await fatigueLearningService.removeCapturedSetData(setId: set.id)
+        }
+
         return SetSaveResult(
             setId: set.id,
             effectiveWeight: newEffectiveWeight ?? 0,
@@ -203,6 +210,8 @@ actor SetService: SetServiceProtocol {
             )
         )
 
+        try await fatigueLearningService.removeCapturedSetData(setId: setId)
+
         return SetSaveResult(
             setId: setId,
             effectiveWeight: effectiveWeight,
@@ -245,6 +254,8 @@ actor SetService: SetServiceProtocol {
                 workoutId: workoutId
             )
         )
+
+        try await fatigueLearningService.removeCapturedSetData(setId: setId)
     }
 
     // MARK: - Fetch (006: Active Workout Screen)
@@ -295,5 +306,17 @@ actor SetService: SetServiceProtocol {
         }
 
         return weight + (bodyweight * exercise.bodyweightFactor)
+    }
+
+    private func shouldInvalidateFatigueCapture(previous: WorkoutSet, updated: WorkoutSet) -> Bool {
+        guard previous.completed else { return false }
+
+        return previous.setType != updated.setType
+            || previous.weight != updated.weight
+            || previous.reps != updated.reps
+            || previous.rir != updated.rir
+            || previous.exerciseId != updated.exerciseId
+            || previous.workoutId != updated.workoutId
+            || previous.restDurationSeconds != updated.restDurationSeconds
     }
 }

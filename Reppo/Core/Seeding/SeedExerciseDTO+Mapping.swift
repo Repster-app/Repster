@@ -34,6 +34,7 @@ extension SeedExerciseDTO {
         switch value {
         case "WEIGHT_REPS": return .weightReps
         case "DURATION": return .duration
+        case "DURATION_DISTANCE": return .durationDistance
         case "WEIGHT_DISTANCE": return .weightDistance
         case "WEIGHT_REPS_DURATION": return .weightRepsDuration
         case "CUSTOM": return .custom

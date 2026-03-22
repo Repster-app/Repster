@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reppo Color Palette</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111113; color: #EAEAEF; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif; padding: 40px; }
+  h1 { font-size: 28px; margin-bottom: 32px; }
+  h2 { font-size: 18px; color: #9999A8; margin: 32px 0 16px; font-weight: 500; }
+  .grid { display: flex; flex-wrap: wrap; gap: 12px; }
+  .swatch {
+    width: 140px; border-radius: 12px; overflow: hidden;
+    background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06);
+  }
+  .swatch .color { height: 72px; }
+  .swatch .info { padding: 10px 12px; }
+  .swatch .name { font-size: 13px; font-weight: 600; }
+  .swatch .hex { font-size: 11px; color: #9999A8; margin-top: 2px; font-family: 'SF Mono', monospace; }
+</style>
+</head>
+<body>
+
+<h1>Reppo Color Palette</h1>
+
+<h2>Backgrounds</h2>
+<div class="grid">
+  <div class="swatch"><div class="color" style="background:#111113;border-bottom:1px solid rgba(255,255,255,0.06)"></div><div class="info"><div class="name">bg</div><div class="hex">#111113</div></div></div>
+  <div class="swatch"><div class="color" style="background:#1B1B1F"></div><div class="info"><div class="name">bgCard</div><div class="hex">#1B1B1F</div></div></div>
+  <div class="swatch"><div class="color" style="background:#222228"></div><div class="info"><div class="name">bgHover</div><div class="hex">#222228</div></div></div>
+  <div class="swatch"><div class="color" style="background:#262630"></div><div class="info"><div class="name">bgSubtle</div><div class="hex">#262630</div></div></div>
+  <div class="swatch"><div class="color" style="background:#1F1F25"></div><div class="info"><div class="name">bgInput</div><div class="hex">#1F1F25</div></div></div>
+</div>
+
+<h2>Text</h2>
+<div class="grid">
+  <div class="swatch"><div class="color" style="background:#EAEAEF"></div><div class="info"><div class="name">textPrimary</div><div class="hex">#EAEAEF</div></div></div>
+  <div class="swatch"><div class="color" style="background:#9999A8"></div><div class="info"><div class="name">textSecondary</div><div class="hex">#9999A8</div></div></div>
+  <div class="swatch"><div class="color" style="background:#5C5C6E"></div><div class="info"><div class="name">textTertiary</div><div class="hex">#5C5C6E</div></div></div>
+</div>
+
+<h2>Accents</h2>
+<div class="grid">
+  <div class="swatch"><div class="color" style="background:#5B8DEF"></div><div class="info"><div class="name">accent</div><div class="hex">#5B8DEF</div></div></div>
+  <div class="swatch"><div class="color" style="background:#5EC269"></div><div class="info"><div class="name">success</div><div class="hex">#5EC269</div></div></div>
+  <div class="swatch"><div class="color" style="background:#D4A23A"></div><div class="info"><div class="name">gold</div><div class="hex">#D4A23A</div></div></div>
+  <div class="swatch"><div class="color" style="background:#E05555"></div><div class="info"><div class="name">danger</div><div class="hex">#E05555</div></div></div>
+  <div class="swatch"><div class="color" style="background:#E89B3E"></div><div class="info"><div class="name">orange</div><div class="hex">#E89B3E</div></div></div>
+</div>
+
+<h2>RIR Intensity Scale</h2>
+<div class="grid">
+  <div class="swatch"><div class="color" style="background:#E05555"></div><div class="info"><div class="name">rir0 (Failure)</div><div class="hex">#E05555</div></div></div>
+  <div class="swatch"><div class="color" style="background:#E07040"></div><div class="info"><div class="name">rir1</div><div class="hex">#E07040</div></div></div>
+  <div class="swatch"><div class="color" style="background:#E89B3E"></div><div class="info"><div class="name">rir2</div><div class="hex">#E89B3E</div></div></div>
+  <div class="swatch"><div class="color" style="background:#D4A23A"></div><div class="info"><div class="name">rir3</div><div class="hex">#D4A23A</div></div></div>
+  <div class="swatch"><div class="color" style="background:#A0B83C"></div><div class="info"><div class="name">rir4</div><div class="hex">#A0B83C</div></div></div>
+  <div class="swatch"><div class="color" style="background:#5EC269"></div><div class="info"><div class="name">rir5 (Easy)</div><div class="hex">#5EC269</div></div></div>
+</div>
+
+<h2>Charts</h2>
+<div class="grid">
+  <div class="swatch"><div class="color" style="background:#5B8DEF"></div><div class="info"><div class="name">chart1</div><div class="hex">#5B8DEF</div></div></div>
+  <div class="swatch"><div class="color" style="background:#5EC269"></div><div class="info"><div class="name">chart2</div><div class="hex">#5EC269</div></div></div>
+  <div class="swatch"><div class="color" style="background:#D4A23A"></div><div class="info"><div class="name">chart3</div><div class="hex">#D4A23A</div></div></div>
+  <div class="swatch"><div class="color" style="background:#E05555"></div><div class="info"><div class="name">chart4</div><div class="hex">#E05555</div></div></div>
+  <div class="swatch"><div class="color" style="background:#A87EE6"></div><div class="info"><div class="name">chart5</div><div class="hex">#A87EE6</div></div></div>
+  <div class="swatch"><div class="color" style="background:#E89B3E"></div><div class="info"><div class="name">chart6</div><div class="hex">#E89B3E</div></div></div>
+  <div class="swatch"><div class="color" style="background:#4ECDC4"></div><div class="info"><div class="name">chart7</div><div class="hex">#4ECDC4</div></div></div>
+  <div class="swatch"><div class="color" style="background:#FF6B9D"></div><div class="info"><div class="name">chart8</div><div class="hex">#FF6B9D</div></div></div>
+</div>
+
+<h2>Border</h2>
+<div class="grid">
+  <div class="swatch"><div class="color" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1)"></div><div class="info"><div class="name">border</div><div class="hex">white 6%</div></div></div>
+</div>
+
+<p style="color:#5C5C6E;margin-top:40px;font-size:12px">Source: Reppo/Core/Extensions/DesignTokens.swift</p>
+</body>
+</html>

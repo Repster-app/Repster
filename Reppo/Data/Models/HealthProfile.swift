@@ -47,6 +47,15 @@ final class HealthProfile {
     /// Default recovery constant in seconds for fatigue decay. Default: 180.
     var prescriptionDefaultRecoveryConstant: Double?
 
+    /// User-wide learned fatigue rate. Nil = use fixed default (0.04) when no exercise override exists.
+    var prescriptionLearnedFatigueRate: Double? = nil
+
+    /// Number of qualifying workouts contributing to the global fatigue baseline.
+    var prescriptionFatigueLearningSessionCount: Int? = nil
+
+    /// Running EMA of normalized prediction errors across all qualifying workouts.
+    var prescriptionFatigueLearningCumulativeError: Double? = nil
+
     var createdAt: Date
     var updatedAt: Date
 
@@ -67,6 +76,9 @@ final class HealthProfile {
         prescriptionFreshnessBonusPercent: Double = 0.03,
         prescriptionFatigueModelingEnabled: Bool = true,
         prescriptionDefaultRecoveryConstant: Double = 180,
+        prescriptionLearnedFatigueRate: Double? = nil,
+        prescriptionFatigueLearningSessionCount: Int? = nil,
+        prescriptionFatigueLearningCumulativeError: Double? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -86,6 +98,9 @@ final class HealthProfile {
         self.prescriptionFreshnessBonusPercent = prescriptionFreshnessBonusPercent
         self.prescriptionFatigueModelingEnabled = prescriptionFatigueModelingEnabled
         self.prescriptionDefaultRecoveryConstant = prescriptionDefaultRecoveryConstant
+        self.prescriptionLearnedFatigueRate = prescriptionLearnedFatigueRate
+        self.prescriptionFatigueLearningSessionCount = prescriptionFatigueLearningSessionCount
+        self.prescriptionFatigueLearningCumulativeError = prescriptionFatigueLearningCumulativeError
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

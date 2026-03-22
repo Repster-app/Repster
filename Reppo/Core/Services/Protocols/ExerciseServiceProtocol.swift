@@ -39,7 +39,7 @@ protocol ExerciseServiceProtocol: Sendable {
 
     /// Update an existing exercise with metadata mutability enforcement.
     ///
-    /// 1. If sets exist AND trackingType changed -> throw ExerciseServiceError.trackingTypeImmutable
+    /// 1. If logged set data exists AND trackingType changed -> throw ExerciseServiceError.trackingTypeImmutable
     /// 2. Detect if rebuild-required fields changed
     /// 3. Persist the update
     /// 4. If rebuild needed -> trigger PR + stats rebuild
@@ -91,4 +91,8 @@ protocol ExerciseServiceProtocol: Sendable {
     /// - Parameter exerciseId: The exercise to check.
     /// - Returns: true if any WorkoutSets reference this exercise.
     func exerciseHasSets(_ exerciseId: UUID) async throws -> Bool
+
+    /// Check if an exercise has logged set data.
+    /// Used by UI/service to lock trackingType only after real values exist.
+    func exerciseHasLoggedSetData(_ exerciseId: UUID) async throws -> Bool
 }

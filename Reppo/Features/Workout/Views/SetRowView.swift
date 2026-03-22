@@ -70,6 +70,7 @@ enum RIROption: CaseIterable, Identifiable {
 /// Columns adapt to the exercise's `trackingType`:
 /// - `.weightReps` → weight + reps
 /// - `.duration` → duration only
+/// - `.durationDistance` → duration + distance
 /// - `.weightDistance` → weight + distance
 /// - `.weightRepsDuration` → weight + reps + duration
 ///
@@ -337,6 +338,29 @@ struct SetRowView: View {
             )
             .frame(maxWidth: .infinity)
 
+        case .durationDistance:
+            SetInputField(
+                value: $durationText,
+                placeholder: "0:00",
+                keyboardType: .numberPad,
+                isCompleted: set.completed,
+                isActiveOverride: focusedInput == .duration,
+                isCustomEntry: true,
+                onCustomTap: { activateCustomKeyboard(for: .duration) }
+            )
+            .frame(maxWidth: .infinity)
+
+            SetInputField(
+                value: $distanceText,
+                placeholder: "0",
+                keyboardType: .decimalPad,
+                isCompleted: set.completed,
+                isActiveOverride: focusedInput == .distance,
+                isCustomEntry: true,
+                onCustomTap: { activateCustomKeyboard(for: .distance) }
+            )
+            .frame(maxWidth: .infinity)
+
         case .weightDistance:
             SetInputField(
                 value: $weightText,
@@ -474,6 +498,8 @@ struct SetRowView: View {
             return [.weight, .reps]
         case .duration:
             return [.duration]
+        case .durationDistance:
+            return [.duration, .distance]
         case .weightDistance:
             return [.weight, .distance]
         case .weightRepsDuration:

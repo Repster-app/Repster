@@ -58,7 +58,7 @@ struct LastWorkoutCardView: View {
 
     private var formattedTopSets: String {
         info.topSets.map { set -> String in
-            // Use raw weight/reps for unit-aware formatting; fall back to formattedLabel for duration
+            // Use raw weight/reps for unit-aware formatting; fall back to formattedLabel for non-weight variants.
             if let reps = set.reps, reps > 0 {
                 return "\(formatWeight(set.weight))×\(reps)"
             }
@@ -84,8 +84,8 @@ struct LastWorkoutCardView: View {
         LastWorkoutCardView(
             info: LastWorkoutInfo(
                 topSets: [
-                    TopSet(weight: 85, reps: 8, durationSeconds: nil, formattedLabel: "85×8"),
-                    TopSet(weight: 80, reps: 8, durationSeconds: nil, formattedLabel: "80×8")
+                    TopSet(weight: 85, reps: 8, durationSeconds: nil, distanceMeters: nil, formattedLabel: "85×8"),
+                    TopSet(weight: 80, reps: 8, durationSeconds: nil, distanceMeters: nil, formattedLabel: "80×8")
                 ],
                 daysAgo: 9,
                 relativeTimeLabel: "9 days ago"
@@ -104,8 +104,8 @@ struct LastWorkoutCardView: View {
         LastWorkoutCardView(
             info: LastWorkoutInfo(
                 topSets: [
-                    TopSet(weight: 0, reps: nil, durationSeconds: 150, formattedLabel: "2m 30s"),
-                    TopSet(weight: 0, reps: nil, durationSeconds: 120, formattedLabel: "2m")
+                    TopSet(weight: 0, reps: nil, durationSeconds: 150, distanceMeters: 400, formattedLabel: "2m 30s • 400 m"),
+                    TopSet(weight: 0, reps: nil, durationSeconds: 120, distanceMeters: 300, formattedLabel: "2m • 300 m")
                 ],
                 daysAgo: 3,
                 relativeTimeLabel: "3 days ago"

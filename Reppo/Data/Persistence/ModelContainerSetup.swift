@@ -18,7 +18,8 @@ enum ModelContainerSetup {
             WorkoutTemplate.self,
             TemplateExercise.self,
             TemplateSet.self,
-            FatigueObservation.self
+            FatigueObservation.self,
+            FatigueLearningSetAudit.self
         ])
 
         let configuration = ModelConfiguration(

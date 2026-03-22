@@ -1,26 +1,26 @@
-// FatigueLearningAdminView.swift
-// Admin panel showing adaptive fatigue learning status per exercise.
-
 import SwiftUI
-
-// MARK: - List View
 
 struct FatigueLearningAdminView: View {
     let fatigueLearningService: FatigueLearningService
 
-    @State private var exercises: [Exercise] = []
+    @State private var globalSummary: GlobalFatigueLearningSummary?
+    @State private var exercises: [FatigueLearningExerciseDiagnostics] = []
     @State private var isLoading = true
     @State private var showResetAllAlert = false
+
+    private var hasData: Bool {
+        (globalSummary?.sessionCount ?? 0) > 0 || !exercises.isEmpty
+    }
 
     var body: some View {
         Group {
             if isLoading {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if exercises.isEmpty {
+            } else if !hasData {
                 noDataView
             } else {
-                exerciseList
+                diagnosticsList
             }
         }
         .background(Color.bg)
@@ -28,7 +28,7 @@ struct FatigueLearningAdminView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                if !exercises.isEmpty {
+                if hasData {
                     Button(role: .destructive) {
                         showResetAllAlert = true
                     } label: {
@@ -47,7 +47,7 @@ struct FatigueLearningAdminView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will reset learned fatigue rates for all exercises back to defaults. Observation history will be deleted.")
+            Text("This clears the global fatigue baseline, all exercise overrides, observations, and troubleshooting audits.")
         }
         .task { await loadData() }
     }
@@ -60,7 +60,7 @@ struct FatigueLearningAdminView: View {
             Text("No Learning Data Yet")
                 .font(.headline)
                 .foregroundStyle(Color.textPrimary)
-            Text("Complete workouts with Smart Suggestions enabled. The system will start collecting fatigue prediction data after your second set of each exercise.")
+            Text("Complete workouts with Smart Suggestions enabled. The app starts a global fatigue baseline after the first workout with at least 2 tracked sets, and exercise-specific tuning begins after 5 qualifying sessions.")
                 .font(.subheadline)
                 .foregroundStyle(Color.textSecondary)
                 .multilineTextAlignment(.center)
@@ -69,74 +69,134 @@ struct FatigueLearningAdminView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var exerciseList: some View {
+    private var diagnosticsList: some View {
         List {
+            if let globalSummary {
+                Section("Global Baseline") {
+                    summaryRow(
+                        label: "Applied Rate",
+                        value: String(format: "%.2f%%", globalSummary.appliedRate.rate * 100),
+                        detail: globalSummary.appliedRate.source.displayTitle
+                    )
+                    summaryRow(
+                        label: "Qualifying Workouts",
+                        value: "\(globalSummary.sessionCount)",
+                        detail: globalSummary.sessionCount == 0
+                            ? "waiting for first qualifying workout"
+                            : "global adjustments active for exercises without overrides"
+                    )
+                    summaryRow(
+                        label: "Cumulative Error",
+                        value: String(format: "%+.4f", globalSummary.cumulativeError),
+                        detail: errorDescription(globalSummary.cumulativeError)
+                    )
+                }
+                .listRowBackground(Color.bgCard)
+            }
+
             Section {
-                ForEach(exercises, id: \.id) { exercise in
+                ForEach(exercises) { item in
                     NavigationLink {
                         FatigueLearningDetailView(
-                            exercise: exercise,
+                            initialDiagnostics: item,
                             fatigueLearningService: fatigueLearningService,
                             onReset: { Task { await loadData() } }
                         )
                     } label: {
-                        ExerciseLearningRow(exercise: exercise)
+                        ExerciseLearningRow(item: item)
                     }
                     .listRowBackground(Color.bgCard)
                 }
             } header: {
-                Text("Exercises with learning data")
+                Text("Exercise Diagnostics")
             } footer: {
-                Text("Fatigue rates adjust automatically after \(FatigueLearningService.minimumSessionsForLearning) qualifying sessions. Each session needs at least 2 completed working sets with RIR logged.")
+                Text("Every completed set gets an audit row. Working set 1 is always the baseline, and only later sets with suggestion data, valid performance, RIR, and <=20% weight change are used.")
                     .foregroundStyle(Color.textTertiary)
             }
         }
         .scrollContentBackground(.hidden)
     }
 
+    private func summaryRow(label: String, value: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(label)
+                    .foregroundStyle(Color.textPrimary)
+                Spacer()
+                Text(value)
+                    .foregroundStyle(Color.textPrimary)
+                    .fontDesign(.monospaced)
+            }
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(Color.textTertiary)
+        }
+        .padding(.vertical, 2)
+    }
+
     private func loadData() async {
         isLoading = true
-        exercises = (try? await fatigueLearningService.exercisesWithLearningData()) ?? []
+        globalSummary = try? await fatigueLearningService.globalSummary()
+        exercises = (try? await fatigueLearningService.diagnosticsExercises()) ?? []
         isLoading = false
+    }
+
+    private func errorDescription(_ error: Double) -> String {
+        if abs(error) < 0.005 {
+            return "model predictions are currently stable"
+        } else if error < 0 {
+            return "you tend to out-perform the model"
+        } else {
+            return "you tend to under-perform the model"
+        }
     }
 }
 
-// MARK: - Exercise Row
-
 private struct ExerciseLearningRow: View {
-    let exercise: Exercise
+    let item: FatigueLearningExerciseDiagnostics
 
-    private var sessionCount: Int { exercise.fatigueLearningSessionCount ?? 0 }
-    private var cumulativeError: Double { exercise.fatigueLearningCumulativeError ?? 0 }
-    private var isPersonalized: Bool {
-        sessionCount >= FatigueLearningService.minimumSessionsForLearning && exercise.fatigueRate != nil
-    }
-    private var isCollecting: Bool {
-        sessionCount > 0 && sessionCount < FatigueLearningService.minimumSessionsForLearning
-    }
+    private var exercise: Exercise { item.exercise }
+    private var localSessionCount: Int { exercise.fatigueLearningSessionCount ?? 0 }
+    private var cumulativeError: Double { exercise.fatigueLearningCumulativeError ?? 0.0 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
+            HStack(spacing: 8) {
                 Text(exercise.name)
                     .foregroundStyle(Color.textPrimary)
                     .font(.body.weight(.medium))
                 Spacer()
+                sourceBadge(item.appliedRate.source)
                 statusBadge
             }
 
             HStack(spacing: 12) {
-                Label("\(sessionCount) sessions", systemImage: "chart.bar")
+                Label(String(format: "%.2f%%", item.appliedRate.rate * 100), systemImage: "flame")
                     .font(.caption)
                     .foregroundStyle(Color.textSecondary)
 
-                if let rate = exercise.fatigueRate {
-                    Label(String(format: "%.1f%%", rate * 100), systemImage: "flame")
+                Label(localSessionCount == 0 ? "0/5 local" : "\(localSessionCount)/5 local", systemImage: "chart.bar")
+                    .font(.caption)
+                    .foregroundStyle(Color.textSecondary)
+
+                if item.hasAuditHistory, let lastAuditDate = item.lastAuditDate {
+                    Label(lastAuditDate.formatted(date: .abbreviated, time: .omitted), systemImage: "clock")
                         .font(.caption)
                         .foregroundStyle(Color.textSecondary)
                 }
+            }
 
-                trendIndicator
+            if abs(cumulativeError) > 0.005 {
+                HStack(spacing: 4) {
+                    Image(systemName: cumulativeError < 0 ? "arrow.down.right" : "arrow.up.right")
+                    Text(cumulativeError < 0 ? "tending toward less fatigue than predicted" : "tending toward more fatigue than predicted")
+                }
+                .font(.caption)
+                .foregroundStyle(cumulativeError < 0 ? Color.success : Color.orange)
+            } else if item.hasAuditHistory && localSessionCount == 0 {
+                Text("Audit history available even though exercise-specific learning has not started yet.")
+                    .font(.caption)
+                    .foregroundStyle(Color.textTertiary)
             }
         }
         .padding(.vertical, 4)
@@ -144,66 +204,78 @@ private struct ExerciseLearningRow: View {
 
     @ViewBuilder
     private var statusBadge: some View {
-        if isPersonalized {
-            Text("Personalized")
+        if localSessionCount >= FatigueLearningService.minimumSessionsForLearning {
+            Text("Local override")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(Color.success)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
                 .background(Color.success.opacity(0.15), in: Capsule())
-        } else if isCollecting {
-            Text("\(sessionCount)/\(FatigueLearningService.minimumSessionsForLearning)")
+        } else if localSessionCount > 0 {
+            Text("\(localSessionCount)/\(FatigueLearningService.minimumSessionsForLearning)")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(Color.accent)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
                 .background(Color.accent.opacity(0.15), in: Capsule())
+        } else if item.hasAuditHistory {
+            Text("Audited")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Color.textSecondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Color.textSecondary.opacity(0.12), in: Capsule())
         }
     }
 
-    @ViewBuilder
-    private var trendIndicator: some View {
-        if abs(cumulativeError) > 0.005 {
-            HStack(spacing: 2) {
-                Image(systemName: cumulativeError < 0 ? "arrow.down.right" : "arrow.up.right")
-                Text(cumulativeError < 0 ? "less fatigue" : "more fatigue")
-            }
-            .font(.caption)
-            .foregroundStyle(cumulativeError < 0 ? Color.success : Color.orange)
+    private func sourceBadge(_ source: AppliedFatigueRateSource) -> some View {
+        let color: Color = switch source {
+        case .exerciseOverride: .success
+        case .globalLearned: .accent
+        case .defaultRate: .textSecondary
         }
+
+        return Text(source.displayTitle)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(color)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(color.opacity(0.12), in: Capsule())
     }
 }
 
-// MARK: - Detail View
-
 struct FatigueLearningDetailView: View {
-    let initialExercise: Exercise
+    let initialDiagnostics: FatigueLearningExerciseDiagnostics
     let fatigueLearningService: FatigueLearningService
     let onReset: () -> Void
 
-    @State private var exercise: Exercise
-    @State private var sessions: [SessionErrorSummary] = []
+    @State private var diagnostics: FatigueLearningExerciseDiagnostics
+    @State private var globalSummary: GlobalFatigueLearningSummary?
+    @State private var sessions: [FatigueLearningWorkoutAuditSummary] = []
     @State private var isLoading = true
     @State private var showResetAlert = false
     @Environment(\.dismiss) private var dismiss
 
-    init(exercise: Exercise, fatigueLearningService: FatigueLearningService, onReset: @escaping () -> Void) {
-        self.initialExercise = exercise
+    init(
+        initialDiagnostics: FatigueLearningExerciseDiagnostics,
+        fatigueLearningService: FatigueLearningService,
+        onReset: @escaping () -> Void
+    ) {
+        self.initialDiagnostics = initialDiagnostics
         self.fatigueLearningService = fatigueLearningService
         self.onReset = onReset
-        _exercise = State(initialValue: exercise)
+        _diagnostics = State(initialValue: initialDiagnostics)
     }
 
-    private var sessionCount: Int { exercise.fatigueLearningSessionCount ?? 0 }
-    private var cumulativeError: Double { exercise.fatigueLearningCumulativeError ?? 0 }
-    private var currentRate: Double { exercise.fatigueRate ?? 0.04 }
-    private let defaultRate: Double = 0.04
+    private var exercise: Exercise { diagnostics.exercise }
+    private var localSessionCount: Int { exercise.fatigueLearningSessionCount ?? 0 }
+    private var cumulativeError: Double { exercise.fatigueLearningCumulativeError ?? 0.0 }
 
     var body: some View {
         List {
-            parametersSection
+            appliedRateSection
             nudgeSection
-            sessionHistorySection
+            workoutHistorySection
             resetSection
         }
         .scrollContentBackground(.hidden)
@@ -220,60 +292,42 @@ struct FatigueLearningDetailView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will reset the learned fatigue rate for \(exercise.name) back to the default (\(String(format: "%.1f%%", defaultRate * 100))). All observation history will be deleted.")
+            Text("This clears the exercise override, local learning history, observations, and troubleshooting audits for \(exercise.name). The global baseline stays intact.")
         }
-        .task {
-            sessions = (try? await fatigueLearningService.recentSessionSummaries(exerciseId: exercise.id)) ?? []
-            isLoading = false
-        }
+        .task { await reload() }
     }
 
-    // MARK: - Parameters Section
-
-    private var parametersSection: some View {
-        Section("Current Parameters") {
+    private var appliedRateSection: some View {
+        Section("Applied Rate") {
             parameterRow(
-                label: "Fatigue Rate",
-                value: String(format: "%.2f%%", currentRate * 100),
-                detail: exercise.fatigueRate != nil
-                    ? "default: \(String(format: "%.2f%%", defaultRate * 100))"
-                    : "using default"
+                label: "Current Rate",
+                value: String(format: "%.2f%%", diagnostics.appliedRate.rate * 100),
+                detail: diagnostics.appliedRate.source.displayTitle
             )
 
             parameterRow(
-                label: "Sessions",
-                value: "\(sessionCount)",
-                detail: sessionCount >= FatigueLearningService.minimumSessionsForLearning
-                    ? "actively adjusting"
-                    : "\(FatigueLearningService.minimumSessionsForLearning - sessionCount) more needed"
+                label: "Local Sessions",
+                value: "\(localSessionCount)",
+                detail: localSessionCount >= FatigueLearningService.minimumSessionsForLearning
+                    ? "exercise-specific override is active"
+                    : "\(FatigueLearningService.minimumSessionsForLearning - localSessionCount) more qualifying sessions needed for local override"
             )
 
             parameterRow(
-                label: "Cumulative Error",
+                label: "Local Error",
                 value: String(format: "%+.4f", cumulativeError),
-                detail: errorDescription
+                detail: errorDescription(cumulativeError)
             )
 
-            if exercise.fatigueRate != nil {
-                let changePercent = ((currentRate - defaultRate) / defaultRate) * 100
+            if let globalSummary, diagnostics.appliedRate.source != .defaultRate {
                 parameterRow(
-                    label: "Change from Default",
-                    value: String(format: "%+.1f%%", changePercent),
-                    detail: currentRate < defaultRate ? "reduced fatigue prediction" : "increased fatigue prediction"
+                    label: "Global Baseline",
+                    value: String(format: "%.2f%%", globalSummary.appliedRate.rate * 100),
+                    detail: globalSummary.appliedRate.source.displayTitle
                 )
             }
         }
         .listRowBackground(Color.bgCard)
-    }
-
-    private var errorDescription: String {
-        if abs(cumulativeError) < 0.005 {
-            return "model predictions are accurate"
-        } else if cumulativeError < 0 {
-            return "you tend to out-perform predictions"
-        } else {
-            return "you tend to under-perform predictions"
-        }
     }
 
     private func parameterRow(label: String, value: String, detail: String) -> some View {
@@ -293,32 +347,27 @@ struct FatigueLearningDetailView: View {
         .padding(.vertical, 2)
     }
 
-    // MARK: - Nudge Section
-
     private var nudgeSection: some View {
         Section {
             HStack(spacing: 12) {
-                nudgeButton(
-                    title: "Less Fatigue",
-                    systemImage: "arrow.down.right",
-                    color: .success
-                ) {
-                    Task { await applyNudge(.lessAggressive) }
+                nudgeButton(title: "Less Fatigue", systemImage: "arrow.down.right", color: .success) {
+                    Task {
+                        try? await fatigueLearningService.applyManualNudge(exerciseId: exercise.id, nudge: .lessAggressive)
+                        await reload()
+                    }
                 }
-
-                nudgeButton(
-                    title: "More Fatigue",
-                    systemImage: "arrow.up.right",
-                    color: .orange
-                ) {
-                    Task { await applyNudge(.moreAggressive) }
+                nudgeButton(title: "More Fatigue", systemImage: "arrow.up.right", color: .orange) {
+                    Task {
+                        try? await fatigueLearningService.applyManualNudge(exerciseId: exercise.id, nudge: .moreAggressive)
+                        await reload()
+                    }
                 }
             }
             .listRowBackground(Color.bgCard)
         } header: {
             Text("Manual Adjustment")
         } footer: {
-            Text("Nudge the fatigue rate by \(String(format: "%.1f%%", FatigueLearningService.fatigueRateStep * 100)) per tap. \"Less Fatigue\" means you fatigue less than predicted.")
+            Text("This creates or updates an exercise-specific override. If the exercise had been using the global baseline, the nudge starts from that applied rate.")
                 .foregroundStyle(Color.textTertiary)
         }
     }
@@ -339,122 +388,128 @@ struct FatigueLearningDetailView: View {
         .buttonStyle(.plain)
     }
 
-    private func applyNudge(_ nudge: FatigueNudge) async {
-        try? await fatigueLearningService.applyManualNudge(exerciseId: exercise.id, nudge: nudge)
-        await reloadExercise()
-    }
-
-    private func reloadExercise() async {
-        if let updated = try? await fatigueLearningService.exercisesWithLearningData().first(where: { $0.id == exercise.id }) {
-            exercise = updated
-        }
-    }
-
-    // MARK: - Session History Section
-
-    private var sessionHistorySection: some View {
+    private var workoutHistorySection: some View {
         Section {
             if isLoading {
                 ProgressView()
                     .frame(maxWidth: .infinity)
             } else if sessions.isEmpty {
-                Text("No session data yet")
+                Text("No workout diagnostics yet")
                     .foregroundStyle(Color.textTertiary)
             } else {
                 ForEach(sessions) { session in
                     NavigationLink {
-                        SessionObservationDetailView(
+                        SessionAuditDetailView(
                             session: session,
                             exerciseId: exercise.id,
                             fatigueLearningService: fatigueLearningService
                         )
                     } label: {
-                        sessionRow(session)
+                        workoutSessionRow(session)
                     }
                 }
             }
         } header: {
-            Text("Recent Sessions")
+            Text("Recent Workout Diagnostics")
         } footer: {
-            Text("Tap a session for per-set details. Only working sets 2+ with RIR logged are tracked — set 1 establishes the baseline.")
+            Text("Every completed set appears here. A workout only counts for local exercise learning when at least 2 sets were marked \"Used for learning\" for this exercise.")
                 .foregroundStyle(Color.textTertiary)
         }
         .listRowBackground(Color.bgCard)
     }
 
-    private func sessionRow(_ session: SessionErrorSummary) -> some View {
+    private func workoutSessionRow(_ session: FatigueLearningWorkoutAuditSummary) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(session.date.formatted(date: .abbreviated, time: .shortened))
                     .foregroundStyle(Color.textPrimary)
                     .font(.subheadline)
                 Spacer()
-                errorBadge(session.medianError)
+                qualificationBadge(session.qualifiesForExerciseLearning)
             }
 
             HStack(spacing: 8) {
-                Text("\(session.observationCount) sets observed")
+                Text("\(session.usedSetCount) of \(session.totalAudits) sets used")
                     .font(.caption)
                     .foregroundStyle(Color.textSecondary)
 
-                Text("errors: \(session.errors.map { String(format: "%+.3f", $0) }.joined(separator: ", "))")
-                    .font(.caption)
-                    .foregroundStyle(Color.textTertiary)
-                    .lineLimit(1)
+                if let medianError = session.medianError {
+                    Text("median \(String(format: "%+.3f", medianError))")
+                        .font(.caption)
+                        .foregroundStyle(Color.textTertiary)
+                } else {
+                    Text("no tracked errors")
+                        .font(.caption)
+                        .foregroundStyle(Color.textTertiary)
+                }
             }
         }
         .padding(.vertical, 2)
     }
 
-    @ViewBuilder
-    private func errorBadge(_ error: Double) -> some View {
-        let isNegative = error < -0.005
-        let isPositive = error > 0.005
-        let color: Color = isNegative ? .success : (isPositive ? .orange : .textSecondary)
-
-        Text(String(format: "%+.3f", error))
-            .font(.caption.weight(.semibold).monospaced())
+    private func qualificationBadge(_ qualifies: Bool) -> some View {
+        let color: Color = qualifies ? .success : .textSecondary
+        return Text(qualifies ? "Qualified" : "Not enough tracked sets")
+            .font(.caption2.weight(.semibold))
             .foregroundStyle(color)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
             .background(color.opacity(0.12), in: Capsule())
     }
-
-    // MARK: - Reset Section
 
     private var resetSection: some View {
         Section {
             Button(role: .destructive) {
                 showResetAlert = true
             } label: {
-                Label("Reset Learning for \(exercise.name)", systemImage: "arrow.counterclockwise")
+                Label("Reset \(exercise.name)", systemImage: "arrow.counterclockwise")
             }
         } footer: {
-            Text("Resets the fatigue rate to the default value and deletes all observation history for this exercise.")
+            Text("Resets the exercise override to use the current global baseline or default rate and deletes local observation/audit history for this exercise.")
                 .foregroundStyle(Color.textTertiary)
         }
         .listRowBackground(Color.bgCard)
     }
+
+    private func reload() async {
+        isLoading = true
+        globalSummary = try? await fatigueLearningService.globalSummary()
+        sessions = (try? await fatigueLearningService.recentWorkoutAuditSummaries(exerciseId: exercise.id)) ?? []
+        if let updated = try? await fatigueLearningService.diagnosticsExercises().first(where: { $0.exercise.id == exercise.id }) {
+            diagnostics = updated
+        }
+        isLoading = false
+    }
+
+    private func errorDescription(_ error: Double) -> String {
+        if abs(error) < 0.005 {
+            return "exercise-specific predictions are currently stable"
+        } else if error < 0 {
+            return "you usually out-perform this exercise's predictions"
+        } else {
+            return "you usually under-perform this exercise's predictions"
+        }
+    }
 }
 
-// MARK: - Session Observation Detail View
-
-struct SessionObservationDetailView: View {
-    let session: SessionErrorSummary
+struct SessionAuditDetailView: View {
+    let session: FatigueLearningWorkoutAuditSummary
     let exerciseId: UUID
     let fatigueLearningService: FatigueLearningService
 
-    @State private var observations: [FatigueObservation] = []
+    @State private var audits: [FatigueLearningSetAudit] = []
     @State private var isLoading = true
 
     var body: some View {
         List {
-            Section {
+            Section("Session Summary") {
                 summaryRow("Date", value: session.date.formatted(date: .abbreviated, time: .shortened))
-                summaryRow("Sets Observed", value: "\(session.observationCount)")
-                summaryRow("Median Error", value: String(format: "%+.4f", session.medianError))
-            } header: {
-                Text("Session Summary")
+                summaryRow("Total Audits", value: "\(session.totalAudits)")
+                summaryRow("Used Sets", value: "\(session.usedSetCount)")
+                summaryRow("Qualified", value: session.qualifiesForExerciseLearning ? "Yes" : "No")
+                if let medianError = session.medianError {
+                    summaryRow("Median Error", value: String(format: "%+.4f", medianError))
+                }
             }
             .listRowBackground(Color.bgCard)
 
@@ -462,18 +517,18 @@ struct SessionObservationDetailView: View {
                 if isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity)
-                } else if observations.isEmpty {
-                    Text("No observation data available")
+                } else if audits.isEmpty {
+                    Text("No audit data available")
                         .foregroundStyle(Color.textTertiary)
                 } else {
-                    ForEach(observations, id: \.id) { obs in
-                        observationRow(obs)
+                    ForEach(audits, id: \.id) { audit in
+                        auditRow(audit)
                     }
                 }
             } header: {
-                Text("Per-Set Observations")
+                Text("Per-Set Diagnostics")
             } footer: {
-                Text("Working set 1 establishes the fatigue-free baseline and is not tracked. Only sets 2+ with RIR logged and weight within 20% of suggested are observed.")
+                Text("These diagnostics explain exactly why each completed set did or did not feed the fatigue model.")
                     .foregroundStyle(Color.textTertiary)
             }
             .listRowBackground(Color.bgCard)
@@ -483,7 +538,7 @@ struct SessionObservationDetailView: View {
         .navigationTitle("Session Details")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            observations = (try? await fatigueLearningService.observations(for: session.workoutId, exerciseId: exerciseId)) ?? []
+            audits = (try? await fatigueLearningService.audits(for: session.workoutId, exerciseId: exerciseId)) ?? []
             isLoading = false
         }
     }
@@ -499,101 +554,82 @@ struct SessionObservationDetailView: View {
         }
     }
 
-    private func observationRow(_ obs: FatigueObservation) -> some View {
-        let e1rmDelta = obs.actualE1RM - obs.predictedEffectiveE1RM
-        let weightDelta = obs.actualWeight - obs.prescribedWeight
-
-        return VStack(alignment: .leading, spacing: 8) {
-            // Header: working set label + error badge
+    private func auditRow(_ audit: FatigueLearningSetAudit) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Working Set \(obs.setIndex + 1)")
+                Text("Set \(audit.visibleSetNumber) • \(audit.setType.displayName)")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color.textPrimary)
                 Spacer()
-                errorBadge(obs.normalizedError)
+                statusBadge(for: audit.status)
             }
 
-            // Plain-language interpretation
-            Text(interpretError(obs.normalizedError))
+            Text(audit.status.detail)
                 .font(.caption)
-                .foregroundStyle(interpretColor(obs.normalizedError))
+                .foregroundStyle(color(for: audit.status))
 
-            // Weight comparison
-            HStack(spacing: 4) {
-                Image(systemName: "scalemass")
-                    .font(.caption)
-                    .foregroundStyle(Color.textTertiary)
-                Text("Suggested \(String(format: "%.1f", obs.prescribedWeight)) kg → Used \(String(format: "%.1f", obs.actualWeight)) kg")
-                    .font(.caption)
-                    .foregroundStyle(Color.textSecondary)
-                if abs(weightDelta) > 0.05 {
-                    Text("(\(String(format: "%+.1f", weightDelta)))")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(weightDelta > 0 ? Color.success : Color.orange)
-                }
-            }
-
-            // Performance: reps + RIR
-            HStack(spacing: 4) {
-                Image(systemName: "repeat")
-                    .font(.caption)
-                    .foregroundStyle(Color.textTertiary)
-                Text("\(obs.actualReps) reps @ RIR \(String(format: "%.0f", obs.actualRIR))")
+            if let reason = audit.suggestionUnavailableReason {
+                Text("\(reason.title): \(reason.message)")
                     .font(.caption)
                     .foregroundStyle(Color.textSecondary)
             }
 
-            // e1RM comparison with delta
-            HStack(spacing: 4) {
-                Image(systemName: "chart.bar")
+            if let prescribedWeight = audit.prescribedWeight, let actualWeight = audit.actualWeight {
+                Text("Suggested \(String(format: "%.1f", prescribedWeight)) kg -> Used \(String(format: "%.1f", actualWeight)) kg")
                     .font(.caption)
-                    .foregroundStyle(Color.textTertiary)
-                Text("e1RM: predicted \(String(format: "%.1f", obs.predictedEffectiveE1RM)) vs actual \(String(format: "%.1f", obs.actualE1RM))")
-                    .font(.caption)
-                    .foregroundStyle(Color.textTertiary)
-                Text("(\(String(format: "%+.1f", e1rmDelta)))")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(e1rmDelta > 0 ? Color.success : Color.orange)
+                    .foregroundStyle(Color.textSecondary)
             }
 
-            // Rest duration
-            if let rest = obs.restDurationSeconds {
+            if let actualReps = audit.actualReps {
+                let rirLabel = audit.actualRIR.map { " @ RIR \(String(format: "%.0f", $0))" } ?? ""
+                Text("\(actualReps) reps\(rirLabel)")
+                    .font(.caption)
+                    .foregroundStyle(Color.textSecondary)
+            }
+
+            if let deviationFraction = audit.deviationFraction {
+                Text("Weight deviation \(String(format: "%.1f%%", deviationFraction * 100))")
+                    .font(.caption)
+                    .foregroundStyle(Color.textTertiary)
+            }
+
+            if let normalizedError = audit.normalizedError {
                 HStack(spacing: 4) {
-                    Image(systemName: "timer")
+                    Text("Normalized error")
                         .font(.caption)
                         .foregroundStyle(Color.textTertiary)
-                    Text("\(rest / 60)m \(rest % 60)s rest")
-                        .font(.caption)
-                        .foregroundStyle(Color.textTertiary)
+                    errorBadge(normalizedError)
                 }
             }
         }
         .padding(.vertical, 4)
     }
 
-    private func interpretError(_ error: Double) -> String {
-        if error < -0.02 {
-            return "You were stronger than predicted — model over-estimated fatigue"
-        } else if error > 0.02 {
-            return "You were weaker than predicted — model under-estimated fatigue"
-        } else {
-            return "Prediction was accurate"
+    private func statusBadge(for status: FatigueLearningAuditStatus) -> some View {
+        Text(status.displayTitle)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(color(for: status))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(color(for: status).opacity(0.12), in: Capsule())
+    }
+
+    private func color(for status: FatigueLearningAuditStatus) -> Color {
+        switch status {
+        case .used:
+            return .success
+        case .suggestionUnavailable, .missingRIR, .weightDeviationOver20Percent:
+            return .orange
+        case .invalidPerformance:
+            return .danger
+        case .warmupNotTracked, .baselineFirstWorkingSet:
+            return .textSecondary
         }
     }
 
-    private func interpretColor(_ error: Double) -> Color {
-        if error < -0.02 { return .success }
-        if error > 0.02 { return .orange }
-        return .textSecondary
-    }
-
-    @ViewBuilder
     private func errorBadge(_ error: Double) -> some View {
-        let isNegative = error < -0.005
-        let isPositive = error > 0.005
-        let color: Color = isNegative ? .success : (isPositive ? .orange : .textSecondary)
-
-        Text(String(format: "%+.4f", error))
+        let color: Color = error < -0.005 ? .success : (error > 0.005 ? .orange : .textSecondary)
+        return Text(String(format: "%+.4f", error))
             .font(.caption.weight(.semibold).monospaced())
             .foregroundStyle(color)
             .padding(.horizontal, 6)

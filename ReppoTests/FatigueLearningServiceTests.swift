@@ -3,32 +3,28 @@ import XCTest
 
 final class FatigueLearningServiceTests: XCTestCase {
 
-    // MARK: - computeNormalizedError
+    // MARK: - Pure Helpers
 
     func testNormalizedError_modelTooAggressive_returnsNegative() {
-        // Model predicted less capacity than user actually had
         let error = FatigueLearningService.computeNormalizedError(
-            predicted: 130.0,  // model thought effective e1RM was 130
-            actual: 140.0,     // user demonstrated 140
-            base: 150.0        // baseline was 150
+            predicted: 130.0,
+            actual: 140.0,
+            base: 150.0
         )
 
-        // (130 - 140) / 150 = -0.0667
         XCTAssertEqual(error, -10.0 / 150.0, accuracy: 0.0001)
-        XCTAssertLessThan(error, 0, "Negative error means model was too aggressive")
+        XCTAssertLessThan(error, 0)
     }
 
     func testNormalizedError_modelTooLenient_returnsPositive() {
-        // Model predicted more capacity than user actually had
         let error = FatigueLearningService.computeNormalizedError(
             predicted: 145.0,
             actual: 135.0,
             base: 150.0
         )
 
-        // (145 - 135) / 150 = 0.0667
         XCTAssertEqual(error, 10.0 / 150.0, accuracy: 0.0001)
-        XCTAssertGreaterThan(error, 0, "Positive error means model was too lenient")
+        XCTAssertGreaterThan(error, 0)
     }
 
     func testNormalizedError_perfectPrediction_returnsZero() {
@@ -48,387 +44,378 @@ final class FatigueLearningServiceTests: XCTestCase {
             base: 0.0
         )
 
-        XCTAssertEqual(error, 0.0, "Should return 0 when base is 0 to avoid division by zero")
+        XCTAssertEqual(error, 0.0)
     }
 
-    // MARK: - medianError
-
     func testMedianError_oddCount() {
-        let median = FatigueLearningService.medianError([-0.05, -0.02, -0.08])
-        XCTAssertEqual(median, -0.05, accuracy: 0.0001)
+        XCTAssertEqual(FatigueLearningService.medianError([-0.05, -0.02, -0.08]), -0.05, accuracy: 0.0001)
     }
 
     func testMedianError_evenCount() {
-        let median = FatigueLearningService.medianError([-0.05, -0.02, -0.08, -0.01])
-        // sorted: -0.08, -0.05, -0.02, -0.01 → median = (-0.05 + -0.02) / 2 = -0.035
-        XCTAssertEqual(median, -0.035, accuracy: 0.0001)
+        XCTAssertEqual(FatigueLearningService.medianError([-0.05, -0.02, -0.08, -0.01]), -0.035, accuracy: 0.0001)
     }
 
     func testMedianError_singleValue() {
-        let median = FatigueLearningService.medianError([-0.03])
-        XCTAssertEqual(median, -0.03, accuracy: 0.0001)
+        XCTAssertEqual(FatigueLearningService.medianError([-0.03]), -0.03, accuracy: 0.0001)
     }
 
     func testMedianError_emptyArray() {
-        let median = FatigueLearningService.medianError([])
-        XCTAssertEqual(median, 0.0)
+        XCTAssertEqual(FatigueLearningService.medianError([]), 0.0)
     }
 
     func testMedianError_robustToOutliers() {
-        // One large outlier should not dominate
-        let median = FatigueLearningService.medianError([-0.03, -0.04, -0.50, -0.02, -0.05])
-        // sorted: -0.50, -0.05, -0.04, -0.03, -0.02 → median = -0.04
-        XCTAssertEqual(median, -0.04, accuracy: 0.0001)
+        XCTAssertEqual(FatigueLearningService.medianError([-0.03, -0.04, -0.50, -0.02, -0.05]), -0.04, accuracy: 0.0001)
     }
 
-    // MARK: - Quality Filters (via recordObservation)
+    // MARK: - Deterministic Capture
 
-    func testRecordObservation_skipsSetIndexZero() async throws {
-        let service = makeService()
-        let snapshot = makePrediction()
+    func testCaptureCompletedSet_recordsUsedAuditAndObservation() async throws {
+        let observationRepo = InMemoryFatigueObservationRepo()
+        let auditRepo = InMemoryFatigueLearningSetAuditRepo()
+        let service = makeService(observationRepo: observationRepo, auditRepo: auditRepo)
 
-        let result = try await service.recordObservation(
-            exerciseId: UUID(),
-            workoutId: UUID(),
-            setIndex: 0,  // first set — no fatigue signal
-            prediction: snapshot,
-            actualWeight: 100,
-            actualReps: 10,
-            actualRIR: 0,
-            restDurationSeconds: 180
-        )
-
-        XCTAssertNil(result, "Set 0 should be skipped (no fatigue signal)")
-    }
-
-    func testRecordObservation_skipsNilRIR() async throws {
-        let service = makeService()
-        let snapshot = makePrediction()
-
-        let result = try await service.recordObservation(
-            exerciseId: UUID(),
-            workoutId: UUID(),
-            setIndex: 1,
-            prediction: snapshot,
-            actualWeight: 100,
-            actualReps: 10,
-            actualRIR: nil,  // no RIR reported
-            restDurationSeconds: 180
-        )
-
-        XCTAssertNil(result, "Should skip when RIR is nil")
-    }
-
-    func testRecordObservation_skipsLargeWeightDeviation() async throws {
-        let service = makeService()
-        let snapshot = makePrediction(prescribedWeight: 100)
-
-        let result = try await service.recordObservation(
-            exerciseId: UUID(),
-            workoutId: UUID(),
-            setIndex: 1,
-            prediction: snapshot,
-            actualWeight: 130,  // 30% deviation > 20% threshold
-            actualReps: 10,
-            actualRIR: 0,
-            restDurationSeconds: 180
-        )
-
-        XCTAssertNil(result, "Should skip when weight deviates >20% from prescribed")
-    }
-
-    func testRecordObservation_recordsValidObservation() async throws {
-        let repo = InMemoryFatigueObservationRepo()
-        let service = makeService(observationRepo: repo)
-        let snapshot = makePrediction(effectiveE1RM: 140, baseE1RM: 150, prescribedWeight: 110)
-
-        let result = try await service.recordObservation(
-            exerciseId: UUID(),
-            workoutId: UUID(),
-            setIndex: 2,
-            prediction: snapshot,
+        let result = try await capture(
+            with: service,
             actualWeight: 115,
             actualReps: 10,
-            actualRIR: 0,
-            restDurationSeconds: 180
+            actualRIR: 0
         )
 
-        XCTAssertNotNil(result)
-        XCTAssertEqual(repo.observations.count, 1)
+        XCTAssertEqual(result.audit.status, .used)
+        XCTAssertNotNil(result.observation)
+        XCTAssertEqual(observationRepo.observations.count, 1)
+        XCTAssertEqual(auditRepo.audits.count, 1)
 
-        // Actual e1RM: Epley formula, weight=115, reps=10+0=10
-        // e1RM = 115 * (1 + 10/30) = 115 * 1.333 = 153.33
         let expectedActualE1RM = 115.0 * (1.0 + 10.0 / 30.0)
-        XCTAssertEqual(result?.actualE1RM ?? 0, expectedActualE1RM, accuracy: 0.01)
-
-        // Normalized error = (140 - 153.33) / 150
-        let expectedError = (140.0 - expectedActualE1RM) / 150.0
-        XCTAssertEqual(result?.normalizedError ?? 0, expectedError, accuracy: 0.001)
-        XCTAssertLessThan(result?.normalizedError ?? 0, 0, "User over-performed, error should be negative")
+        XCTAssertEqual(result.observation?.actualE1RM ?? 0, expectedActualE1RM, accuracy: 0.01)
+        XCTAssertLessThan(result.observation?.normalizedError ?? 0, 0)
     }
 
-    // MARK: - Learning Algorithm (processSessionEnd)
-
-    func testProcessSessionEnd_updatesLearningState() async throws {
-        let exerciseId = UUID()
-        let workoutId = UUID()
-        let exercise = Exercise(
-            id: exerciseId,
-            name: "Leg Extension",
-            equipmentType: .machinePin,
-            trackingType: .weightReps
-        )
-
-        let exerciseRepo = InMemoryExerciseRepo(exercises: [exercise])
+    func testCaptureCompletedSet_recordsAllSkippedStatuses() async throws {
         let observationRepo = InMemoryFatigueObservationRepo()
+        let auditRepo = InMemoryFatigueLearningSetAuditRepo()
+        let service = makeService(observationRepo: observationRepo, auditRepo: auditRepo)
 
-        // Add observations simulating user over-performing (negative errors)
-        observationRepo.observations = [
-            FatigueObservation(
-                exerciseId: exerciseId, workoutId: workoutId, setIndex: 1,
-                predictedEffectiveE1RM: 140, actualE1RM: 148,
-                normalizedError: -0.053, baseE1RM: 150,
-                prescribedWeight: 105, actualWeight: 110, actualReps: 10, actualRIR: 0
+        let scenarios: [(String, FatigueLearningAuditStatus, () async throws -> FatigueLearningCaptureResult)] = [
+            (
+                "warmup",
+                .warmupNotTracked,
+                { try await self.capture(with: service, setType: .warmup) }
             ),
-            FatigueObservation(
-                exerciseId: exerciseId, workoutId: workoutId, setIndex: 2,
-                predictedEffectiveE1RM: 135, actualE1RM: 145,
-                normalizedError: -0.067, baseE1RM: 150,
-                prescribedWeight: 100, actualWeight: 110, actualReps: 10, actualRIR: 0
+            (
+                "baseline",
+                .baselineFirstWorkingSet,
+                { try await self.capture(with: service, priorCompletedWorkingSetCount: 0) }
+            ),
+            (
+                "suggestion unavailable",
+                .suggestionUnavailable,
+                {
+                    try await self.capture(
+                        with: service,
+                        suggestionUnavailableReason: .noStrengthData,
+                        prediction: nil
+                    )
+                }
+            ),
+            (
+                "missing RIR",
+                .missingRIR,
+                { try await self.capture(with: service, actualRIR: nil) }
+            ),
+            (
+                "invalid performance",
+                .invalidPerformance,
+                { try await self.capture(with: service, actualWeight: nil) }
+            ),
+            (
+                "deviation over 20 percent",
+                .weightDeviationOver20Percent,
+                { try await self.capture(with: service, actualWeight: 135) }
             ),
         ]
 
-        let service = FatigueLearningService(
-            observationRepo: observationRepo,
-            exerciseRepo: exerciseRepo
+        for (name, expectedStatus, runScenario) in scenarios {
+            let result = try await runScenario()
+            XCTAssertEqual(result.audit.status, expectedStatus, name)
+            XCTAssertNil(result.observation, name)
+        }
+
+        XCTAssertEqual(observationRepo.observations.count, 0)
+        XCTAssertEqual(auditRepo.audits.count, scenarios.count)
+    }
+
+    func testCaptureCompletedSet_replacesExistingObservationForSameSet() async throws {
+        let setId = UUID()
+        let observationRepo = InMemoryFatigueObservationRepo()
+        let auditRepo = InMemoryFatigueLearningSetAuditRepo()
+        let service = makeService(observationRepo: observationRepo, auditRepo: auditRepo)
+
+        _ = try await capture(with: service, setId: setId, actualWeight: 110, actualReps: 10, actualRIR: 0)
+        _ = try await capture(with: service, setId: setId, actualWeight: 112.5, actualReps: 10, actualRIR: 0)
+
+        XCTAssertEqual(observationRepo.observations.count, 1)
+        XCTAssertEqual(auditRepo.audits.count, 1)
+        XCTAssertEqual(observationRepo.observations.first?.actualWeight, 112.5)
+    }
+
+    // MARK: - Session-End Learning
+
+    func testProcessSessionEnd_updatesGlobalBaselineFromTwoUsedSetsAcrossWorkout() async throws {
+        let workoutId = UUID()
+        let chest = Exercise(name: "Chest Press", equipmentType: .machinePin, trackingType: .weightReps)
+        let row = Exercise(name: "Row", equipmentType: .machinePin, trackingType: .weightReps)
+        let exerciseRepo = InMemoryExerciseRepo(exercises: [chest, row])
+        let profileRepo = InMemoryHealthProfileRepo(profile: HealthProfile())
+        let auditRepo = InMemoryFatigueLearningSetAuditRepo(
+            audits: [
+                makeUsedAudit(exerciseId: chest.id, workoutId: workoutId, visibleSetNumber: 2, normalizedError: -0.06),
+                makeUsedAudit(exerciseId: row.id, workoutId: workoutId, visibleSetNumber: 2, normalizedError: -0.02)
+            ]
+        )
+        let service = makeService(
+            exerciseRepo: exerciseRepo,
+            healthProfileRepo: profileRepo,
+            auditRepo: auditRepo
         )
 
         await service.processSessionEnd(workoutId: workoutId)
 
-        // Session count should be 1
-        XCTAssertEqual(exercise.fatigueLearningSessionCount, 1)
-
-        // Cumulative error should be negative (EMA of session error)
-        XCTAssertNotNil(exercise.fatigueLearningCumulativeError)
-        XCTAssertLessThan(exercise.fatigueLearningCumulativeError ?? 0, 0)
-
-        // FatigueRate should NOT change yet (need 5 sessions minimum)
-        XCTAssertNil(exercise.fatigueRate, "Should not adjust fatigueRate before 5 sessions")
+        let profile = try await profileRepo.fetchOrCreate()
+        XCTAssertEqual(profile.prescriptionFatigueLearningSessionCount, 1)
+        XCTAssertEqual(profile.prescriptionLearnedFatigueRate ?? 0, 0.038, accuracy: 0.0001)
+        XCTAssertLessThan(profile.prescriptionFatigueLearningCumulativeError ?? 0, 0)
+        XCTAssertNil(chest.fatigueLearningSessionCount)
+        XCTAssertNil(row.fatigueLearningSessionCount)
     }
 
-    func testProcessSessionEnd_adjustsFatigueRateAfterMinimumSessions() async throws {
-        let exerciseId = UUID()
-        let exercise = Exercise(
-            id: exerciseId,
-            name: "Leg Extension",
-            equipmentType: .machinePin,
-            trackingType: .weightReps
+    func testProcessSessionEnd_keepsExerciseLocalLearningAtTwoObservationsThreshold() async throws {
+        let workoutId = UUID()
+        let exercise = Exercise(name: "Leg Extension", equipmentType: .machinePin, trackingType: .weightReps)
+        let exerciseRepo = InMemoryExerciseRepo(exercises: [exercise])
+        let auditRepo = InMemoryFatigueLearningSetAuditRepo(
+            audits: [makeUsedAudit(exerciseId: exercise.id, workoutId: workoutId, visibleSetNumber: 2, normalizedError: -0.05)]
         )
-        // Simulate 4 prior sessions with consistently negative error
+        let service = makeService(exerciseRepo: exerciseRepo, auditRepo: auditRepo)
+
+        await service.processSessionEnd(workoutId: workoutId)
+
+        XCTAssertNil(exercise.fatigueLearningSessionCount)
+        let profile = try await service.globalSummary()
+        XCTAssertEqual(profile.sessionCount, 0)
+    }
+
+    func testProcessSessionEnd_seedsFirstExerciseOverrideFromGlobalRateAfterFiveSessions() async throws {
+        let workoutId = UUID()
+        let exercise = Exercise(name: "Leg Extension", equipmentType: .machinePin, trackingType: .weightReps)
         exercise.fatigueLearningSessionCount = 4
-        exercise.fatigueLearningCumulativeError = -0.05
+        exercise.fatigueLearningCumulativeError = -0.04
 
+        let profile = HealthProfile(
+            prescriptionLearnedFatigueRate: 0.05,
+            prescriptionFatigueLearningSessionCount: 3,
+            prescriptionFatigueLearningCumulativeError: -0.03
+        )
         let exerciseRepo = InMemoryExerciseRepo(exercises: [exercise])
-        let observationRepo = InMemoryFatigueObservationRepo()
-
-        let workoutId = UUID()
-        observationRepo.observations = [
-            FatigueObservation(
-                exerciseId: exerciseId, workoutId: workoutId, setIndex: 1,
-                predictedEffectiveE1RM: 140, actualE1RM: 148,
-                normalizedError: -0.053, baseE1RM: 150,
-                prescribedWeight: 105, actualWeight: 110, actualReps: 10, actualRIR: 0
-            ),
-            FatigueObservation(
-                exerciseId: exerciseId, workoutId: workoutId, setIndex: 2,
-                predictedEffectiveE1RM: 135, actualE1RM: 145,
-                normalizedError: -0.067, baseE1RM: 150,
-                prescribedWeight: 100, actualWeight: 110, actualReps: 10, actualRIR: 0
-            ),
-        ]
-
-        let service = FatigueLearningService(
-            observationRepo: observationRepo,
-            exerciseRepo: exerciseRepo
+        let profileRepo = InMemoryHealthProfileRepo(profile: profile)
+        let auditRepo = InMemoryFatigueLearningSetAuditRepo(
+            audits: [
+                makeUsedAudit(exerciseId: exercise.id, workoutId: workoutId, visibleSetNumber: 2, normalizedError: -0.06),
+                makeUsedAudit(exerciseId: exercise.id, workoutId: workoutId, visibleSetNumber: 3, normalizedError: -0.04)
+            ]
+        )
+        let service = makeService(
+            exerciseRepo: exerciseRepo,
+            healthProfileRepo: profileRepo,
+            auditRepo: auditRepo
         )
 
         await service.processSessionEnd(workoutId: workoutId)
 
-        // Session count should be 5 now
         XCTAssertEqual(exercise.fatigueLearningSessionCount, 5)
-
-        // Cumulative error is still negative
+        XCTAssertEqual(exercise.fatigueRate ?? 0, 0.046, accuracy: 0.0001)
         XCTAssertLessThan(exercise.fatigueLearningCumulativeError ?? 0, 0)
-
-        // FatigueRate should now be adjusted: default 0.04 - 0.002 = 0.038
-        XCTAssertNotNil(exercise.fatigueRate)
-        XCTAssertEqual(exercise.fatigueRate ?? 0, 0.038, accuracy: 0.0001,
-                       "Negative cumulative error should decrease fatigueRate")
     }
 
-    func testProcessSessionEnd_respectsLowerBound() async throws {
-        let exerciseId = UUID()
+    // MARK: - Applied Rate + Diagnostics
+
+    func testAppliedFatigueRate_prefersExerciseThenGlobalThenDefault() async throws {
+        let defaultExercise = Exercise(name: "Pulldown", equipmentType: .machinePin, trackingType: .weightReps)
+        let globalExercise = Exercise(name: "Press", equipmentType: .machinePin, trackingType: .weightReps)
+        let overrideExercise = Exercise(name: "Curl", equipmentType: .cable, trackingType: .weightReps, fatigueRate: 0.06)
+        let exerciseRepo = InMemoryExerciseRepo(exercises: [defaultExercise, globalExercise, overrideExercise])
+
+        let defaultService = makeService(exerciseRepo: exerciseRepo)
+        let defaultRate = try await defaultService.appliedFatigueRate(for: defaultExercise.id)
+        XCTAssertEqual(defaultRate.rate, 0.04, accuracy: 0.0001)
+        XCTAssertEqual(defaultRate.source.displayTitle, "Default")
+
+        let globalService = makeService(
+            exerciseRepo: exerciseRepo,
+            healthProfileRepo: InMemoryHealthProfileRepo(
+                profile: HealthProfile(prescriptionLearnedFatigueRate: 0.05)
+            )
+        )
+        let globalRate = try await globalService.appliedFatigueRate(for: globalExercise.id)
+        XCTAssertEqual(globalRate.rate, 0.05, accuracy: 0.0001)
+        XCTAssertEqual(globalRate.source.displayTitle, "Global learned")
+
+        let overrideRate = try await globalService.appliedFatigueRate(for: overrideExercise.id)
+        XCTAssertEqual(overrideRate.rate, 0.06, accuracy: 0.0001)
+        XCTAssertEqual(overrideRate.source.displayTitle, "Exercise override")
+    }
+
+    func testDiagnosticsExercises_includeAuditHistoryWithoutLocalLearning() async throws {
+        let workoutId = UUID()
+        let exercise = Exercise(name: "Lat Pulldown", equipmentType: .machinePin, trackingType: .weightReps)
+        let exerciseRepo = InMemoryExerciseRepo(exercises: [exercise])
+        let auditRepo = InMemoryFatigueLearningSetAuditRepo(
+            audits: [
+                FatigueLearningSetAudit(
+                    workoutId: workoutId,
+                    exerciseId: exercise.id,
+                    setId: UUID(),
+                    visibleSetNumber: 2,
+                    setType: .working,
+                    status: .suggestionUnavailable,
+                    suggestionUnavailableReason: .noStrengthData
+                )
+            ]
+        )
+        let service = makeService(exerciseRepo: exerciseRepo, auditRepo: auditRepo)
+
+        let diagnostics = try await service.diagnosticsExercises()
+
+        XCTAssertEqual(diagnostics.count, 1)
+        XCTAssertEqual(diagnostics.first?.exercise.id, exercise.id)
+        XCTAssertEqual(diagnostics.first?.hasAuditHistory, true)
+    }
+
+    // MARK: - Manual Nudge + Reset
+
+    func testApplyManualNudge_usesGlobalRateWhenExerciseHasNoOverride() async throws {
+        let exercise = Exercise(name: "Leg Extension", equipmentType: .machinePin, trackingType: .weightReps)
+        let exerciseRepo = InMemoryExerciseRepo(exercises: [exercise])
+        let service = makeService(
+            exerciseRepo: exerciseRepo,
+            healthProfileRepo: InMemoryHealthProfileRepo(
+                profile: HealthProfile(prescriptionLearnedFatigueRate: 0.05)
+            )
+        )
+
+        try await service.applyManualNudge(exerciseId: exercise.id, nudge: .lessAggressive)
+
+        XCTAssertEqual(exercise.fatigueRate ?? 0, 0.048, accuracy: 0.0001)
+        XCTAssertNil(exercise.fatigueLearningSessionCount)
+        XCTAssertNil(exercise.fatigueLearningCumulativeError)
+    }
+
+    func testResetLearning_clearsExerciseDataAndPreservesGlobalBaseline() async throws {
+        let workoutId = UUID()
         let exercise = Exercise(
-            id: exerciseId,
             name: "Leg Extension",
             equipmentType: .machinePin,
             trackingType: .weightReps,
-            fatigueRate: 0.011  // very close to lower bound of 0.01
-        )
-        exercise.fatigueLearningSessionCount = 10
-        exercise.fatigueLearningCumulativeError = -0.05
-
-        let exerciseRepo = InMemoryExerciseRepo(exercises: [exercise])
-        let observationRepo = InMemoryFatigueObservationRepo()
-
-        let workoutId = UUID()
-        observationRepo.observations = [
-            FatigueObservation(
-                exerciseId: exerciseId, workoutId: workoutId, setIndex: 1,
-                predictedEffectiveE1RM: 140, actualE1RM: 148,
-                normalizedError: -0.053, baseE1RM: 150,
-                prescribedWeight: 105, actualWeight: 110, actualReps: 10, actualRIR: 0
-            ),
-            FatigueObservation(
-                exerciseId: exerciseId, workoutId: workoutId, setIndex: 2,
-                predictedEffectiveE1RM: 135, actualE1RM: 145,
-                normalizedError: -0.067, baseE1RM: 150,
-                prescribedWeight: 100, actualWeight: 110, actualReps: 10, actualRIR: 0
-            ),
-        ]
-
-        let service = FatigueLearningService(
-            observationRepo: observationRepo,
-            exerciseRepo: exerciseRepo
-        )
-
-        await service.processSessionEnd(workoutId: workoutId)
-
-        // Should clamp to lower bound
-        XCTAssertEqual(exercise.fatigueRate ?? 0, 0.01, accuracy: 0.0001,
-                       "FatigueRate should not go below 0.01")
-    }
-
-    func testProcessSessionEnd_skipsExerciseWithTooFewObservations() async throws {
-        let exerciseId = UUID()
-        let exercise = Exercise(
-            id: exerciseId,
-            name: "Leg Extension",
-            equipmentType: .machinePin,
-            trackingType: .weightReps
-        )
-
-        let exerciseRepo = InMemoryExerciseRepo(exercises: [exercise])
-        let observationRepo = InMemoryFatigueObservationRepo()
-
-        let workoutId = UUID()
-        // Only 1 observation — need at least 2
-        observationRepo.observations = [
-            FatigueObservation(
-                exerciseId: exerciseId, workoutId: workoutId, setIndex: 1,
-                predictedEffectiveE1RM: 140, actualE1RM: 148,
-                normalizedError: -0.053, baseE1RM: 150,
-                prescribedWeight: 105, actualWeight: 110, actualReps: 10, actualRIR: 0
-            ),
-        ]
-
-        let service = FatigueLearningService(
-            observationRepo: observationRepo,
-            exerciseRepo: exerciseRepo
-        )
-
-        await service.processSessionEnd(workoutId: workoutId)
-
-        XCTAssertNil(exercise.fatigueLearningSessionCount,
-                     "Should not update learning state with < 2 observations")
-    }
-
-    // MARK: - Manual Nudge
-
-    func testApplyManualNudge_lessAggressive_decreasesRate() async throws {
-        let exerciseId = UUID()
-        let exercise = Exercise(
-            id: exerciseId,
-            name: "Leg Extension",
-            equipmentType: .machinePin,
-            trackingType: .weightReps
-        )
-        // Start at default rate
-        let exerciseRepo = InMemoryExerciseRepo(exercises: [exercise])
-        let service = makeService(exerciseRepo: exerciseRepo)
-
-        try await service.applyManualNudge(exerciseId: exerciseId, nudge: .lessAggressive)
-
-        XCTAssertEqual(exercise.fatigueRate ?? 0, 0.038, accuracy: 0.0001,
-                       "Less aggressive nudge should decrease rate by 0.002")
-    }
-
-    func testApplyManualNudge_moreAggressive_increasesRate() async throws {
-        let exerciseId = UUID()
-        let exercise = Exercise(
-            id: exerciseId,
-            name: "Leg Extension",
-            equipmentType: .machinePin,
-            trackingType: .weightReps
-        )
-        let exerciseRepo = InMemoryExerciseRepo(exercises: [exercise])
-        let service = makeService(exerciseRepo: exerciseRepo)
-
-        try await service.applyManualNudge(exerciseId: exerciseId, nudge: .moreAggressive)
-
-        XCTAssertEqual(exercise.fatigueRate ?? 0, 0.042, accuracy: 0.0001,
-                       "More aggressive nudge should increase rate by 0.002")
-    }
-
-    func testApplyManualNudge_respectsBounds() async throws {
-        let exerciseId = UUID()
-        let exercise = Exercise(
-            id: exerciseId,
-            name: "Leg Extension",
-            equipmentType: .machinePin,
-            trackingType: .weightReps,
-            fatigueRate: 0.079 // near upper bound of 0.08
-        )
-        let exerciseRepo = InMemoryExerciseRepo(exercises: [exercise])
-        let service = makeService(exerciseRepo: exerciseRepo)
-
-        try await service.applyManualNudge(exerciseId: exerciseId, nudge: .moreAggressive)
-
-        XCTAssertEqual(exercise.fatigueRate ?? 0, 0.08, accuracy: 0.0001,
-                       "Should clamp to upper bound")
-    }
-
-    func testApplyManualNudge_doesNotChangeLearningState() async throws {
-        let exerciseId = UUID()
-        let exercise = Exercise(
-            id: exerciseId,
-            name: "Leg Extension",
-            equipmentType: .machinePin,
-            trackingType: .weightReps
+            fatigueRate: 0.05
         )
         exercise.fatigueLearningSessionCount = 3
         exercise.fatigueLearningCumulativeError = -0.02
 
-        let exerciseRepo = InMemoryExerciseRepo(exercises: [exercise])
-        let service = makeService(exerciseRepo: exerciseRepo)
+        let profile = HealthProfile(
+            prescriptionLearnedFatigueRate: 0.047,
+            prescriptionFatigueLearningSessionCount: 2,
+            prescriptionFatigueLearningCumulativeError: -0.01
+        )
+        let observation = makeObservation(exerciseId: exercise.id, workoutId: workoutId)
+        let observationRepo = InMemoryFatigueObservationRepo(observations: [observation])
+        let auditRepo = InMemoryFatigueLearningSetAuditRepo(
+            audits: [makeUsedAudit(exerciseId: exercise.id, workoutId: workoutId, setId: observation.setId, visibleSetNumber: 2, normalizedError: -0.05)]
+        )
+        let profileRepo = InMemoryHealthProfileRepo(profile: profile)
+        let service = makeService(
+            observationRepo: observationRepo,
+            exerciseRepo: InMemoryExerciseRepo(exercises: [exercise]),
+            healthProfileRepo: profileRepo,
+            auditRepo: auditRepo
+        )
 
-        try await service.applyManualNudge(exerciseId: exerciseId, nudge: .lessAggressive)
+        try await service.resetLearning(exerciseId: exercise.id)
 
-        XCTAssertEqual(exercise.fatigueLearningSessionCount, 3,
-                       "Manual nudge should not change session count")
-        XCTAssertEqual(exercise.fatigueLearningCumulativeError ?? 0, -0.02, accuracy: 0.0001,
-                       "Manual nudge should not change cumulative error")
+        XCTAssertNil(exercise.fatigueRate)
+        XCTAssertNil(exercise.fatigueLearningSessionCount)
+        XCTAssertNil(exercise.fatigueLearningCumulativeError)
+        XCTAssertTrue(observationRepo.observations.isEmpty)
+        XCTAssertTrue(auditRepo.audits.isEmpty)
+
+        let persistedProfile = try await profileRepo.fetchOrCreate()
+        XCTAssertEqual(persistedProfile.prescriptionLearnedFatigueRate ?? 0, 0.047, accuracy: 0.0001)
+        XCTAssertEqual(persistedProfile.prescriptionFatigueLearningSessionCount, 2)
+    }
+
+    func testResetAllLearning_clearsGlobalAndExerciseData() async throws {
+        let workoutId = UUID()
+        let learningExercise = Exercise(
+            name: "Leg Extension",
+            equipmentType: .machinePin,
+            trackingType: .weightReps,
+            fatigueRate: 0.05
+        )
+        learningExercise.fatigueLearningSessionCount = 3
+        learningExercise.fatigueLearningCumulativeError = -0.02
+
+        let auditOnlyExercise = Exercise(name: "Lat Pulldown", equipmentType: .machinePin, trackingType: .weightReps)
+        let profile = HealthProfile(
+            prescriptionLearnedFatigueRate: 0.047,
+            prescriptionFatigueLearningSessionCount: 2,
+            prescriptionFatigueLearningCumulativeError: -0.01
+        )
+        let observationRepo = InMemoryFatigueObservationRepo(
+            observations: [
+                makeObservation(exerciseId: learningExercise.id, workoutId: workoutId),
+                makeObservation(exerciseId: auditOnlyExercise.id, workoutId: workoutId)
+            ]
+        )
+        let auditRepo = InMemoryFatigueLearningSetAuditRepo(
+            audits: [
+                makeUsedAudit(exerciseId: learningExercise.id, workoutId: workoutId, visibleSetNumber: 2, normalizedError: -0.05),
+                makeUsedAudit(exerciseId: auditOnlyExercise.id, workoutId: workoutId, visibleSetNumber: 2, normalizedError: -0.03)
+            ]
+        )
+        let profileRepo = InMemoryHealthProfileRepo(profile: profile)
+        let service = makeService(
+            observationRepo: observationRepo,
+            exerciseRepo: InMemoryExerciseRepo(exercises: [learningExercise, auditOnlyExercise]),
+            healthProfileRepo: profileRepo,
+            auditRepo: auditRepo
+        )
+
+        try await service.resetAllLearning()
+
+        XCTAssertNil(learningExercise.fatigueRate)
+        XCTAssertNil(learningExercise.fatigueLearningSessionCount)
+        XCTAssertNil(learningExercise.fatigueLearningCumulativeError)
+        XCTAssertTrue(observationRepo.observations.isEmpty)
+        XCTAssertTrue(auditRepo.audits.isEmpty)
+
+        let persistedProfile = try await profileRepo.fetchOrCreate()
+        XCTAssertNil(persistedProfile.prescriptionLearnedFatigueRate)
+        XCTAssertNil(persistedProfile.prescriptionFatigueLearningSessionCount)
+        XCTAssertNil(persistedProfile.prescriptionFatigueLearningCumulativeError)
     }
 
     // MARK: - Helpers
 
     private func makeService(
-        observationRepo: FatigueObservationRepositoryProtocol? = nil,
-        exerciseRepo: ExerciseRepositoryProtocol? = nil
+        observationRepo: (any FatigueObservationRepositoryProtocol)? = nil,
+        exerciseRepo: (any ExerciseRepositoryProtocol)? = nil,
+        healthProfileRepo: (any HealthProfileRepositoryProtocol)? = nil,
+        auditRepo: (any FatigueLearningSetAuditRepositoryProtocol)? = nil
     ) -> FatigueLearningService {
         FatigueLearningService(
             observationRepo: observationRepo ?? InMemoryFatigueObservationRepo(),
-            exerciseRepo: exerciseRepo ?? InMemoryExerciseRepo()
+            exerciseRepo: exerciseRepo ?? InMemoryExerciseRepo(),
+            healthProfileRepo: healthProfileRepo ?? InMemoryHealthProfileRepo(profile: HealthProfile()),
+            auditRepo: auditRepo ?? InMemoryFatigueLearningSetAuditRepo()
         )
     }
 
@@ -444,24 +431,117 @@ final class FatigueLearningServiceTests: XCTestCase {
             formula: .epley
         )
     }
+
+    private func capture(
+        with service: FatigueLearningService,
+        setId: UUID = UUID(),
+        exerciseId: UUID = UUID(),
+        workoutId: UUID = UUID(),
+        visibleSetNumber: Int = 2,
+        setType: SetType = .working,
+        priorCompletedWorkingSetCount: Int = 1,
+        suggestionUnavailableReason: SuggestionUnavailableReason? = nil,
+        prediction: PredictionSnapshot? = PredictionSnapshot(
+            effectiveE1RM: 140,
+            baseE1RM: 150,
+            prescribedWeight: 110,
+            formula: .epley
+        ),
+        actualWeight: Double? = 110,
+        actualReps: Int? = 10,
+        actualRIR: Double? = 0,
+        restDurationSeconds: Int? = 180
+    ) async throws -> FatigueLearningCaptureResult {
+        try await service.captureCompletedSet(
+            setId: setId,
+            exerciseId: exerciseId,
+            workoutId: workoutId,
+            visibleSetNumber: visibleSetNumber,
+            setType: setType,
+            priorCompletedWorkingSetCount: priorCompletedWorkingSetCount,
+            suggestionUnavailableReason: suggestionUnavailableReason,
+            prediction: prediction,
+            actualWeight: actualWeight,
+            actualReps: actualReps,
+            actualRIR: actualRIR,
+            restDurationSeconds: restDurationSeconds
+        )
+    }
+
+    private func makeUsedAudit(
+        exerciseId: UUID,
+        workoutId: UUID,
+        setId: UUID = UUID(),
+        visibleSetNumber: Int,
+        normalizedError: Double,
+        createdAt: Date = Date()
+    ) -> FatigueLearningSetAudit {
+        FatigueLearningSetAudit(
+            workoutId: workoutId,
+            exerciseId: exerciseId,
+            setId: setId,
+            visibleSetNumber: visibleSetNumber,
+            setType: .working,
+            status: .used,
+            predictedEffectiveE1RM: 140,
+            baseE1RM: 150,
+            prescribedWeight: 110,
+            actualWeight: 110,
+            actualReps: 10,
+            actualRIR: 0,
+            deviationFraction: 0,
+            normalizedError: normalizedError,
+            createdAt: createdAt
+        )
+    }
+
+    private func makeObservation(
+        exerciseId: UUID,
+        workoutId: UUID,
+        setId: UUID = UUID()
+    ) -> FatigueObservation {
+        FatigueObservation(
+            exerciseId: exerciseId,
+            workoutId: workoutId,
+            setId: setId,
+            setIndex: 1,
+            predictedEffectiveE1RM: 140,
+            actualE1RM: 148,
+            normalizedError: -0.053,
+            baseE1RM: 150,
+            prescribedWeight: 105,
+            actualWeight: 110,
+            actualReps: 10,
+            actualRIR: 0
+        )
+    }
 }
 
-// MARK: - In-Memory Test Doubles
-
 private final class InMemoryFatigueObservationRepo: @unchecked Sendable, FatigueObservationRepositoryProtocol {
-    var observations: [FatigueObservation] = []
+    var observations: [FatigueObservation]
 
-    func save(_ observation: FatigueObservation) async throws {
+    init(observations: [FatigueObservation] = []) {
+        self.observations = observations
+    }
+
+    func upsert(_ observation: FatigueObservation) async throws {
+        observations.removeAll { $0.setId == observation.setId }
         observations.append(observation)
     }
 
     func fetchObservations(for workoutId: UUID) async throws -> [FatigueObservation] {
-        observations.filter { $0.workoutId == workoutId }
+        observations
+            .filter { $0.workoutId == workoutId }
+            .sorted { $0.setIndex < $1.setIndex }
     }
 
     func fetchObservations(exerciseId: UUID, limit: Int?) async throws -> [FatigueObservation] {
-        let filtered = observations.filter { $0.exerciseId == exerciseId }
-        if let limit { return Array(filtered.prefix(limit)) }
+        let filtered = observations
+            .filter { $0.exerciseId == exerciseId }
+            .sorted { $0.createdAt > $1.createdAt }
+        if let limit {
+            return Array(filtered.prefix(limit))
+        }
         return filtered
     }
 
@@ -469,9 +549,113 @@ private final class InMemoryFatigueObservationRepo: @unchecked Sendable, Fatigue
         Set(observations.filter { $0.exerciseId == exerciseId }.map(\.workoutId)).count
     }
 
+    func deleteObservation(for setId: UUID) async throws {
+        observations.removeAll { $0.setId == setId }
+    }
+
     @discardableResult
     func pruneObservations(exerciseId: UUID, keepRecentSessions: Int) async throws -> Int {
-        0
+        let originalCount = observations.count
+        guard keepRecentSessions > 0 else {
+            observations.removeAll { $0.exerciseId == exerciseId }
+            return originalCount - observations.count
+        }
+
+        let grouped = Dictionary(grouping: observations.filter { $0.exerciseId == exerciseId }, by: \.workoutId)
+        let sortedWorkoutIds = grouped.keys.sorted { lhs, rhs in
+            let lhsDate = grouped[lhs]?.first?.createdAt ?? .distantPast
+            let rhsDate = grouped[rhs]?.first?.createdAt ?? .distantPast
+            return lhsDate > rhsDate
+        }
+        let workoutsToKeep = Set(sortedWorkoutIds.prefix(keepRecentSessions))
+        observations.removeAll {
+            $0.exerciseId == exerciseId && !workoutsToKeep.contains($0.workoutId)
+        }
+        return originalCount - observations.count
+    }
+}
+
+private final class InMemoryFatigueLearningSetAuditRepo: @unchecked Sendable, FatigueLearningSetAuditRepositoryProtocol {
+    var audits: [FatigueLearningSetAudit]
+
+    init(audits: [FatigueLearningSetAudit] = []) {
+        self.audits = audits
+    }
+
+    func upsert(_ audit: FatigueLearningSetAudit) async throws {
+        audits.removeAll { $0.setId == audit.setId }
+        audits.append(audit)
+    }
+
+    func fetchAudits(for workoutId: UUID) async throws -> [FatigueLearningSetAudit] {
+        audits
+            .filter { $0.workoutId == workoutId }
+            .sorted {
+                if $0.createdAt != $1.createdAt { return $0.createdAt < $1.createdAt }
+                return $0.visibleSetNumber < $1.visibleSetNumber
+            }
+    }
+
+    func fetchAudits(workoutId: UUID, exerciseId: UUID) async throws -> [FatigueLearningSetAudit] {
+        audits
+            .filter { $0.workoutId == workoutId && $0.exerciseId == exerciseId }
+            .sorted {
+                if $0.visibleSetNumber != $1.visibleSetNumber { return $0.visibleSetNumber < $1.visibleSetNumber }
+                return $0.createdAt < $1.createdAt
+            }
+    }
+
+    func fetchAudits(exerciseId: UUID, limit: Int?) async throws -> [FatigueLearningSetAudit] {
+        let filtered = audits
+            .filter { $0.exerciseId == exerciseId }
+            .sorted {
+                if $0.createdAt != $1.createdAt { return $0.createdAt > $1.createdAt }
+                return $0.visibleSetNumber < $1.visibleSetNumber
+            }
+        if let limit {
+            return Array(filtered.prefix(limit))
+        }
+        return filtered
+    }
+
+    func exerciseIdsWithAudits() async throws -> [UUID] {
+        Array(Set(audits.map(\.exerciseId))).sorted { $0.uuidString < $1.uuidString }
+    }
+
+    func deleteAudit(for setId: UUID) async throws {
+        audits.removeAll { $0.setId == setId }
+    }
+
+    func deleteAudits(workoutId: UUID) async throws {
+        audits.removeAll { $0.workoutId == workoutId }
+    }
+
+    func deleteAudits(exerciseId: UUID) async throws {
+        audits.removeAll { $0.exerciseId == exerciseId }
+    }
+
+    func deleteAll() async throws {
+        audits.removeAll()
+    }
+}
+
+private final class InMemoryHealthProfileRepo: @unchecked Sendable, HealthProfileRepositoryProtocol {
+    private var profile: HealthProfile
+
+    init(profile: HealthProfile) {
+        self.profile = profile
+    }
+
+    func save(_ profile: HealthProfile) async throws {
+        self.profile = profile
+    }
+
+    func fetch() async throws -> HealthProfile? {
+        profile
+    }
+
+    func fetchOrCreate() async throws -> HealthProfile {
+        profile
     }
 }
 
@@ -498,8 +682,12 @@ private final class InMemoryExerciseRepo: @unchecked Sendable, ExerciseRepositor
         exercises.first { $0.id == id }
     }
 
-    func fetchAll() async throws -> [Exercise] { exercises }
+    func fetchAll() async throws -> [Exercise] {
+        exercises
+    }
+
     func fetchAllChartExercises() async throws -> [ChartExerciseData] { [] }
     func search(name: String) async throws -> [Exercise] { [] }
     func hasAssociatedSets(_ exerciseId: UUID) async throws -> Bool { false }
+    func hasLoggedSetData(_ exerciseId: UUID) async throws -> Bool { false }
 }

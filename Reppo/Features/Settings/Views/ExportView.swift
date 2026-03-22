@@ -238,6 +238,23 @@ struct RestoreBackupView: View {
                     .padding()
                     .background(Color.bgCard)
                     .cornerRadius(12)
+
+                    if let warning = result.learningDataWarningMessage {
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(Color.orange)
+                                .padding(.top, 2)
+
+                            Text(warning)
+                                .font(.subheadline)
+                                .foregroundStyle(Color.textSecondary)
+                                .multilineTextAlignment(.leading)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .background(Color.orange.opacity(0.10))
+                        .cornerRadius(12)
+                    }
                 }
 
                 Button("Restore Another Backup") {

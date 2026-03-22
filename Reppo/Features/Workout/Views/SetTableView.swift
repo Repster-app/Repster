@@ -149,6 +149,12 @@ struct SetTableView: View {
                 Text("TIME")
                     .frame(maxWidth: .infinity)
 
+            case .durationDistance:
+                Text("TIME")
+                    .frame(maxWidth: .infinity)
+                Text("DIST")
+                    .frame(maxWidth: .infinity)
+
             case .weightDistance:
                 Text("WEIGHT")
                     .frame(maxWidth: .infinity)
@@ -913,7 +919,7 @@ struct SetEntryKeyboardOverlay: View {
         switch context.trackingType {
         case .weightReps, .weightRepsDuration, .custom:
             return true
-        case .duration, .weightDistance:
+        case .duration, .durationDistance, .weightDistance:
             return false
         }
     }
@@ -931,6 +937,8 @@ struct SetEntryKeyboardOverlay: View {
             return [.weight, .reps]
         case .duration:
             return [.duration]
+        case .durationDistance:
+            return [.duration, .distance]
         case .weightDistance:
             return [.weight, .distance]
         case .weightRepsDuration:

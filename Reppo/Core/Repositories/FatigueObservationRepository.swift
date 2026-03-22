@@ -4,7 +4,8 @@ import Foundation
 @ModelActor
 actor FatigueObservationRepository: FatigueObservationRepositoryProtocol {
 
-    func save(_ observation: FatigueObservation) throws {
+    func upsert(_ observation: FatigueObservation) throws {
+        try deleteObservation(for: observation.setId)
         modelContext.insert(observation)
         try modelContext.save()
     }
@@ -32,6 +33,19 @@ actor FatigueObservationRepository: FatigueObservationRepositoryProtocol {
         let observations = try fetchObservations(exerciseId: exerciseId, limit: nil)
         let uniqueWorkouts = Set(observations.map(\.workoutId))
         return uniqueWorkouts.count
+    }
+
+    func deleteObservation(for setId: UUID) throws {
+        let descriptor = FetchDescriptor<FatigueObservation>(
+            predicate: #Predicate { $0.storedSetId == setId || ($0.storedSetId == nil && $0.id == setId) }
+        )
+        let observations = try modelContext.fetch(descriptor)
+        for observation in observations {
+            modelContext.delete(observation)
+        }
+        if !observations.isEmpty {
+            try modelContext.save()
+        }
     }
 
     @discardableResult
@@ -62,5 +76,100 @@ actor FatigueObservationRepository: FatigueObservationRepositoryProtocol {
 
         try modelContext.save()
         return deletedCount
+    }
+}
+
+@ModelActor
+actor FatigueLearningSetAuditRepository: FatigueLearningSetAuditRepositoryProtocol {
+
+    func upsert(_ audit: FatigueLearningSetAudit) throws {
+        try deleteExistingAudit(for: audit.setId)
+        modelContext.insert(audit)
+        try modelContext.save()
+    }
+
+    func fetchAudits(for workoutId: UUID) throws -> [FatigueLearningSetAudit] {
+        let descriptor = FetchDescriptor<FatigueLearningSetAudit>(
+            predicate: #Predicate { $0.workoutId == workoutId },
+            sortBy: [SortDescriptor(\.createdAt), SortDescriptor(\.visibleSetNumber)]
+        )
+        return try modelContext.fetch(descriptor)
+    }
+
+    func fetchAudits(workoutId: UUID, exerciseId: UUID) throws -> [FatigueLearningSetAudit] {
+        let descriptor = FetchDescriptor<FatigueLearningSetAudit>(
+            predicate: #Predicate { $0.workoutId == workoutId && $0.exerciseId == exerciseId },
+            sortBy: [SortDescriptor(\.visibleSetNumber), SortDescriptor(\.createdAt)]
+        )
+        return try modelContext.fetch(descriptor)
+    }
+
+    func fetchAudits(exerciseId: UUID, limit: Int?) throws -> [FatigueLearningSetAudit] {
+        var descriptor = FetchDescriptor<FatigueLearningSetAudit>(
+            predicate: #Predicate { $0.exerciseId == exerciseId },
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse), SortDescriptor(\.visibleSetNumber)]
+        )
+        if let limit {
+            descriptor.fetchLimit = limit
+        }
+        return try modelContext.fetch(descriptor)
+    }
+
+    func exerciseIdsWithAudits() throws -> [UUID] {
+        let audits = try modelContext.fetch(FetchDescriptor<FatigueLearningSetAudit>())
+        return Array(Set(audits.map(\.exerciseId))).sorted { $0.uuidString < $1.uuidString }
+    }
+
+    func deleteAudit(for setId: UUID) throws {
+        let descriptor = FetchDescriptor<FatigueLearningSetAudit>(
+            predicate: #Predicate { $0.setId == setId }
+        )
+        let audits = try modelContext.fetch(descriptor)
+        for audit in audits {
+            modelContext.delete(audit)
+        }
+        if !audits.isEmpty {
+            try modelContext.save()
+        }
+    }
+
+    func deleteAudits(workoutId: UUID) throws {
+        let audits = try fetchAudits(for: workoutId)
+        for audit in audits {
+            modelContext.delete(audit)
+        }
+        if !audits.isEmpty {
+            try modelContext.save()
+        }
+    }
+
+    func deleteAudits(exerciseId: UUID) throws {
+        let audits = try fetchAudits(exerciseId: exerciseId, limit: nil)
+        for audit in audits {
+            modelContext.delete(audit)
+        }
+        if !audits.isEmpty {
+            try modelContext.save()
+        }
+    }
+
+    func deleteAll() throws {
+        let audits = try modelContext.fetch(FetchDescriptor<FatigueLearningSetAudit>())
+        for audit in audits {
+            modelContext.delete(audit)
+        }
+        if !audits.isEmpty {
+            try modelContext.save()
+        }
+    }
+
+    private func deleteExistingAudit(for setId: UUID) throws {
+        let descriptor = FetchDescriptor<FatigueLearningSetAudit>(
+            predicate: #Predicate { $0.setId == setId }
+        )
+        let audits = try modelContext.fetch(descriptor)
+        for audit in audits {
+            modelContext.delete(audit)
+        }
     }
 }

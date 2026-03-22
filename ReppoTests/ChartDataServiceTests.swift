@@ -246,6 +246,8 @@ final class ChartDataServiceTests: XCTestCase {
             PerformanceRecord.self,
             BodyweightEntry.self,
             HealthProfile.self,
+            FatigueObservation.self,
+            FatigueLearningSetAudit.self,
             configurations: configuration
         )
 
@@ -256,6 +258,8 @@ final class ChartDataServiceTests: XCTestCase {
         let performanceRecordRepo = PerformanceRecordRepository(modelContainer: container)
         let bodyweightRepo = BodyweightEntryRepository(modelContainer: container)
         let healthProfileRepo = HealthProfileRepository(modelContainer: container)
+        let fatigueObservationRepo = FatigueObservationRepository(modelContainer: container)
+        let fatigueLearningAuditRepo = FatigueLearningSetAuditRepository(modelContainer: container)
 
         let statsService = StatsService(
             exerciseStatsRepository: exerciseStatsRepo,
@@ -270,13 +274,20 @@ final class ChartDataServiceTests: XCTestCase {
             healthProfileRepository: healthProfileRepo,
             exerciseRepository: exerciseRepo
         )
+        let fatigueLearningService = FatigueLearningService(
+            observationRepo: fatigueObservationRepo,
+            exerciseRepo: exerciseRepo,
+            healthProfileRepo: healthProfileRepo,
+            auditRepo: fatigueLearningAuditRepo
+        )
         let setService = SetService(
             setRepository: setRepo,
             exerciseRepository: exerciseRepo,
             bodyweightEntryRepository: bodyweightRepo,
             healthProfileRepository: healthProfileRepo,
             prService: prService,
-            statsService: statsService
+            statsService: statsService,
+            fatigueLearningService: fatigueLearningService
         )
         let chartService = ChartDataService(
             setRepository: setRepo,

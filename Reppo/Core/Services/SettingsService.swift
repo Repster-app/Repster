@@ -164,6 +164,8 @@ actor SettingsService: SettingsServiceProtocol {
         try deleteAll(Workout.self, in: context)
         try deleteAll(ExerciseStats.self, in: context)
         try deleteAll(PerformanceRecord.self, in: context)
+        try deleteAll(FatigueObservation.self, in: context)
+        try deleteAll(FatigueLearningSetAudit.self, in: context)
         try deleteAll(BodyweightEntry.self, in: context)
         try deleteAll(HealthProfile.self, in: context)
         try deleteAll(ProgramExercise.self, in: context)

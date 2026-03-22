@@ -15,6 +15,7 @@ actor ExerciseService: ExerciseServiceProtocol {
     private let performanceRecordRepo: PerformanceRecordRepositoryProtocol
     private let prService: PRServiceProtocol
     private let statsService: StatsServiceProtocol
+    private let fatigueLearningService: FatigueLearningService
 
     init(
         exerciseRepository: ExerciseRepositoryProtocol,
@@ -22,7 +23,8 @@ actor ExerciseService: ExerciseServiceProtocol {
         exerciseStatsRepository: ExerciseStatsRepositoryProtocol,
         performanceRecordRepository: PerformanceRecordRepositoryProtocol,
         prService: PRServiceProtocol,
-        statsService: StatsServiceProtocol
+        statsService: StatsServiceProtocol,
+        fatigueLearningService: FatigueLearningService
     ) {
         self.exerciseRepo = exerciseRepository
         self.setRepo = setRepository
@@ -30,6 +32,7 @@ actor ExerciseService: ExerciseServiceProtocol {
         self.performanceRecordRepo = performanceRecordRepository
         self.prService = prService
         self.statsService = statsService
+        self.fatigueLearningService = fatigueLearningService
     }
 
     // MARK: - CRUD (FR-005, FR-007)
@@ -54,19 +57,23 @@ actor ExerciseService: ExerciseServiceProtocol {
         return try await exerciseRepo.hasAssociatedSets(exerciseId)
     }
 
+    func exerciseHasLoggedSetData(_ exerciseId: UUID) async throws -> Bool {
+        return try await exerciseRepo.hasLoggedSetData(exerciseId)
+    }
+
     // MARK: - Update with Metadata Enforcement (FR-005, FR-006)
 
     func updateExercise(_ exercise: Exercise, originalTrackingType: TrackingType) async throws {
-        let hasSets = try await exerciseRepo.hasAssociatedSets(exercise.id)
+        let hasLoggedSetData = try await exerciseRepo.hasLoggedSetData(exercise.id)
 
         // FR-005: trackingType immutability (specdoc S5.6)
-        if hasSets && exercise.trackingType != originalTrackingType {
+        if hasLoggedSetData && exercise.trackingType != originalTrackingType {
             throw ExerciseServiceError.trackingTypeImmutable(exerciseId: exercise.id)
         }
 
         // Detect rebuild-required field changes (specdoc S5.6)
         var needsRebuild = false
-        if hasSets {
+        if hasLoggedSetData {
             needsRebuild = try await detectRebuildRequired(for: exercise)
         }
 
@@ -91,18 +98,21 @@ actor ExerciseService: ExerciseServiceProtocol {
             throw ExerciseServiceError.exerciseNotFound(exerciseId)
         }
 
-        // 1. Bulk delete all sets for this exercise
+        // 1. Remove fatigue learning rows tied to this exercise before deleting core history.
+        try await fatigueLearningService.removeCapturedExerciseData(exerciseId: exerciseId)
+
+        // 2. Bulk delete all sets for this exercise
         try await setRepo.deleteSets(forExercise: exerciseId)
 
-        // 2. Delete ExerciseStats (if exists)
+        // 3. Delete ExerciseStats (if exists)
         if let stats = try await exerciseStatsRepo.fetch(for: exerciseId) {
             try await exerciseStatsRepo.delete(stats)
         }
 
-        // 3. Delete all PerformanceRecords for this exercise
+        // 4. Delete all PerformanceRecords for this exercise
         try await performanceRecordRepo.deleteAll(for: exerciseId)
 
-        // 4. Delete the exercise itself
+        // 5. Delete the exercise itself
         try await exerciseRepo.delete(exercise)
     }
 

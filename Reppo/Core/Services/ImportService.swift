@@ -170,10 +170,10 @@ actor ImportService: ImportServiceProtocol {
         switch kind?.lowercased() {
         case "wr":  return .weightReps
         case "d":   return .duration
+        case "dt":  return .durationDistance
         case "wd":  return .weightDistance
         case "wrd": return .weightRepsDuration
         case "wt":  return .duration           // weight + time
-        case "dt":  return .duration           // distance + time
         case "tr":  return .duration           // time + reps
         case "t":   return .duration           // time only
         case "r":   return .weightReps         // reps only

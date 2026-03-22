@@ -179,22 +179,15 @@ enum ExerciseInfoProvider {
 
         let workingSets = lastGroup
             .filter { $0.setType == .working && $0.hasData }
-            .sorted { ($0.effectiveWeight ?? 0) > ($1.effectiveWeight ?? 0) }
+            .sorted { compareTopSetPriority(lhs: $0, rhs: $1) }
 
         let topSets = workingSets.prefix(2).map { set -> TopSet in
-            let label: String
-            if let ew = set.effectiveWeight, let reps = set.reps, reps > 0 {
-                label = "\(formatWeight(ew))×\(reps)"
-            } else if let duration = set.durationSeconds, duration > 0 {
-                label = UnitConversion.formatDuration(duration)
-            } else {
-                label = "--"
-            }
             return TopSet(
                 weight: set.effectiveWeight ?? 0,
                 reps: set.reps,
                 durationSeconds: set.durationSeconds,
-                formattedLabel: label
+                distanceMeters: set.distanceMeters,
+                formattedLabel: formatTopSetLabel(set)
             )
         }
 
@@ -222,6 +215,60 @@ enum ExerciseInfoProvider {
         return (value / increment).rounded() * increment
     }
 
+    private static func compareTopSetPriority(lhs: WorkoutSet, rhs: WorkoutSet) -> Bool {
+        let lhsPriority = topSetPriority(for: lhs)
+        let rhsPriority = topSetPriority(for: rhs)
+
+        if lhsPriority.rank != rhsPriority.rank {
+            return lhsPriority.rank > rhsPriority.rank
+        }
+        if lhsPriority.primaryMetric != rhsPriority.primaryMetric {
+            return lhsPriority.primaryMetric > rhsPriority.primaryMetric
+        }
+        return lhsPriority.secondaryMetric > rhsPriority.secondaryMetric
+    }
+
+    private static func topSetPriority(for set: WorkoutSet) -> (rank: Int, primaryMetric: Double, secondaryMetric: Double) {
+        let weight = set.effectiveWeight ?? set.weight ?? 0
+        let reps = Double(set.reps ?? 0)
+        let duration = Double(set.durationSeconds ?? 0)
+        let distance = set.distanceMeters ?? 0
+
+        if weight > 0, reps > 0 {
+            return (4, weight, reps)
+        }
+        if weight > 0, distance > 0 {
+            return (3, weight, distance)
+        }
+        if distance > 0, duration > 0 {
+            return (2, distance, duration)
+        }
+        if distance > 0 {
+            return (1, distance, 0)
+        }
+        return (0, duration, 0)
+    }
+
+    private static func formatTopSetLabel(_ set: WorkoutSet) -> String {
+        if let ew = set.effectiveWeight, let reps = set.reps, reps > 0 {
+            return "\(formatWeight(ew))×\(reps)"
+        }
+        if let ew = set.effectiveWeight, ew > 0, let distance = set.distanceMeters, distance > 0 {
+            return "\(formatWeight(ew)) • \(formatDistance(distance))"
+        }
+        if let duration = set.durationSeconds, duration > 0,
+           let distance = set.distanceMeters, distance > 0 {
+            return "\(UnitConversion.formatDuration(duration)) • \(formatDistance(distance))"
+        }
+        if let duration = set.durationSeconds, duration > 0 {
+            return UnitConversion.formatDuration(duration)
+        }
+        if let distance = set.distanceMeters, distance > 0 {
+            return formatDistance(distance)
+        }
+        return "--"
+    }
+
     private static func formatWeight(_ kg: Double) -> String {
         if kg.truncatingRemainder(dividingBy: 1) == 0 {
             return String(format: "%.0f", kg)
@@ -230,5 +277,15 @@ enum ExerciseInfoProvider {
         formatter.minimumFractionDigits = 1
         formatter.maximumFractionDigits = 2
         return formatter.string(from: NSNumber(value: kg)) ?? String(format: "%.2f", kg)
+    }
+
+    private static func formatDistance(_ meters: Double) -> String {
+        if meters >= 1000 {
+            return String(format: "%.2f km", meters / 1000)
+        }
+        if meters == meters.rounded() {
+            return String(format: "%.0f m", meters)
+        }
+        return String(format: "%.1f m", meters)
     }
 }

@@ -29,4 +29,8 @@ protocol ExerciseRepositoryProtocol: Sendable {
     /// Check if an exercise has any associated WorkoutSets.
     /// Used to enforce trackingType immutability (AGENT_RULES S3.5).
     func hasAssociatedSets(_ exerciseId: UUID) async throws -> Bool
+
+    /// Check if an exercise has any associated WorkoutSets with real logged data.
+    /// Uses the same rule as WorkoutSet.hasData.
+    func hasLoggedSetData(_ exerciseId: UUID) async throws -> Bool
 }

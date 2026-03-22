@@ -85,7 +85,7 @@ final class CreateEditExerciseViewModel {
 
     func checkTrackingTypeLock() async {
         guard let exercise = existingExercise else { return }
-        isTrackingTypeLocked = (try? await exerciseService.exerciseHasSets(exercise.id)) ?? false
+        isTrackingTypeLocked = (try? await exerciseService.exerciseHasLoggedSetData(exercise.id)) ?? false
     }
 
     // MARK: - Save
