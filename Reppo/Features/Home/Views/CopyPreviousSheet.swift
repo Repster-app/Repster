@@ -84,8 +84,10 @@ struct CopyPreviousSheet: View {
                 Text("\(workout.exerciseCount) exercises")
                 Text("\u{00B7}")
                 Text("\(workout.setCount) sets")
-                Text("\u{00B7}")
-                Text(formatVolume(workout.totalVolume))
+                if let primaryMetric = workout.primaryMetric {
+                    Text("\u{00B7}")
+                    Text(primaryMetric.formattedValue())
+                }
             }
             .font(.system(size: 12, weight: .medium))
             .foregroundStyle(Color.textTertiary)
@@ -128,12 +130,5 @@ struct CopyPreviousSheet: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE, MMM d"
         return formatter.string(from: date)
-    }
-
-    private func formatVolume(_ kg: Double) -> String {
-        if kg >= 1000 {
-            return String(format: "%.1ft", kg / 1000)
-        }
-        return "\(Int(kg)) kg"
     }
 }

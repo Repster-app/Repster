@@ -40,7 +40,8 @@ actor SetService: SetServiceProtocol {
     // MARK: - SetServiceProtocol
 
     func save(_ set: WorkoutSet) async throws -> SetSaveResult {
-        set.syncDerivedPerformanceFields(for: try await exerciseRepo.fetch(byId: set.exerciseId))
+        let exercise = try await exerciseRepo.fetch(byId: set.exerciseId)
+        set.syncDerivedPerformanceFields(for: exercise)
 
         // 1. Compute effectiveWeight (specdoc S5.4)
         let effectiveWeight = try await computeEffectiveWeight(
@@ -59,21 +60,29 @@ actor SetService: SetServiceProtocol {
         }
 
         // 2. Persist immediately (FR-012)
+        if !supportsRepPRs(for: exercise) {
+            set.cachedPRStatus = nil
+        }
         try await setRepo.save(set)
         set.markFatigueLearningSnapshotPersisted(effectiveWeightOverride: effectiveWeight)
 
         // 3. PR evaluation (FR-002)
-        let prResult = try await prService.evaluate(
-            setId: set.id,
-            exerciseId: set.exerciseId,
-            reps: set.prReps,
-            effectiveWeight: effectiveWeight ?? 0,
-            workoutId: set.workoutId,
-            setType: set.setType,
-            hasData: set.hasData,
-            excludeFromPRs: set.excludeFromPRs ?? false,
-            date: set.date
-        )
+        let prResult: PREvaluationResult
+        if supportsRepPRs(for: exercise) {
+            prResult = try await prService.evaluate(
+                setId: set.id,
+                exerciseId: set.exerciseId,
+                reps: set.prReps,
+                effectiveWeight: effectiveWeight ?? 0,
+                workoutId: set.workoutId,
+                setType: set.setType,
+                hasData: set.hasData,
+                excludeFromPRs: set.excludeFromPRs ?? false,
+                date: set.date
+            )
+        } else {
+            prResult = emptyPRResult(for: set.id)
+        }
 
         // 4. Stats update (FR-003)
         try await statsService.updateStats(
@@ -96,7 +105,8 @@ actor SetService: SetServiceProtocol {
     }
 
     func edit(_ set: WorkoutSet) async throws -> SetSaveResult {
-        set.syncDerivedPerformanceFields(for: try await exerciseRepo.fetch(byId: set.exerciseId))
+        let exercise = try await exerciseRepo.fetch(byId: set.exerciseId)
+        set.syncDerivedPerformanceFields(for: exercise)
 
         // 1. Capture old values BEFORE changes (for stats delta)
         guard let oldSet = try await setRepo.fetch(byId: set.id) else {
@@ -129,21 +139,29 @@ actor SetService: SetServiceProtocol {
         }
 
         // 3. Persist updated set
+        if !supportsRepPRs(for: exercise) {
+            set.cachedPRStatus = nil
+        }
         try await setRepo.save(set)
 
         // 4. PR re-evaluation (FR-004)
-        let prResult = try await prService.evaluateAfterEdit(
-            setId: set.id,
-            exerciseId: set.exerciseId,
-            reps: set.prReps,
-            effectiveWeight: newEffectiveWeight ?? 0,
-            workoutId: set.workoutId,
-            setType: set.setType,
-            hasData: set.hasData,
-            excludeFromPRs: set.excludeFromPRs ?? false,
-            previousCachedPRStatus: oldCachedPRStatus,
-            date: set.date
-        )
+        let prResult: PREvaluationResult
+        if supportsRepPRs(for: exercise) {
+            prResult = try await prService.evaluateAfterEdit(
+                setId: set.id,
+                exerciseId: set.exerciseId,
+                reps: set.prReps,
+                effectiveWeight: newEffectiveWeight ?? 0,
+                workoutId: set.workoutId,
+                setType: set.setType,
+                hasData: set.hasData,
+                excludeFromPRs: set.excludeFromPRs ?? false,
+                previousCachedPRStatus: oldCachedPRStatus,
+                date: set.date
+            )
+        } else {
+            prResult = emptyPRResult(for: set.id)
+        }
 
         // 5. Stats update with edit delta
         try await statsService.updateStats(
@@ -206,12 +224,18 @@ actor SetService: SetServiceProtocol {
 
         // 4. PR demotion — same as delete path
         // handleDeletion is a no-op if this set wasn't the PR owner
-        let prResult = try await prService.handleDeletion(
-            setId: setId,
-            exerciseId: exerciseId,
-            reps: prReps,
-            cachedPRStatus: cachedPRStatus
-        )
+        let exercise = try await exerciseRepo.fetch(byId: exerciseId)
+        let prResult: PREvaluationResult
+        if supportsRepPRs(for: exercise) {
+            prResult = try await prService.handleDeletion(
+                setId: setId,
+                exerciseId: exerciseId,
+                reps: prReps,
+                cachedPRStatus: cachedPRStatus
+            )
+        } else {
+            prResult = emptyPRResult(for: setId)
+        }
 
         // 5. Stats decrement — same as delete path
         try await statsService.updateStats(
@@ -252,12 +276,15 @@ actor SetService: SetServiceProtocol {
         try await setRepo.delete(set)
 
         // 3. PR recomputation (FR-005)
-        _ = try await prService.handleDeletion(
-            setId: setId,
-            exerciseId: exerciseId,
-            reps: prReps,
-            cachedPRStatus: cachedPRStatus
-        )
+        let exercise = try await exerciseRepo.fetch(byId: exerciseId)
+        if supportsRepPRs(for: exercise) {
+            _ = try await prService.handleDeletion(
+                setId: setId,
+                exerciseId: exerciseId,
+                reps: prReps,
+                cachedPRStatus: cachedPRStatus
+            )
+        }
 
         // 4. Stats decrement
         try await statsService.updateStats(
@@ -327,5 +354,18 @@ actor SetService: SetServiceProtocol {
         }
 
         return weight + (bodyweight * exercise.bodyweightFactor)
+    }
+
+    private func supportsRepPRs(for exercise: Exercise?) -> Bool {
+        exercise?.trackingType.supportsRepPRs == true
+    }
+
+    private func emptyPRResult(for setId: UUID) -> PREvaluationResult {
+        PREvaluationResult(
+            setId: setId,
+            newStatus: nil,
+            affectedSetIds: [:],
+            prRecordChanged: false
+        )
     }
 }

@@ -18,4 +18,8 @@ enum TrackingType: String, Codable, CaseIterable {
         case .custom:             return "Custom"
         }
     }
+
+    var supportsRepPRs: Bool {
+        self == .weightReps
+    }
 }

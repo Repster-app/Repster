@@ -9,6 +9,7 @@ import UniformTypeIdentifiers
 struct CreateEditTemplateView: View {
 
     private let editingTemplateId: UUID?
+    private let onSaved: (() -> Void)?
     @State private var viewModel: CreateEditTemplateViewModel
     @State private var draggedExerciseId: UUID? = nil
     @State private var dropTargetExerciseId: UUID? = nil
@@ -18,9 +19,11 @@ struct CreateEditTemplateView: View {
     init(
         templateService: any TemplateServiceProtocol,
         exerciseService: any ExerciseServiceProtocol,
-        editingTemplateId: UUID? = nil
+        editingTemplateId: UUID? = nil,
+        onSaved: (() -> Void)? = nil
     ) {
         self.editingTemplateId = editingTemplateId
+        self.onSaved = onSaved
         _viewModel = State(initialValue: CreateEditTemplateViewModel(
             templateService: templateService,
             exerciseService: exerciseService
@@ -28,43 +31,42 @@ struct CreateEditTemplateView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    // Template name
-                    nameSection
+        ScrollView {
+            VStack(spacing: 16) {
+                // Template name
+                nameSection
 
-                    // Exercises header + list
-                    exercisesSection
+                // Exercises header + list
+                exercisesSection
 
-                    // Add exercise button
-                    addExerciseButton
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-                .padding(.bottom, 40)
+                // Add exercise button
+                addExerciseButton
             }
-            .background(Color.bg)
-            .navigationTitle(editingTemplateId != nil ? "Edit Template" : "New Template")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        Task {
-                            do {
-                                try await viewModel.save()
-                                dismiss()
-                            } catch {
-                                print("[CreateEditTemplateView] Save failed: \(error)")
-                            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 40)
+        }
+        .background(Color.bg)
+        .navigationTitle(editingTemplateId != nil ? "Edit Template" : "New Template")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { dismiss() }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") {
+                    Task {
+                        do {
+                            try await viewModel.save()
+                            onSaved?()
+                            dismiss()
+                        } catch {
+                            print("[CreateEditTemplateView] Save failed: \(error)")
                         }
                     }
-                    .fontWeight(.semibold)
-                    .disabled(!viewModel.canSave || viewModel.isSaving)
                 }
+                .fontWeight(.semibold)
+                .disabled(!viewModel.canSave || viewModel.isSaving)
             }
         }
         .preferredColorScheme(.dark)

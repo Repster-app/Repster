@@ -75,9 +75,14 @@ final class ChartDataServiceTests: XCTestCase {
         XCTAssertEqual(data.first?.label, "Chest")
         XCTAssertEqual(data.first?.value ?? 0, 500, accuracy: 0.001)
         XCTAssertEqual(summary.totalVolume, 500, accuracy: 0.001)
+        XCTAssertEqual(summary.totalDistanceMeters, 0, accuracy: 0.001)
+        XCTAssertEqual(summary.totalDurationSeconds, 0)
         XCTAssertEqual(summary.totalSets, 1)
         XCTAssertEqual(summary.totalReps, 5)
         XCTAssertEqual(summary.totalWorkouts, 1)
+        XCTAssertEqual(summary.volumeSetCount, 1)
+        XCTAssertEqual(summary.distanceSetCount, 0)
+        XCTAssertEqual(summary.durationSetCount, 0)
     }
 
     func testCalendarThenChartsRegressionDoesNotCrashAndReturnsBreakdownData() async throws {
@@ -114,6 +119,71 @@ final class ChartDataServiceTests: XCTestCase {
         XCTAssertEqual(data.first?.value ?? 0, 1, accuracy: 0.001)
         XCTAssertEqual(summary.totalSets, 1)
         XCTAssertEqual(summary.totalReps, 8)
+        XCTAssertEqual(summary.volumeSetCount, 1)
+    }
+
+    func testBreakdownSummaryIncludesDistanceDurationTotalsAndPrimaryMetricSupport() async throws {
+        let context = try makeContext()
+        let running = makeExercise(
+            name: "Run",
+            primaryMuscle: "legs",
+            equipmentType: .bodyweight,
+            trackingType: .durationDistance
+        )
+        let plank = makeExercise(
+            name: "Plank",
+            primaryMuscle: "abs",
+            equipmentType: .bodyweight,
+            trackingType: .duration
+        )
+        let workout = makeWorkout(on: makeDate(year: 2026, month: 3, day: 20))
+
+        try await context.exerciseRepo.save(running)
+        try await context.exerciseRepo.save(plank)
+        try await context.workoutRepo.save(workout)
+        try await context.setRepo.save(
+            makeSet(
+                workoutId: workout.id,
+                exerciseId: running.id,
+                date: workout.date,
+                weight: nil,
+                effectiveWeight: nil,
+                reps: nil,
+                durationSeconds: 300,
+                distanceMeters: 1000,
+                setType: .working,
+                orderInWorkout: 1,
+                orderInExercise: 1
+            )
+        )
+        try await context.setRepo.save(
+            makeSet(
+                workoutId: workout.id,
+                exerciseId: plank.id,
+                date: workout.date,
+                weight: nil,
+                effectiveWeight: nil,
+                reps: nil,
+                durationSeconds: 90,
+                distanceMeters: nil,
+                setType: .working,
+                orderInWorkout: 2,
+                orderInExercise: 1
+            )
+        )
+
+        let summary = try await context.chartService.fetchBreakdownSummary(timeRange: .all)
+
+        XCTAssertEqual(summary.totalDistanceMeters, 1000, accuracy: 0.001)
+        XCTAssertEqual(summary.totalDurationSeconds, 390)
+        XCTAssertEqual(summary.volumeSetCount, 0)
+        XCTAssertEqual(summary.distanceSetCount, 1)
+        XCTAssertEqual(summary.durationSetCount, 1)
+        if case let .distance(value)? = summary.primaryMetric {
+            XCTAssertEqual(value, 1000, accuracy: 0.001)
+        } else {
+            XCTFail("Expected distance to win the tie-breaker")
+        }
     }
 
     func testFetchPerformedExercisesUsesStatsSnapshots() async throws {
@@ -307,11 +377,16 @@ final class ChartDataServiceTests: XCTestCase {
         )
     }
 
-    private func makeExercise(name: String, primaryMuscle: String) -> Exercise {
+    private func makeExercise(
+        name: String,
+        primaryMuscle: String,
+        equipmentType: EquipmentType = .barbell,
+        trackingType: TrackingType = .weightReps
+    ) -> Exercise {
         Exercise(
             name: name,
-            equipmentType: .barbell,
-            trackingType: .weightReps,
+            equipmentType: equipmentType,
+            trackingType: trackingType,
             primaryMuscle: primaryMuscle
         )
     }
@@ -330,6 +405,8 @@ final class ChartDataServiceTests: XCTestCase {
         weight: Double?,
         effectiveWeight: Double?,
         reps: Int?,
+        durationSeconds: Int? = nil,
+        distanceMeters: Double? = nil,
         setType: SetType,
         orderInWorkout: Int,
         orderInExercise: Int
@@ -342,6 +419,8 @@ final class ChartDataServiceTests: XCTestCase {
             weight: weight,
             effectiveWeight: effectiveWeight,
             reps: reps,
+            durationSeconds: durationSeconds,
+            distanceMeters: distanceMeters,
             setType: setType,
             orderInWorkout: orderInWorkout,
             orderInExercise: orderInExercise,

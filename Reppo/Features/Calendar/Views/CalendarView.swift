@@ -114,6 +114,8 @@ struct CalendarView: View {
                         viewModel.currentMonth = targetMonth
                     }
                     await viewModel.selectDate(date)
+                } else if viewModel.selectedDate == nil {
+                    await viewModel.selectDate(Date())
                 }
             }
             .onChange(of: initialDate) { _, newDate in
@@ -191,6 +193,7 @@ struct CalendarView: View {
                 withAnimation(.easeInOut(duration: 0.3)) {
                     viewModel.scrollToToday()
                 }
+                Task { await viewModel.selectDate(Date()) }
             } label: {
                 Text("Today")
                     .font(.system(size: 14, weight: .medium))

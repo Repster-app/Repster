@@ -15,6 +15,10 @@ struct CalendarExerciseCard: View {
             .sorted { $0.orderInExercise < $1.orderInExercise }
     }
 
+    private var readOnlyFields: [WorkoutSetReadOnlyField] {
+        WorkoutSetPerformanceFormatter.readOnlyFields(for: exercise.trackingType)
+    }
+
     var body: some View {
         Button(action: onTapped) {
             VStack(alignment: .leading, spacing: 10) {
@@ -54,16 +58,12 @@ struct CalendarExerciseCard: View {
 
     private var setTable: some View {
         VStack(spacing: 0) {
-            // Column headers
             HStack {
                 Text("SET")
                     .frame(width: 32, alignment: .leading)
-                Text("WEIGHT")
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                Text("REPS")
-                    .frame(width: 44, alignment: .center)
-                Text("RIR")
-                    .frame(width: 32, alignment: .center)
+                ForEach(readOnlyFields) { field in
+                    headerCell(for: field)
+                }
                 Color.clear
                     .frame(width: 44)
             }
@@ -71,7 +71,6 @@ struct CalendarExerciseCard: View {
             .foregroundStyle(Color.textTertiary)
             .padding(.bottom, 6)
 
-            // Set rows
             ForEach(Array(displaySets.enumerated()), id: \.element.id) { index, workoutSet in
                 setRow(index: index + 1, workoutSet: workoutSet)
             }
@@ -86,10 +85,8 @@ struct CalendarExerciseCard: View {
         } else {
             let isWarmup = workoutSet.setType == .warmup
             let hasNote = workoutSet.notes != nil && !(workoutSet.notes?.isEmpty ?? true)
-            let display = WorkoutSetPerformanceFormatter.display(for: workoutSet, exercise: exercise)
 
             HStack {
-                // Set number with optional note dot
                 ZStack(alignment: .topTrailing) {
                     Text("\(index)")
                         .font(.system(size: 12))
@@ -104,16 +101,13 @@ struct CalendarExerciseCard: View {
                 }
                 .frame(width: 32, alignment: .leading)
 
-                Text(formatWeight(workoutSet))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.textPrimary)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-
-                repsView(for: display)
-                    .frame(width: 44, alignment: .center)
-
-                rirView(for: display, set: workoutSet)
-                    .frame(width: 32, alignment: .center)
+                ForEach(readOnlyFields) { field in
+                    fieldView(
+                        WorkoutSetPerformanceFormatter.fieldDisplay(for: field, set: workoutSet, exercise: exercise),
+                        field: field,
+                        set: workoutSet
+                    )
+                }
 
                 Color.clear
                     .frame(width: 44, height: 1)
@@ -126,48 +120,47 @@ struct CalendarExerciseCard: View {
         }
     }
 
-    // MARK: - Formatting
-
-    private func formatWeight(_ set: WorkoutSet) -> String {
-        guard let weight = set.effectiveWeight else { return "—" }
-        return "\(UnitConversion.formatWeight(weight)) kg"
+    private func headerCell(for field: WorkoutSetReadOnlyField) -> some View {
+        Text(field.title)
+            .frame(maxWidth: .infinity, alignment: alignment(for: field))
     }
 
     @ViewBuilder
-    private func repsView(for display: WorkoutSetDisplayText) -> some View {
-        if !display.sideRepsLabels.isEmpty {
+    private func fieldView(
+        _ display: WorkoutSetReadOnlyCellDisplay,
+        field: WorkoutSetReadOnlyField,
+        set: WorkoutSet
+    ) -> some View {
+        if !display.stackedLabels.isEmpty {
             VStack(spacing: 1) {
-                ForEach(display.sideRepsLabels, id: \.self) { label in
+                ForEach(display.stackedLabels, id: \.self) { label in
                     Text(label)
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Color.textPrimary)
+                        .foregroundStyle(field == .rir ? Color.textSecondary : Color.textPrimary)
                         .lineLimit(1)
                         .multilineTextAlignment(.center)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: alignment(for: field))
         } else {
-            Text(display.repsLabel ?? "—")
+            Text(display.text)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.textPrimary)
+                .foregroundStyle(color(for: field, text: display.text, set: set))
+                .frame(maxWidth: .infinity, alignment: alignment(for: field))
         }
     }
 
-    @ViewBuilder
-    private func rirView(for display: WorkoutSetDisplayText, set: WorkoutSet) -> some View {
-        if !display.sideRIRLabels.isEmpty {
-            VStack(spacing: 1) {
-                ForEach(display.sideRIRLabels, id: \.self) { label in
-                    Text(label)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Color.textSecondary)
-                        .lineLimit(1)
-                        .multilineTextAlignment(.center)
-                }
-            }
-        } else {
-            Text(display.rirLabel?.replacingOccurrences(of: "RIR ", with: "") ?? "—")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.rirColor(for: set.rir))
+    private func alignment(for field: WorkoutSetReadOnlyField) -> Alignment {
+        switch field {
+        case .weight:
+            return .trailing
+        case .reps, .distance, .time, .rir:
+            return .center
         }
+    }
+
+    private func color(for field: WorkoutSetReadOnlyField, text: String, set: WorkoutSet) -> Color {
+        guard field == .rir else { return .textPrimary }
+        return text == "—" ? .textSecondary : Color.rirColor(for: set.rir)
     }
 }

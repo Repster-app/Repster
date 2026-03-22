@@ -34,6 +34,9 @@ struct SetInputField: View {
     /// Whether this set has been completed — triggers green completed state.
     let isCompleted: Bool
 
+    /// Optional explicit control height used for compact custom layouts.
+    var controlHeight: CGFloat? = nil
+
     /// Optional external focus binding for row-level keyboard navigation.
     var externalFocus: FocusState<SetRowInputField?>.Binding? = nil
 
@@ -101,35 +104,59 @@ struct SetInputField: View {
     }
 
     private var baseTextField: some View {
-        TextField(placeholder, text: $value)
-            .keyboardType(keyboardType)
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundColor(.textPrimary)
-            .multilineTextAlignment(.center)
-            .padding(.vertical, 8)
-            .padding(.horizontal, 6)
+        Group {
+            if let controlHeight {
+                TextField(placeholder, text: $value)
+                    .keyboardType(keyboardType)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.textPrimary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 6)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: controlHeight)
+            } else {
+                TextField(placeholder, text: $value)
+                    .keyboardType(keyboardType)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.textPrimary)
+                    .multilineTextAlignment(.center)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 6)
+            }
+        }
+        .background(backgroundColor)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(borderColor, lineWidth: 1)
+        )
+        .cornerRadius(8)
+    }
+
+    private func customEntryButton(onTap: @escaping () -> Void) -> some View {
+        Button(action: onTap) {
+            Group {
+                if let controlHeight {
+                    Text(value.isEmpty ? placeholder : value)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(value.isEmpty ? .textTertiary : .textPrimary)
+                        .padding(.horizontal, 6)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: controlHeight)
+                } else {
+                    Text(value.isEmpty ? placeholder : value)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(value.isEmpty ? .textTertiary : .textPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 6)
+                }
+            }
             .background(backgroundColor)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(borderColor, lineWidth: 1)
             )
             .cornerRadius(8)
-    }
-
-    private func customEntryButton(onTap: @escaping () -> Void) -> some View {
-        Button(action: onTap) {
-            Text(value.isEmpty ? placeholder : value)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(value.isEmpty ? .textTertiary : .textPrimary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .padding(.horizontal, 6)
-                .background(backgroundColor)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(borderColor, lineWidth: 1)
-                )
-                .cornerRadius(8)
         }
         .buttonStyle(.plain)
     }

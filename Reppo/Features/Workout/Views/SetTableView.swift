@@ -83,7 +83,7 @@ struct SetTableView: View {
         VStack(spacing: 0) {
             // Header row
             if let exercise {
-                headerRow(for: exercise.trackingType)
+                headerRow(for: exercise)
             }
 
             // Set rows — warmups get W1/W2, working sets start at 1
@@ -131,44 +131,14 @@ struct SetTableView: View {
     /// Labels: SET | input column labels | RIR | PR | ✓
     /// Font: 11pt semibold, uppercase, textTertiary color.
     @ViewBuilder
-    private func headerRow(for trackingType: TrackingType) -> some View {
+    private func headerRow(for exercise: Exercise) -> some View {
         HStack(spacing: 4) {
             // Set column header
             Text("SET")
                 .frame(width: 36)
 
             // Input column headers — adapt to trackingType
-            switch trackingType {
-            case .weightReps, .custom:
-                Text("WEIGHT")
-                    .frame(maxWidth: .infinity)
-                Text("REPS")
-                    .frame(maxWidth: .infinity)
-
-            case .duration:
-                Text("TIME")
-                    .frame(maxWidth: .infinity)
-
-            case .durationDistance:
-                Text("DIST")
-                    .frame(maxWidth: .infinity)
-                Text("TIME")
-                    .frame(maxWidth: .infinity)
-
-            case .weightDistance:
-                Text("WEIGHT")
-                    .frame(maxWidth: .infinity)
-                Text("DIST")
-                    .frame(maxWidth: .infinity)
-
-            case .weightRepsDuration:
-                Text("WEIGHT")
-                    .frame(maxWidth: .infinity)
-                Text("REPS")
-                    .frame(maxWidth: .infinity)
-                Text("TIME")
-                    .frame(maxWidth: .infinity)
-            }
+            inputHeaders(for: exercise)
 
             // RIR column header
             Text("RIR")
@@ -195,6 +165,96 @@ struct SetTableView: View {
                 .foregroundColor(.white.opacity(0.08)),
             alignment: .bottom
         )
+    }
+
+    @ViewBuilder
+    private func inputHeaders(for exercise: Exercise) -> some View {
+        switch exercise.trackingType {
+        case .weightReps:
+            if isUnilateralLogging(for: exercise) {
+                unilateralWeightRepsHeader
+            } else {
+                Text("WEIGHT")
+                    .frame(maxWidth: .infinity)
+                Text("REPS")
+                    .frame(maxWidth: .infinity)
+            }
+
+        case .custom:
+            Text("WEIGHT")
+                .frame(maxWidth: .infinity)
+            Text("REPS")
+                .frame(maxWidth: .infinity)
+
+        case .duration:
+            Text("TIME")
+                .frame(maxWidth: .infinity)
+
+        case .durationDistance:
+            Text("DIST")
+                .frame(maxWidth: .infinity)
+            Text("TIME")
+                .frame(maxWidth: .infinity)
+
+        case .weightDistance:
+            Text("WEIGHT")
+                .frame(maxWidth: .infinity)
+            Text("DIST")
+                .frame(maxWidth: .infinity)
+
+        case .weightRepsDuration:
+            if isUnilateralLogging(for: exercise) {
+                unilateralWeightRepsDurationHeader
+            } else {
+                Text("WEIGHT")
+                    .frame(maxWidth: .infinity)
+                Text("REPS")
+                    .frame(maxWidth: .infinity)
+                Text("TIME")
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private var unilateralWeightRepsHeader: some View {
+        GeometryReader { geometry in
+            unilateralWeightRepsHeaderContent(availableWidth: geometry.size.width)
+                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var unilateralWeightRepsDurationHeader: some View {
+        GeometryReader { geometry in
+            let durationWidth = UnilateralSetRowLayout.durationWidth(for: geometry.size.width)
+            let weightRepsWidth = UnilateralSetRowLayout.weightRepsGroupWidth(for: geometry.size.width)
+
+            HStack(spacing: UnilateralSetRowLayout.groupedColumnSpacing) {
+                unilateralWeightRepsHeaderContent(availableWidth: weightRepsWidth)
+                    .frame(width: weightRepsWidth, alignment: .leading)
+
+                Text("TIME")
+                    .frame(width: durationWidth)
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func unilateralWeightRepsHeaderContent(availableWidth: CGFloat) -> some View {
+        let weightWidth = UnilateralSetRowLayout.weightWidth(for: availableWidth)
+
+        return HStack(spacing: UnilateralSetRowLayout.weightToRepsSpacing) {
+            Text("WEIGHT")
+                .frame(width: weightWidth)
+
+            Text("REPS")
+                .frame(maxWidth: .infinity)
+        }
+    }
+
+    private func isUnilateralLogging(for exercise: Exercise) -> Bool {
+        exercise.unilateral && exercise.supportsUnilateralLogging
     }
 
     // MARK: - Add Buttons (T016)
@@ -664,6 +724,34 @@ final class SetEntryKeyboardContext {
         self.dismiss = dismiss
         self.trackedField = activeField ?? getFocusedField()
     }
+
+    var canMovePreviousInTrackedOrder: Bool {
+        guard let trackedField else { return false }
+        guard let index = inputOrder.firstIndex(of: trackedField) else { return false }
+        return index > 0
+    }
+
+    var canMoveNextInTrackedOrder: Bool {
+        guard let trackedField else { return false }
+        guard let index = inputOrder.firstIndex(of: trackedField) else { return false }
+        return index < inputOrder.count - 1
+    }
+
+    func movePreviousInTrackedOrder() {
+        guard let trackedField else { return }
+        guard let index = inputOrder.firstIndex(of: trackedField), index > 0 else { return }
+        let previousField = inputOrder[index - 1]
+        self.trackedField = previousField
+        setFocusedField(previousField)
+    }
+
+    func moveNextInTrackedOrder() {
+        guard let trackedField else { return }
+        guard let index = inputOrder.firstIndex(of: trackedField), index < inputOrder.count - 1 else { return }
+        let nextField = inputOrder[index + 1]
+        self.trackedField = nextField
+        setFocusedField(nextField)
+    }
 }
 
 /// Shared manager that coordinates a single active custom keyboard session.
@@ -826,8 +914,8 @@ struct SetEntryKeyboardOverlay: View {
     private func actionRail(for context: SetEntryKeyboardContext) -> some View {
         let focusedField = context.trackedField
         let onWeightField = focusedField == .weight
-        let canGoPrev = context.canMovePrevious()
-        let canGoNext = context.canMoveNext()
+        let canGoPrev = context.canMovePreviousInTrackedOrder
+        let canGoNext = context.canMoveNextInTrackedOrder
         let suggestedWeight = context.getSuggestedWeight()
         let increment = context.getWeightIncrement()
         let canNudgeWeight = focusedField == .weight
@@ -901,16 +989,14 @@ struct SetEntryKeyboardOverlay: View {
                     if rirMode {
                         rirMode = false
                     } else {
-                        context.movePrevious()
-                        context.trackedField = context.getFocusedField()
+                        context.movePreviousInTrackedOrder()
                     }
                     refreshTick += 1
                     manager.show(context)
                 }
                 railNavButton(title: "Next", disabled: !canGoNext) {
                     if canGoNext {
-                        context.moveNext()
-                        context.trackedField = context.getFocusedField()
+                        context.moveNextInTrackedOrder()
                     }
                     refreshTick += 1
                     manager.show(context)
@@ -1064,48 +1150,6 @@ struct SetEntryKeyboardOverlay: View {
 
     private func shouldShowWeightHelper(for context: SetEntryKeyboardContext) -> Bool {
         context.trackedField == .weight && context.equipmentType == .barbell
-    }
-
-    private func canMoveToPreviousField(_ context: SetEntryKeyboardContext) -> Bool {
-        guard let focused = context.trackedField else { return false }
-        guard let index = context.inputOrder.firstIndex(of: focused) else { return false }
-        return index > 0
-    }
-
-    private func canMoveToNextField(_ context: SetEntryKeyboardContext) -> Bool {
-        guard let focused = context.trackedField else { return false }
-        guard let index = context.inputOrder.firstIndex(of: focused) else { return false }
-        return index < context.inputOrder.count - 1
-    }
-
-    /// Move to previous field, updating trackedField and syncing with SetRowView.
-    private func moveToPreviousField(_ context: SetEntryKeyboardContext) {
-        let ordered = context.inputOrder
-        guard let current = context.trackedField,
-              let idx = ordered.firstIndex(of: current),
-              idx - 1 >= 0 else { return }
-        let prevField = ordered[idx - 1]
-        context.trackedField = prevField
-        context.setFocusedField(prevField)
-    }
-
-    /// Move to next field, updating trackedField and syncing with SetRowView.
-    private func moveToNextField(_ context: SetEntryKeyboardContext) {
-        let ordered = context.inputOrder
-        guard let current = context.trackedField,
-              let idx = ordered.firstIndex(of: current),
-              idx + 1 < ordered.count else { return }
-        let nextField = ordered[idx + 1]
-        context.trackedField = nextField
-        context.setFocusedField(nextField)
-    }
-
-    private func canMovePreviousInOverlay(_ context: SetEntryKeyboardContext) -> Bool {
-        return canMoveToPreviousField(context)
-    }
-
-    private func canMoveNextInOverlay(_ context: SetEntryKeyboardContext) -> Bool {
-        return canMoveToNextField(context)
     }
 
     private func applySuggestedWeight(_ context: SetEntryKeyboardContext) {

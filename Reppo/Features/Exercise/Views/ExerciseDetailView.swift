@@ -54,8 +54,6 @@ struct ExerciseDetailView: View {
         .background(Color.bg)
         .navigationTitle(viewModel.exercise?.name ?? "Exercise")
         .navigationBarTitleDisplayMode(.inline)
-        // Hide tab bar when exercise detail is pushed (T031)
-        .toolbar(.hidden, for: .tabBar)
         // Edit/Delete toolbar menu (T034)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

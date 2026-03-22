@@ -28,7 +28,12 @@ struct RecentWorkoutCardView: View {
                 statPill(icon: "dumbbell", value: "\(summary.exerciseCount)")
                 statPill(icon: "checkmark.circle", value: "\(summary.setCount) sets")
                 statPill(icon: "clock", value: formatDuration(summary.durationMinutes))
-                statPill(icon: "scalemass", value: formatVolume(summary.totalVolume))
+                if let primaryMetric = summary.primaryMetric {
+                    statPill(
+                        icon: primaryMetric.systemImageName,
+                        value: primaryMetric.formattedValue()
+                    )
+                }
             }
 
             // Muscle group tags – flowing layout that doesn't break words
@@ -88,13 +93,6 @@ struct RecentWorkoutCardView: View {
             return m > 0 ? "\(h)h \(m)m" : "\(h)h"
         }
         return "\(minutes)m"
-    }
-
-    private func formatVolume(_ kg: Double) -> String {
-        if kg >= 1000 {
-            return String(format: "%.1ft", kg / 1000)
-        }
-        return "\(Int(kg))kg"
     }
 }
 

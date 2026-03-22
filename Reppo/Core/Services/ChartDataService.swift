@@ -138,17 +138,22 @@ actor ChartDataService: ChartDataServiceProtocol {
         let endDate = Date()
         let allSets = try await setRepository.fetchChartSets(from: startDate, to: endDate)
         let eligible = chartEligibleSets(allSets)
-
-        let totalVolume = eligible.reduce(0.0) { $0 + (($1.effectiveWeight ?? 0) * Double($1.totalReps)) }
+        let exerciseCache = try await fetchExerciseLookup()
+        let aggregate = WorkoutAggregateSummary.summarize(sets: eligible, exercisesById: exerciseCache)
         let totalSets = eligible.count
         let totalReps = eligible.reduce(0) { $0 + $1.totalReps }
         let totalWorkouts = Swift.Set(eligible.map { $0.workoutId }).count
 
         return BreakdownSummary(
-            totalVolume: totalVolume,
+            totalVolume: aggregate.totalVolume,
+            totalDistanceMeters: aggregate.totalDistanceMeters,
+            totalDurationSeconds: aggregate.totalDurationSeconds,
             totalSets: totalSets,
             totalReps: totalReps,
-            totalWorkouts: totalWorkouts
+            totalWorkouts: totalWorkouts,
+            volumeSetCount: aggregate.volumeSetCount,
+            distanceSetCount: aggregate.distanceSetCount,
+            durationSetCount: aggregate.durationSetCount
         )
     }
 

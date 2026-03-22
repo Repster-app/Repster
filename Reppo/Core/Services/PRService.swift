@@ -43,6 +43,9 @@ actor PRService: PRServiceProtocol {
         excludeFromPRs: Bool,
         date: Date
     ) async throws -> PREvaluationResult {
+        guard try await supportsRepPRs(for: exerciseId) else {
+            return emptyResult(for: setId)
+        }
 
         // STEP 1: ELIGIBILITY CHECK (specdoc S7.2 step 1, FR-003)
         guard try await isEligible(
@@ -174,6 +177,9 @@ actor PRService: PRServiceProtocol {
         previousCachedPRStatus: CachedPRStatus?,
         date: Date
     ) async throws -> PREvaluationResult {
+        guard try await supportsRepPRs(for: exerciseId) else {
+            return emptyResult(for: setId)
+        }
 
         // CASE 1: Edited set was NOT the PR owner
         // Re-run evaluate() logic with new values — treat as if it's a new set.
@@ -356,6 +362,9 @@ actor PRService: PRServiceProtocol {
         reps: Int,
         cachedPRStatus: CachedPRStatus?
     ) async throws -> PREvaluationResult {
+        guard try await supportsRepPRs(for: exerciseId) else {
+            return emptyResult(for: setId)
+        }
 
         // Non-PR-owner deleted — no PR changes needed.
         // Uses isPROwner to correctly identify both .current and .dominated owners.
@@ -382,6 +391,10 @@ actor PRService: PRServiceProtocol {
     /// Returns only entries on the capability frontier — entries dominated
     /// by higher-rep PRs are hidden.
     func fetchPRTable(for exerciseId: UUID) async throws -> [PRTableEntry] {
+        guard try await supportsRepPRs(for: exerciseId) else {
+            return []
+        }
+
         // Fetch all repMax records for this exercise
         let records = try await performanceRecordRepo.fetchAll(
             for: exerciseId,
@@ -431,9 +444,6 @@ actor PRService: PRServiceProtocol {
     /// Rebuild PRs for a single exercise from scratch.
     /// Clean slate approach: delete all PRs, clear cached statuses, then rebuild.
     func rebuild(for exerciseId: UUID) async throws {
-        let profile = try await healthProfileRepo.fetchOrCreate()
-        let excludeWarmups = !profile.includeWarmupsInPRs
-
         // Step 1: Delete all existing PerformanceRecords for this exercise
         let existingRecords = try await performanceRecordRepo.fetchAll(for: exerciseId)
         for record in existingRecords {
@@ -448,6 +458,13 @@ actor PRService: PRServiceProtocol {
                 try await setRepo.save(set)
             }
         }
+
+        guard try await supportsRepPRs(for: exerciseId) else {
+            return
+        }
+
+        let profile = try await healthProfileRepo.fetchOrCreate()
+        let excludeWarmups = !profile.includeWarmupsInPRs
 
         // Step 3: Collect unique rep counts from eligible sets
         // Group eligible sets by reps, find best for each rep count
@@ -685,5 +702,21 @@ actor PRService: PRServiceProtocol {
         }
 
         return true
+    }
+
+    private func supportsRepPRs(for exerciseId: UUID) async throws -> Bool {
+        guard let exercise = try await exerciseRepo.fetch(byId: exerciseId) else {
+            return false
+        }
+        return exercise.trackingType.supportsRepPRs
+    }
+
+    private func emptyResult(for setId: UUID) -> PREvaluationResult {
+        PREvaluationResult(
+            setId: setId,
+            newStatus: nil,
+            affectedSetIds: [:],
+            prRecordChanged: false
+        )
     }
 }

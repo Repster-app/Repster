@@ -5,7 +5,7 @@ import SwiftUI
 
 struct MonthlyStatsCardView: View {
     let totalWorkouts: Int
-    let totalVolume: Double
+    let primaryMetric: WorkoutPrimaryMetric?
     let totalSets: Int
 
     var body: some View {
@@ -17,7 +17,12 @@ struct MonthlyStatsCardView: View {
 
             HStack(spacing: 8) {
                 statCell(value: "\(totalWorkouts)", label: "Workouts")
-                statCell(value: formattedVolume, label: "Volume")
+                if let primaryMetric {
+                    statCell(
+                        value: primaryMetric.formattedValue(),
+                        label: primaryMetric.label
+                    )
+                }
                 statCell(value: "\(totalSets)", label: "Sets")
             }
             .padding(14)
@@ -41,13 +46,5 @@ struct MonthlyStatsCardView: View {
         .padding(.vertical, 12)
         .background(Color.bgSubtle)
         .cornerRadius(10)
-    }
-
-    private var formattedVolume: String {
-        if totalVolume >= 1000 {
-            let tons = totalVolume / 1000
-            return String(format: "%.1ft", tons)
-        }
-        return "\(Int(totalVolume))kg"
     }
 }

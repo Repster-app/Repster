@@ -2015,6 +2015,18 @@ final class TemplateImportExportTests: XCTestCase {
             sets: sets
         )
     }
+
+    private func makeDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int, _ minute: Int) -> Date {
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.timeZone = TimeZone(secondsFromGMT: 0)
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+        return components.date!
+    }
 }
 
 @MainActor

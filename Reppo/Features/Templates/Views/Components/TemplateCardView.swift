@@ -39,20 +39,34 @@ struct TemplateCardView: View {
     var body: some View {
         HStack(spacing: 12) {
             Button(action: onTap) {
-                HStack(spacing: 14) {
-                    // Icon
+                HStack(alignment: .top, spacing: 14) {
                     Text(iconLetter)
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(iconColor)
-                        .frame(width: 44, height: 44)
+                        .frame(width: 46, height: 46)
                         .background(iconColor.opacity(0.15))
-                        .cornerRadius(12)
+                        .cornerRadius(14)
 
-                    // Info
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(template.name)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.textPrimary)
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(template.name)
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundColor(.textPrimary)
+                                .multilineTextAlignment(.leading)
+                                .lineLimit(2)
+
+                            Spacer(minLength: 0)
+
+                            if let lastUsed = template.lastUsedAt {
+                                Text(relativeDate(lastUsed))
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(.textTertiary)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.bgSubtle)
+                                    .cornerRadius(8)
+                            }
+                        }
 
                         HStack(spacing: 8) {
                             Text("\(template.exerciseCount) exercises")
@@ -66,6 +80,14 @@ struct TemplateCardView: View {
                             Text("\(template.totalSetCount) sets")
                                 .font(.system(size: 12, weight: .regular))
                                 .foregroundColor(.textSecondary)
+
+                            Circle()
+                                .fill(Color.accent)
+                                .frame(width: 3, height: 3)
+
+                            Text("Tap to start")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.accent)
                         }
 
                         if !visibleMuscleGroups.isEmpty {
@@ -80,50 +102,53 @@ struct TemplateCardView: View {
                             }
                         }
                     }
-
-                    Spacer()
-
-                    if let lastUsed = template.lastUsedAt {
-                        Text(relativeDate(lastUsed))
-                            .font(.system(size: 11, weight: .regular))
-                            .foregroundColor(.textTertiary)
-                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
-            VStack(spacing: 6) {
-                Button(action: onExport) {
-                    Group {
-                        if isExporting {
-                            ProgressView()
-                                .tint(Color.textSecondary)
-                        } else {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.textSecondary)
-                        }
-                    }
-                    .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
+            Menu {
+                Button {
+                    onExport()
+                } label: {
+                    Label("Export Template", systemImage: "square.and.arrow.up")
                 }
-                .buttonStyle(.plain)
-                .disabled(isExporting)
 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.textTertiary)
+                Button {
+                    onEdit()
+                } label: {
+                    Label("Edit Template", systemImage: "pencil")
+                }
+
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Label("Delete Template", systemImage: "trash")
+                }
+            } label: {
+                Group {
+                    if isExporting {
+                        ProgressView()
+                            .tint(Color.textSecondary)
+                    } else {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.textSecondary)
+                    }
+                }
+                .frame(width: 36, height: 36)
+                .background(Color.bgSubtle)
+                .cornerRadius(12)
+                .contentShape(Rectangle())
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
-        .contentShape(Rectangle())
+        .padding(16)
+        .background(Color.bgCard)
+        .cornerRadius(18)
         .overlay(
-            Rectangle()
-                .frame(height: 1)
-                .foregroundColor(.border),
-            alignment: .bottom
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.border, lineWidth: 1)
         )
         .contextMenu {
             Button {

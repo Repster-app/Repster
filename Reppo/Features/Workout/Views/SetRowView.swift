@@ -8,6 +8,31 @@
 
 import SwiftUI
 
+enum UnilateralSetRowLayout {
+    static let controlHeight: CGFloat = 36
+    static let verticalSpacing: CGFloat = 6
+    static let weightToRepsSpacing: CGFloat = 8
+    static let sideLabelSpacing: CGFloat = 6
+    static let sideLabelWidth: CGFloat = 10
+    static let maxWeightWidth: CGFloat = 104
+    static let weightWidthFraction: CGFloat = 0.42
+    static let groupedColumnSpacing: CGFloat = 4
+    static let weightRepsGroupFraction: CGFloat = 2.0 / 3.0
+
+    static func weightWidth(for availableWidth: CGFloat) -> CGFloat {
+        max(0, min(maxWeightWidth, availableWidth * weightWidthFraction))
+    }
+
+    static func durationWidth(for totalWidth: CGFloat) -> CGFloat {
+        max(0, (totalWidth - groupedColumnSpacing) * (1 - weightRepsGroupFraction))
+    }
+
+    static func weightRepsGroupWidth(for totalWidth: CGFloat) -> CGFloat {
+        let durationWidth = durationWidth(for: totalWidth)
+        return max(0, totalWidth - durationWidth - groupedColumnSpacing)
+    }
+}
+
 /// RIR picker options displayed in the Menu dropdown.
 /// Values: nil (—), 0, 1, 2, 3, 4, 5 (represents 5+).
 enum RIROption: CaseIterable, Identifiable {
@@ -258,7 +283,7 @@ struct SetRowView: View {
     private var rirPicker: some View {
         if isUnilateralLogging {
             return AnyView(
-                VStack(spacing: 6) {
+                VStack(spacing: UnilateralSetRowLayout.verticalSpacing) {
                     unilateralRIRControl(title: "L", value: $leftRIRValue)
                     unilateralRIRControl(title: "R", value: $rightRIRValue)
                 }
@@ -414,18 +439,7 @@ struct SetRowView: View {
 
         case .weightRepsDuration:
             if isUnilateralLogging {
-                unilateralWeightAndRepsFields
-
-                SetInputField(
-                    value: $durationText,
-                    placeholder: "MM:SS",
-                    keyboardType: .numberPad,
-                    isCompleted: set.completed,
-                    isActiveOverride: focusedInput == .duration,
-                    isCustomEntry: true,
-                    onCustomTap: { activateCustomKeyboard(for: .duration) }
-                )
-                .frame(maxWidth: .infinity)
+                unilateralWeightAndRepsDurationFields
             } else {
                 SetInputField(
                     value: $weightText,
@@ -673,33 +687,71 @@ struct SetRowView: View {
         )
     }
 
-    @ViewBuilder
     private var unilateralWeightAndRepsFields: some View {
-        SetInputField(
-            value: $weightText,
-            placeholder: "0",
-            keyboardType: .decimalPad,
-            isCompleted: set.completed,
-            isActiveOverride: focusedInput == .weight,
-            isCustomEntry: true,
-            onCustomTap: { activateCustomKeyboard(for: .weight) }
-        )
-        .frame(maxWidth: .infinity)
-
-        VStack(spacing: 6) {
-            unilateralSideInput(
-                title: "L",
-                repsText: $leftRepsText,
-                focusedField: .leftReps
-            )
-
-            unilateralSideInput(
-                title: "R",
-                repsText: $rightRepsText,
-                focusedField: .rightReps
-            )
+        GeometryReader { geometry in
+            unilateralWeightAndRepsContent(availableWidth: geometry.size.width)
+                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .center)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var unilateralWeightAndRepsDurationFields: some View {
+        GeometryReader { geometry in
+            let durationWidth = UnilateralSetRowLayout.durationWidth(for: geometry.size.width)
+            let weightRepsWidth = UnilateralSetRowLayout.weightRepsGroupWidth(for: geometry.size.width)
+
+            HStack(spacing: UnilateralSetRowLayout.groupedColumnSpacing) {
+                unilateralWeightAndRepsContent(availableWidth: weightRepsWidth)
+                    .frame(width: weightRepsWidth, alignment: .leading)
+
+                SetInputField(
+                    value: $durationText,
+                    placeholder: "MM:SS",
+                    keyboardType: .numberPad,
+                    isCompleted: set.completed,
+                    controlHeight: UnilateralSetRowLayout.controlHeight,
+                    isActiveOverride: focusedInput == .duration,
+                    isCustomEntry: true,
+                    onCustomTap: { activateCustomKeyboard(for: .duration) }
+                )
+                .frame(width: durationWidth)
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .center)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func unilateralWeightAndRepsContent(availableWidth: CGFloat) -> some View {
+        let weightWidth = UnilateralSetRowLayout.weightWidth(for: availableWidth)
+
+        return HStack(spacing: UnilateralSetRowLayout.weightToRepsSpacing) {
+            SetInputField(
+                value: $weightText,
+                placeholder: "0",
+                keyboardType: .decimalPad,
+                isCompleted: set.completed,
+                controlHeight: UnilateralSetRowLayout.controlHeight,
+                isActiveOverride: focusedInput == .weight,
+                isCustomEntry: true,
+                onCustomTap: { activateCustomKeyboard(for: .weight) }
+            )
+            .frame(width: weightWidth)
+
+            VStack(spacing: UnilateralSetRowLayout.verticalSpacing) {
+                unilateralSideInput(
+                    title: "L",
+                    repsText: $leftRepsText,
+                    focusedField: .leftReps
+                )
+
+                unilateralSideInput(
+                    title: "R",
+                    repsText: $rightRepsText,
+                    focusedField: .rightReps
+                )
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private func unilateralSideInput(
@@ -707,21 +759,22 @@ struct SetRowView: View {
         repsText: Binding<String>,
         focusedField: SetRowInputField
     ) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: UnilateralSetRowLayout.sideLabelSpacing) {
             Text(title)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Color.textTertiary)
-                .frame(width: 10, alignment: .leading)
+                .frame(width: UnilateralSetRowLayout.sideLabelWidth, alignment: .leading)
 
             SetInputField(
                 value: repsText,
                 placeholder: repsPlaceholder,
                 keyboardType: .numberPad,
                 isCompleted: set.completed,
+                controlHeight: UnilateralSetRowLayout.controlHeight,
                 isActiveOverride: focusedInput == focusedField,
                 isCustomEntry: true,
                 onCustomTap: { activateCustomKeyboard(for: focusedField) }
-                )
+            )
         }
         .frame(maxWidth: .infinity)
     }
@@ -752,7 +805,7 @@ struct SetRowView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(currentOption.color)
             }
-            .frame(width: 36, height: 32)
+            .frame(width: 36, height: UnilateralSetRowLayout.controlHeight)
             .background(rirBackground(for: currentOption))
             .overlay(
                 RoundedRectangle(cornerRadius: 7)

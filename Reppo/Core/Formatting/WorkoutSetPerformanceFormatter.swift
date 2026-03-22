@@ -76,6 +76,86 @@ enum WorkoutSetPerformanceFormatter {
         exercise?.isBodyweightStyleExercise == true
     }
 
+    static func readOnlyFields(for trackingType: TrackingType) -> [WorkoutSetReadOnlyField] {
+        trackingType.readOnlyHistoryFields
+    }
+
+    static func fieldDisplay(
+        for field: WorkoutSetReadOnlyField,
+        set: WorkoutSet,
+        exercise: Exercise?
+    ) -> WorkoutSetReadOnlyCellDisplay {
+        let display = display(for: set, exercise: exercise)
+
+        switch field {
+        case .weight:
+            let resolvedWeight = set.effectiveWeight ?? set.weight
+            guard let resolvedWeight else { return .placeholder }
+            if resolvedWeight > 0 || isBodyweightStyleExercise(exercise) {
+                return WorkoutSetReadOnlyCellDisplay(text: weightLabel(for: resolvedWeight, exercise: exercise))
+            }
+            return .placeholder
+
+        case .reps:
+            if !display.sideRepsLabels.isEmpty {
+                return WorkoutSetReadOnlyCellDisplay(text: "—", stackedLabels: display.sideRepsLabels)
+            }
+            return WorkoutSetReadOnlyCellDisplay(text: display.repsLabel ?? "—")
+
+        case .distance:
+            guard let distanceMeters = set.distanceMeters, distanceMeters > 0 else { return .placeholder }
+            return WorkoutSetReadOnlyCellDisplay(text: formatDistance(distanceMeters))
+
+        case .time:
+            guard let durationSeconds = set.durationSeconds, durationSeconds > 0 else { return .placeholder }
+            return WorkoutSetReadOnlyCellDisplay(text: UnitConversion.formatDuration(durationSeconds))
+
+        case .rir:
+            if !display.sideRIRLabels.isEmpty {
+                return WorkoutSetReadOnlyCellDisplay(text: "—", stackedLabels: display.sideRIRLabels)
+            }
+            return WorkoutSetReadOnlyCellDisplay(
+                text: display.rirLabel?.replacingOccurrences(of: "RIR ", with: "") ?? "—"
+            )
+        }
+    }
+
+    static func summaryDistanceLabel(for meters: Double) -> String {
+        if meters >= 1000 {
+            let kilometers = meters / 1000
+            if kilometers >= 10 {
+                return String(format: "%.1f km", kilometers)
+            }
+            return String(format: "%.2f km", kilometers)
+        }
+        if meters == meters.rounded() {
+            return String(format: "%.0f m", meters)
+        }
+        return String(format: "%.1f m", meters)
+    }
+
+    static func summaryDurationLabel(for seconds: Int, style: WorkoutPrimaryMetricDisplayStyle) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        let remainingSeconds = seconds % 60
+
+        if hours > 0 {
+            if minutes > 0 {
+                return "\(hours)h \(minutes)m"
+            }
+            return "\(hours)h"
+        }
+
+        if minutes > 0 {
+            if style == .detailed && remainingSeconds > 0 {
+                return "\(minutes)m \(remainingSeconds)s"
+            }
+            return "\(minutes)m"
+        }
+
+        return "\(remainingSeconds)s"
+    }
+
     private static func display(
         weight: Double?,
         reps: Int?,
@@ -235,5 +315,309 @@ enum WorkoutSetPerformanceFormatter {
             return String(format: "%.0f m", meters)
         }
         return String(format: "%.1f m", meters)
+    }
+}
+
+enum WorkoutMetricFamily: CaseIterable, Sendable {
+    case distance
+    case duration
+    case volume
+}
+
+enum WorkoutPrimaryMetricDisplayStyle: Sendable {
+    case compact
+    case detailed
+}
+
+enum WorkoutPrimaryMetric: Sendable, Equatable {
+    case volume(Double)
+    case distance(Double)
+    case duration(Int)
+
+    var label: String {
+        switch self {
+        case .volume:
+            return "Volume"
+        case .distance:
+            return "Distance"
+        case .duration:
+            return "Duration"
+        }
+    }
+
+    var systemImageName: String {
+        switch self {
+        case .volume:
+            return "scalemass"
+        case .distance:
+            return "figure.run"
+        case .duration:
+            return "timer"
+        }
+    }
+
+    func formattedValue(
+        style: WorkoutPrimaryMetricDisplayStyle = .compact,
+        unitPreference: UnitPreference = .metric
+    ) -> String {
+        switch self {
+        case .volume(let totalVolume):
+            let convertedVolume = unitPreference == .imperial ? UnitConversion.kgToLbs(totalVolume) : totalVolume
+            let unitLabel = unitPreference == .imperial ? "lb" : "kg"
+            if style == .compact {
+                if convertedVolume >= 1000 {
+                    return "\(Self.formatCompactNumber(convertedVolume)) \(unitLabel)"
+                }
+                return "\(Self.formatWholeNumber(convertedVolume)) \(unitLabel)"
+            }
+            return "\(Self.formatDetailedNumber(convertedVolume)) \(unitLabel)"
+
+        case .distance(let meters):
+            return WorkoutSetPerformanceFormatter.summaryDistanceLabel(for: meters)
+
+        case .duration(let seconds):
+            return WorkoutSetPerformanceFormatter.summaryDurationLabel(for: seconds, style: style)
+        }
+    }
+
+    private static func formatCompactNumber(_ value: Double) -> String {
+        if value >= 1_000_000 {
+            return String(format: "%.1fM", value / 1_000_000)
+        }
+        return String(format: "%.1fk", value / 1000)
+    }
+
+    private static func formatWholeNumber(_ value: Double) -> String {
+        let rounded = value.rounded()
+        return String(format: "%.0f", rounded)
+    }
+
+    private static func formatDetailedNumber(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: value.rounded())) ?? formatWholeNumber(value)
+    }
+}
+
+struct WorkoutAggregateSummary: Sendable, Equatable {
+    let totalVolume: Double
+    let totalDistanceMeters: Double
+    let totalDurationSeconds: Int
+    let volumeSetCount: Int
+    let distanceSetCount: Int
+    let durationSetCount: Int
+
+    static let zero = WorkoutAggregateSummary(
+        totalVolume: 0,
+        totalDistanceMeters: 0,
+        totalDurationSeconds: 0,
+        volumeSetCount: 0,
+        distanceSetCount: 0,
+        durationSetCount: 0
+    )
+
+    var primaryMetric: WorkoutPrimaryMetric? {
+        let prioritizedFamilies = WorkoutMetricFamily.allCases.sorted { lhs, rhs in
+            let lhsCount = setCount(for: lhs)
+            let rhsCount = setCount(for: rhs)
+            if lhsCount != rhsCount {
+                return lhsCount > rhsCount
+            }
+            return priority(for: lhs) < priority(for: rhs)
+        }
+
+        for family in prioritizedFamilies where setCount(for: family) > 0 {
+            if let metric = metric(for: family) {
+                return metric
+            }
+        }
+
+        for family in WorkoutMetricFamily.allCases {
+            if let metric = metric(for: family) {
+                return metric
+            }
+        }
+
+        return nil
+    }
+
+    static func summarize(
+        sets: [WorkoutSet],
+        exercisesById: [UUID: Exercise]
+    ) -> WorkoutAggregateSummary {
+        summarize(
+            sets: sets,
+            exerciseId: { $0.exerciseId },
+            exerciseLookup: { exercisesById[$0]?.trackingType },
+            volumeValue: { $0.volume ?? 0 },
+            distanceValue: { $0.distanceMeters ?? 0 },
+            durationValue: { $0.durationSeconds ?? 0 }
+        )
+    }
+
+    static func summarize(
+        sets: [ChartSetData],
+        exercisesById: [UUID: ChartExerciseData]
+    ) -> WorkoutAggregateSummary {
+        summarize(
+            sets: sets,
+            exerciseId: { $0.exerciseId },
+            exerciseLookup: { exercisesById[$0]?.trackingType },
+            volumeValue: { $0.volume ?? 0 },
+            distanceValue: { $0.distanceMeters ?? 0 },
+            durationValue: { $0.durationSeconds ?? 0 }
+        )
+    }
+
+    private var hasVolume: Bool {
+        totalVolume > 0
+    }
+
+    private var hasDistance: Bool {
+        totalDistanceMeters > 0
+    }
+
+    private var hasDuration: Bool {
+        totalDurationSeconds > 0
+    }
+
+    private func setCount(for family: WorkoutMetricFamily) -> Int {
+        switch family {
+        case .distance:
+            return distanceSetCount
+        case .duration:
+            return durationSetCount
+        case .volume:
+            return volumeSetCount
+        }
+    }
+
+    private func metric(for family: WorkoutMetricFamily) -> WorkoutPrimaryMetric? {
+        switch family {
+        case .distance:
+            return hasDistance ? .distance(totalDistanceMeters) : nil
+        case .duration:
+            return hasDuration ? .duration(totalDurationSeconds) : nil
+        case .volume:
+            return hasVolume ? .volume(totalVolume) : nil
+        }
+    }
+
+    private func priority(for family: WorkoutMetricFamily) -> Int {
+        switch family {
+        case .distance:
+            return 0
+        case .duration:
+            return 1
+        case .volume:
+            return 2
+        }
+    }
+
+    private static func summarize<SetType>(
+        sets: [SetType],
+        exerciseId: (SetType) -> UUID,
+        exerciseLookup: (UUID) -> TrackingType?,
+        volumeValue: (SetType) -> Double,
+        distanceValue: (SetType) -> Double,
+        durationValue: (SetType) -> Int
+    ) -> WorkoutAggregateSummary where SetType: Sendable {
+        var totalVolume: Double = 0
+        var totalDistanceMeters: Double = 0
+        var totalDurationSeconds: Int = 0
+        var volumeSetCount = 0
+        var distanceSetCount = 0
+        var durationSetCount = 0
+
+        for set in sets {
+            totalVolume += volumeValue(set)
+            totalDistanceMeters += distanceValue(set)
+            totalDurationSeconds += max(0, durationValue(set))
+
+            guard let trackingType = exerciseLookup(exerciseId(set)) else { continue }
+            switch trackingType.summaryMetricFamily {
+            case .distance:
+                distanceSetCount += 1
+            case .duration:
+                durationSetCount += 1
+            case .volume:
+                volumeSetCount += 1
+            }
+        }
+
+        return WorkoutAggregateSummary(
+            totalVolume: totalVolume,
+            totalDistanceMeters: totalDistanceMeters,
+            totalDurationSeconds: totalDurationSeconds,
+            volumeSetCount: volumeSetCount,
+            distanceSetCount: distanceSetCount,
+            durationSetCount: durationSetCount
+        )
+    }
+}
+
+enum WorkoutSetReadOnlyField: String, CaseIterable, Identifiable, Sendable {
+    case weight
+    case reps
+    case distance
+    case time
+    case rir
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .weight:
+            return "WEIGHT"
+        case .reps:
+            return "REPS"
+        case .distance:
+            return "DIST"
+        case .time:
+            return "TIME"
+        case .rir:
+            return "RIR"
+        }
+    }
+}
+
+struct WorkoutSetReadOnlyCellDisplay: Sendable, Equatable {
+    let text: String
+    let stackedLabels: [String]
+
+    init(text: String, stackedLabels: [String] = []) {
+        self.text = text
+        self.stackedLabels = stackedLabels
+    }
+
+    static let placeholder = WorkoutSetReadOnlyCellDisplay(text: "—")
+}
+
+extension TrackingType {
+    var readOnlyHistoryFields: [WorkoutSetReadOnlyField] {
+        switch self {
+        case .weightReps, .custom:
+            return [.weight, .reps, .rir]
+        case .duration:
+            return [.time]
+        case .durationDistance:
+            return [.distance, .time]
+        case .weightDistance:
+            return [.weight, .distance]
+        case .weightRepsDuration:
+            return [.weight, .reps, .time, .rir]
+        }
+    }
+
+    var summaryMetricFamily: WorkoutMetricFamily {
+        switch self {
+        case .durationDistance, .weightDistance:
+            return .distance
+        case .duration:
+            return .duration
+        case .weightReps, .weightRepsDuration, .custom:
+            return .volume
+        }
     }
 }

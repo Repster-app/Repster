@@ -133,6 +133,12 @@ actor StatsService: StatsServiceProtocol {
         var seen = Set<UUID>()
         var result: [PerformanceRecord] = []
         for record in records {
+            guard let exercise = try await exerciseRepo.fetch(byId: record.exerciseId),
+                  exercise.trackingType.supportsRepPRs,
+                  let recordReps = record.reps,
+                  recordReps > 0 else {
+                continue
+            }
             guard seen.insert(record.exerciseId).inserted else { continue }
 
             // Check if this record's e1RM is the best across all repMax records for the exercise
@@ -140,8 +146,13 @@ actor StatsService: StatsServiceProtocol {
                 for: record.exerciseId,
                 recordType: .repMax
             )
-            let recordE1RM = formula.calculate(weight: record.value, reps: record.reps ?? 1)
-            let bestE1RM = allRepMaxes.map { formula.calculate(weight: $0.value, reps: $0.reps ?? 1) }.max() ?? 0
+            let validRepMaxes = allRepMaxes.filter { ($0.reps ?? 0) > 0 }
+            guard !validRepMaxes.isEmpty else { continue }
+
+            let recordE1RM = formula.calculate(weight: record.value, reps: recordReps)
+            let bestE1RM = validRepMaxes.map {
+                formula.calculate(weight: $0.value, reps: $0.reps ?? 1)
+            }.max() ?? 0
 
             guard recordE1RM >= bestE1RM else { continue }
 

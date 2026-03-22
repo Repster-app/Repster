@@ -162,12 +162,32 @@ struct BreakdownDataPoint: Identifiable {
     let color: Color
 }
 
-/// Summary stats for the Breakdown tab — all 4 totals for the selected time range.
+/// Summary stats for the Breakdown tab — existing totals plus shared workout-metric aggregates.
 struct BreakdownSummary {
     let totalVolume: Double   // sum(effectiveWeight × reps)
+    let totalDistanceMeters: Double
+    let totalDurationSeconds: Int
     let totalSets: Int        // count of eligible sets
     let totalReps: Int        // sum(reps)
     let totalWorkouts: Int    // count of distinct workoutIds
+    let volumeSetCount: Int
+    let distanceSetCount: Int
+    let durationSetCount: Int
+
+    var aggregateSummary: WorkoutAggregateSummary {
+        WorkoutAggregateSummary(
+            totalVolume: totalVolume,
+            totalDistanceMeters: totalDistanceMeters,
+            totalDurationSeconds: totalDurationSeconds,
+            volumeSetCount: volumeSetCount,
+            distanceSetCount: distanceSetCount,
+            durationSetCount: durationSetCount
+        )
+    }
+
+    var primaryMetric: WorkoutPrimaryMetric? {
+        aggregateSummary.primaryMetric
+    }
 }
 
 struct WorkoutsTimeSeriesPoint: Identifiable {

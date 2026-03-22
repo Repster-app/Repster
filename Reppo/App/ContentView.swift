@@ -6,25 +6,21 @@
 
 import SwiftUI
 
-private enum TemplateEditorRoute: Identifiable {
-    case create(sessionId: UUID)
-    case edit(templateId: UUID)
+enum StartupPRRebuildMaintenance {
+    static let currentVersion = 1
+    static let userDefaultsKey = "startupPRRebuildMaintenanceVersion"
 
-    var id: String {
-        switch self {
-        case .create(let sessionId):
-            return "create-\(sessionId.uuidString)"
-        case .edit(let templateId):
-            return "edit-\(templateId.uuidString)"
-        }
-    }
+    static func runIfNeeded(
+        settingsService: any SettingsServiceProtocol,
+        userDefaults: UserDefaults = .standard
+    ) async {
+        guard userDefaults.integer(forKey: userDefaultsKey) < currentVersion else { return }
 
-    var editingTemplateId: UUID? {
-        switch self {
-        case .create:
-            return nil
-        case .edit(let templateId):
-            return templateId
+        do {
+            try await settingsService.rebuildPRs()
+            userDefaults.set(currentVersion, forKey: userDefaultsKey)
+        } catch {
+            print("[ContentView] Startup PR rebuild maintenance failed: \(error)")
         }
     }
 }
@@ -52,6 +48,9 @@ struct ContentView: View {
     /// Whether the initial check for an active workout has been performed.
     @State private var hasCheckedForActive = false
 
+    /// Whether one-time startup PR maintenance has been scheduled for this app session.
+    @State private var hasScheduledStartupPRMaintenance = false
+
     /// Whether the Exercise List (browse mode) is shown via FAB (T030).
     @State private var showExerciseList = false
 
@@ -70,17 +69,14 @@ struct ContentView: View {
     /// Pending workout ID for copy when discard confirmation is needed.
     @State private var pendingCopyWorkoutId: UUID? = nil
 
-    /// Whether the template list sheet should open after StartWorkoutSheet dismisses.
-    @State private var pendingTemplateSheet = false
+    /// Whether the templates flow should open after StartWorkoutSheet dismisses.
+    @State private var pendingTemplateFlow = false
 
-    /// Whether the create/edit template sheet should open after TemplateListSheet dismisses.
-    @State private var pendingTemplateEditorRoute: TemplateEditorRoute? = nil
+    /// Whether the full-screen templates flow is presented.
+    @State private var showTemplateFlow = false
 
-    /// Whether the Template List sheet is shown.
-    @State private var showTemplateListSheet = false
-
-    /// The create/edit template route currently presented.
-    @State private var templateEditorRoute: TemplateEditorRoute? = nil
+    /// Whether starting a template workout should resume into the active workout after flow dismissal.
+    @State private var shouldResumeActiveWorkoutAfterTemplateFlow = false
 
     /// Whether an active workout currently exists (drives FAB behavior).
     @State private var hasActiveWorkout = false
@@ -198,6 +194,14 @@ struct ContentView: View {
             }
         }
         .task {
+            if !hasScheduledStartupPRMaintenance {
+                hasScheduledStartupPRMaintenance = true
+                let settingsService = services.settingsService
+                Task(priority: .utility) {
+                    await StartupPRRebuildMaintenance.runIfNeeded(settingsService: settingsService)
+                }
+            }
+
             // Check for active workout on launch (AGENT_RULES S7.3)
             guard !hasCheckedForActive else { return }
             hasCheckedForActive = true
@@ -210,10 +214,9 @@ struct ContentView: View {
             configureTabBarAppearance()
         }
         .sheet(isPresented: $showStartWorkoutSheet, onDismiss: {
-            // Present template list after StartWorkoutSheet fully dismisses
-            if pendingTemplateSheet {
-                pendingTemplateSheet = false
-                showTemplateListSheet = true
+            if pendingTemplateFlow {
+                pendingTemplateFlow = false
+                showTemplateFlow = true
             }
         }) {
             StartWorkoutSheet(
@@ -233,7 +236,7 @@ struct ContentView: View {
                     showCopyPreviousSheet = true
                 },
                 onTemplates: {
-                    pendingTemplateSheet = true
+                    pendingTemplateFlow = true
                 }
             )
         }
@@ -253,34 +256,21 @@ struct ContentView: View {
                 }
             )
         }
-        .sheet(isPresented: $showTemplateListSheet, onDismiss: {
-            // Present create/edit template sheet after TemplateListSheet fully dismisses
-            if let route = pendingTemplateEditorRoute {
-                pendingTemplateEditorRoute = nil
-                templateEditorRoute = route
+        .fullScreenCover(isPresented: $showTemplateFlow, onDismiss: {
+            if shouldResumeActiveWorkoutAfterTemplateFlow {
+                shouldResumeActiveWorkoutAfterTemplateFlow = false
+                hasActiveWorkout = true
+                showActiveWorkout = true
             }
         }) {
-            TemplateListSheet(
-                templateService: services.templateService,
-                onStartWorkout: {
-                    hasActiveWorkout = true
-                    showActiveWorkout = true
-                },
-                onCreateTemplate: {
-                    pendingTemplateEditorRoute = .create(sessionId: UUID())
-                },
-                onEditTemplate: { templateId in
-                    pendingTemplateEditorRoute = .edit(templateId: templateId)
-                }
-            )
-        }
-        .sheet(item: $templateEditorRoute) { route in
-            CreateEditTemplateView(
+            TemplateFlowView(
                 templateService: services.templateService,
                 exerciseService: services.exerciseService,
-                editingTemplateId: route.editingTemplateId
+                onStartWorkout: {
+                    shouldResumeActiveWorkoutAfterTemplateFlow = true
+                    showTemplateFlow = false
+                }
             )
-            .id(route.id)
         }
     }
 
@@ -368,17 +358,23 @@ struct ContentView: View {
             for workout in completed {
                 let sets = try await services.setService.fetchSets(for: workout.id)
                 let workingSetsWithData = sets.filter { $0.setType == .working && $0.hasData }
-                let totalVolume = workingSetsWithData.compactMap(\.volume).reduce(0, +)
-                let exerciseIds = try await services.setService.fetchExerciseIds(for: workout.id)
+                let exerciseIds = Set(sets.map(\.exerciseId))
 
+                var exerciseLookup: [UUID: Exercise] = [:]
                 var muscleGroups: [String] = []
                 for exerciseId in exerciseIds {
-                    if let exercise = try await services.exerciseService.fetchExercise(exerciseId),
-                       let muscle = ExercisePrimaryGroup.normalizedValue(exercise.primaryMuscle),
-                       !muscleGroups.contains(muscle) {
-                        muscleGroups.append(muscle)
+                    if let exercise = try await services.exerciseService.fetchExercise(exerciseId) {
+                        exerciseLookup[exerciseId] = exercise
+                        if let muscle = ExercisePrimaryGroup.normalizedValue(exercise.primaryMuscle),
+                           !muscleGroups.contains(muscle) {
+                            muscleGroups.append(muscle)
+                        }
                     }
                 }
+                let aggregate = WorkoutAggregateSummary.summarize(
+                    sets: workingSetsWithData,
+                    exercisesById: exerciseLookup
+                )
 
                 items.append(CopyPreviousWorkout(
                     id: workout.id,
@@ -387,7 +383,7 @@ struct ContentView: View {
                     date: workout.date,
                     exerciseCount: exerciseIds.count,
                     setCount: workingSetsWithData.count,
-                    totalVolume: totalVolume,
+                    primaryMetric: aggregate.primaryMetric,
                     muscleGroups: muscleGroups
                 ))
             }

@@ -5,26 +5,18 @@
 import SwiftUI
 
 struct SummaryStatsStrip: View {
-    let totalVolume: Double
+    let primaryMetric: WorkoutPrimaryMetric?
     let exerciseCount: Int
     let setCount: Int
     let duration: Int?
 
     var body: some View {
         HStack(spacing: 0) {
-            statItem(value: formatVolume(totalVolume), label: "VOLUME")
-
-            divider
-
-            statItem(value: "\(exerciseCount)", label: "EXERCISES")
-
-            divider
-
-            statItem(value: "\(setCount)", label: "SETS")
-
-            if let duration {
-                divider
-                statItem(value: formatDuration(duration), label: "DURATION")
+            ForEach(Array(statItems.enumerated()), id: \.offset) { index, item in
+                if index > 0 {
+                    divider
+                }
+                statItem(value: item.value, label: item.label)
             }
         }
         .padding(14)
@@ -54,13 +46,24 @@ struct SummaryStatsStrip: View {
             .padding(.vertical, 2)
     }
 
-    // MARK: - Formatting
+    private var statItems: [(label: String, value: String)] {
+        var items: [(label: String, value: String)] = []
 
-    private func formatVolume(_ kg: Double) -> String {
-        if kg >= 1000 {
-            return String(format: "%.1fk", kg / 1000)
+        if let primaryMetric {
+            items.append((
+                label: primaryMetric.label.uppercased(),
+                value: primaryMetric.formattedValue()
+            ))
         }
-        return "\(Int(kg)) kg"
+
+        items.append((label: "EXERCISES", value: "\(exerciseCount)"))
+        items.append((label: "SETS", value: "\(setCount)"))
+
+        if let duration {
+            items.append((label: "DURATION", value: formatDuration(duration)))
+        }
+
+        return items
     }
 
     private func formatDuration(_ seconds: Int) -> String {

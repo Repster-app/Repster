@@ -152,6 +152,289 @@ final class SetServiceTests: XCTestCase {
         XCTAssertEqual(archivedSet.reps, 10)
     }
 
+    func testSaveWeightRepsSetStillCreatesPRRecord() async throws {
+        let context = try makeContext()
+        let workoutDate = makeDate(2026, 3, 22, 9, 0)
+        let records = try await insertExerciseAndWorkout(
+            in: context,
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest",
+            date: workoutDate
+        )
+        let set = WorkoutSet(
+            workoutId: records.workout.id,
+            exerciseId: records.exercise.id,
+            date: workoutDate,
+            completedAt: workoutDate.addingTimeInterval(300),
+            weight: 100,
+            reps: 5,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+
+        let result = try await context.setService.save(set)
+        let performanceRecords = try await context.performanceRecordRepo.fetchAll(
+            for: records.exercise.id,
+            recordType: .repMax
+        )
+        let persistedSet = try await context.setRepo.fetch(byId: set.id)
+
+        XCTAssertEqual(result.prResult.newStatus, .current)
+        XCTAssertEqual(performanceRecords.count, 1)
+        XCTAssertEqual(performanceRecords.first?.reps, 5)
+        XCTAssertEqual(performanceRecords.first?.value ?? 0, 100, accuracy: 0.001)
+        XCTAssertEqual(persistedSet?.cachedPRStatus, .current)
+    }
+
+    func testSaveWeightRepsDurationSetDoesNotCreatePRRecordOrBadge() async throws {
+        let context = try makeContext()
+        let workoutDate = makeDate(2026, 3, 22, 9, 15)
+        let records = try await insertExerciseAndWorkout(
+            in: context,
+            name: "Tempo Row",
+            equipmentType: .machinePin,
+            trackingType: .weightRepsDuration,
+            primaryMuscle: "back",
+            date: workoutDate
+        )
+        let set = WorkoutSet(
+            workoutId: records.workout.id,
+            exerciseId: records.exercise.id,
+            date: workoutDate,
+            completedAt: workoutDate.addingTimeInterval(240),
+            weight: 45,
+            reps: 8,
+            durationSeconds: 75,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+
+        let result = try await context.setService.save(set)
+        let performanceRecords = try await context.performanceRecordRepo.fetchAll(
+            for: records.exercise.id,
+            recordType: .repMax
+        )
+        let persistedSet = try await context.setRepo.fetch(byId: set.id)
+
+        XCTAssertNil(result.prResult.newStatus)
+        XCTAssertFalse(result.prResult.prRecordChanged)
+        XCTAssertTrue(performanceRecords.isEmpty)
+        XCTAssertNil(persistedSet?.cachedPRStatus)
+    }
+
+    func testFetchPRTableReturnsEmptyForUnsupportedExerciseWithStalePRData() async throws {
+        let context = try makeContext()
+        let workoutDate = makeDate(2026, 3, 22, 9, 30)
+        let records = try await insertExerciseAndWorkout(
+            in: context,
+            name: "Run",
+            equipmentType: .bodyweight,
+            trackingType: .durationDistance,
+            primaryMuscle: "legs",
+            date: workoutDate
+        )
+        let set = WorkoutSet(
+            workoutId: records.workout.id,
+            exerciseId: records.exercise.id,
+            date: workoutDate,
+            durationSeconds: 1_500,
+            distanceMeters: 5_000,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+        try await context.setRepo.save(set)
+        try await context.performanceRecordRepo.save(
+            PerformanceRecord(
+                exerciseId: records.exercise.id,
+                recordType: .repMax,
+                reps: 1,
+                value: 1,
+                setId: set.id,
+                date: workoutDate
+            )
+        )
+
+        let table = try await context.prService.fetchPRTable(for: records.exercise.id)
+
+        XCTAssertTrue(table.isEmpty)
+    }
+
+    func testRebuildRemovesStalePRDataForUnsupportedExercise() async throws {
+        let context = try makeContext()
+        let workoutDate = makeDate(2026, 3, 22, 9, 45)
+        let records = try await insertExerciseAndWorkout(
+            in: context,
+            name: "Interval Run",
+            equipmentType: .bodyweight,
+            trackingType: .durationDistance,
+            primaryMuscle: "legs",
+            date: workoutDate
+        )
+        let set = WorkoutSet(
+            workoutId: records.workout.id,
+            exerciseId: records.exercise.id,
+            date: workoutDate,
+            durationSeconds: 600,
+            distanceMeters: 1_600,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true,
+            cachedPRStatus: .current
+        )
+        try await context.setRepo.save(set)
+        try await context.performanceRecordRepo.save(
+            PerformanceRecord(
+                exerciseId: records.exercise.id,
+                recordType: .repMax,
+                reps: 1,
+                value: 1,
+                setId: set.id,
+                date: workoutDate
+            )
+        )
+
+        try await context.prService.rebuild(for: records.exercise.id)
+
+        let performanceRecords = try await context.performanceRecordRepo.fetchAll(for: records.exercise.id)
+        let persistedSet = try await context.setRepo.fetch(byId: set.id)
+
+        XCTAssertTrue(performanceRecords.isEmpty)
+        XCTAssertNil(persistedSet?.cachedPRStatus)
+    }
+
+    func testFetchRecentPRsIgnoresUnsupportedExercises() async throws {
+        let context = try makeContext()
+        let supportedDate = makeDate(2026, 3, 22, 10, 0)
+        let unsupportedDate = makeDate(2026, 3, 22, 10, 5)
+
+        let supported = try await insertExerciseAndWorkout(
+            in: context,
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest",
+            date: supportedDate
+        )
+        let supportedSet = WorkoutSet(
+            workoutId: supported.workout.id,
+            exerciseId: supported.exercise.id,
+            date: supportedDate,
+            completedAt: supportedDate.addingTimeInterval(240),
+            weight: 110,
+            reps: 3,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+        _ = try await context.setService.save(supportedSet)
+
+        let unsupported = try await insertExerciseAndWorkout(
+            in: context,
+            name: "Tempo Row",
+            equipmentType: .machinePin,
+            trackingType: .weightRepsDuration,
+            primaryMuscle: "back",
+            date: unsupportedDate
+        )
+        let unsupportedSet = WorkoutSet(
+            workoutId: unsupported.workout.id,
+            exerciseId: unsupported.exercise.id,
+            date: unsupportedDate,
+            weight: 55,
+            reps: 10,
+            durationSeconds: 60,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+        try await context.setRepo.save(unsupportedSet)
+        try await context.performanceRecordRepo.save(
+            PerformanceRecord(
+                exerciseId: unsupported.exercise.id,
+                recordType: .repMax,
+                reps: 10,
+                value: 55,
+                setId: unsupportedSet.id,
+                date: unsupportedDate
+            )
+        )
+
+        let recentPRs = try await context.statsService.fetchRecentPRs(
+            since: supportedDate.addingTimeInterval(-3_600),
+            limit: 3
+        )
+
+        XCTAssertEqual(recentPRs.map(\.exerciseId), [supported.exercise.id])
+    }
+
+    func testStartupPRRebuildMaintenanceRunsOnceOnSuccess() async throws {
+        let suiteName = "StartupPRRebuildMaintenanceRunsOnce-\(UUID().uuidString)"
+        let userDefaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let settingsService = StartupPRRebuildSettingsServiceStub()
+        defer {
+            userDefaults.removePersistentDomain(forName: suiteName)
+        }
+
+        await StartupPRRebuildMaintenance.runIfNeeded(
+            settingsService: settingsService,
+            userDefaults: userDefaults
+        )
+        await StartupPRRebuildMaintenance.runIfNeeded(
+            settingsService: settingsService,
+            userDefaults: userDefaults
+        )
+        let rebuildCallCount = await settingsService.recordedRebuildPRsCallCount()
+
+        XCTAssertEqual(
+            userDefaults.integer(forKey: StartupPRRebuildMaintenance.userDefaultsKey),
+            StartupPRRebuildMaintenance.currentVersion
+        )
+        XCTAssertEqual(rebuildCallCount, 1)
+    }
+
+    func testStartupPRRebuildMaintenanceRetriesAfterFailure() async throws {
+        let suiteName = "StartupPRRebuildMaintenanceRetries-\(UUID().uuidString)"
+        let userDefaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let settingsService = StartupPRRebuildSettingsServiceStub()
+        defer {
+            userDefaults.removePersistentDomain(forName: suiteName)
+        }
+
+        await settingsService.setRebuildPRsError(StartupPRRebuildTestError.failed)
+        await StartupPRRebuildMaintenance.runIfNeeded(
+            settingsService: settingsService,
+            userDefaults: userDefaults
+        )
+        let failedCallCount = await settingsService.recordedRebuildPRsCallCount()
+
+        XCTAssertEqual(userDefaults.integer(forKey: StartupPRRebuildMaintenance.userDefaultsKey), 0)
+        XCTAssertEqual(failedCallCount, 1)
+
+        await settingsService.setRebuildPRsError(nil)
+        await StartupPRRebuildMaintenance.runIfNeeded(
+            settingsService: settingsService,
+            userDefaults: userDefaults
+        )
+        let finalCallCount = await settingsService.recordedRebuildPRsCallCount()
+
+        XCTAssertEqual(
+            userDefaults.integer(forKey: StartupPRRebuildMaintenance.userDefaultsKey),
+            StartupPRRebuildMaintenance.currentVersion
+        )
+        XCTAssertEqual(finalCallCount, 2)
+    }
+
     private func makeContext() throws -> SetServiceTestContext {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
@@ -219,11 +502,43 @@ final class SetServiceTests: XCTestCase {
         return SetServiceTestContext(
             modelContainer: container,
             setService: setService,
+            statsService: statsService,
+            prService: prService,
             backupService: backupService,
             exerciseRepo: exerciseRepo,
             workoutRepo: workoutRepo,
-            setRepo: setRepo
+            setRepo: setRepo,
+            performanceRecordRepo: performanceRecordRepo
         )
+    }
+
+    private func insertExerciseAndWorkout(
+        in context: SetServiceTestContext,
+        name: String,
+        equipmentType: EquipmentType,
+        trackingType: TrackingType,
+        primaryMuscle: String,
+        date: Date
+    ) async throws -> (exercise: Exercise, workout: Workout) {
+        let exercise = Exercise(
+            name: name,
+            equipmentType: equipmentType,
+            trackingType: trackingType,
+            primaryMuscle: primaryMuscle
+        )
+        let workout = Workout(
+            date: date,
+            title: name,
+            startTime: date,
+            endTime: date.addingTimeInterval(1_800),
+            duration: 1_800,
+            status: .completed
+        )
+
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(workout)
+
+        return (exercise, workout)
     }
 
     private func seedTrackedCompletedSet(
@@ -361,10 +676,13 @@ final class SetServiceTests: XCTestCase {
 private struct SetServiceTestContext {
     let modelContainer: ModelContainer
     let setService: SetService
+    let statsService: StatsService
+    let prService: PRService
     let backupService: WorkoutHistoryBackupService
     let exerciseRepo: ExerciseRepository
     let workoutRepo: WorkoutRepository
     let setRepo: SetRepository
+    let performanceRecordRepo: PerformanceRecordRepository
 }
 
 private struct SeededTrackedSet {
@@ -373,4 +691,49 @@ private struct SeededTrackedSet {
     let set: WorkoutSet
     let observation: FatigueObservation
     let audit: FatigueLearningSetAudit
+}
+
+private actor StartupPRRebuildSettingsServiceStub: SettingsServiceProtocol {
+    private var rebuildPRsCallCount = 0
+    private var rebuildPRsError: Error?
+
+    func setRebuildPRsError(_ error: Error?) {
+        rebuildPRsError = error
+    }
+
+    func recordedRebuildPRsCallCount() -> Int {
+        rebuildPRsCallCount
+    }
+
+    func fetchSettings() async throws -> HealthProfile { HealthProfile() }
+    func updateUnitPreference(_ preference: UnitPreference) async throws {}
+    func updateE1RMFormula(_ formula: E1RMFormula) async throws {}
+    func updateIncludeWarmupsInVolume(_ include: Bool) async throws {}
+    func updateIncludeWarmupsInPRs(_ include: Bool) async throws {}
+    func updateDefaultRestTime(_ seconds: Int?) async throws {}
+    func updateDefaultWarmupRestTime(_ seconds: Int?) async throws {}
+    func updateRestTimerAlert(_ value: String) async throws {}
+    func updatePrescriptionEnabled(_ enabled: Bool) async throws {}
+    func updatePrescriptionRecencyWeeks(_ weeks: Int) async throws {}
+    func updatePrescriptionDefaultIncrement(_ increment: Double) async throws {}
+    func updatePrescriptionDefaultTargetReps(_ reps: Int) async throws {}
+    func updatePrescriptionDefaultTargetRIR(_ rir: Int) async throws {}
+    func updatePrescriptionFreshnessBonus(enabled: Bool, percent: Double) async throws {}
+    func updatePrescriptionFatigueModelingEnabled(_ enabled: Bool) async throws {}
+    func updatePrescriptionDefaultRecoveryConstant(_ seconds: Double) async throws {}
+    func resetAllAppData() async throws {}
+
+    func rebuildPRs() async throws {
+        rebuildPRsCallCount += 1
+        if let rebuildPRsError {
+            throw rebuildPRsError
+        }
+    }
+
+    func rebuildStats() async throws {}
+    func rebuildAll() async throws {}
+}
+
+private enum StartupPRRebuildTestError: Error {
+    case failed
 }

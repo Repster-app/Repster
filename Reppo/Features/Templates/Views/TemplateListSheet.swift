@@ -1,14 +1,41 @@
 // TemplateListSheet.swift
-// Bottom sheet showing saved templates for the user to select and start a workout from.
-// Also hosts reviewed template import and the ChatGPT prompt-helper flow.
+// Full-screen templates flow launched from StartWorkoutSheet.
+// Hosts template quick-start, create/edit navigation, import/export,
+// and the ChatGPT prompt-helper flow.
 
 import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
 
-struct TemplateListSheet: View {
+private enum TemplateFlowRoute: Hashable, Identifiable {
+    case create(sessionId: UUID)
+    case edit(templateId: UUID)
 
+    var id: String {
+        switch self {
+        case .create(let sessionId):
+            return "create-\(sessionId.uuidString)"
+        case .edit(let templateId):
+            return "edit-\(templateId.uuidString)"
+        }
+    }
+
+    var editingTemplateId: UUID? {
+        switch self {
+        case .create:
+            return nil
+        case .edit(let templateId):
+            return templateId
+        }
+    }
+}
+
+struct TemplateFlowView: View {
+
+    private let templateService: any TemplateServiceProtocol
+    private let exerciseService: any ExerciseServiceProtocol
     @State private var viewModel: TemplateListViewModel
+    @State private var navigationPath = NavigationPath()
     @State private var showImportPicker = false
     @State private var showAIHelper = false
     @State private var isImportingTemplate = false
@@ -17,112 +44,79 @@ struct TemplateListSheet: View {
     @State private var actionAlert: TemplateActionAlert? = nil
     @State private var pendingImportReview: PendingTemplateImportReview? = nil
     @Environment(\.dismiss) private var dismiss
-    @Environment(ServiceContainer.self) private var services
 
     let onStartWorkout: () -> Void
-    let onCreateTemplate: () -> Void
-    let onEditTemplate: (UUID) -> Void
 
     init(
         templateService: any TemplateServiceProtocol,
-        onStartWorkout: @escaping () -> Void,
-        onCreateTemplate: @escaping () -> Void,
-        onEditTemplate: @escaping (UUID) -> Void
+        exerciseService: any ExerciseServiceProtocol,
+        onStartWorkout: @escaping () -> Void
     ) {
+        self.templateService = templateService
+        self.exerciseService = exerciseService
         _viewModel = State(initialValue: TemplateListViewModel(templateService: templateService))
         self.onStartWorkout = onStartWorkout
-        self.onCreateTemplate = onCreateTemplate
-        self.onEditTemplate = onEditTemplate
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Capsule()
-                .fill(Color.bgSubtle)
-                .frame(width: 36, height: 5)
-                .padding(.top, 12)
-                .padding(.bottom, 16)
-
-            HStack {
-                Text("Templates")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(Color.textPrimary)
-
-                Spacer()
-
-                HStack(spacing: 8) {
-                    actionPill(title: "AI Helper", systemImage: "sparkles", accent: true) {
-                        showAIHelper = true
-                    }
-
-                    actionPill(title: "Import", systemImage: "square.and.arrow.down") {
-                        showImportPicker = true
-                    }
-
-                    Button {
-                        onCreateTemplate()
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 12, weight: .bold))
-                            Text("New")
-                                .font(.system(size: 13, weight: .semibold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Color.accent)
-                        .cornerRadius(10)
-                    }
-                    .buttonStyle(.plain)
+        NavigationStack(path: $navigationPath) {
+            Group {
+                if viewModel.isLoading {
+                    loadingState
+                } else if viewModel.templates.isEmpty {
+                    emptyState
+                } else {
+                    templateList
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 4)
+            .background(Color.bg.ignoresSafeArea())
+            .navigationTitle("Templates")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    HStack(spacing: 14) {
+                        Menu {
+                            Button {
+                                showAIHelper = true
+                            } label: {
+                                Label("AI Helper", systemImage: "sparkles")
+                            }
 
-            Text("Select a template to start your workout")
-                .font(.system(size: 14, weight: .regular))
-                .foregroundStyle(Color.textSecondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 16)
+                            Button {
+                                showImportPicker = true
+                            } label: {
+                                Label("Import", systemImage: "square.and.arrow.down")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(Color.textSecondary)
+                        }
 
-            if viewModel.isLoading {
-                ProgressView()
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 40)
-            } else if viewModel.templates.isEmpty {
-                emptyState
-            } else {
-                templateList
+                        Button {
+                            navigationPath.append(TemplateFlowRoute.create(sessionId: UUID()))
+                        } label: {
+                            Text("New")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                    }
+                }
             }
-
-            Button {
-                dismiss()
-            } label: {
-                Text("Cancel")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color.textSecondary)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(Color.bg)
-                    .cornerRadius(14)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color.border, lineWidth: 1)
-                    )
+            .navigationDestination(for: TemplateFlowRoute.self) { route in
+                CreateEditTemplateView(
+                    templateService: templateService,
+                    exerciseService: exerciseService,
+                    editingTemplateId: route.editingTemplateId,
+                    onSaved: {
+                        Task { await viewModel.loadTemplates() }
+                    }
+                )
+                .id(route.id)
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
-            .padding(.bottom, 8)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.bgCard.ignoresSafeArea())
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.hidden)
-        .presentationBackground(Color.bgCard)
         .preferredColorScheme(.dark)
         .fileImporter(
             isPresented: $showImportPicker,
@@ -136,7 +130,7 @@ struct TemplateListSheet: View {
         .sheet(isPresented: $showAIHelper) {
             AITemplateHelperSheet(
                 viewModel: viewModel,
-                exerciseService: services.exerciseService,
+                exerciseService: exerciseService,
                 onImported: handleImportedTemplate
             )
         }
@@ -144,7 +138,7 @@ struct TemplateListSheet: View {
             TemplateImportReviewSheet(
                 preview: item.preview,
                 viewModel: viewModel,
-                exerciseService: services.exerciseService,
+                exerciseService: exerciseService,
                 onImported: handleImportedTemplate
             )
         }
@@ -185,81 +179,119 @@ struct TemplateListSheet: View {
         }
     }
 
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "doc.text")
-                .font(.system(size: 40))
-                .foregroundColor(.textTertiary)
+    private var loadingState: some View {
+        VStack(spacing: 18) {
+            listIntro
 
-            Text("No templates yet")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(.textSecondary)
-
-            Text("Create your first template or save one after finishing a workout")
-                .font(.system(size: 13, weight: .regular))
-                .foregroundColor(.textTertiary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 20)
+            ProgressView()
+                .tint(Color.accent)
+                .padding(.top, 24)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+    }
+
+    private var emptyState: some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                listIntro
+
+                VStack(spacing: 12) {
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 40))
+                        .foregroundColor(.textTertiary)
+
+                    Text("No templates yet")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.textSecondary)
+
+                    Text("Create your first template or save one after finishing a workout.")
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundColor(.textTertiary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 20)
+
+                    Button {
+                        navigationPath.append(TemplateFlowRoute.create(sessionId: UUID()))
+                    } label: {
+                        Label("Create Template", systemImage: "plus")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 12)
+                            .background(Color.accent)
+                            .cornerRadius(12)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 6)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 44)
+                .background(Color.bgCard)
+                .cornerRadius(18)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18)
+                        .stroke(Color.border, lineWidth: 1)
+                )
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 20)
+        }
     }
 
     private var templateList: some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(viewModel.templates) { template in
-                    TemplateCardView(
-                        template: template,
-                        isExporting: exportingTemplateId == template.id,
-                        onTap: {
-                            Task {
-                                do {
-                                    _ = try await viewModel.startWorkoutFromTemplate(template.id)
-                                    dismiss()
-                                    onStartWorkout()
-                                } catch {
-                                    print("[TemplateListSheet] Start from template failed: \(error)")
-                                }
+            VStack(alignment: .leading, spacing: 18) {
+                listIntro
+
+                LazyVStack(spacing: 12) {
+                    ForEach(viewModel.templates) { template in
+                        TemplateCardView(
+                            template: template,
+                            isExporting: exportingTemplateId == template.id,
+                            onTap: {
+                                startWorkout(from: template)
+                            },
+                            onExport: {
+                                Task { await exportTemplate(template) }
+                            },
+                            onEdit: {
+                                navigationPath.append(TemplateFlowRoute.edit(templateId: template.id))
+                            },
+                            onDelete: {
+                                viewModel.confirmDelete(template.id)
                             }
-                        },
-                        onExport: {
-                            Task { await exportTemplate(template) }
-                        },
-                        onEdit: {
-                            onEditTemplate(template.id)
-                            dismiss()
-                        },
-                        onDelete: {
-                            viewModel.confirmDelete(template.id)
-                        }
-                    )
+                        )
+                    }
                 }
             }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 20)
+        }
+        .refreshable {
+            await viewModel.loadTemplates()
         }
     }
 
-    @ViewBuilder
-    private func actionPill(
-        title: String,
-        systemImage: String,
-        accent: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 12, weight: .bold))
-                Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-            }
-            .foregroundColor(accent ? .white : .accent)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(accent ? Color.accent.opacity(0.88) : Color.accentSoft)
-            .cornerRadius(10)
+    private var listIntro: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Pick a template and start fast.")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(Color.textPrimary)
+
+            Text("Tap any template to launch your workout. Use the top-right menu for import and AI tools, and each row menu for management actions.")
+                .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(Color.textSecondary)
         }
-        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color.bgCard)
+        .cornerRadius(18)
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.border, lineWidth: 1)
+        )
     }
 
     private func handleImportSelection(_ result: Result<URL, Error>) {
@@ -334,6 +366,20 @@ struct TemplateListSheet: View {
                 title: "Template Imported",
                 message: "\"\(importedName)\" was added to your templates."
             )
+        }
+    }
+
+    private func startWorkout(from template: TemplateSummary) {
+        Task {
+            do {
+                _ = try await viewModel.startWorkoutFromTemplate(template.id)
+                onStartWorkout()
+            } catch {
+                actionAlert = TemplateActionAlert(
+                    title: "Couldn’t Start Workout",
+                    message: error.localizedDescription
+                )
+            }
         }
     }
 }

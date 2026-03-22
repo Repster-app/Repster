@@ -18,7 +18,7 @@ struct WeekDay: Identifiable {
 
 struct MonthlyStats {
     let totalWorkouts: Int
-    let totalVolume: Double
+    let primaryMetric: WorkoutPrimaryMetric?
     let totalSets: Int
 }
 
@@ -30,7 +30,7 @@ struct RecentWorkoutSummary: Identifiable {
     let exerciseCount: Int
     let setCount: Int         // working sets with hasData
     let durationMinutes: Int
-    let totalVolume: Double   // sum(effectiveWeight × reps) for working sets with hasData
+    let primaryMetric: WorkoutPrimaryMetric?
     let muscleGroups: [String]
 }
 
@@ -41,7 +41,7 @@ struct CopyPreviousWorkout: Identifiable {
     let date: Date
     let exerciseCount: Int
     let setCount: Int
-    let totalVolume: Double
+    let primaryMetric: WorkoutPrimaryMetric?
     let muscleGroups: [String]
 }
 
@@ -244,7 +244,7 @@ final class HomeViewModel {
             if summary.totalWorkouts > 0 {
                 monthlyStats = MonthlyStats(
                     totalWorkouts: summary.totalWorkouts,
-                    totalVolume: summary.totalVolume,
+                    primaryMetric: summary.primaryMetric,
                     totalSets: summary.totalSets
                 )
             } else {
@@ -303,17 +303,22 @@ final class HomeViewModel {
             for workout in completed {
                 let sets = try await setService.fetchSets(for: workout.id)
                 let workingSetsWithData = sets.filter { $0.setType == .working && $0.hasData }
-                let totalVolume = workingSetsWithData.compactMap(\.volume).reduce(0, +)
-                let exerciseIds = try await setService.fetchExerciseIds(for: workout.id)
+                let exerciseIds = Set(sets.map(\.exerciseId))
 
+                var exerciseLookup: [UUID: Exercise] = [:]
                 var muscleGroups: [String] = []
                 for exerciseId in exerciseIds {
-                    if let exercise = try await cachedExercise(exerciseId),
-                       let muscle = ExercisePrimaryGroup.normalizedValue(exercise.primaryMuscle),
+                    guard let exercise = try await cachedExercise(exerciseId) else { continue }
+                    exerciseLookup[exerciseId] = exercise
+                    if let muscle = ExercisePrimaryGroup.normalizedValue(exercise.primaryMuscle),
                        !muscleGroups.contains(muscle) {
                         muscleGroups.append(muscle)
                     }
                 }
+                let aggregate = WorkoutAggregateSummary.summarize(
+                    sets: workingSetsWithData,
+                    exercisesById: exerciseLookup
+                )
 
                 summaries.append(RecentWorkoutSummary(
                     id: workout.id,
@@ -323,7 +328,7 @@ final class HomeViewModel {
                     exerciseCount: exerciseIds.count,
                     setCount: workingSetsWithData.count,
                     durationMinutes: (workout.duration ?? 0) / 60,
-                    totalVolume: totalVolume,
+                    primaryMetric: aggregate.primaryMetric,
                     muscleGroups: muscleGroups
                 ))
             }

@@ -42,7 +42,7 @@ struct CalendarWorkoutDetailView: View {
             }
 
             SummaryStatsStrip(
-                totalVolume: detail.totalVolume,
+                primaryMetric: detail.primaryMetric,
                 exerciseCount: detail.exerciseCount,
                 setCount: detail.setCount,
                 duration: detail.workout.duration

@@ -69,6 +69,9 @@ struct WorkoutSummarySheet: View {
     /// Whether suggestion feedback is expanded.
     @State private var isSuggestionFeedbackExpanded = false
 
+    /// Whether the compact effort selector popover is showing.
+    @State private var showEffortOptions = false
+
     // MARK: - Body
 
     var body: some View {
@@ -139,25 +142,28 @@ struct WorkoutSummarySheet: View {
     // MARK: - Header
 
     private var headerBar: some View {
-        HStack(spacing: 12) {
-            Button("Cancel") {
-                dismiss()
-            }
-            .font(.system(size: 16, weight: .medium))
-            .foregroundColor(.textSecondary)
-            .frame(width: 72, alignment: .leading)
-
-            Spacer()
-
+        ZStack {
             Text("Workout complete")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(.textPrimary)
                 .lineLimit(1)
 
-            Spacer()
+            HStack {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.textSecondary)
+                        .frame(width: 32, height: 32)
+                        .background(Color.bgInput)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close")
 
-            Color.clear
-                .frame(width: 72, height: 1)
+                Spacer()
+            }
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
@@ -185,7 +191,15 @@ struct WorkoutSummarySheet: View {
                             prominent: true
                         )
                         compactSummaryMetric(label: "Sets", value: "\(summary.totalSets)")
-                        compactSummaryMetric(label: "Volume", value: formatVolume(summary.totalVolume))
+                        if let primaryMetric = summary.primaryMetric {
+                            compactSummaryMetric(
+                                label: primaryMetric.label,
+                                value: primaryMetric.formattedValue(
+                                    style: .detailed,
+                                    unitPreference: viewModel.unitPreference
+                                )
+                            )
+                        }
                     }
 
                     if summary.prsHit > 0 {
@@ -229,68 +243,59 @@ struct WorkoutSummarySheet: View {
 
     private func summaryTitleSection(summary: WorkoutSummaryData) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isEditingTitle.toggle()
-                }
+            HStack(alignment: .center, spacing: 12) {
+                Text(summaryDateLabel(summary.date))
+                    .font(.caption)
+                    .foregroundColor(.textSecondary)
+                    .lineLimit(1)
 
-                if isEditingTitle {
-                    focusedField = .title
-                } else {
-                    focusedField = nil
-                }
-            } label: {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Text("Workout title")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.textSecondary)
+                Spacer()
 
-                            Spacer(minLength: 8)
-
-                            Text(summaryDateLabel(summary.date))
-                                .font(.caption)
-                                .foregroundColor(.textSecondary)
-                                .lineLimit(1)
-                        }
-
-                        Text(resolvedWorkoutTitle)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.textPrimary)
-                            .multilineTextAlignment(.leading)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isEditingTitle.toggle()
                     }
 
-                    Spacer()
-
+                    if isEditingTitle {
+                        focusedField = .title
+                    } else {
+                        focusedField = nil
+                    }
+                } label: {
                     Label(isEditingTitle ? "Done" : "Edit", systemImage: isEditingTitle ? "checkmark.circle.fill" : "pencil")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(isEditingTitle ? .accent : .textSecondary)
                 }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
 
             if isEditingTitle {
-                VStack(alignment: .leading, spacing: 8) {
-                    TextField("", text: $workoutTitle, prompt: Text(automaticWorkoutTitle))
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.textPrimary)
-                        .textInputAutocapitalization(.words)
-                        .autocorrectionDisabled()
-                        .padding(12)
-                        .background(Color.bgInput)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(Color.border, lineWidth: 1)
-                        }
-                        .focused($focusedField, equals: .title)
-
-                    Text("Leave blank to keep the automatic title.")
-                        .font(.caption)
-                        .foregroundColor(.textTertiary)
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
+                TextField("", text: $workoutTitle, prompt: Text(automaticWorkoutTitle).foregroundColor(.textSecondary))
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.textPrimary)
+                    .textFieldStyle(.plain)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color.bgInput)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.border, lineWidth: 1)
+                    }
+                    .focused($focusedField, equals: .title)
+                    .onSubmit {
+                        isEditingTitle = false
+                        focusedField = nil
+                    }
+            } else {
+                Text(resolvedWorkoutTitle)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.textPrimary)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
@@ -344,31 +349,15 @@ struct WorkoutSummarySheet: View {
 
                 Spacer()
 
-                Menu {
-                    Button("Clear") {
-                        selectedEffort = nil
-                    }
-
-                    Divider()
-
-                    ForEach(1...10, id: \.self) { effort in
-                        Button {
-                            selectedEffort = Double(effort)
-                        } label: {
-                            if selectedEffort == Double(effort) {
-                                Label("\(effort)/10", systemImage: "checkmark")
-                            } else {
-                                Text("\(effort)/10")
-                            }
-                        }
-                    }
+                Button {
+                    showEffortOptions = true
                 } label: {
                     HStack(spacing: 6) {
                         Text(effortValueLabel)
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(selectedEffort == nil ? .textSecondary : .textPrimary)
 
-                        Image(systemName: "chevron.up.chevron.down")
+                        Image(systemName: "chevron.down")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(.textSecondary)
                     }
@@ -377,8 +366,57 @@ struct WorkoutSummarySheet: View {
                     .background(Color.bgInput)
                     .clipShape(Capsule())
                 }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showEffortOptions, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+                    effortPickerPopover
+                        .presentationCompactAdaptation(.popover)
+                }
             }
         }
+    }
+
+    private var effortPickerPopover: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Text("Effort")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.textPrimary)
+
+                Spacer()
+
+                Button("Clear") {
+                    selectedEffort = nil
+                    showEffortOptions = false
+                }
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(.textSecondary)
+                .opacity(selectedEffort == nil ? 0.5 : 1)
+                .disabled(selectedEffort == nil)
+            }
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+                ForEach(1...10, id: \.self) { effort in
+                    let isSelected = selectedEffort == Double(effort)
+
+                    Button {
+                        selectedEffort = Double(effort)
+                        showEffortOptions = false
+                    } label: {
+                        Text("\(effort)/10")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(isSelected ? .white : .textPrimary)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 36)
+                            .background(isSelected ? Color.accent : Color.bgInput)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(14)
+        .frame(width: 280)
+        .background(Color.bgCard)
     }
 
     // MARK: - Exercise Recap
@@ -743,10 +781,6 @@ struct WorkoutSummarySheet: View {
         date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
     }
 
-    private var weightUnitLabel: String {
-        viewModel.unitPreference == .imperial ? "lbs" : "kg"
-    }
-
     private func exercisesForFeedback(summary: WorkoutSummaryData) -> [ExerciseSummary] {
         summary.exerciseSummaries.filter { viewModel.exerciseIdsWithPredictions.contains($0.id) }
     }
@@ -777,10 +811,6 @@ struct WorkoutSummarySheet: View {
         }
     }
 
-    private func displayWeight(_ kg: Double) -> Double {
-        viewModel.unitPreference == .imperial ? UnitConversion.kgToLbs(kg) : kg
-    }
-
     private func formatDuration(_ interval: TimeInterval) -> String {
         let total = Int(interval)
         let hours = total / 3600
@@ -790,22 +820,6 @@ struct WorkoutSummarySheet: View {
             return "\(hours)h \(minutes)m"
         }
         return "\(minutes)m"
-    }
-
-    private func formatVolume(_ volume: Double) -> String {
-        let convertedVolume = displayWeight(volume)
-        if convertedVolume == 0 { return "0 \(weightUnitLabel)" }
-
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.maximumFractionDigits = 0
-        let formatted = formatter.string(from: NSNumber(value: convertedVolume)) ?? "\(Int(convertedVolume))"
-        return "\(formatted) \(weightUnitLabel)"
-    }
-
-    private func formatWeight(_ weight: Double) -> String {
-        let convertedWeight = displayWeight(weight)
-        return "\(UnitConversion.formatWeight(convertedWeight)) \(weightUnitLabel)"
     }
 }
 

@@ -20,7 +20,7 @@ struct WorkoutSummaryData {
     let date: Date
     let duration: TimeInterval
     let totalSets: Int
-    let totalVolume: Double
+    let primaryMetric: WorkoutPrimaryMetric?
     let exerciseSummaries: [ExerciseSummary]
     let prsHit: Int
 }
@@ -1573,22 +1573,19 @@ final class ActiveWorkoutViewModel {
         let duration = currentElapsedTime(referenceDate: referenceDate)
 
         var totalSets = 0
-        var totalVolume: Double = 0
         var prsHit = 0
         var exerciseSummaries: [ExerciseSummary] = []
+        var completedWorkoutSets: [WorkoutSet] = []
+        var exerciseLookup: [UUID: Exercise] = [:]
 
         for exercise in exercises {
             let sets = setsByExercise[exercise.id] ?? []
             let completedSets = sets.filter { $0.completed }
+            exerciseLookup[exercise.id] = exercise
+            completedWorkoutSets.append(contentsOf: completedSets)
 
             let exerciseSetCount = completedSets.count
             totalSets += exerciseSetCount
-
-            // Volume: sum of effectiveWeight * reps for completed sets
-            let exerciseVolume = completedSets.reduce(0.0) { sum, s in
-                sum + (s.volume ?? 0)
-            }
-            totalVolume += exerciseVolume
 
             // Best weight and reps in this exercise
             let bestWeight = completedSets.compactMap(\.effectiveWeight).max()
@@ -1607,12 +1604,16 @@ final class ActiveWorkoutViewModel {
                 hadPR: exercisePRs > 0
             ))
         }
+        let aggregate = WorkoutAggregateSummary.summarize(
+            sets: completedWorkoutSets,
+            exercisesById: exerciseLookup
+        )
 
         return WorkoutSummaryData(
             date: workout.date,
             duration: duration,
             totalSets: totalSets,
-            totalVolume: totalVolume,
+            primaryMetric: aggregate.primaryMetric,
             exerciseSummaries: exerciseSummaries,
             prsHit: prsHit
         )

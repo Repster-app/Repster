@@ -114,7 +114,7 @@ struct HomeView: View {
             if let stats = viewModel.monthlyStats {
                 MonthlyStatsCardView(
                     totalWorkouts: stats.totalWorkouts,
-                    totalVolume: stats.totalVolume,
+                    primaryMetric: stats.primaryMetric,
                     totalSets: stats.totalSets
                 )
             }

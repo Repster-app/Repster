@@ -15,7 +15,7 @@ struct ExerciseGroup {
 struct WorkoutDetail {
     let workout: Workout
     let exerciseGroups: [ExerciseGroup]
-    let totalVolume: Double
+    let primaryMetric: WorkoutPrimaryMetric?
     let exerciseCount: Int
     let setCount: Int
 }
@@ -180,9 +180,11 @@ final class CalendarViewModel {
 
                 // Build exercise groups ordered by position in workout
                 var exerciseGroups: [ExerciseGroup] = []
+                var exerciseLookup: [UUID: Exercise] = [:]
                 for (exerciseId, exerciseSets) in exerciseSetMap {
                     let exercise = try await cachedExercise(exerciseId)
                     guard let exercise else { continue }
+                    exerciseLookup[exerciseId] = exercise
 
                     let sortedSets = exerciseSets.sorted { $0.orderInExercise < $1.orderInExercise }
                     let stats = try? await statsService.fetchStats(for: exerciseId)
@@ -202,13 +204,16 @@ final class CalendarViewModel {
 
                 // Compute summary stats using hasData filter
                 let completedSets = sets.filter(\.hasData)
-                let totalVolume = completedSets.compactMap(\.volume).reduce(0, +)
+                let aggregate = WorkoutAggregateSummary.summarize(
+                    sets: completedSets,
+                    exercisesById: exerciseLookup
+                )
                 let uniqueExercises = Set(sets.map(\.exerciseId)).count
 
                 details[workout.id] = WorkoutDetail(
                     workout: workout,
                     exerciseGroups: exerciseGroups,
-                    totalVolume: totalVolume,
+                    primaryMetric: aggregate.primaryMetric,
                     exerciseCount: uniqueExercises,
                     setCount: completedSets.count
                 )
