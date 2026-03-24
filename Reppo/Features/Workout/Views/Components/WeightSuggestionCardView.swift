@@ -151,7 +151,10 @@ struct WeightSuggestionCardView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(
-                    "base \(formatWeight(diagnostics.baseE1RM)) | effective \(formatWeight(diagnostics.effectiveE1RM)) (\(formatSignedPercent(diagnostics.readinessPercent)))"
+                    "session \(formatWeight(diagnostics.sessionCapabilityE1RM)) | effective \(formatWeight(diagnostics.effectiveE1RM)) (\(formatSignedPercent(diagnostics.readinessPercent)))"
+                )
+                Text(
+                    "history \(formatWeight(diagnostics.historicalBaseE1RM)) | capability source \(diagnostics.sessionCapabilitySourceLabel)"
                 )
                 Text(
                     "fatigue \(String(format: "%.3f", diagnostics.fatigueDiscount)) | projected \(String(format: "%.3f", diagnostics.projectedSessionFatigue)) | freshness \(diagnostics.freshnessApplied ? "on" : "off")"

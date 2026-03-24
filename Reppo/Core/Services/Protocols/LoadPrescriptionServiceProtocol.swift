@@ -165,6 +165,36 @@ struct NeutralSuggestionCalibrationProvider: SuggestionCalibrationProviderProtoc
     }
 }
 
+/// How completed-set performance should update the session capability baseline.
+enum SessionCapabilityPolicy: Sendable, Equatable {
+    case blended(observedWeight: Double, priorWeight: Double)
+
+    static let defaultBlended: SessionCapabilityPolicy = .blended(observedWeight: 0.7, priorWeight: 0.3)
+
+    var label: String {
+        switch self {
+        case .blended:
+            return "session blend"
+        }
+    }
+
+    var cacheSignature: String {
+        switch self {
+        case let .blended(observedWeight, priorWeight):
+            return "blend-\(String(format: "%.3f", observedWeight))-\(String(format: "%.3f", priorWeight))"
+        }
+    }
+
+    func blend(observedCapability: Double, priorCapability: Double) -> Double {
+        switch self {
+        case let .blended(observedWeight, priorWeight):
+            let totalWeight = observedWeight + priorWeight
+            guard totalWeight > 0 else { return observedCapability }
+            return ((observedCapability * observedWeight) + (priorCapability * priorWeight)) / totalWeight
+        }
+    }
+}
+
 /// A pending set that needs a smart suggestion.
 struct SuggestionPendingSetInput: Sendable {
     /// The underlying WorkoutSet identifier for row-level mapping.
@@ -196,6 +226,8 @@ struct SuggestionSettingsSnapshot: Sendable {
     let baseFatigueRate: Double
     /// Per-exercise or global recovery time constant in seconds (default 180 for v2).
     let recoveryConstant: Double
+    /// Policy for incorporating completed-set capability into the current workout baseline.
+    let sessionCapabilityPolicy: SessionCapabilityPolicy
 }
 
 /// Normalized engine input after app-model resolution.
@@ -218,11 +250,14 @@ struct SuggestionDecision: Sendable {
     let rawWeight: Double
     let weightIncrement: Double
     let baseE1RM: Double
+    let historicalBaseE1RM: Double
+    let sessionCapabilityE1RM: Double
     let effectiveE1RM: Double
     let intensityFactor: Double
     let fatigueDiscount: Double
     let freshnessApplied: Bool
     let e1RMSource: E1RMSource
+    let sessionCapabilitySourceLabel: String
     let bestReps: Int?
     let calibrationAdjustment: SuggestionCalibrationAdjustment
     /// Projected cumulative session fatigue at the point this set would be performed.
@@ -344,6 +379,19 @@ enum SuggestionEngine {
     private static let readinessMaxFactor: Double = 1.05
     private static let missingRIRDefault: Double = 1.0
 
+    private struct CompletedSessionState: Sendable {
+        let sessionCapabilityE1RM: Double
+        let runningFatigue: Double
+        let usedSessionCapabilityBlend: Bool
+    }
+
+    private struct ReadinessState: Sendable {
+        let effectiveE1RM: Double
+        let fatigueDiscount: Double
+        let freshnessApplied: Bool
+        let normalizationMultiplier: Double
+    }
+
     // MARK: - Set-type fatigue multipliers
 
     static func setTypeMultiplier(_ type: SetType) -> Double {
@@ -390,12 +438,13 @@ enum SuggestionEngine {
         baseFatigueRate: Double
     ) -> Double {
         var sessionFatigue: Double = 0.0
-        let sortedSets = completedSets.filter(\.completed)
+        let sortedSets = orderedCompletedSets(completedSets)
 
         for (index, set) in sortedSets.enumerated() {
             if index > 0 {
-                // Use actual captured rest duration if available, otherwise configured rest.
-                let restSeconds = Double(set.restDurationSeconds ?? Int(configuredRestSeconds))
+                // Rest is stored on the previous completed set and applies to the transition into this set.
+                let previousSet = sortedSets[index - 1]
+                let restSeconds = Double(previousSet.restDurationSeconds ?? Int(configuredRestSeconds))
                 sessionFatigue *= exp(-restSeconds / recoveryConstant)
             }
 
@@ -417,23 +466,26 @@ enum SuggestionEngine {
         let baseFatigueRate = input.settings.baseFatigueRate
         let recoveryConstant = input.settings.recoveryConstant
         let configuredRestSeconds = input.settings.restTimerSeconds
+        let completedState = processCompletedSessionState(input)
+        let sessionCapabilityE1RM = completedState.sessionCapabilityE1RM
+        let sessionCapabilitySourceLabel = completedState.usedSessionCapabilityBlend
+            ? input.settings.sessionCapabilityPolicy.label
+            : input.baseSource.label
 
         // Accumulate fatigue from completed sets.
         var runningFatigue: Double = 0.0
         if input.settings.fatigueEnabled {
-            runningFatigue = computeSessionFatigue(
-                completedSets: input.completedSessionSets,
-                configuredRestSeconds: configuredRestSeconds,
-                recoveryConstant: recoveryConstant,
-                baseFatigueRate: baseFatigueRate
-            )
+            runningFatigue = completedState.runningFatigue
         }
 
         let firstSuggestedSetIndex = input.pendingSets.map(\.setIndex).min()
+        let completedWorkSetCount = orderedCompletedSets(input.completedSessionSets)
+            .filter { isCapabilityTrackingSetType($0.setType) }
+            .count
         var decisions: [SuggestionDecision] = []
 
         for (pendingIndex, setSpec) in input.pendingSets.enumerated() {
-            let isFirstSet = input.completedSessionSets.isEmpty && setSpec.setIndex == firstSuggestedSetIndex
+            let isFirstSet = completedWorkSetCount == 0 && setSpec.setIndex == firstSuggestedSetIndex
 
             // Forward projection: decay fatigue between pending sets using configured rest.
             if input.settings.fatigueEnabled && pendingIndex > 0 {
@@ -451,22 +503,14 @@ enum SuggestionEngine {
             }
 
             let projectedFatigue = runningFatigue
-
-            let fatigueDiscount = min(
-                1.0,
-                max(0.0, (1.0 - projectedFatigue) + input.calibrationAdjustment.fatigueDiscountOffset)
+            let readinessState = readinessState(
+                capabilityE1RM: sessionCapabilityE1RM,
+                projectedFatigue: projectedFatigue,
+                isFirstSet: isFirstSet,
+                settings: input.settings,
+                calibrationAdjustment: input.calibrationAdjustment
             )
-            var readinessRawE1RM = input.baseE1RM * input.calibrationAdjustment.readinessMultiplier * fatigueDiscount
-
-            var freshnessApplied = false
-            if isFirstSet && input.settings.freshnessEnabled {
-                readinessRawE1RM *= (1.0 + input.settings.freshnessPercent)
-                freshnessApplied = true
-            }
-
-            let minReadiness = input.baseE1RM * Self.readinessMinFactor
-            let maxReadiness = input.baseE1RM * Self.readinessMaxFactor
-            let effectiveE1RM = min(max(readinessRawE1RM, minReadiness), maxReadiness)
+            let effectiveE1RM = readinessState.effectiveE1RM
 
             let bestReps: Int?
             let intensityFactor: Double
@@ -517,12 +561,15 @@ enum SuggestionEngine {
                 prescribedWeight: max(0, prescribedWeight),
                 rawWeight: rawWeight,
                 weightIncrement: input.settings.weightIncrement,
-                baseE1RM: input.baseE1RM,
+                baseE1RM: sessionCapabilityE1RM,
+                historicalBaseE1RM: input.baseE1RM,
+                sessionCapabilityE1RM: sessionCapabilityE1RM,
                 effectiveE1RM: effectiveE1RM,
                 intensityFactor: intensityFactor,
-                fatigueDiscount: fatigueDiscount,
-                freshnessApplied: freshnessApplied,
+                fatigueDiscount: readinessState.fatigueDiscount,
+                freshnessApplied: readinessState.freshnessApplied,
                 e1RMSource: input.baseSource,
+                sessionCapabilitySourceLabel: sessionCapabilitySourceLabel,
                 bestReps: bestReps,
                 calibrationAdjustment: input.calibrationAdjustment,
                 projectedSessionFatigue: projectedFatigue
@@ -530,6 +577,145 @@ enum SuggestionEngine {
         }
 
         return decisions
+    }
+
+    private static func processCompletedSessionState(_ input: SuggestionEngineInput) -> CompletedSessionState {
+        let completedSets = orderedCompletedSets(input.completedSessionSets)
+        let configuredRestSeconds = input.settings.restTimerSeconds
+        let recoveryConstant = input.settings.recoveryConstant
+        let baseFatigueRate = input.settings.baseFatigueRate
+
+        var sessionCapabilityE1RM = input.baseE1RM
+        var runningFatigue: Double = 0.0
+        var usedSessionCapabilityBlend = false
+        var hasSeenCompletedWorkSet = false
+
+        for (index, set) in completedSets.enumerated() {
+            if input.settings.fatigueEnabled, index > 0 {
+                let previousSet = completedSets[index - 1]
+                let restSeconds = Double(previousSet.restDurationSeconds ?? Int(configuredRestSeconds))
+                runningFatigue *= exp(-restSeconds / recoveryConstant)
+            }
+
+            let readiness = readinessState(
+                capabilityE1RM: sessionCapabilityE1RM,
+                projectedFatigue: runningFatigue,
+                isFirstSet: isCapabilityTrackingSetType(set.setType) && !hasSeenCompletedWorkSet,
+                settings: input.settings,
+                calibrationAdjustment: input.calibrationAdjustment
+            )
+
+            if let normalizedObservedCapability = normalizedObservedCapability(
+                for: set,
+                readiness: readiness,
+                formula: input.settings.formula
+            ) {
+                sessionCapabilityE1RM = input.settings.sessionCapabilityPolicy.blend(
+                    observedCapability: normalizedObservedCapability,
+                    priorCapability: sessionCapabilityE1RM
+                )
+                usedSessionCapabilityBlend = true
+            }
+
+            if isCapabilityTrackingSetType(set.setType) {
+                hasSeenCompletedWorkSet = true
+            }
+
+            if input.settings.fatigueEnabled {
+                let setFatigue = computeSetFatigue(
+                    reps: set.reps,
+                    rir: set.rir,
+                    setType: set.setType,
+                    baseFatigueRate: baseFatigueRate
+                )
+                runningFatigue = min(runningFatigue + setFatigue, Self.maxFatigue)
+            }
+        }
+
+        return CompletedSessionState(
+            sessionCapabilityE1RM: sessionCapabilityE1RM,
+            runningFatigue: runningFatigue,
+            usedSessionCapabilityBlend: usedSessionCapabilityBlend
+        )
+    }
+
+    private static func normalizedObservedCapability(
+        for set: SessionSetContext,
+        readiness: ReadinessState,
+        formula: E1RMFormula
+    ) -> Double? {
+        guard set.setType != .warmup,
+              set.setType != .partial,
+              set.weight > 0,
+              set.reps > 0,
+              let actualRIR = set.rir,
+              actualRIR >= 0 else { return nil }
+
+        let totalReps = max(1, set.reps + Int(actualRIR))
+        let observedEffectiveE1RM = formula.calculate(weight: set.weight, reps: totalReps)
+
+        guard readiness.normalizationMultiplier > 0 else {
+            return observedEffectiveE1RM
+        }
+        return observedEffectiveE1RM / readiness.normalizationMultiplier
+    }
+
+    private static func readinessState(
+        capabilityE1RM: Double,
+        projectedFatigue: Double,
+        isFirstSet: Bool,
+        settings: SuggestionSettingsSnapshot,
+        calibrationAdjustment: SuggestionCalibrationAdjustment
+    ) -> ReadinessState {
+        let fatigueDiscount = min(
+            1.0,
+            max(0.0, (1.0 - projectedFatigue) + calibrationAdjustment.fatigueDiscountOffset)
+        )
+        let readinessMultiplier = calibrationAdjustment.readinessMultiplier * fatigueDiscount
+
+        var freshnessApplied = false
+        let freshnessMultiplier: Double
+        if isFirstSet && settings.freshnessEnabled {
+            freshnessMultiplier = 1.0 + settings.freshnessPercent
+            freshnessApplied = true
+        } else {
+            freshnessMultiplier = 1.0
+        }
+        let normalizationMultiplier = readinessMultiplier * freshnessMultiplier
+        let readinessRawE1RM = capabilityE1RM * normalizationMultiplier
+
+        let minReadiness = capabilityE1RM * Self.readinessMinFactor
+        let maxReadiness = capabilityE1RM * Self.readinessMaxFactor
+        let effectiveE1RM = min(max(readinessRawE1RM, minReadiness), maxReadiness)
+
+        return ReadinessState(
+            effectiveE1RM: effectiveE1RM,
+            fatigueDiscount: fatigueDiscount,
+            freshnessApplied: freshnessApplied,
+            normalizationMultiplier: normalizationMultiplier
+        )
+    }
+
+    private static func isCapabilityTrackingSetType(_ type: SetType) -> Bool {
+        type != .warmup && type != .partial
+    }
+
+    private static func orderedCompletedSets(_ completedSets: [SessionSetContext]) -> [SessionSetContext] {
+        completedSets.enumerated()
+            .filter { $0.element.completed }
+            .sorted { lhs, rhs in
+                switch (lhs.element.completedAt, rhs.element.completedAt) {
+                case let (leftDate?, rightDate?) where leftDate != rightDate:
+                    return leftDate < rightDate
+                case (_?, nil):
+                    return true
+                case (nil, _?):
+                    return false
+                default:
+                    return lhs.offset < rhs.offset
+                }
+            }
+            .map(\.element)
     }
 
     private static func roundToIncrement(_ value: Double, increment: Double) -> Double {

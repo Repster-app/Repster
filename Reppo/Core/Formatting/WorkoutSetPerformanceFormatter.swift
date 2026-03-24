@@ -605,6 +605,8 @@ extension TrackingType {
             return [.distance, .time]
         case .weightDistance:
             return [.weight, .distance]
+        case .weightDuration:
+            return [.weight, .time]
         case .weightRepsDuration:
             return [.weight, .reps, .time, .rir]
         }
@@ -614,7 +616,7 @@ extension TrackingType {
         switch self {
         case .durationDistance, .weightDistance:
             return .distance
-        case .duration:
+        case .duration, .weightDuration:
             return .duration
         case .weightReps, .weightRepsDuration, .custom:
             return .volume

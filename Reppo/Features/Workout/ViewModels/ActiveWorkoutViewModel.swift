@@ -59,6 +59,8 @@ enum ActiveWorkoutSessionDefaultsKeys {
     static let workoutClockAccumulatedElapsedSeconds = "activeWorkoutClockAccumulatedElapsedSeconds"
     static let workoutClockLastResumedAt = "activeWorkoutClockLastResumedAt"
     static let workoutClockIsPaused = "activeWorkoutClockIsPaused"
+    static let selectedExerciseWorkoutId = "activeWorkoutSelectedExerciseWorkoutId"
+    static let selectedExerciseId = "activeWorkoutSelectedExerciseId"
     static let restTimerWorkoutId = "activeWorkoutRestTimerWorkoutId"
     static let restTimerStartDate = "restTimerStartDate"
     static let restTimerTotalDuration = "restTimerTotalDuration"
@@ -106,7 +108,13 @@ final class ActiveWorkoutViewModel {
     var exercises: [Exercise] = []
 
     /// Index of the currently selected exercise tab.
-    var selectedExerciseIndex: Int = 0
+    var selectedExerciseIndex: Int = 0 {
+        didSet {
+            guard selectedExerciseIndex != oldValue else { return }
+            persistSelectedExerciseState()
+            updateLiveActivityState()
+        }
+    }
 
     /// Global default rest time from HealthProfile (fallback when exercise has none).
     private var globalDefaultRestTime: Int?
@@ -271,6 +279,7 @@ final class ActiveWorkoutViewModel {
             // 1. Check for existing active workout
             guard let active = try await workoutService.getActiveWorkout() else {
                 clearPersistedWorkoutClockState()
+                clearPersistedSelectedExerciseState()
                 clearPersistedRestTimerState()
                 timerSubscription?.cancel()
                 timerSubscription = nil
@@ -278,6 +287,7 @@ final class ActiveWorkoutViewModel {
                 workoutTimerSubscription = nil
                 workout = nil
                 exercises = []
+                selectedExerciseIndex = 0
                 setsByExercise = [:]
                 restTimer = .idle
                 isWorkoutPaused = false
@@ -310,10 +320,11 @@ final class ActiveWorkoutViewModel {
                 return lhsOrder < rhsOrder
             }
             self.exercises = loadedExercises
+            restoreSelectedExerciseState(for: active)
 
             // 6. Start Live Activity for Lock Screen / Dynamic Island
             if let startTime = active.startTime {
-                let firstExercise = loadedExercises.first
+                let firstExercise = currentExercise ?? loadedExercises.first
                 let firstSets = firstExercise.flatMap { setsByExercise[$0.id] } ?? []
                 let completedCount = firstSets.filter(\.completed).count
                 liveActivityManager.startActivity(
@@ -853,6 +864,62 @@ final class ActiveWorkoutViewModel {
         defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockIsPaused)
     }
 
+    private func restoreSelectedExerciseState(for workout: Workout) {
+        guard !exercises.isEmpty else {
+            selectedExerciseIndex = 0
+            clearPersistedSelectedExerciseState()
+            return
+        }
+
+        let defaults = UserDefaults.standard
+        let workoutId = workout.id.uuidString
+        let persistedWorkoutId = defaults.string(forKey: ActiveWorkoutSessionDefaultsKeys.selectedExerciseWorkoutId)
+
+        if persistedWorkoutId == workoutId,
+           let persistedExerciseId = defaults.string(forKey: ActiveWorkoutSessionDefaultsKeys.selectedExerciseId),
+           let selectedExerciseId = UUID(uuidString: persistedExerciseId),
+           let restoredIndex = exercises.firstIndex(where: { $0.id == selectedExerciseId }) {
+            selectedExerciseIndex = restoredIndex
+            persistSelectedExerciseState()
+            return
+        }
+
+        selectedExerciseIndex = inferredCurrentExerciseIndex()
+        persistSelectedExerciseState()
+    }
+
+    private func inferredCurrentExerciseIndex() -> Int {
+        guard !exercises.isEmpty else { return 0 }
+
+        if let firstPendingIndex = exercises.firstIndex(where: exerciseHasPendingWork(_:)) {
+            return firstPendingIndex
+        }
+
+        return exercises.count - 1
+    }
+
+    private func exerciseHasPendingWork(_ exercise: Exercise) -> Bool {
+        let sets = setsByExercise[exercise.id] ?? []
+        return sets.isEmpty || sets.contains(where: { !$0.completed })
+    }
+
+    private func persistSelectedExerciseState() {
+        let defaults = UserDefaults.standard
+        guard let workout, let currentExercise else {
+            clearPersistedSelectedExerciseState()
+            return
+        }
+
+        defaults.set(workout.id.uuidString, forKey: ActiveWorkoutSessionDefaultsKeys.selectedExerciseWorkoutId)
+        defaults.set(currentExercise.id.uuidString, forKey: ActiveWorkoutSessionDefaultsKeys.selectedExerciseId)
+    }
+
+    private func clearPersistedSelectedExerciseState() {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.selectedExerciseWorkoutId)
+        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.selectedExerciseId)
+    }
+
     // MARK: - Rest Timer (T027, T028)
 
     /// Start or restart the rest timer with a given duration in seconds.
@@ -1215,6 +1282,7 @@ final class ActiveWorkoutViewModel {
     private func fireTimerAlert() {
         let mode = restTimerAlertMode
         if mode == "vibration" || mode == "both" {
+            AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
         if mode == "sound" || mode == "both" {
@@ -1238,7 +1306,7 @@ final class ActiveWorkoutViewModel {
         let content = UNMutableNotificationContent()
         content.title = "Rest Timer"
         content.body = "Rest period is over — time for your next set!"
-        content.sound = (restTimerAlertMode == "vibration") ? nil : .default
+        content.sound = Self.restTimerBackgroundNotificationUsesSystemSound(for: restTimerAlertMode) ? .default : nil
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, TimeInterval(seconds)), repeats: false)
         let request = UNNotificationRequest(identifier: Self.restTimerNotificationId, content: content, trigger: trigger)
@@ -1248,6 +1316,19 @@ final class ActiveWorkoutViewModel {
     /// Cancel any pending rest timer notification (e.g. timer dismissed or completed in foreground).
     private func cancelRestTimerNotification() {
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [Self.restTimerNotificationId])
+    }
+
+    static func restTimerBackgroundNotificationUsesSystemSound(for alertMode: String) -> Bool {
+        switch alertMode {
+        case "off":
+            return false
+        case "vibration", "sound", "both":
+            // Local notifications do not produce a background vibration if no
+            // sound is attached, so "vibration" still needs the system alert.
+            return true
+        default:
+            return true
+        }
     }
 
     // MARK: - Live Activity Updates
@@ -1645,10 +1726,12 @@ final class ActiveWorkoutViewModel {
 
             stopWorkoutClockTicker()
             clearPersistedWorkoutClockState()
+            clearPersistedSelectedExerciseState()
 
             // Clear local state
             self.workout = nil
             self.exercises = []
+            self.selectedExerciseIndex = 0
             self.setsByExercise = [:]
             self.isWorkoutPaused = false
             self.accumulatedElapsedSeconds = 0
@@ -1680,10 +1763,12 @@ final class ActiveWorkoutViewModel {
 
             stopWorkoutClockTicker()
             clearPersistedWorkoutClockState()
+            clearPersistedSelectedExerciseState()
 
             // Clear local state
             self.workout = nil
             self.exercises = []
+            self.selectedExerciseIndex = 0
             self.setsByExercise = [:]
             self.isWorkoutPaused = false
             self.accumulatedElapsedSeconds = 0

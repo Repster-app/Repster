@@ -202,6 +202,12 @@ struct SetTableView: View {
             Text("DIST")
                 .frame(maxWidth: .infinity)
 
+        case .weightDuration:
+            Text("WEIGHT")
+                .frame(maxWidth: .infinity)
+            Text("TIME")
+                .frame(maxWidth: .infinity)
+
         case .weightRepsDuration:
             if isUnilateralLogging(for: exercise) {
                 unilateralWeightRepsDurationHeader

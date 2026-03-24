@@ -8,6 +8,7 @@ import SwiftUI
 struct RestTimePickerSheet: View {
     let currentSeconds: Int?
     var title: String = "Default Rest Time"
+    var noneOptionLabel: String? = nil
     let onSelect: (Int?) -> Void
     @Environment(\.dismiss) private var dismiss
 
@@ -16,20 +17,21 @@ struct RestTimePickerSheet: View {
     var body: some View {
         NavigationStack {
             List {
+                if let noneOptionLabel {
+                    Button {
+                        onSelect(nil)
+                        dismiss()
+                    } label: {
+                        optionRow(title: noneOptionLabel, isSelected: currentSeconds == nil)
+                    }
+                }
+
                 ForEach(options, id: \.self) { seconds in
                     Button {
                         onSelect(seconds)
                         dismiss()
                     } label: {
-                        HStack {
-                            Text(displayName(for: seconds))
-                                .foregroundStyle(Color.textPrimary)
-                            Spacer()
-                            if seconds == (currentSeconds ?? 150) {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(Color.accent)
-                            }
-                        }
+                        optionRow(title: displayName(for: seconds), isSelected: seconds == currentSeconds)
                     }
                 }
             }
@@ -48,5 +50,18 @@ struct RestTimePickerSheet: View {
 
     private func displayName(for seconds: Int) -> String {
         return UnitConversion.formatDuration(seconds)
+    }
+
+    private func optionRow(title: String, isSelected: Bool) -> some View {
+        HStack {
+            Text(title)
+                .foregroundStyle(Color.textPrimary)
+            Spacer()
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .foregroundStyle(Color.accent)
+            }
+        }
+        .contentShape(Rectangle())
     }
 }

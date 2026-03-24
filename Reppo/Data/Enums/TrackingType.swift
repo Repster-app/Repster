@@ -5,6 +5,7 @@ enum TrackingType: String, Codable, CaseIterable {
     case duration
     case durationDistance
     case weightDistance
+    case weightDuration
     case weightRepsDuration
     case custom
 
@@ -14,6 +15,7 @@ enum TrackingType: String, Codable, CaseIterable {
         case .duration:           return "Duration"
         case .durationDistance:   return "Distance & Duration"
         case .weightDistance:     return "Weight & Distance"
+        case .weightDuration:    return "Weight & Duration"
         case .weightRepsDuration: return "Weight, Reps & Duration"
         case .custom:             return "Custom"
         }

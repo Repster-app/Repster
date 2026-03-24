@@ -98,7 +98,8 @@
       "Bash(git init)",
       "Bash(/Users/nikolettkiraly/Downloads/NewWorkoutProject/.gitignore:*)",
       "Bash(find /Users/nikolettkiraly/Downloads/NewWorkoutProject -type f -name \"*.swift\" -exec grep -l \"menu\\\\|MenuBar\\\\|topBar\\\\|navBar\" {})",
-      "Bash(find /Users/nikolettkiraly/Downloads/NewWorkoutProject/Reppo/Core/Services/Protocols -name *.swift)"
+      "Bash(find /Users/nikolettkiraly/Downloads/NewWorkoutProject/Reppo/Core/Services/Protocols -name *.swift)",
+      "Bash(xcrun simctl:*)"
     ]
   }
 }

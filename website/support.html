@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Support — Reppo</title>
+  <meta name="description" content="Get help with Reppo. Find answers to common questions or contact support.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="container">
+      <a href="index.html" class="nav-logo">Reppo</a>
+      <button class="nav-toggle" aria-label="Toggle navigation">&#9776;</button>
+      <ul class="nav-links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="docs.html">Docs</a></li>
+        <li><a href="support.html" class="active">Support</a></li>
+        <li><a href="privacy.html">Privacy</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="container">
+      <h1>Support</h1>
+      <p>Find answers to common questions or get in touch.</p>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="content">
+
+    <h2>Frequently Asked Questions</h2>
+
+    <div class="faq-item">
+      <button class="faq-question">How do Smart Suggestions work?</button>
+      <div class="faq-answer">
+        <p>Smart Suggestions estimate the right weight for each set based on your recent performance and current fatigue level. The system looks at your best recent e1RM, accounts for fatigue accumulated during the session, and factors in rest between sets. Over time, it learns your personal fatigue patterns and becomes more accurate. You can configure target reps, target RIR, and other settings in Settings &gt; Prescription Settings.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question">What does the fatigue feedback after a workout do?</button>
+      <div class="faq-answer">
+        <p>After finishing a workout, you can rate each exercise's suggestions as "less aggressive," "about right," or "more aggressive." This feedback helps the adaptive fatigue learning system adjust its model for that specific exercise, making future suggestions more aligned with how your body responds.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question">How are personal records detected?</button>
+      <div class="faq-answer">
+        <p>Reppo automatically evaluates every completed set against your full history for that exercise. If a set represents a new best weight at a given rep count (or higher), it's flagged as a PR. The system uses a frontier algorithm — meaning a 5-rep PR at 100kg is only "current" if you don't also have a 6-rep PR at 100kg or higher.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question">Can I import my data from another app?</button>
+      <div class="faq-answer">
+        <p>Yes. Reppo supports CSV import in the FitNotes format. Go to Settings &gt; Import Data to select your CSV file. The import process previews your data before committing, creates any new exercises automatically, and rebuilds all stats and PRs after completion.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question">How do I back up my data?</button>
+      <div class="faq-answer">
+        <p>Go to Settings &gt; Export Backup to create a full backup file containing all your workouts, exercises, sets, templates, and fatigue learning data. Save it to your preferred location. To restore, use Settings &gt; Restore Backup and select a previously exported file.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question">What is the free tier and how does the subscription work?</button>
+      <div class="faq-answer">
+        <p>Reppo allows you to log up to 5 workouts for free. After that, a subscription is required for full access. The subscription unlocks unlimited workout logging and all features. Subscriptions are managed through the App Store.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question">Is my data stored in the cloud?</button>
+      <div class="faq-answer">
+        <p>No. All your data is stored locally on your device. Reppo does not have user accounts, servers, or cloud sync. The only external connection is to RevenueCat for subscription verification. See our <a href="privacy.html">Privacy Policy</a> for full details.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question">How does the AI template generator work?</button>
+      <div class="faq-answer">
+        <p>The AI template generator creates a prompt based on your exercise library that you can copy and paste into ChatGPT. ChatGPT returns a JSON response, which you paste back into Reppo to preview and import as a template. Reppo does not connect to any AI service directly — you handle the conversation with ChatGPT yourself.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question">What tracking types are supported?</button>
+      <div class="faq-answer">
+        <p>Reppo supports multiple tracking types to cover different exercise styles: weight + reps, duration only, duration + distance, weight + distance, weight + reps + duration, and custom. You set the tracking type when creating an exercise, and it determines which fields appear in the set entry UI.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question">Can I track unilateral exercises (single-arm/leg)?</button>
+      <div class="faq-answer">
+        <p>Yes. When creating or editing an exercise, you can mark it as unilateral. This enables separate left/right rep and RIR tracking for each set, along with a bilateral load factor for weight calculations.</p>
+      </div>
+    </div>
+
+    <!-- Contact -->
+    <div class="contact-card">
+      <h3>Still need help?</h3>
+      <p>If you can't find the answer you're looking for, reach out and we'll get back to you.</p>
+      <a href="mailto:support@reppo.app" class="contact-link">Email Support</a>
+    </div>
+
+    <div style="margin-top: 32px; text-align: center;">
+      <p>For detailed feature documentation, visit the <a href="docs.html">Docs</a> page.</p>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <ul class="footer-links">
+        <li><a href="docs.html">Docs</a></li>
+        <li><a href="support.html">Support</a></li>
+        <li><a href="privacy.html">Privacy Policy</a></li>
+      </ul>
+      <span class="footer-copy">&copy; 2026 Reppo. All rights reserved.</span>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

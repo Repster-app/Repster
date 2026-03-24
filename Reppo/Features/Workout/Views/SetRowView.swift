@@ -437,6 +437,29 @@ struct SetRowView: View {
             )
             .frame(maxWidth: .infinity)
 
+        case .weightDuration:
+            SetInputField(
+                value: $weightText,
+                placeholder: "0",
+                keyboardType: .decimalPad,
+                isCompleted: set.completed,
+                isActiveOverride: focusedInput == .weight,
+                isCustomEntry: true,
+                onCustomTap: { activateCustomKeyboard(for: .weight) }
+            )
+            .frame(maxWidth: .infinity)
+
+            SetInputField(
+                value: $durationText,
+                placeholder: "MM:SS",
+                keyboardType: .numberPad,
+                isCompleted: set.completed,
+                isActiveOverride: focusedInput == .duration,
+                isCustomEntry: true,
+                onCustomTap: { activateCustomKeyboard(for: .duration) }
+            )
+            .frame(maxWidth: .infinity)
+
         case .weightRepsDuration:
             if isUnilateralLogging {
                 unilateralWeightAndRepsDurationFields
@@ -570,6 +593,8 @@ struct SetRowView: View {
             return [.distance, .duration]
         case .weightDistance:
             return [.weight, .distance]
+        case .weightDuration:
+            return [.weight, .duration]
         case .weightRepsDuration:
             if isUnilateralLogging {
                 return [.weight, .leftReps, .rightReps, .duration]

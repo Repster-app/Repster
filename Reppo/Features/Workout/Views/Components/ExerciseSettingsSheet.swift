@@ -26,12 +26,12 @@ struct ExerciseSettingsSheet: View {
     @State private var appDefaultRestTime: Int?
     @State private var appDefaultIncrement: Double?
     @State private var isSaving: Bool = false
+    @State private var showRestTimeSheet: Bool = false
     @State private var showFullSettings: Bool = false
 
     // MARK: - Available Increments
 
     private static let weightIncrements: [Double] = [0.5, 1.0, 1.25, 2.0, 2.5, 5.0, 10.0]
-    private static let restTimeOptions: [Int] = [30, 45, 60, 90, 120, 150, 180, 210, 240, 300]
 
     // MARK: - Init
 
@@ -48,14 +48,14 @@ struct ExerciseSettingsSheet: View {
         NavigationStack {
             Form {
                 Section("Rest Time") {
-                    Picker("Default Rest Time", selection: $restTimeSeconds) {
-                        Text("App Default (\(formatRestTime(appDefaultRestTime)))")
-                            .tag(Optional<Int>.none)
-                        ForEach(Self.restTimeOptions, id: \.self) { seconds in
-                            Text(formatRestTime(seconds)).tag(Optional(seconds))
-                        }
+                    Button {
+                        showRestTimeSheet = true
+                    } label: {
+                        ExerciseQuickSettingRow(
+                            title: "Default Rest Time",
+                            summary: restTimeSummary
+                        )
                     }
-                    .foregroundColor(.textPrimary)
                 }
 
                 Section("Weight Increment") {
@@ -103,6 +103,15 @@ struct ExerciseSettingsSheet: View {
             }
         }
         .presentationDetents([.medium])
+        .sheet(isPresented: $showRestTimeSheet) {
+            RestTimePickerSheet(
+                currentSeconds: restTimeSeconds,
+                title: "Default Rest Time",
+                noneOptionLabel: "App Default (\(formatRestTime(appDefaultRestTime)))"
+            ) { seconds in
+                restTimeSeconds = seconds
+            }
+        }
         .sheet(isPresented: $showFullSettings) {
             CreateEditExerciseSheet(
                 exercise: exercise,
@@ -137,6 +146,13 @@ struct ExerciseSettingsSheet: View {
         appDefaultIncrement = profile.prescriptionDefaultIncrement
     }
 
+    private var restTimeSummary: String {
+        if let restTimeSeconds {
+            return formatRestTime(restTimeSeconds)
+        }
+        return "App Default (\(formatRestTime(appDefaultRestTime)))"
+    }
+
     // MARK: - Formatters
 
     private func formatRestTime(_ seconds: Int?) -> String {
@@ -159,5 +175,31 @@ struct ExerciseSettingsSheet: View {
         formatter.maximumFractionDigits = 2
         let formatted = formatter.string(from: NSNumber(value: value)) ?? String(format: "%.2f", value)
         return "\(formatted) kg"
+    }
+}
+
+private struct ExerciseQuickSettingRow: View {
+    let title: String
+    let summary: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(title)
+                .foregroundStyle(Color.textPrimary)
+
+            Spacer(minLength: 12)
+
+            Text(summary)
+                .font(.subheadline)
+                .foregroundStyle(Color.textSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(Color.textTertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
     }
 }

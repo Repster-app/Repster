@@ -59,6 +59,18 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         XCTAssertNil(mode)
     }
 
+    func testBackgroundRestTimerNotificationUsesSystemSoundForVibrationMode() {
+        XCTAssertTrue(
+            ActiveWorkoutViewModel.restTimerBackgroundNotificationUsesSystemSound(for: "vibration")
+        )
+    }
+
+    func testBackgroundRestTimerNotificationDisablesSystemSoundWhenAlertsAreOff() {
+        XCTAssertFalse(
+            ActiveWorkoutViewModel.restTimerBackgroundNotificationUsesSystemSound(for: "off")
+        )
+    }
+
     func testFinishWorkoutForwardsSummaryMetadataAndMarksWorkoutFinished() async throws {
         let workoutService = WorkoutServiceStub()
         let profile = HealthProfile()
@@ -192,6 +204,147 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         XCTAssertEqual(
             UserDefaults.standard.string(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockWorkoutId),
             workout.id.uuidString
+        )
+    }
+
+    func testLoadActiveWorkoutRestoresPersistedSelectedExerciseForMatchingWorkout() async throws {
+        clearActiveWorkoutSessionDefaults()
+        defer { clearActiveWorkoutSessionDefaults() }
+
+        let workout = Workout(
+            id: UUID(),
+            date: Date(),
+            startTime: Date().addingTimeInterval(-900),
+            status: .inProgress
+        )
+        let firstExercise = makeExercise(name: "Bench Press")
+        let secondExercise = makeExercise(name: "Incline Dumbbell Press")
+        let firstSet = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: firstExercise.id,
+            reps: 8,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+        let secondSet = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: secondExercise.id,
+            reps: 10,
+            orderInWorkout: 2,
+            orderInExercise: 1,
+            completed: false
+        )
+
+        let workoutService = WorkoutServiceStub()
+        workoutService.activeWorkout = workout
+        let setService = SetServiceStub()
+        setService.workoutSets[workout.id] = [firstSet, secondSet]
+        let exerciseService = ExerciseServiceStub()
+        exerciseService.fetchedExercises[firstExercise.id] = firstExercise
+        exerciseService.fetchedExercises[secondExercise.id] = secondExercise
+        let profile = HealthProfile()
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: workoutService,
+            setService: setService,
+            exerciseService: exerciseService,
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+
+        UserDefaults.standard.set(
+            workout.id.uuidString,
+            forKey: ActiveWorkoutSessionDefaultsKeys.selectedExerciseWorkoutId
+        )
+        UserDefaults.standard.set(
+            secondExercise.id.uuidString,
+            forKey: ActiveWorkoutSessionDefaultsKeys.selectedExerciseId
+        )
+
+        await viewModel.loadActiveWorkout()
+
+        XCTAssertEqual(viewModel.selectedExerciseIndex, 1)
+        XCTAssertEqual(viewModel.currentExercise?.id, secondExercise.id)
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: ActiveWorkoutSessionDefaultsKeys.selectedExerciseId),
+            secondExercise.id.uuidString
+        )
+    }
+
+    func testLoadActiveWorkoutFallsBackToFirstExerciseWithIncompleteWork() async throws {
+        clearActiveWorkoutSessionDefaults()
+        defer { clearActiveWorkoutSessionDefaults() }
+
+        let workout = Workout(
+            id: UUID(),
+            date: Date(),
+            startTime: Date().addingTimeInterval(-900),
+            status: .inProgress
+        )
+        let firstExercise = makeExercise(name: "Back Squat")
+        let secondExercise = makeExercise(name: "Romanian Deadlift")
+        let thirdExercise = makeExercise(name: "Leg Press")
+        let completedSet = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: firstExercise.id,
+            reps: 5,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+        let currentSet = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: secondExercise.id,
+            reps: 8,
+            orderInWorkout: 2,
+            orderInExercise: 1,
+            completed: false
+        )
+        let laterSet = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: thirdExercise.id,
+            reps: 12,
+            orderInWorkout: 3,
+            orderInExercise: 1,
+            completed: false
+        )
+
+        let workoutService = WorkoutServiceStub()
+        workoutService.activeWorkout = workout
+        let setService = SetServiceStub()
+        setService.workoutSets[workout.id] = [completedSet, currentSet, laterSet]
+        let exerciseService = ExerciseServiceStub()
+        exerciseService.fetchedExercises[firstExercise.id] = firstExercise
+        exerciseService.fetchedExercises[secondExercise.id] = secondExercise
+        exerciseService.fetchedExercises[thirdExercise.id] = thirdExercise
+        let profile = HealthProfile()
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: workoutService,
+            setService: setService,
+            exerciseService: exerciseService,
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+
+        await viewModel.loadActiveWorkout()
+
+        XCTAssertEqual(viewModel.selectedExerciseIndex, 1)
+        XCTAssertEqual(viewModel.currentExercise?.id, secondExercise.id)
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: ActiveWorkoutSessionDefaultsKeys.selectedExerciseWorkoutId),
+            workout.id.uuidString
+        )
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: ActiveWorkoutSessionDefaultsKeys.selectedExerciseId),
+            secondExercise.id.uuidString
         )
     }
 
@@ -1286,7 +1439,8 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
                 freshnessEnabled: false,
                 freshnessPercent: 0.03,
                 baseFatigueRate: 0.04,
-                recoveryConstant: 180.0
+                recoveryConstant: 180.0,
+                sessionCapabilityPolicy: .defaultBlended
             ),
             calibrationAdjustment: .neutral
         )
@@ -1307,11 +1461,14 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
             rawWeight: 79.4,
             weightIncrement: 2.5,
             baseE1RM: 100,
+            historicalBaseE1RM: 100,
+            sessionCapabilityE1RM: 100,
             effectiveE1RM: 100,
             intensityFactor: 0.8,
             fatigueDiscount: 1.0,
             freshnessApplied: false,
             e1RMSource: .recentPerformance,
+            sessionCapabilitySourceLabel: SessionCapabilityPolicy.defaultBlended.label,
             bestReps: nil,
             calibrationAdjustment: .neutral,
             projectedSessionFatigue: 0.0
@@ -2632,7 +2789,8 @@ private final class LoadPrescriptionServiceSpy: @unchecked Sendable, LoadPrescri
                 freshnessEnabled: false,
                 freshnessPercent: 0.03,
                 baseFatigueRate: 0.04,
-                recoveryConstant: 180.0
+                recoveryConstant: 180.0,
+                sessionCapabilityPolicy: .defaultBlended
             ),
             calibrationAdjustment: .neutral
         )
@@ -2745,6 +2903,8 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
     var editedSetIds: [UUID] = []
     var uncompletedSetIds: [UUID] = []
     var deletedSetIds: [UUID] = []
+    var workoutSets: [UUID: [WorkoutSet]] = [:]
+    var exerciseSets: [UUID: [WorkoutSet]] = [:]
 
     func save(_ set: WorkoutSet) async throws -> SetSaveResult {
         SetSaveResult(
@@ -2771,19 +2931,21 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
     }
 
     func fetchSets(for workoutId: UUID) async throws -> [WorkoutSet] {
-        let _ = workoutId
-        return []
+        workoutSets[workoutId] ?? []
     }
 
     func fetchExerciseIds(for workoutId: UUID) async throws -> Set<UUID> {
-        let _ = workoutId
-        return []
+        Set((workoutSets[workoutId] ?? []).map(\.exerciseId))
     }
 
     func fetchSets(for exerciseId: UUID, limit: Int?) async throws -> [WorkoutSet] {
-        let _ = exerciseId
-        let _ = limit
-        return []
+        let sets = exerciseSets[exerciseId] ?? workoutSets.values.flatMap { workoutSets in
+            workoutSets.filter { $0.exerciseId == exerciseId }
+        }
+        if let limit {
+            return Array(sets.prefix(limit))
+        }
+        return sets
     }
 }
 
@@ -3173,6 +3335,237 @@ final class FatigueModelV2Tests: XCTestCase {
         XCTAssertEqual(fatigueNilRIR, fatigueRIR1, accuracy: 0.0001)
     }
 
+    // MARK: - Session capability blend
+
+    func testSessionCapabilityBlendRaisesRecommendationAfterEasyTopSet() {
+        let pendingSet = SuggestionPendingSetInput(
+            setId: UUID(),
+            setIndex: 1,
+            setNumber: 2,
+            target: SuggestionTarget(
+                reps: 7,
+                rir: 0,
+                repRange: 6...8,
+                repsSource: .template,
+                rirSource: .template
+            ),
+            setType: .working
+        )
+        let input = SuggestionEngineInput(
+            baseE1RM: 50.67,
+            baseSource: .recentPerformance,
+            completedSessionSets: [
+                SessionSetContext(
+                    weight: 40,
+                    reps: 8,
+                    rir: 4.0,
+                    completedAt: Date(),
+                    completed: true,
+                    setType: .working,
+                    restDurationSeconds: nil
+                )
+            ],
+            pendingSets: [pendingSet],
+            settings: SuggestionSettingsSnapshot(
+                formula: .epley,
+                restTimerSeconds: 150,
+                weightIncrement: 2.5,
+                fatigueEnabled: true,
+                freshnessEnabled: false,
+                freshnessPercent: 0.03,
+                baseFatigueRate: 0.04,
+                recoveryConstant: 180.0,
+                sessionCapabilityPolicy: .defaultBlended
+            ),
+            calibrationAdjustment: .neutral
+        )
+
+        let decision = try! XCTUnwrap(SuggestionEngine.evaluate(input).first)
+        XCTAssertEqual(decision.sessionCapabilityE1RM, 54.401, accuracy: 0.001)
+        XCTAssertEqual(decision.prescribedWeight, 42.5, accuracy: 0.001)
+        XCTAssertEqual(decision.bestReps, 7)
+    }
+
+    func testSessionCapabilityBlendLowersRecommendationAfterMissedTopSet() {
+        let pendingSet = SuggestionPendingSetInput(
+            setId: UUID(),
+            setIndex: 1,
+            setNumber: 2,
+            target: SuggestionTarget(
+                reps: 7,
+                rir: 0,
+                repRange: 6...8,
+                repsSource: .template,
+                rirSource: .template
+            ),
+            setType: .working
+        )
+        let input = SuggestionEngineInput(
+            baseE1RM: 86.67,
+            baseSource: .recentPerformance,
+            completedSessionSets: [
+                SessionSetContext(
+                    weight: 65,
+                    reps: 8,
+                    rir: 0.0,
+                    completedAt: Date(),
+                    completed: true,
+                    setType: .working,
+                    restDurationSeconds: nil
+                )
+            ],
+            pendingSets: [pendingSet],
+            settings: SuggestionSettingsSnapshot(
+                formula: .epley,
+                restTimerSeconds: 120,
+                weightIncrement: 5,
+                fatigueEnabled: true,
+                freshnessEnabled: false,
+                freshnessPercent: 0.03,
+                baseFatigueRate: 0.04,
+                recoveryConstant: 180.0,
+                sessionCapabilityPolicy: .defaultBlended
+            ),
+            calibrationAdjustment: .neutral
+        )
+
+        let decision = try! XCTUnwrap(SuggestionEngine.evaluate(input).first)
+        XCTAssertEqual(decision.sessionCapabilityE1RM, 83.634, accuracy: 0.001)
+        XCTAssertEqual(decision.prescribedWeight, 65, accuracy: 0.001)
+        XCTAssertEqual(decision.bestReps, 6)
+    }
+
+    func testSessionCapabilityBlendMovesUpAndDownSymmetrically() {
+        let pendingSet = SuggestionPendingSetInput(
+            setId: UUID(),
+            setIndex: 1,
+            setNumber: 2,
+            target: SuggestionTarget(
+                reps: 8,
+                rir: 0,
+                repRange: nil,
+                repsSource: .template,
+                rirSource: .template
+            ),
+            setType: .working
+        )
+
+        let stronger = SuggestionEngineInput(
+            baseE1RM: 100,
+            baseSource: .recentPerformance,
+            completedSessionSets: [
+                SessionSetContext(
+                    weight: 78.75,
+                    reps: 10,
+                    rir: 0.0,
+                    completedAt: Date(),
+                    completed: true,
+                    setType: .working,
+                    restDurationSeconds: nil
+                )
+            ],
+            pendingSets: [pendingSet],
+            settings: SuggestionSettingsSnapshot(
+                formula: .epley,
+                restTimerSeconds: 120,
+                weightIncrement: 2.5,
+                fatigueEnabled: false,
+                freshnessEnabled: false,
+                freshnessPercent: 0.03,
+                baseFatigueRate: 0.04,
+                recoveryConstant: 180.0,
+                sessionCapabilityPolicy: .defaultBlended
+            ),
+            calibrationAdjustment: .neutral
+        )
+        let weaker = SuggestionEngineInput(
+            baseE1RM: 100,
+            baseSource: .recentPerformance,
+            completedSessionSets: [
+                SessionSetContext(
+                    weight: 71.25,
+                    reps: 10,
+                    rir: 0.0,
+                    completedAt: Date(),
+                    completed: true,
+                    setType: .working,
+                    restDurationSeconds: nil
+                )
+            ],
+            pendingSets: [pendingSet],
+            settings: stronger.settings,
+            calibrationAdjustment: .neutral
+        )
+
+        let strongerDecision = try! XCTUnwrap(SuggestionEngine.evaluate(stronger).first)
+        let weakerDecision = try! XCTUnwrap(SuggestionEngine.evaluate(weaker).first)
+
+        XCTAssertEqual(strongerDecision.sessionCapabilityE1RM, 103.5, accuracy: 0.001)
+        XCTAssertEqual(weakerDecision.sessionCapabilityE1RM, 96.5, accuracy: 0.001)
+        XCTAssertEqual(
+            strongerDecision.sessionCapabilityE1RM - 100,
+            100 - weakerDecision.sessionCapabilityE1RM,
+            accuracy: 0.001
+        )
+    }
+
+    func testObservedPerformanceIsDefatiguedBeforeBlending() {
+        let completedSets = [
+            SessionSetContext(
+                weight: 78.9474,
+                reps: 8,
+                rir: 0.0,
+                completedAt: Date(),
+                completed: true,
+                setType: .working,
+                restDurationSeconds: 180
+            ),
+            SessionSetContext(
+                weight: 77.2625,
+                reps: 8,
+                rir: 0.0,
+                completedAt: Date(),
+                completed: true,
+                setType: .working,
+                restDurationSeconds: nil
+            )
+        ]
+        let pendingSet = SuggestionPendingSetInput(
+            setId: UUID(),
+            setIndex: 2,
+            setNumber: 3,
+            target: SuggestionTarget(
+                reps: 8,
+                rir: 0.0,
+                repRange: nil,
+                repsSource: .template,
+                rirSource: .template
+            ),
+            setType: .working
+        )
+        let input = SuggestionEngineInput(
+            baseE1RM: 100,
+            baseSource: .recentPerformance,
+            completedSessionSets: completedSets,
+            pendingSets: [pendingSet],
+            settings: SuggestionSettingsSnapshot(
+                formula: .epley,
+                restTimerSeconds: 180,
+                weightIncrement: 2.5,
+                fatigueEnabled: true,
+                freshnessEnabled: false,
+                freshnessPercent: 0.03,
+                baseFatigueRate: 0.04,
+                recoveryConstant: 180.0,
+                sessionCapabilityPolicy: .defaultBlended
+            ),
+            calibrationAdjustment: .neutral
+        )
+
+        let decision = try! XCTUnwrap(SuggestionEngine.evaluate(input).first)
+        XCTAssertEqual(decision.sessionCapabilityE1RM, 100, accuracy: 0.05)
+    }
+
     // MARK: - Forward projection
 
     func testForwardProjectionDecreasesSuggestions() {
@@ -3208,7 +3601,8 @@ final class FatigueModelV2Tests: XCTestCase {
                 freshnessEnabled: false,
                 freshnessPercent: 0.03,
                 baseFatigueRate: 0.04,
-                recoveryConstant: 180.0
+                recoveryConstant: 180.0,
+                sessionCapabilityPolicy: .defaultBlended
             ),
             calibrationAdjustment: .neutral
         )
@@ -3233,24 +3627,24 @@ final class FatigueModelV2Tests: XCTestCase {
             SessionSetContext(
                 weight: 100, reps: 8, rir: 2.0,
                 completedAt: Date(), completed: true,
-                setType: .working, restDurationSeconds: nil
+                setType: .working, restDurationSeconds: 300
             ),
             SessionSetContext(
                 weight: 100, reps: 8, rir: 2.0,
                 completedAt: Date(), completed: true,
-                setType: .working, restDurationSeconds: 300
+                setType: .working, restDurationSeconds: nil
             )
         ]
         let shortRest = [
             SessionSetContext(
                 weight: 100, reps: 8, rir: 2.0,
                 completedAt: Date(), completed: true,
-                setType: .working, restDurationSeconds: nil
+                setType: .working, restDurationSeconds: 60
             ),
             SessionSetContext(
                 weight: 100, reps: 8, rir: 2.0,
                 completedAt: Date(), completed: true,
-                setType: .working, restDurationSeconds: 60
+                setType: .working, restDurationSeconds: nil
             )
         ]
 
@@ -3288,12 +3682,12 @@ final class FatigueModelV2Tests: XCTestCase {
             SessionSetContext(
                 weight: 100, reps: 8, rir: 2.0,
                 completedAt: Date(), completed: true,
-                setType: .working, restDurationSeconds: nil
+                setType: .working, restDurationSeconds: 150
             ),
             SessionSetContext(
                 weight: 100, reps: 8, rir: 2.0,
                 completedAt: Date(), completed: true,
-                setType: .working, restDurationSeconds: 150
+                setType: .working, restDurationSeconds: nil
             )
         ]
 
@@ -3312,6 +3706,48 @@ final class FatigueModelV2Tests: XCTestCase {
 
         // Both should be identical since nil falls back to configuredRestSeconds=150
         XCTAssertEqual(fatigueNil, fatigueExplicit, accuracy: 0.0001)
+    }
+
+    func testRestDurationOnCompletedSetAffectsTransitionIntoNextSet() {
+        let restOnCompletedSetOne = [
+            SessionSetContext(
+                weight: 100, reps: 8, rir: 2.0,
+                completedAt: Date(), completed: true,
+                setType: .working, restDurationSeconds: 300
+            ),
+            SessionSetContext(
+                weight: 100, reps: 8, rir: 2.0,
+                completedAt: Date(), completed: true,
+                setType: .working, restDurationSeconds: nil
+            )
+        ]
+        let restShiftedToSetTwo = [
+            SessionSetContext(
+                weight: 100, reps: 8, rir: 2.0,
+                completedAt: Date(), completed: true,
+                setType: .working, restDurationSeconds: nil
+            ),
+            SessionSetContext(
+                weight: 100, reps: 8, rir: 2.0,
+                completedAt: Date(), completed: true,
+                setType: .working, restDurationSeconds: 300
+            )
+        ]
+
+        let firstTransitionFatigue = SuggestionEngine.computeSessionFatigue(
+            completedSets: restOnCompletedSetOne,
+            configuredRestSeconds: 150,
+            recoveryConstant: 180,
+            baseFatigueRate: 0.04
+        )
+        let shiftedTransitionFatigue = SuggestionEngine.computeSessionFatigue(
+            completedSets: restShiftedToSetTwo,
+            configuredRestSeconds: 150,
+            recoveryConstant: 180,
+            baseFatigueRate: 0.04
+        )
+
+        XCTAssertLessThan(firstTransitionFatigue, shiftedTransitionFatigue)
     }
 
     // MARK: - Readiness clamp
@@ -3350,7 +3786,8 @@ final class FatigueModelV2Tests: XCTestCase {
                 freshnessEnabled: false,
                 freshnessPercent: 0.03,
                 baseFatigueRate: 0.04,
-                recoveryConstant: 180.0
+                recoveryConstant: 180.0,
+                sessionCapabilityPolicy: .defaultBlended
             ),
             calibrationAdjustment: .neutral
         )
@@ -3408,7 +3845,8 @@ final class FatigueModelV2Tests: XCTestCase {
                 freshnessEnabled: false,
                 freshnessPercent: 0.03,
                 baseFatigueRate: 0.04,
-                recoveryConstant: 210.0
+                recoveryConstant: 210.0,
+                sessionCapabilityPolicy: .defaultBlended
             ),
             calibrationAdjustment: .neutral
         )
@@ -3558,6 +3996,8 @@ private func clearActiveWorkoutSessionDefaults() {
     defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockAccumulatedElapsedSeconds)
     defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockLastResumedAt)
     defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockIsPaused)
+    defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.selectedExerciseWorkoutId)
+    defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.selectedExerciseId)
     defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerWorkoutId)
     defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerStartDate)
     defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerTotalDuration)

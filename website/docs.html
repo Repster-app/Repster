@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Docs — Reppo</title>
+  <meta name="description" content="Detailed feature documentation for Reppo, the intelligent workout tracker.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="container">
+      <a href="index.html" class="nav-logo">Reppo</a>
+      <button class="nav-toggle" aria-label="Toggle navigation">&#9776;</button>
+      <ul class="nav-links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="docs.html" class="active">Docs</a></li>
+        <li><a href="support.html">Support</a></li>
+        <li><a href="privacy.html">Privacy</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="container">
+      <h1>Documentation</h1>
+      <p>A detailed guide to every feature in Reppo.</p>
+    </div>
+  </div>
+
+  <!-- Docs Layout -->
+  <div class="docs-layout">
+
+    <!-- Sidebar -->
+    <nav class="docs-nav">
+      <ul class="docs-sidebar">
+        <li><a href="#home-dashboard">Home Dashboard</a></li>
+        <li><a href="#active-workout">Active Workout</a></li>
+        <li><a href="#smart-suggestions">Smart Suggestions</a></li>
+        <li><a href="#fatigue-learning">Fatigue Learning</a></li>
+        <li><a href="#exercises">Exercise Management</a></li>
+        <li><a href="#personal-records">Personal Records</a></li>
+        <li><a href="#templates">Templates</a></li>
+        <li><a href="#calendar">Calendar</a></li>
+        <li><a href="#charts">Charts & Analytics</a></li>
+        <li><a href="#settings">Settings</a></li>
+        <li><a href="#bodyweight">Body Weight</a></li>
+        <li><a href="#import-export">Import & Export</a></li>
+        <li><a href="#onboarding">Onboarding</a></li>
+        <li><a href="#subscription">Subscription</a></li>
+      </ul>
+    </nav>
+
+    <!-- Docs Content -->
+    <div class="docs-content">
+
+      <!-- Home Dashboard -->
+      <div id="home-dashboard" class="docs-section">
+        <h2>Home Dashboard</h2>
+        <p>The home screen is your launch pad for every workout session and a snapshot of your recent activity.</p>
+
+        <h3>Customizable Sections</h3>
+        <p>Long-press on the home screen to enter edit mode. You can toggle the visibility of individual sections — Monthly Stats, Recent PRs, and more — so the dashboard shows exactly what matters to you.</p>
+
+        <h3>Week Strip</h3>
+        <p>A horizontal strip at the top of the home screen shows your workout activity for the current week, day by day. Tap any day to navigate to it in the Calendar.</p>
+
+        <h3>Start Workout</h3>
+        <p>The start workout card gives you three ways to begin:</p>
+        <ul>
+          <li><strong>Empty workout</strong> — start fresh and add exercises as you go</li>
+          <li><strong>Copy previous</strong> — duplicate the structure of a recent completed workout</li>
+          <li><strong>From template</strong> — start from a saved workout template</li>
+        </ul>
+
+        <h3>Recent Workouts</h3>
+        <p>A list of your most recently completed workouts. Tap any workout to view its full details — exercises, sets, volume, and notes.</p>
+
+        <h3>Monthly Stats</h3>
+        <p>A card showing your current month's totals: number of workouts, total sets completed, and your primary performance metric.</p>
+
+        <h3>Recent PRs</h3>
+        <p>Displays your most recently achieved personal records across all exercises, so you can see progress at a glance.</p>
+      </div>
+
+      <!-- Active Workout -->
+      <div id="active-workout" class="docs-section">
+        <h2>Active Workout</h2>
+        <p>The active workout screen is where you log every set. It's designed to be focused and efficient.</p>
+
+        <h3>Exercise Tabs</h3>
+        <p>A horizontal tab strip at the top lets you switch between exercises in your current workout. Each exercise has four sub-tabs:</p>
+        <ul>
+          <li><strong>Sets</strong> — the main data entry view for logging weight and reps</li>
+          <li><strong>History</strong> — your previous sessions for this exercise</li>
+          <li><strong>PRs</strong> — all personal records for this exercise</li>
+          <li><strong>Charts</strong> — embedded performance graphs</li>
+        </ul>
+
+        <h3>Set Entry</h3>
+        <p>Each set row shows a set number badge, weight input, reps input, and a completion checkbox. For unilateral exercises, left and right reps are tracked separately. Sets can be classified as working, warmup, or partial.</p>
+
+        <h3>Smart Weight Suggestions</h3>
+        <p>When enabled, a suggestion module appears showing the recommended weight for your next set. This is powered by the Smart Suggestions engine — see the <a href="#smart-suggestions">Smart Suggestions</a> section for details.</p>
+
+        <h3>Rest Timer</h3>
+        <p>The rest timer auto-starts when you complete a set. It shows a countdown with a progress visualization. You can pause/resume, add or subtract time, and it has a compact mode that stays visible when the keyboard is open.</p>
+
+        <h3>Session Timer</h3>
+        <p>An elapsed timer in the header tracks your total workout duration from start to finish.</p>
+
+        <h3>Adding Exercises</h3>
+        <p>Tap the add button to open the exercise picker and add more exercises to your current workout at any time.</p>
+
+        <h3>Workout Summary</h3>
+        <p>When you finish a workout, a summary sheet appears with:</p>
+        <ul>
+          <li>Overall workout statistics (total sets, exercises, volume)</li>
+          <li>Editable workout title and notes</li>
+          <li>Session effort rating (RPE, 1–10 scale)</li>
+          <li>Per-exercise fatigue feedback (less aggressive / about right / more aggressive)</li>
+          <li>Option to save the workout as a template</li>
+        </ul>
+      </div>
+
+      <!-- Smart Suggestions -->
+      <div id="smart-suggestions" class="docs-section">
+        <h2>Smart Suggestions</h2>
+        <p>Smart Suggestions is Reppo's fatigue-aware weight recommendation engine. It calculates the right weight for every set based on your capacity, fatigue, and goals.</p>
+
+        <h3>How It Works</h3>
+        <p>The system follows these steps for each set:</p>
+        <ul>
+          <li><strong>Base e1RM estimation</strong> — looks at peak performances from your recent workouts (configurable recency window) to estimate your current one-rep max for the exercise</li>
+          <li><strong>Fatigue accumulation</strong> — tracks how fatigue builds through the session based on the number of sets, effort, and rep counts. Fatigue decays during rest periods</li>
+          <li><strong>Forward projection</strong> — estimates fatigue for upcoming sets so the suggestion accounts for where you'll be, not just where you are now</li>
+          <li><strong>Freshness bonus</strong> — optionally applies a small bonus (~3–6%) on the first set of an exercise when you're fresh</li>
+          <li><strong>Readiness clamping</strong> — ensures the effective e1RM stays within a reasonable range (88–105% of capacity)</li>
+          <li><strong>Weight prescription</strong> — converts the readiness e1RM into a target weight using your selected e1RM formula, target reps, and target RIR, then rounds to your configured increment</li>
+        </ul>
+
+        <h3>Configuration</h3>
+        <p>You can configure Smart Suggestions in Settings &gt; Prescription Settings:</p>
+        <ul>
+          <li><strong>Recency window</strong> — how many weeks of data to consider (2–12 weeks)</li>
+          <li><strong>Target reps</strong> — default rep target per set</li>
+          <li><strong>Target RIR</strong> — default Reps In Reserve target</li>
+          <li><strong>Fatigue modeling</strong> — enable or disable fatigue accumulation in calculations</li>
+          <li><strong>Freshness bonus</strong> — toggle and percentage for the first-set bonus</li>
+          <li><strong>Weight increment</strong> — rounding increment for prescribed weights (e.g. 2.5kg)</li>
+        </ul>
+      </div>
+
+      <!-- Fatigue Learning -->
+      <div id="fatigue-learning" class="docs-section">
+        <h2>Adaptive Fatigue Learning</h2>
+        <p>The fatigue learning system makes Smart Suggestions more accurate over time by learning from the difference between what it predicted and what you actually lifted.</p>
+
+        <h3>How It Learns</h3>
+        <p>After every completed working set where a suggestion was available, the system records a fatigue observation — the predicted effective e1RM versus your actual performance. These observations are normalized to your base e1RM so they can be compared across different rep ranges and weights.</p>
+
+        <h3>Global vs. Per-Exercise</h3>
+        <p>Learning happens at two levels:</p>
+        <ul>
+          <li><strong>Global baseline</strong> — engages after your first qualified workout (2+ tracked working sets). Adjusts the default fatigue rate used for all exercises</li>
+          <li><strong>Per-exercise tuning</strong> — engages after 5 qualifying sessions for a specific exercise. Overrides the global rate with a rate tuned to that exercise's fatigue pattern</li>
+        </ul>
+
+        <h3>Smoothing & Bounds</h3>
+        <p>Cumulative error is tracked with exponential moving average smoothing (alpha = 0.3) to prevent overcorrection from single outlier sessions. Fatigue rates are bounded between 0.01 and 0.08 to keep suggestions reasonable.</p>
+
+        <h3>Your Feedback Matters</h3>
+        <p>The fatigue feedback you provide after each workout (less aggressive / about right / more aggressive) is part of this learning loop. It helps the system understand whether its fatigue model is calibrated to your perception of effort.</p>
+
+        <h3>Admin Panel</h3>
+        <p>For advanced users, Settings includes a Fatigue Learning admin panel with:</p>
+        <ul>
+          <li>Global baseline diagnostics (current fatigue rate and its source)</li>
+          <li>Per-exercise tuning data (session counts and adjusted rates)</li>
+          <li>Observation log (detailed prediction vs. actual data)</li>
+          <li>Set audit trail (status classification for every set)</li>
+          <li>Reset option to clear all learning data and start fresh</li>
+        </ul>
+      </div>
+
+      <!-- Exercise Management -->
+      <div id="exercises" class="docs-section">
+        <h2>Exercise Management</h2>
+        <p>Reppo comes with a seeded exercise library and lets you create fully custom exercises.</p>
+
+        <h3>Browsing & Searching</h3>
+        <p>The exercise list supports full-text search and filtering by muscle group using visual filter pills. Sort by name, most used, or other criteria. The list operates in two modes:</p>
+        <ul>
+          <li><strong>Browse mode</strong> — tap an exercise to start a workout with it; tap the info button for details</li>
+          <li><strong>Add-to-workout mode</strong> — multi-select exercises and add them as a batch to your active workout</li>
+        </ul>
+
+        <h3>Exercise Properties</h3>
+        <p>Each exercise includes:</p>
+        <ul>
+          <li><strong>Name</strong> and <strong>equipment type</strong> (barbell, dumbbell, bodyweight, cable, machine, etc.)</li>
+          <li><strong>Primary and secondary muscle groups</strong></li>
+          <li><strong>Movement pattern</strong> (squat, hinge, push, pull, etc.)</li>
+          <li><strong>Tracking type</strong> — determines which fields appear in set entry: weight+reps, duration, duration+distance, weight+distance, weight+reps+duration, or custom</li>
+          <li><strong>Unilateral flag</strong> — enables left/right tracking with a bilateral load factor</li>
+          <li><strong>Bodyweight factor</strong> — a percentage of your bodyweight added to effective weight calculations</li>
+          <li><strong>Weight increment</strong> — rounding increment for this exercise's suggestions</li>
+          <li><strong>Default rest time</strong> — per-exercise rest timer override</li>
+        </ul>
+        <p>Note: the tracking type is immutable once sets have been logged for an exercise, to prevent data corruption.</p>
+
+        <h3>Exercise Detail</h3>
+        <p>The detail view shows an exercise's full history, all personal records, and aggregate stats (total workouts, total sets, total volume, best e1RM, and trend slope).</p>
+      </div>
+
+      <!-- Personal Records -->
+      <div id="personal-records" class="docs-section">
+        <h2>Personal Records</h2>
+        <p>Reppo automatically detects and tracks personal records for every exercise.</p>
+
+        <h3>How Detection Works</h3>
+        <p>Every time you complete a set, it's evaluated against your full history for that exercise. The system uses gram-based precision (no floating-point rounding issues) to determine if a set represents a new best.</p>
+
+        <h3>PR Badges</h3>
+        <p>Sets can receive one of four PR statuses:</p>
+        <ul>
+          <li><strong>Current</strong> — this set is on the performance frontier (a best at its rep count)</li>
+          <li><strong>Matched</strong> — ties the current record exactly</li>
+          <li><strong>Previous</strong> — was once a PR but has since been beaten</li>
+          <li><strong>Dominated</strong> — a higher-rep set exists at equal or greater weight, making this record less significant</li>
+        </ul>
+
+        <h3>Frontier Algorithm</h3>
+        <p>Reppo uses a suffix-max frontier to rank PRs intelligently. A 5-rep PR at 100kg is only considered "current" if there isn't also a 6-rep (or higher) PR at 100kg or more. This ensures the PR list reflects genuinely meaningful bests, not just data points.</p>
+
+        <h3>Where PRs Appear</h3>
+        <ul>
+          <li>PR badges on sets during and after workouts</li>
+          <li>Recent PRs section on the home dashboard</li>
+          <li>Per-exercise PR history in the exercise detail view</li>
+          <li>PRs sub-tab in the active workout screen</li>
+        </ul>
+      </div>
+
+      <!-- Templates -->
+      <div id="templates" class="docs-section">
+        <h2>Templates</h2>
+        <p>Templates let you save workout structures and reuse them to start future sessions quickly.</p>
+
+        <h3>Creating Templates</h3>
+        <p>There are several ways to create a template:</p>
+        <ul>
+          <li><strong>Save from workout</strong> — after finishing a workout, choose "Save as Template" in the summary sheet</li>
+          <li><strong>Create manually</strong> — build a template from scratch by selecting exercises, setting target reps, RIR, and set counts</li>
+          <li><strong>AI generator</strong> — use the ChatGPT prompt helper to generate a template based on your exercise library (see below)</li>
+        </ul>
+
+        <h3>Using Templates</h3>
+        <p>From the template list or the home screen's start-workout menu, tap a template to start a workout pre-loaded with its exercises and set structure. Target reps and weights from the template are carried into the workout.</p>
+
+        <h3>Superset Support</h3>
+        <p>Template exercises can be grouped into supersets using group IDs. When you start a workout from a template with supersets, the exercise ordering reflects the superset grouping.</p>
+
+        <h3>Import & Export</h3>
+        <p>Templates can be exported as files and shared with others. Import a template file to add it to your library. The import process validates exercise references and resolves any mismatches.</p>
+
+        <h3>AI Template Generator</h3>
+        <p>The AI helper exports your exercise library as context, generates a prompt you copy into ChatGPT, and then lets you paste the JSON response back to preview and import as a template. No direct API connection — you control the entire process.</p>
+      </div>
+
+      <!-- Calendar -->
+      <div id="calendar" class="docs-section">
+        <h2>Calendar</h2>
+        <p>The calendar tab gives you a visual overview of your training history.</p>
+
+        <h3>Monthly Grid</h3>
+        <p>A swipeable monthly calendar grid showing up to 24 months in the past and 6 months into the future. Days with workouts are marked with color-coded dots indicating the muscle groups trained.</p>
+
+        <h3>Day Detail</h3>
+        <p>Tap any day to see a detail panel below the calendar. For each workout on that day, it shows:</p>
+        <ul>
+          <li>Muscle groups trained</li>
+          <li>Total exercises, sets, and volume</li>
+          <li>Workout title and duration</li>
+        </ul>
+        <p>Tap through to view the full workout breakdown with every exercise and set.</p>
+
+        <h3>Save as Template</h3>
+        <p>From the workout detail view in the calendar, you can save any past workout as a template for future use.</p>
+      </div>
+
+      <!-- Charts & Analytics -->
+      <div id="charts" class="docs-section">
+        <h2>Charts & Analytics</h2>
+        <p>The charts tab provides visual analytics across three sub-tabs, each with time period filters (1 week, 1 month, 3 months, 6 months, 1 year, all time).</p>
+
+        <h3>Breakdown Tab</h3>
+        <p>A donut chart showing how your training volume is distributed across muscle groups or exercises. Useful for identifying imbalances or confirming that your programming covers what you intend.</p>
+
+        <h3>Workouts Tab</h3>
+        <p>Time-series charts showing:</p>
+        <ul>
+          <li>Workout frequency over time</li>
+          <li>Total sets per workout trend</li>
+          <li>Primary performance metric progression</li>
+        </ul>
+
+        <h3>Exercises Tab</h3>
+        <p>Track individual exercise performance over time. Select one or more exercises to see weight and rep progression charts. A data point navigator lets you inspect specific sessions in detail.</p>
+
+        <h3>Chart Types</h3>
+        <p>Reppo uses multi-line charts with trend overlays, time-series bar charts, and donut charts — all with color-coded legends and interactive time period selectors.</p>
+      </div>
+
+      <!-- Settings -->
+      <div id="settings" class="docs-section">
+        <h2>Settings</h2>
+        <p>Configure Reppo to match your preferences and training style.</p>
+
+        <h3>General</h3>
+        <ul>
+          <li><strong>Unit preference</strong> — metric (kg) or imperial (lbs)</li>
+          <li><strong>E1RM formula</strong> — choose from Epley, Brzycki, Lander, Mayhew, O'Conner, or Wathan for estimated one-rep max calculations</li>
+        </ul>
+
+        <h3>Workout</h3>
+        <ul>
+          <li><strong>Default rest time</strong> — the starting duration for the rest timer</li>
+          <li><strong>Warmup inclusion</strong> — whether warmup sets count toward volume totals and PR evaluation</li>
+          <li><strong>Prescription settings</strong> — full configuration for Smart Suggestions (see <a href="#smart-suggestions">Smart Suggestions</a>)</li>
+        </ul>
+
+        <h3>Data</h3>
+        <ul>
+          <li><strong>Import data</strong> — CSV import from FitNotes format</li>
+          <li><strong>Export backup</strong> — full data backup</li>
+          <li><strong>Restore backup</strong> — restore from a backup file</li>
+          <li><strong>Reset app data</strong> — delete all data with confirmation</li>
+        </ul>
+
+        <h3>Fatigue Learning Admin</h3>
+        <p>An advanced section for inspecting and managing the adaptive fatigue learning system. See <a href="#fatigue-learning">Adaptive Fatigue Learning</a> for details.</p>
+      </div>
+
+      <!-- Body Weight -->
+      <div id="bodyweight" class="docs-section">
+        <h2>Body Weight Tracking</h2>
+        <p>Track your bodyweight over time from the Settings screen.</p>
+
+        <h3>Logging Entries</h3>
+        <p>Add a bodyweight entry with a date and weight value. View all historical entries in a list.</p>
+
+        <h3>Role in Calculations</h3>
+        <p>For exercises with a bodyweight factor (e.g., pull-ups, dips), Reppo uses your nearest bodyweight entry to calculate the effective weight of each set. This ensures that PRs, e1RM estimates, and Smart Suggestions accurately reflect the total load on your body.</p>
+      </div>
+
+      <!-- Import & Export -->
+      <div id="import-export" class="docs-section">
+        <h2>Import & Export</h2>
+
+        <h3>CSV Import</h3>
+        <p>Import workout history from a CSV file in FitNotes format (11-column standard). The import process:</p>
+        <ul>
+          <li>Validates headers and rows before importing</li>
+          <li>Automatically creates new exercises that don't exist in your library</li>
+          <li>Processes data in batches (500 rows at a time) with progress indication</li>
+          <li>Rebuilds all personal records and stats after completion</li>
+        </ul>
+
+        <h3>Full Backup</h3>
+        <p>Export a complete backup containing workouts, exercises, sets, templates, and fatigue learning data. Restore from a backup at any time — the restore process handles conflict resolution for existing data.</p>
+
+        <h3>Reset</h3>
+        <p>The "Reset App Data" option in Settings deletes all data and restores the default exercise library. This action requires confirmation and cannot be undone.</p>
+      </div>
+
+      <!-- Onboarding -->
+      <div id="onboarding" class="docs-section">
+        <h2>Onboarding</h2>
+        <p>When you first open Reppo, a setup flow guides you through initial configuration.</p>
+
+        <h3>Setup Modes</h3>
+        <ul>
+          <li><strong>Quick setup</strong> — unit preference only, get started fast</li>
+          <li><strong>Advanced setup</strong> — unit preference, e1RM formula selection, optional bodyweight entry, and optional CSV import</li>
+        </ul>
+        <p>All settings chosen during onboarding can be changed later in the Settings screen.</p>
+      </div>
+
+      <!-- Subscription -->
+      <div id="subscription" class="docs-section">
+        <h2>Subscription</h2>
+
+        <h3>Free Tier</h3>
+        <p>Reppo allows you to log up to 5 workouts completely free, with access to all features. This lets you fully experience the app before deciding to subscribe.</p>
+
+        <h3>Full Access</h3>
+        <p>After the free tier, a subscription unlocks unlimited workout logging. Subscriptions are managed through Apple's App Store and can be cancelled at any time in your device's subscription settings.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <ul class="footer-links">
+        <li><a href="docs.html">Docs</a></li>
+        <li><a href="support.html">Support</a></li>
+        <li><a href="privacy.html">Privacy Policy</a></li>
+      </ul>
+      <span class="footer-copy">&copy; 2026 Reppo. All rights reserved.</span>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

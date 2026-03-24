@@ -119,7 +119,8 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
                 freshnessEnabled: freshnessEnabled,
                 freshnessPercent: freshnessPercent,
                 baseFatigueRate: baseFatigueRate,
-                recoveryConstant: recoveryConstant
+                recoveryConstant: recoveryConstant,
+                sessionCapabilityPolicy: .defaultBlended
             ),
             calibrationAdjustment: calibrationAdjustment
         )

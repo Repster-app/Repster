@@ -50,12 +50,15 @@ struct SuggestionExplanation: Sendable {
     let rirSourceLabel: String
     let defaultUsageLabel: String?
     let baselineSourceLabel: String
+    let sessionCapabilitySourceLabel: String
     let calibrationLabel: String
 }
 
 /// Expanded diagnostics payload for a single suggestion row.
 struct SetSuggestionDiagnostics: Sendable {
     let baseE1RM: Double
+    let historicalBaseE1RM: Double
+    let sessionCapabilityE1RM: Double
     let effectiveE1RM: Double
     let readinessPercent: Double
     let fatigueDiscount: Double
@@ -72,6 +75,7 @@ struct SetSuggestionDiagnostics: Sendable {
     let rirSourceLabel: String
     let defaultUsageLabel: String?
     let baselineSourceLabel: String
+    let sessionCapabilitySourceLabel: String
     let calibrationLabel: String
     let alternatives: [SuggestionRepAlternative]
     // v2 fatigue diagnostics
@@ -571,12 +575,18 @@ enum SuggestionExplainer {
     }
 
     private static func explanation(for decision: SuggestionDecision) -> SuggestionExplanation {
-        let readinessPercent = ((decision.effectiveE1RM / decision.baseE1RM) - 1.0) * 100.0
+        let readinessPercent = ((decision.effectiveE1RM / decision.sessionCapabilityE1RM) - 1.0) * 100.0
         var summaryParts = [
-            "\(String(format: "%.1f", decision.baseE1RM)) kg capacity from \(decision.e1RMSource.label)",
+            "\(String(format: "%.1f", decision.historicalBaseE1RM)) kg capacity from \(decision.e1RMSource.label)",
             "readiness \(formatSignedPercent(readinessPercent))",
             "target from \(decision.targetSourceLabel)"
         ]
+        if abs(decision.sessionCapabilityE1RM - decision.historicalBaseE1RM) > 0.05 {
+            summaryParts.insert(
+                "\(String(format: "%.1f", decision.sessionCapabilityE1RM)) kg \(decision.sessionCapabilitySourceLabel)",
+                at: 1
+            )
+        }
         if let defaultUsageLabel = decision.targetDefaultUsageLabel {
             summaryParts.append(defaultUsageLabel)
         }
@@ -589,6 +599,7 @@ enum SuggestionExplainer {
             rirSourceLabel: decision.targetRIRSourceLabel,
             defaultUsageLabel: decision.targetDefaultUsageLabel,
             baselineSourceLabel: decision.e1RMSource.label,
+            sessionCapabilitySourceLabel: decision.sessionCapabilitySourceLabel,
             calibrationLabel: decision.calibrationAdjustment.explanation
         )
     }
@@ -600,10 +611,12 @@ enum SuggestionExplainer {
         configuredRestSeconds: Double
     ) -> SetSuggestionDiagnostics {
         let chosenReps = decision.bestReps ?? decision.targetReps
-        let readinessPercent = ((decision.effectiveE1RM / decision.baseE1RM) - 1.0) * 100.0
+        let readinessPercent = ((decision.effectiveE1RM / decision.sessionCapabilityE1RM) - 1.0) * 100.0
 
         return SetSuggestionDiagnostics(
             baseE1RM: decision.baseE1RM,
+            historicalBaseE1RM: decision.historicalBaseE1RM,
+            sessionCapabilityE1RM: decision.sessionCapabilityE1RM,
             effectiveE1RM: decision.effectiveE1RM,
             readinessPercent: readinessPercent,
             fatigueDiscount: decision.fatigueDiscount,
@@ -620,6 +633,7 @@ enum SuggestionExplainer {
             rirSourceLabel: decision.targetRIRSourceLabel,
             defaultUsageLabel: decision.targetDefaultUsageLabel,
             baselineSourceLabel: decision.e1RMSource.label,
+            sessionCapabilitySourceLabel: decision.sessionCapabilitySourceLabel,
             calibrationLabel: decision.calibrationAdjustment.explanation,
             alternatives: alternatives(for: decision, formula: formula),
             projectedSessionFatigue: decision.projectedSessionFatigue,
