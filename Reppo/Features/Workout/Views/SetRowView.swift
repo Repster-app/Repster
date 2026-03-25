@@ -702,6 +702,15 @@ struct SetRowView: View {
             setRIRValue: { rirBinding.wrappedValue = $0 },
             getSuggestedWeight: { suggestedWeight },
             getWeightIncrement: { exercise.weightIncrement ?? 2.5 },
+            getTargetRepRange: {
+                let min = set.draftTargetRepMin ?? set.targetRepMin
+                let max = set.draftTargetRepMax ?? set.targetRepMax
+                return (min: min, max: max)
+            },
+            setTargetRepRange: { newMin, newMax in
+                set.draftTargetRepMin = newMin
+                set.draftTargetRepMax = newMax
+            },
             onCompleteSet: { if !set.completed { onComplete() } },
             canCompleteSet: canCompleteSet,
             canMovePrevious: { canMoveToPreviousInput },

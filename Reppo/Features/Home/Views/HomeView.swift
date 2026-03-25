@@ -65,10 +65,6 @@ struct HomeView: View {
                 .padding(.bottom, 100)
             }
             .background(Color.bg)
-            .onAppear {
-                viewModel.lastLoadTime = nil
-                Task { await viewModel.loadData() }
-            }
             .navigationDestination(for: UUID.self) { workoutId in
                 WorkoutDetailFromHomeView(
                     workoutId: workoutId,
@@ -85,10 +81,6 @@ struct HomeView: View {
         }
         .onChange(of: popToRootTrigger) {
             navigationPath = NavigationPath()
-        }
-        .onAppear {
-            viewModel.lastLoadTime = nil
-            Task { await viewModel.loadData() }
         }
         .onLongPressGesture(minimumDuration: 0.5) {
             withAnimation(.easeInOut(duration: 0.2)) {

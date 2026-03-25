@@ -679,6 +679,8 @@ final class SetEntryKeyboardContext {
     let setRIRValue: (Double?) -> Void
     let getSuggestedWeight: () -> Double?
     let getWeightIncrement: () -> Double
+    let getTargetRepRange: () -> (min: Int?, max: Int?)
+    let setTargetRepRange: (Int?, Int?) -> Void
     let onCompleteSet: (() -> Void)?
     let canCompleteSet: () -> Bool
     let canMovePrevious: () -> Bool
@@ -701,6 +703,8 @@ final class SetEntryKeyboardContext {
         setRIRValue: @escaping (Double?) -> Void,
         getSuggestedWeight: @escaping () -> Double?,
         getWeightIncrement: @escaping () -> Double = { 2.5 },
+        getTargetRepRange: @escaping () -> (min: Int?, max: Int?) = { (nil, nil) },
+        setTargetRepRange: @escaping (Int?, Int?) -> Void = { _, _ in },
         onCompleteSet: (() -> Void)? = nil,
         canCompleteSet: @escaping () -> Bool = { true },
         canMovePrevious: @escaping () -> Bool,
@@ -721,6 +725,8 @@ final class SetEntryKeyboardContext {
         self.setRIRValue = setRIRValue
         self.getSuggestedWeight = getSuggestedWeight
         self.getWeightIncrement = getWeightIncrement
+        self.getTargetRepRange = getTargetRepRange
+        self.setTargetRepRange = setTargetRepRange
         self.onCompleteSet = onCompleteSet
         self.canCompleteSet = canCompleteSet
         self.canMovePrevious = canMovePrevious
@@ -791,6 +797,12 @@ struct SetEntryKeyboardOverlay: View {
     @State private var rirMode = false
     @State private var repMode: String = "F"
     @State private var refreshTick = 0
+    @State private var repRangeEditMode = false
+    @State private var repRangeMinText = ""
+    @State private var repRangeMaxText = ""
+    @State private var repRangeActiveField: RepRangeField = .min
+
+    private enum RepRangeField { case min, max }
 
     var body: some View {
         Group {
@@ -817,6 +829,7 @@ struct SetEntryKeyboardOverlay: View {
                 .onChange(of: manager.context?.ownerSetID) { _, _ in
                     rirMode = false
                     repMode = "F"
+                    repRangeEditMode = false
                     refreshTick = 0
                 }
             }
@@ -827,40 +840,147 @@ struct SetEntryKeyboardOverlay: View {
     @ViewBuilder
     private func topStrip(for context: SetEntryKeyboardContext) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("Set")
-                    .foregroundColor(.accent)
-                    .font(.system(size: 14, weight: .semibold))
-                Text("· \(fieldTitle(context.trackedField))")
-                    .foregroundColor(.textSecondary)
-                    .font(.system(size: 14, weight: .semibold))
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-
-            if showRIRChips(for: context) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        rirChip(context, label: "—", value: nil)
-                        rirChip(context, label: "0", value: 0)
-                        rirChip(context, label: "1", value: 1)
-                        rirChip(context, label: "2", value: 2)
-                        rirChip(context, label: "3", value: 3)
-                        rirChip(context, label: "4", value: 4)
-                        rirChip(context, label: "5+", value: 5)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 10)
+            if repRangeEditMode {
+                HStack {
+                    Text("Rep Range Target")
+                        .foregroundColor(.accent)
+                        .font(.system(size: 14, weight: .semibold))
+                    Spacer()
                 }
-            } else if shouldShowWeightHelper(for: context) {
-                Text(weightHelperText(context))
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.textSecondary)
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 10)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+
+                HStack(spacing: 8) {
+                    repRangeInputField(text: $repRangeMinText, placeholder: "Min", isActive: repRangeActiveField == .min)
+                        .onTapGesture { repRangeActiveField = .min }
+                    Text("—")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.textSecondary)
+                    repRangeInputField(text: $repRangeMaxText, placeholder: "Max", isActive: repRangeActiveField == .max)
+                        .onTapGesture { repRangeActiveField = .max }
+                    Button {
+                        applyRepRange(context)
+                    } label: {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundColor(.accent)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 10)
+            } else {
+                HStack {
+                    Text("Set")
+                        .foregroundColor(.accent)
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("· \(fieldTitle(context.trackedField))")
+                        .foregroundColor(.textSecondary)
+                        .font(.system(size: 14, weight: .semibold))
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+
+                if showRIRChips(for: context) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            rirChip(context, label: "—", value: nil)
+                            rirChip(context, label: "0", value: 0)
+                            rirChip(context, label: "1", value: 1)
+                            rirChip(context, label: "2", value: 2)
+                            rirChip(context, label: "3", value: 3)
+                            rirChip(context, label: "4", value: 4)
+                            rirChip(context, label: "5+", value: 5)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 10)
+                    }
+                } else if shouldShowWeightHelper(for: context) {
+                    Text(weightHelperText(context))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.textSecondary)
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 10)
+                }
             }
         }
+    }
+
+    private func repRangeInputField(text: Binding<String>, placeholder: String, isActive: Bool) -> some View {
+        Text(text.wrappedValue.isEmpty ? placeholder : text.wrappedValue)
+            .font(.system(size: 18, weight: .semibold))
+            .foregroundColor(text.wrappedValue.isEmpty ? .textTertiary : .textPrimary)
+            .frame(width: 56, height: 38)
+            .background(isActive ? Color.bgHover : Color.bgSubtle)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(isActive ? Color.accent : Color.border, lineWidth: isActive ? 1.5 : 1)
+            )
+    }
+
+    private func enterRepRangeEditMode(_ context: SetEntryKeyboardContext) {
+        let range = context.getTargetRepRange()
+        repRangeMinText = range.min.map { "\($0)" } ?? ""
+        repRangeMaxText = range.max.map { "\($0)" } ?? ""
+        repRangeActiveField = .min
+        repRangeEditMode = true
+        refreshTick += 1
+    }
+
+    private func applyRepRange(_ context: SetEntryKeyboardContext) {
+        let minVal = Int(repRangeMinText)
+        let maxVal = Int(repRangeMaxText)
+        context.setTargetRepRange(minVal, maxVal)
+        repRangeEditMode = false
+        refreshTick += 1
+        manager.refresh()
+    }
+
+    private func repRangeButton(for context: SetEntryKeyboardContext) -> some View {
+        let range = context.getTargetRepRange()
+        let hasRange = range.min != nil || range.max != nil
+        let rangeLabel: String? = {
+            switch (range.min, range.max) {
+            case let (.some(lo), .some(hi)) where lo == hi:
+                return "\(lo)"
+            case let (.some(lo), .some(hi)):
+                return "\(lo)-\(hi)"
+            case let (.some(lo), .none):
+                return "\(lo)"
+            case let (.none, .some(hi)):
+                return "\(hi)"
+            default:
+                return nil
+            }
+        }()
+
+        return Button {
+            if repRangeEditMode {
+                applyRepRange(context)
+            } else {
+                enterRepRangeEditMode(context)
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "target")
+                    .font(.system(size: 13, weight: .semibold))
+                if let label = rangeLabel {
+                    Text(label)
+                        .font(.system(size: 13, weight: .semibold))
+                } else {
+                    Text("Range")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+            }
+            .foregroundColor(repRangeEditMode ? .white : (hasRange ? .white : .textTertiary))
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
+            .background(repRangeEditMode ? Color.accent.opacity(0.8) : (hasRange ? Color.accent : Color.bgInput))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
     }
 
     private func rirChip(_ context: SetEntryKeyboardContext, label: String, value: Double?) -> some View {
@@ -891,10 +1011,10 @@ struct SetEntryKeyboardOverlay: View {
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
             ForEach(keys, id: \.self) { key in
                 let isDecimalKey = key == "."
-                let showColon = isDecimalKey && isDurationField
-                // D6: Show dash key on reps field instead of disabled decimal
-                let showDash = isDecimalKey && isRepsField
-                let keyDisabled = isDecimalKey && !decimalAllowed && !isRepsField && !isDurationField
+                let showColon = isDecimalKey && isDurationField && !repRangeEditMode
+                // D6: Show dash key on reps field or rep range edit mode
+                let showDash = isDecimalKey && (isRepsField || repRangeEditMode)
+                let keyDisabled = isDecimalKey && !decimalAllowed && !isRepsField && !isDurationField && !repRangeEditMode
                 let keyLabel = showColon ? ":" : (showDash ? "-" : (keyDisabled ? "•" : key))
                 let effectiveKey = showColon ? ":" : (showDash ? "-" : key)
                 Button {
@@ -920,18 +1040,20 @@ struct SetEntryKeyboardOverlay: View {
     private func actionRail(for context: SetEntryKeyboardContext) -> some View {
         let focusedField = context.trackedField
         let onWeightField = focusedField == .weight
+        let onRepsField = focusedField == .reps || focusedField == .leftReps || focusedField == .rightReps
         let canGoPrev = context.canMovePreviousInTrackedOrder
         let canGoNext = context.canMoveNextInTrackedOrder
         let suggestedWeight = context.getSuggestedWeight()
         let increment = context.getWeightIncrement()
         let canNudgeWeight = focusedField == .weight
-        let canNudgeReps = focusedField == .reps || focusedField == .leftReps || focusedField == .rightReps
+        let canNudgeReps = onRepsField
         let canNudgeActiveField = canNudgeWeight || canNudgeReps
 
         return VStack(spacing: 6) {
             // D1: Keyboard-dismiss icon instead of "Hide" text
             Button {
                 rirMode = false
+                repRangeEditMode = false
                 context.dismiss()
                 manager.hide(ownerSetID: context.ownerSetID)
             } label: {
@@ -949,28 +1071,32 @@ struct SetEntryKeyboardOverlay: View {
             }
             .buttonStyle(.plain)
 
-            // D2: Wand icon + weight value in blue for smart suggestion
-            Button {
-                applySuggestedWeight(context)
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "wand.and.stars")
-                        .font(.system(size: 13, weight: .semibold))
-                    if let weight = suggestedWeight {
-                        Text("\(UnitConversion.formatWeight(weight)) kg")
+            // D2: Context-aware suggestion button — weight suggestion or rep range
+            if onWeightField {
+                Button {
+                    applySuggestedWeight(context)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "wand.and.stars")
                             .font(.system(size: 13, weight: .semibold))
+                        if let weight = suggestedWeight {
+                            Text("\(UnitConversion.formatWeight(weight)) kg")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
                     }
+                    .foregroundColor(suggestedWeight == nil ? .textTertiary : .white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(suggestedWeight == nil ? Color.bgInput : Color.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
-                .foregroundColor(suggestedWeight == nil ? .textTertiary : .white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 44)
-                .background(suggestedWeight == nil ? Color.bgInput : Color.accent)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .buttonStyle(.plain)
+                .disabled(suggestedWeight == nil)
+            } else if onRepsField {
+                repRangeButton(for: context)
+            } else {
+                Color.clear.frame(height: 44)
             }
-            .buttonStyle(.plain)
-            .disabled(!onWeightField || suggestedWeight == nil)
-            .opacity(onWeightField ? 1 : 0)
-            .accessibilityHidden(!onWeightField)
 
             // D3: +/- with exercise increment; D5: +1/-1 for reps (replaces F/P)
             HStack(spacing: 8) {
@@ -1087,6 +1213,11 @@ struct SetEntryKeyboardOverlay: View {
     }
 
     private func handleKey(_ key: String, context: SetEntryKeyboardContext) {
+        // Route input to rep range mini-fields when in edit mode
+        if repRangeEditMode {
+            handleRepRangeKey(key)
+            return
+        }
         guard !rirMode, let field = context.trackedField else { return }
         var value = context.getFieldValue(field)
 
@@ -1131,6 +1262,34 @@ struct SetEntryKeyboardOverlay: View {
         manager.refresh()
     }
 
+    private func handleRepRangeKey(_ key: String) {
+        var text = repRangeActiveField == .min ? repRangeMinText : repRangeMaxText
+
+        if key == "⌫" {
+            text = String(text.dropLast())
+        } else if key == "-" {
+            // Dash switches from min to max field
+            repRangeActiveField = .max
+            refreshTick += 1
+            return
+        } else if key == "." || key == ":" {
+            // Not valid for integer rep range fields
+            return
+        } else {
+            // Only allow up to 3 digits
+            guard text.count < 3 else { return }
+            if text == "0" { text = "" }
+            text += key
+        }
+
+        if repRangeActiveField == .min {
+            repRangeMinText = text
+        } else {
+            repRangeMaxText = text
+        }
+        refreshTick += 1
+    }
+
     private func allowsDecimal(_ field: SetRowInputField?) -> Bool {
         field == .weight || field == .distance
     }
@@ -1148,6 +1307,7 @@ struct SetEntryKeyboardOverlay: View {
     }
 
     private func showRIRChips(for context: SetEntryKeyboardContext) -> Bool {
+        if repRangeEditMode { return false }
         if rirMode {
             return true
         }
