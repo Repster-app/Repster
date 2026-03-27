@@ -1623,7 +1623,7 @@ final class ActiveWorkoutViewModel {
                 preparation: preparation,
                 evaluation: .unavailable(.calculationFailed)
             )
-            suggestionsLoadedForKey = preparation.cacheKey
+            suggestionsLoadedForKey = nil
         }
     }
 
@@ -1865,12 +1865,13 @@ extension ActiveWorkoutViewModel: SetTableDataSource {
 
     /// Draft edits only affect live suggestions for reps and RIR on incomplete sets.
     func markSetDirty(_ set: WorkoutSet, field: SetDraftField) {
-        guard !set.completed, currentExercise?.id == set.exerciseId else { return }
+        guard currentExercise?.id == set.exerciseId else { return }
 
         switch field {
         case .reps, .rir:
             requestWeightSuggestionRefresh(
                 mode: .preserveExisting,
+                invalidateCache: true,
                 debounce: suggestionDraftEditDebounce
             )
         case .weight, .duration, .distance:

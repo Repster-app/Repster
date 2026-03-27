@@ -1,0 +1,1881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Set Type UX Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #111113;
+    --bg-card: #1b1b1f;
+    --bg-card-2: #17171b;
+    --bg-hover: #222228;
+    --bg-subtle: #262630;
+    --bg-input: #1f1f25;
+    --text: #eaeaf0;
+    --text-mid: #9a9aac;
+    --text-dim: #5c5c6e;
+    --border: rgba(255,255,255,0.07);
+    --border-strong: rgba(255,255,255,0.12);
+    --success: #5ec269;
+    --success-soft: rgba(94,194,105,0.08);
+    --gold: #d4a23a;
+    --gold-soft: rgba(212,162,58,0.10);
+    --danger: #e05555;
+    --shadow: 0 24px 60px rgba(0,0,0,0.42);
+    --r: 14px;
+    --r-sm: 10px;
+
+    --type-accent: #5b8def;
+    --type-soft: rgba(91,141,239,0.12);
+    --type-soft-2: rgba(91,141,239,0.18);
+    --type-glow: rgba(91,141,239,0.30);
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at top, rgba(91,141,239,0.08), transparent 36%),
+      linear-gradient(180deg, #09090b 0%, #060608 100%);
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    padding: 28px 20px 40px;
+  }
+
+  .page-shell {
+    width: min(100%, 430px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+  }
+
+  .page-title {
+    text-align: center;
+  }
+
+  .page-kicker {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-dim);
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .page-title h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+  }
+
+  .page-title p {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--text-mid);
+    max-width: 360px;
+  }
+
+  .phone {
+    width: 393px;
+    height: 852px;
+    background: var(--bg);
+    border-radius: 44px;
+    border: 2.5px solid #232328;
+    overflow: hidden;
+    position: relative;
+    box-shadow: var(--shadow);
+  }
+
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 28px 6px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .status-right {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .status-right svg {
+    width: 16px;
+    height: 16px;
+    fill: var(--text);
+  }
+
+  .scroll {
+    height: calc(100% - 42px);
+    overflow-y: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    transition: height 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scroll.kb-open {
+    height: calc(100% - 42px - 312px);
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px 8px;
+    gap: 10px;
+  }
+
+  .btn-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--type-accent);
+    font-size: 14px;
+    font-weight: 600;
+    background: none;
+    border: none;
+    font-family: inherit;
+  }
+
+  .btn-back svg {
+    width: 18px;
+    height: 18px;
+    stroke: var(--type-accent);
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .timer-pill {
+    margin-left: auto;
+    margin-right: 8px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-mid);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .btn-finish {
+    border: none;
+    border-radius: 8px;
+    background: var(--type-soft);
+    color: var(--type-accent);
+    padding: 8px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .ex-nav {
+    display: flex;
+    gap: 4px;
+    padding: 0 20px;
+    margin-bottom: 14px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .ex-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ex-tab {
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    background: var(--bg-card);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .ex-tab.active {
+    background: var(--type-accent);
+    color: #fff;
+    font-weight: 700;
+  }
+
+  .ex-title-block {
+    padding: 0 20px;
+    margin-bottom: 14px;
+  }
+
+  .ex-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .ex-sub {
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--text-mid);
+    line-height: 1.45;
+  }
+
+  .type-switcher-wrap {
+    padding: 0 20px;
+    margin-bottom: 12px;
+  }
+
+  .type-switcher-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .type-switcher {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .type-switcher::-webkit-scrollbar {
+    display: none;
+  }
+
+  .type-btn {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-card);
+    color: var(--text-mid);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 9px 12px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+  }
+
+  .type-btn.active {
+    background: var(--type-soft);
+    color: var(--type-accent);
+    border-color: var(--type-glow);
+    transform: translateY(-1px);
+  }
+
+  .target-bar {
+    margin: 0 20px 10px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border: 1px solid var(--type-soft-2);
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .target-icon {
+    min-width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--type-soft);
+    color: var(--type-accent);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .target-copy {
+    flex: 1;
+  }
+
+  .target-copy strong {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--type-accent);
+    margin-bottom: 4px;
+  }
+
+  .target-copy span {
+    display: block;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text);
+  }
+
+  .helper-strip {
+    display: flex;
+    gap: 6px;
+    padding: 0 20px;
+    margin-bottom: 12px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .helper-strip::-webkit-scrollbar {
+    display: none;
+  }
+
+  .helper-chip {
+    border-radius: 999px;
+    padding: 7px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    background: var(--bg-card);
+    color: var(--text-mid);
+    border: 1px solid var(--border);
+  }
+
+  .helper-chip.primary {
+    background: var(--type-soft);
+    border-color: var(--type-glow);
+    color: var(--type-accent);
+  }
+
+  .set-table {
+    margin: 0 20px 16px;
+    background: var(--bg-card);
+    border-radius: var(--r);
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.03);
+  }
+
+  .set-table-head {
+    display: grid;
+    grid-template-columns: 38px 1.08fr 1.08fr 0.92fr 0.92fr 40px;
+    gap: 4px;
+    padding: 10px 8px 8px;
+    background: rgba(255,255,255,0.02);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .set-table-head span {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    text-align: center;
+  }
+
+  .set-table-head span:first-child {
+    text-align: left;
+  }
+
+  .set-row {
+    display: grid;
+    grid-template-columns: 38px 1.08fr 1.08fr 0.92fr 0.92fr 40px;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px;
+    min-height: 54px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+  }
+
+  .set-row:last-child {
+    border-bottom: none;
+  }
+
+  .set-row.compact.warmup {
+    opacity: 0.55;
+  }
+
+  .set-row.upcoming-row {
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+  }
+
+  .cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .set-num {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-dim);
+    background: var(--bg-subtle);
+  }
+
+  .set-num.warm {
+    background: none;
+    font-style: italic;
+    color: var(--gold);
+  }
+
+  .set-num.completed {
+    background: var(--success);
+    color: #fff;
+  }
+
+  .static-cell {
+    min-height: 34px;
+    border-radius: 9px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .static-cell.completed {
+    background: var(--success-soft);
+    border-color: rgba(94,194,105,0.18);
+  }
+
+  .static-cell.subtle {
+    color: var(--text-mid);
+  }
+
+  .static-pill {
+    padding: 6px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-mid);
+    white-space: nowrap;
+  }
+
+  .static-pill.pr {
+    background: var(--gold-soft);
+    color: var(--gold);
+    border-color: rgba(212,162,58,0.16);
+  }
+
+  .set-check {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    border: 2px solid var(--text-dim);
+  }
+
+  .set-check.done {
+    background: var(--type-accent);
+    border-color: var(--type-accent);
+  }
+
+  .active-shell {
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.015), transparent),
+      linear-gradient(90deg, rgba(255,255,255,0.015), transparent 40%);
+  }
+
+  .active-main {
+    display: grid;
+    grid-template-columns: 38px 1.08fr 1.08fr 0.92fr 0.92fr 40px;
+    gap: 4px;
+    align-items: start;
+    padding: 10px 8px 6px;
+  }
+
+  .active-row-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding-top: 2px;
+  }
+
+  .active-row-badge .set-num {
+    background: var(--type-soft);
+    color: var(--type-accent);
+    border: 1px solid var(--type-glow);
+  }
+
+  .type-mini-tag {
+    min-width: 26px;
+    padding: 3px 6px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    color: var(--text-mid);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-align: center;
+  }
+
+  .field-card {
+    min-height: 72px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-input);
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 9px 10px;
+    text-align: left;
+    font-family: inherit;
+    cursor: pointer;
+    transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+  }
+
+  .field-card.filled .field-value {
+    color: var(--text);
+  }
+
+  .field-card.focused {
+    border-color: var(--type-glow);
+    background: rgba(255,255,255,0.03);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+    transform: translateY(-1px);
+  }
+
+  .field-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .field-value {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text-mid);
+    line-height: 1.1;
+  }
+
+  .field-value.choice {
+    font-size: 14px;
+    line-height: 1.25;
+  }
+
+  .field-hint {
+    font-size: 11px;
+    color: var(--text-mid);
+    line-height: 1.25;
+  }
+
+  .active-info {
+    min-height: 72px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+    padding: 9px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    justify-content: space-between;
+  }
+
+  .active-info-pill {
+    align-self: flex-start;
+    padding: 4px 7px;
+    border-radius: 999px;
+    background: var(--type-soft);
+    color: var(--type-accent);
+    border: 1px solid var(--type-glow);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .active-info-copy {
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--text-mid);
+  }
+
+  .active-footer {
+    margin: 0 8px 10px 50px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .active-footer-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: space-between;
+  }
+
+  .active-footer-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .active-footer-value {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--type-accent);
+  }
+
+  .active-footer-copy {
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text-mid);
+  }
+
+  .upcoming-info {
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--text-mid);
+    text-align: center;
+  }
+
+  .upcoming-pill {
+    padding: 5px 8px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    color: var(--text-mid);
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .flow-pill-wrap {
+    margin: 0 20px 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px;
+    display: flex;
+    gap: 6px;
+  }
+
+  .flow-pill {
+    flex: 1;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    background: var(--bg-subtle);
+    border-radius: 8px;
+    padding: 7px 5px;
+  }
+
+  .flow-pill.current {
+    color: var(--type-accent);
+    background: var(--type-soft);
+  }
+
+  .flow-pill.done {
+    color: var(--success);
+    background: var(--success-soft);
+  }
+
+  .keyboard {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #1a1a1e;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    padding: 8px 10px 28px;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    z-index: 30;
+  }
+
+  .keyboard.open {
+    transform: translateY(0);
+  }
+
+  .kb-toolbar {
+    margin-bottom: 8px;
+    border-radius: 12px;
+    background: #202025;
+    border: 1px solid rgba(255,255,255,0.08);
+    overflow: hidden;
+  }
+
+  .kb-toolbar-main {
+    min-height: 42px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .kb-field-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .kb-field-label span {
+    color: var(--type-accent);
+  }
+
+  .kb-type-badge {
+    padding: 5px 8px;
+    border-radius: 999px;
+    background: var(--type-soft);
+    color: var(--type-accent);
+    border: 1px solid var(--type-glow);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .kb-helper {
+    padding: 10px 12px 12px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    color: var(--text-mid);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .kb-choice-inline {
+    display: none;
+    gap: 8px;
+    padding: 10px 12px 12px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    background: #1f2025;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .kb-choice-inline::-webkit-scrollbar {
+    display: none;
+  }
+
+  .kb-choice-chip {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: #2a2a31;
+    color: var(--text-mid);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 9px 12px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .kb-choice-chip.selected {
+    background: var(--type-soft);
+    color: var(--type-accent);
+    border-color: var(--type-glow);
+  }
+
+  .kb-progress {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .kb-progress-chip {
+    flex: 1;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    background: #222228;
+    border-radius: 7px;
+    padding: 5px 4px;
+  }
+
+  .kb-progress-chip.current {
+    color: var(--type-accent);
+    background: var(--type-soft);
+  }
+
+  .kb-progress-chip.done {
+    color: var(--success);
+    background: var(--success-soft);
+  }
+
+  .kb-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 104px;
+    gap: 8px;
+  }
+
+  .kb-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .kb-key {
+    height: 48px;
+    border-radius: 10px;
+    background: #2a2a30;
+    border: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 22px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .kb-key.backspace {
+    background: #222228;
+    color: var(--text-mid);
+    font-size: 14px;
+  }
+
+  .kb-key.disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .kb-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .kb-rail-btn {
+    height: 48px;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: #36373d;
+    color: #f2f2f3;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .kb-rail-btn.muted {
+    background: #2b2c31;
+    color: var(--type-accent);
+    border-color: var(--type-glow);
+  }
+
+  .kb-rail-split {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .kb-rail-split button,
+  .kb-rail-nav button {
+    border: 1px solid rgba(255,255,255,0.10);
+    background: #2b2c31;
+    color: #ececef;
+    font-family: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .kb-rail-split button {
+    height: 56px;
+    border-radius: 18px;
+    font-size: 26px;
+  }
+
+  .kb-rail-nav {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .kb-rail-nav button {
+    height: 44px;
+    border-radius: 14px;
+    font-size: 12px;
+  }
+
+  .kb-rail-primary {
+    height: 58px;
+    border-radius: 20px;
+    border: none;
+    background: #ececef;
+    color: #111115;
+    font-family: inherit;
+    font-size: 24px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .kb-rail button:disabled,
+  .kb-grid button:disabled {
+    opacity: 0.40;
+    cursor: default;
+  }
+
+  .explainer-card {
+    width: 100%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.015));
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: var(--shadow);
+  }
+
+  .explainer-tag {
+    display: inline-flex;
+    padding: 5px 8px;
+    border-radius: 999px;
+    background: var(--type-soft);
+    color: var(--type-accent);
+    border: 1px solid var(--type-glow);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .explainer-card h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+  }
+
+  .explainer-card p {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--text-mid);
+  }
+
+  .explainer-card p + p {
+    margin-top: 8px;
+  }
+
+  @media (max-width: 430px) {
+    body {
+      padding-inline: 12px;
+    }
+
+    .page-shell {
+      width: 100%;
+    }
+
+    .phone {
+      width: min(100%, 393px);
+    }
+  }
+</style>
+</head>
+<body>
+<div class="page-shell">
+  <div class="page-title">
+    <div class="page-kicker">HTML Prototype</div>
+    <h1>Set Type UX Demo</h1>
+    <p>One workout screen. Switch the active set type and the row reconfigures to match the method instead of acting like a plain label.</p>
+  </div>
+
+  <div class="phone" id="phone">
+    <div class="status-bar">
+      <span>09:41</span>
+      <div class="status-right">
+        <svg viewBox="0 0 16 16"><circle cx="2" cy="8" r="1.5"/><circle cx="6" cy="8" r="1.5"/><circle cx="10" cy="8" r="1.5"/><circle cx="14" cy="8" r="1.5"/></svg>
+        <svg viewBox="0 0 16 16"><path d="M1 11.5c2-4 4.5-6.5 7-8.5M4 12c1.5-3 3.5-5 5.5-6.5M7 12.5c1-2 2.5-3.5 4-4.5M10.5 12.5c.5-.8 1.2-1.5 2-2" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <svg viewBox="0 0 24 14"><rect x="0" y="1" width="20" height="12" rx="2.5" stroke="currentColor" fill="none" stroke-width="1.5"/><rect x="2" y="3" width="14" height="8" rx="1" fill="currentColor"/><path d="M22 5v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+    </div>
+
+    <div class="scroll" id="scroll">
+      <div class="topbar">
+        <button class="btn-back" type="button">
+          <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          Back
+        </button>
+        <div class="timer-pill">18:42</div>
+        <button class="btn-finish" type="button">Finish</button>
+      </div>
+
+      <div class="ex-nav">
+        <div class="ex-tab active">Smith Incline</div>
+        <div class="ex-tab">Cable Fly</div>
+        <div class="ex-tab">Shoulder Press</div>
+      </div>
+
+      <div class="ex-title-block">
+        <div class="ex-title">Incline Smith Press</div>
+        <div class="ex-sub">The warmup and top set stay fixed. The active set row below changes shape, copy, and flow with each set type.</div>
+      </div>
+
+      <div class="type-switcher-wrap">
+        <div class="type-switcher-label">Active Set Type</div>
+        <div class="type-switcher" id="type-switcher">
+          <button class="type-btn active" data-type="working" type="button">Working</button>
+          <button class="type-btn" data-type="backoff" type="button">Back-off</button>
+          <button class="type-btn" data-type="amrap" type="button">AMRAP</button>
+          <button class="type-btn" data-type="dropset" type="button">Drop Set</button>
+          <button class="type-btn" data-type="partial" type="button">Partial</button>
+          <button class="type-btn" data-type="myo" type="button">Myo</button>
+        </div>
+      </div>
+
+      <div class="target-bar">
+        <div class="target-icon" id="target-icon">Work</div>
+        <div class="target-copy">
+          <strong id="target-title">Target Cue</strong>
+          <span id="target-text"></span>
+        </div>
+      </div>
+
+      <div class="helper-strip" id="helper-strip"></div>
+
+      <div class="set-table">
+        <div class="set-table-head">
+          <span>Set</span>
+          <span id="head-field1">Weight</span>
+          <span id="head-field2">Reps</span>
+          <span id="head-field3">RIR</span>
+          <span id="head-info">Info</span>
+          <span></span>
+        </div>
+
+        <div class="set-row compact warmup">
+          <div class="cell"><div class="set-num warm">W1</div></div>
+          <div class="static-cell subtle">40</div>
+          <div class="static-cell subtle">12</div>
+          <div class="static-cell subtle">5</div>
+          <div class="cell"><div class="static-pill">Primer</div></div>
+          <div class="cell"><div class="set-check done"></div></div>
+        </div>
+
+        <div class="set-row compact">
+          <div class="cell"><div class="set-num completed">1</div></div>
+          <div class="static-cell completed">80</div>
+          <div class="static-cell completed">8</div>
+          <div class="static-cell completed">1</div>
+          <div class="cell"><div class="static-pill pr">Top Set</div></div>
+          <div class="cell"><div class="set-check done"></div></div>
+        </div>
+
+        <div class="active-shell" id="active-shell">
+          <div class="active-main">
+            <div class="active-row-badge">
+              <div class="set-num" id="active-badge">2</div>
+              <div class="type-mini-tag" id="active-tag">BASE</div>
+            </div>
+
+            <button class="field-card" id="field-card-1" data-field="field1" type="button">
+              <span class="field-label" id="field1-label">Weight</span>
+              <span class="field-value" id="field1-value">80</span>
+              <span class="field-hint" id="field1-hint">Load</span>
+            </button>
+
+            <button class="field-card" id="field-card-2" data-field="field2" type="button">
+              <span class="field-label" id="field2-label">Reps</span>
+              <span class="field-value" id="field2-value">--</span>
+              <span class="field-hint" id="field2-hint">Straight set</span>
+            </button>
+
+            <button class="field-card" id="field-card-3" data-field="field3" type="button">
+              <span class="field-label" id="field3-label">RIR</span>
+              <span class="field-value choice" id="field3-value">1</span>
+              <span class="field-hint" id="field3-hint">Effort target</span>
+            </button>
+
+            <div class="active-info">
+              <div class="active-info-pill" id="active-info-pill">Straight</div>
+              <div class="active-info-copy" id="active-info-copy">Same row structure as the completed top set. This is the control case.</div>
+            </div>
+
+            <div class="cell"><div class="set-check"></div></div>
+          </div>
+
+          <div class="active-footer">
+            <div class="active-footer-top">
+              <div class="active-footer-title" id="footer-title">Why The Row Changes</div>
+              <div class="active-footer-value" id="footer-value">Baseline</div>
+            </div>
+            <div class="active-footer-copy" id="footer-copy">This row only asks for a load, a rep result, and an effort signal.</div>
+          </div>
+        </div>
+
+        <div class="set-row upcoming-row">
+          <div class="cell"><div class="set-num" id="next-badge">3</div></div>
+          <div class="static-cell" id="next-field1">80</div>
+          <div class="static-cell" id="next-field2">6-8</div>
+          <div class="static-cell" id="next-field3">1</div>
+          <div class="cell">
+            <div class="upcoming-pill" id="next-info-pill">Same Type Next</div>
+          </div>
+          <div class="cell"><div class="upcoming-info" id="next-info-copy">Queued</div></div>
+        </div>
+      </div>
+
+      <div class="flow-pill-wrap">
+        <div class="flow-pill" data-index="0" id="flow-pill-0">Weight</div>
+        <div class="flow-pill" data-index="1" id="flow-pill-1">Reps</div>
+        <div class="flow-pill" data-index="2" id="flow-pill-2">RIR</div>
+      </div>
+    </div>
+
+    <div class="keyboard" id="keyboard">
+      <div class="kb-toolbar">
+        <div class="kb-toolbar-main">
+          <div class="kb-field-label" id="kb-label"><span>Set 2</span> · Weight</div>
+          <div class="kb-type-badge" id="kb-type-badge">Working</div>
+        </div>
+        <div class="kb-helper" id="kb-helper">Standard straight-set entry: set the load, record the reps, then log effort.</div>
+        <div class="kb-choice-inline" id="kb-choice-inline"></div>
+      </div>
+
+      <div class="kb-progress" id="kb-progress">
+        <div class="kb-progress-chip" id="progress-0">Weight</div>
+        <div class="kb-progress-chip" id="progress-1">Reps</div>
+        <div class="kb-progress-chip" id="progress-2">RIR</div>
+      </div>
+
+      <div class="kb-body">
+        <div class="kb-grid" id="kb-grid">
+          <button class="kb-key" data-key="1" type="button">1</button>
+          <button class="kb-key" data-key="2" type="button">2</button>
+          <button class="kb-key" data-key="3" type="button">3</button>
+          <button class="kb-key" data-key="4" type="button">4</button>
+          <button class="kb-key" data-key="5" type="button">5</button>
+          <button class="kb-key" data-key="6" type="button">6</button>
+          <button class="kb-key" data-key="7" type="button">7</button>
+          <button class="kb-key" data-key="8" type="button">8</button>
+          <button class="kb-key" data-key="9" type="button">9</button>
+          <button class="kb-key" data-key="." id="decimal-key" type="button">.</button>
+          <button class="kb-key" data-key="0" type="button">0</button>
+          <button class="kb-key backspace" id="backspace-key" type="button">Delete</button>
+        </div>
+
+        <div class="kb-rail">
+          <button class="kb-rail-btn muted" id="rail-type" type="button">Working</button>
+          <div class="kb-rail-split">
+            <button id="adjust-left" type="button">-</button>
+            <button id="adjust-right" type="button">+</button>
+          </div>
+          <div class="kb-rail-nav">
+            <button id="prev-btn" type="button">Prev</button>
+            <button id="next-btn" type="button">Next</button>
+          </div>
+          <button class="kb-rail-primary" id="done-btn" type="button">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="explainer-card">
+    <div class="explainer-tag" id="explainer-tag">Working</div>
+    <h2 id="explainer-title">Working Set</h2>
+    <p id="explainer-purpose">Purpose: this is the control row for a straight working set.</p>
+    <p id="explainer-why">Why the row changes: this version stays compact because the method does not need extra structure beyond load, reps, and effort.</p>
+  </div>
+</div>
+
+<script>
+  const typeConfigs = {
+    working: {
+      name: "Working",
+      short: "Work",
+      accent: "#5B8DEF",
+      soft: "rgba(91,141,239,0.12)",
+      soft2: "rgba(91,141,239,0.18)",
+      glow: "rgba(91,141,239,0.30)",
+      activeTag: "BASE",
+      targetTitle: "Target Cue",
+      targetText() {
+        return "6-8 reps / RIR 1 / standard 120s rest.";
+      },
+      helperChips(draft) {
+        return ["Straight set", "PR eligible", `Load ${draft.field1 || "80"} kg`];
+      },
+      infoPill: "Straight",
+      infoCopy() {
+        return "Default row. The user only needs one load, one rep result, and one effort signal.";
+      },
+      footerTitle: "Why The Row Changes",
+      footerValue() {
+        return "Baseline";
+      },
+      footerCopy() {
+        return "This row stays simple because a normal working set does not need extra structure.";
+      },
+      explainerTitle: "Working Set",
+      explainerPurpose() {
+        return "Purpose: a baseline straight set with normal load, reps, and effort tracking.";
+      },
+      explainerWhy() {
+        return "Why the row changes: it does not. This is the control state that the other set types are compared against.";
+      },
+      headers: { field1: "Weight", field2: "Reps", field3: "RIR", info: "State" },
+      fields: {
+        field1: { label: "Weight", kind: "numeric", placeholder: "80", hint: "Load", step: 2.5, allowDecimal: true, helper: "Set the straight-set load." },
+        field2: { label: "Reps", kind: "numeric", placeholder: "--", hint: "Straight set", step: 1, allowDecimal: false, helper: "Enter the reps you completed." },
+        field3: { label: "RIR", kind: "choice", placeholder: "1", hint: "Effort target", options: ["--", "0", "1", "2", "3", "4", "5+"], helper: "Choose how many reps were left." }
+      },
+      flow: ["field1", "field2", "field3"],
+      draft: { field1: "80", field2: "", field3: "1" },
+      nextRow: { field1: "80", field2: "6-8", field3: "1", pill: "Same Type Next", note: "Queued" }
+    },
+    backoff: {
+      name: "Back-off",
+      short: "Back",
+      accent: "#78B7C5",
+      soft: "rgba(120,183,197,0.12)",
+      soft2: "rgba(120,183,197,0.18)",
+      glow: "rgba(120,183,197,0.30)",
+      activeTag: "-10%",
+      targetTitle: "Back-off Cue",
+      targetText(draft) {
+        return `${draft.field1 || "72.5"} kg / 8-10 reps / lower stress after the top set.`;
+      },
+      helperChips(draft) {
+        return ["Reduced load", "Recover without drifting", `${draft.field1 || "72.5"} kg from top set`];
+      },
+      infoPill: "Downshift",
+      infoCopy() {
+        return "Same bones as a straight set, but the row makes the reduced load feel intentional and softer.";
+      },
+      footerTitle: "Why The Row Changes",
+      footerValue() {
+        return "Lower Load";
+      },
+      footerCopy() {
+        return "Back-off sets keep the same entry pattern as working sets, but the copy and accents remind the user that this is deliberate load reduction, not a missed top set.";
+      },
+      explainerTitle: "Back-off Set",
+      explainerPurpose() {
+        return "Purpose: continue quality work after a hard top set without pretending the goal is the same intensity.";
+      },
+      explainerWhy() {
+        return "Why the row changes: the structure stays familiar, but the row downshifts the tone so the user sees follow-up volume instead of another max effort attempt.";
+      },
+      headers: { field1: "Weight", field2: "Reps", field3: "RIR", info: "Cue" },
+      fields: {
+        field1: { label: "Weight", kind: "numeric", placeholder: "72.5", hint: "Top set minus load", step: 2.5, allowDecimal: true, helper: "Suggested: reduce from the completed top set." },
+        field2: { label: "Reps", kind: "numeric", placeholder: "8-10", hint: "Volume work", step: 1, allowDecimal: false, helper: "Aim for clean follow-up volume." },
+        field3: { label: "RIR", kind: "choice", placeholder: "2", hint: "Keep margin", options: ["1", "2", "3", "4"], helper: "Keep a little more room than the top set." }
+      },
+      flow: ["field1", "field2", "field3"],
+      draft: { field1: "72.5", field2: "9", field3: "2" },
+      nextRow: { field1: "70", field2: "10", field3: "2", pill: "Second Back-off", note: "Same shape" }
+    },
+    amrap: {
+      name: "AMRAP",
+      short: "AMRAP",
+      accent: "#E89B3E",
+      soft: "rgba(232,155,62,0.12)",
+      soft2: "rgba(232,155,62,0.18)",
+      glow: "rgba(232,155,62,0.30)",
+      activeTag: "8+",
+      targetTitle: "AMRAP Cue",
+      targetText() {
+        return "Hit the floor, then keep going until the set naturally ends.";
+      },
+      helperChips(draft) {
+        return ["Reps are the headline", "Beat the floor", `Current effort: ${draft.field3 || "Near fail"}`];
+      },
+      infoPill: "Open End",
+      infoCopy(draft) {
+        return `${draft.field2 || "--"} reps logged. The row pushes attention toward the rep count, not just the load.`;
+      },
+      footerTitle: "Why The Row Changes",
+      footerValue() {
+        return "Reps First";
+      },
+      footerCopy() {
+        return "AMRAP sets are about the result, not the prescription. The row makes the rep outcome dominant and replaces generic RIR wording with plain effort language.";
+      },
+      explainerTitle: "AMRAP Set",
+      explainerPurpose() {
+        return "Purpose: make the set feel open-ended and competitive against a floor like 8+ reps.";
+      },
+      explainerWhy() {
+        return "Why the row changes: the reps field becomes the hero and the effort field talks in outcome language so the user feels a challenge, not just a normal logged set.";
+      },
+      headers: { field1: "Weight", field2: "Reps", field3: "Effort", info: "Cue" },
+      fields: {
+        field1: { label: "Weight", kind: "numeric", placeholder: "75", hint: "Fixed load", step: 2.5, allowDecimal: true, helper: "AMRAP usually keeps the load fixed while the reps float." },
+        field2: { label: "Reps", kind: "numeric", placeholder: "8+", hint: "Beat the floor", step: 1, allowDecimal: false, helper: "Record how far past the floor you got." },
+        field3: { label: "Effort", kind: "choice", placeholder: "Near fail", hint: "How far did you push?", options: ["Hard", "Near fail", "Failure"], helper: "Choose how close the set got to the edge." }
+      },
+      flow: ["field1", "field2", "field3"],
+      draft: { field1: "75", field2: "11", field3: "Near fail" },
+      nextRow: { field1: "75", field2: "8+", field3: "Hard", pill: "Last Push", note: "Rep floor stays open" }
+    },
+    dropset: {
+      name: "Drop Set",
+      short: "Drop",
+      accent: "#E26655",
+      soft: "rgba(226,102,85,0.12)",
+      soft2: "rgba(226,102,85,0.18)",
+      glow: "rgba(226,102,85,0.30)",
+      activeTag: "CHAIN",
+      targetTitle: "Drop Set Cue",
+      targetText(draft) {
+        const start = Number.parseFloat(draft.field1 || "80");
+        const stepOne = Number.isFinite(start) ? Math.max(0, Math.round((start * 0.9) * 10) / 10) : 72;
+        const stepTwo = Number.isFinite(start) ? Math.max(0, Math.round((start * 0.8) * 10) / 10) : 64;
+        return `${draft.field1 || "80"} -> ${stepOne} -> ${stepTwo} / ${draft.field3 || "8"} reps each stage.`;
+      },
+      helperChips(draft) {
+        return [`${draft.field2 || "2"} drops`, "Minimal rest", "One chained set"];
+      },
+      infoPill: "Sequence",
+      infoCopy(draft) {
+        return `Start heavy, then descend. Current preview: ${this.targetText(draft)}`;
+      },
+      footerTitle: "Why The Row Changes",
+      footerValue() {
+        return "Multi-stage";
+      },
+      footerCopy() {
+        return "A drop set is not one pair of numbers. The row makes the chain explicit so the user sees stages, not a vague normal set with a hidden note.";
+      },
+      explainerTitle: "Drop Set",
+      explainerPurpose() {
+        return "Purpose: represent one effort block as a descending series instead of pretending it is a single straight set.";
+      },
+      explainerWhy() {
+        return "Why the row changes: the extra sequence information has to live in the row itself, otherwise the drop mechanic disappears once the user starts entering numbers.";
+      },
+      headers: { field1: "Start Wt", field2: "Drops", field3: "Rep Goal", info: "Chain" },
+      fields: {
+        field1: { label: "Start Weight", kind: "numeric", placeholder: "80", hint: "Opening load", step: 2.5, allowDecimal: true, helper: "Set the opening load before the drops begin." },
+        field2: { label: "Drops", kind: "numeric", placeholder: "2", hint: "How many reductions?", step: 1, allowDecimal: false, helper: "Choose how many times the load will drop." },
+        field3: { label: "Rep Goal", kind: "numeric", placeholder: "8", hint: "Per stage", step: 1, allowDecimal: false, helper: "Target reps for each segment in the chain." }
+      },
+      flow: ["field1", "field2", "field3"],
+      draft: { field1: "80", field2: "2", field3: "8" },
+      nextRow: { field1: "77.5", field2: "2", field3: "8", pill: "Second Chain", note: "Same pattern" }
+    },
+    partial: {
+      name: "Partial",
+      short: "ROM",
+      accent: "#4ECDC4",
+      soft: "rgba(78,205,196,0.12)",
+      soft2: "rgba(78,205,196,0.18)",
+      glow: "rgba(78,205,196,0.30)",
+      activeTag: "ROM",
+      targetTitle: "Partial Cue",
+      targetText(draft) {
+        return `${draft.field3 || "Top Half"} partials after the full-ROM work. Keep the range explicit.`;
+      },
+      helperChips(draft) {
+        return [`ROM: ${draft.field3 || "Top Half"}`, "Not full range", "Track separately"];
+      },
+      infoPill: "Range Locked",
+      infoCopy(draft) {
+        return `Current ROM: ${draft.field3 || "Top Half"}. The row forces that choice into the set so the log cannot be mistaken for normal reps.`;
+      },
+      footerTitle: "Why The Row Changes",
+      footerValue() {
+        return "ROM Visible";
+      },
+      footerCopy() {
+        return "Partials are easy to confuse with straight reps. The row pulls range of motion into a first-class input so the user never loses that context.";
+      },
+      explainerTitle: "Partial Set",
+      explainerPurpose() {
+        return "Purpose: make a modified range-of-motion set readable at a glance instead of burying it in notes.";
+      },
+      explainerWhy() {
+        return "Why the row changes: the flow starts with the ROM choice because that decision changes what the entire set means.";
+      },
+      headers: { field1: "Weight", field2: "Reps", field3: "ROM", info: "Cue" },
+      fields: {
+        field1: { label: "Weight", kind: "numeric", placeholder: "65", hint: "Load", step: 2.5, allowDecimal: true, helper: "Set the load for the partial range." },
+        field2: { label: "Reps", kind: "numeric", placeholder: "12", hint: "Within the ROM", step: 1, allowDecimal: false, helper: "Count only the reps in the selected range." },
+        field3: { label: "ROM", kind: "choice", placeholder: "Top Half", hint: "Pick the range", options: ["Top Half", "Bottom Half", "Pins"], helper: "Choose the range before entering the numbers." }
+      },
+      flow: ["field3", "field1", "field2"],
+      draft: { field1: "65", field2: "12", field3: "Top Half" },
+      nextRow: { field1: "65", field2: "10-12", field3: "Top Half", pill: "ROM Locked", note: "Same range next" }
+    },
+    myo: {
+      name: "Myo",
+      short: "Myo",
+      accent: "#8FC45D",
+      soft: "rgba(143,196,93,0.12)",
+      soft2: "rgba(143,196,93,0.18)",
+      glow: "rgba(143,196,93,0.30)",
+      activeTag: "BURST",
+      targetTitle: "Myo Cue",
+      targetText(draft) {
+        return `${draft.field2 || "12"} activation reps, then ${draft.field3 || "4 mini sets"} with short breaths.`;
+      },
+      helperChips(draft) {
+        return ["Activation + bursts", draft.field3 || "4 mini sets", "Short breaths"];
+      },
+      infoPill: "Two Phase",
+      infoCopy(draft) {
+        return `Activation first, then ${draft.field3 || "4 mini sets"}. The row separates the setup from the burst structure.`;
+      },
+      footerTitle: "Why The Row Changes",
+      footerValue() {
+        return "Two Stage";
+      },
+      footerCopy() {
+        return "Myo-reps combine an activation set with mini sets. The row splits those ideas so the method reads as a sequence instead of vague effort language.";
+      },
+      explainerTitle: "Myo Set",
+      explainerPurpose() {
+        return "Purpose: give the user a two-phase row for activation work followed by short mini-set bursts.";
+      },
+      explainerWhy() {
+        return "Why the row changes: myo-reps need one field for the activation effort and another for the mini-set structure, otherwise the method collapses into a confusing generic row.";
+      },
+      headers: { field1: "Weight", field2: "Activation", field3: "Minis", info: "Cue" },
+      fields: {
+        field1: { label: "Weight", kind: "numeric", placeholder: "27.5", hint: "Load", step: 2.5, allowDecimal: true, helper: "Pick the load for the activation set." },
+        field2: { label: "Activation", kind: "numeric", placeholder: "12", hint: "First push", step: 1, allowDecimal: false, helper: "Log the first hard activation set." },
+        field3: { label: "Minis", kind: "choice", placeholder: "4 mini sets", hint: "Burst count", options: ["3 mini sets", "4 mini sets", "5 mini sets"], helper: "Choose how many short mini sets follow." }
+      },
+      flow: ["field1", "field2", "field3"],
+      draft: { field1: "27.5", field2: "12", field3: "4 mini sets" },
+      nextRow: { field1: "27.5", field2: "12-15", field3: "4 mini sets", pill: "Burst Repeat", note: "Same structure next" }
+    }
+  };
+
+  const state = {
+    currentType: "working",
+    focusedField: null,
+    drafts: Object.fromEntries(
+      Object.entries(typeConfigs).map(([key, config]) => [key, { ...config.draft }])
+    )
+  };
+
+  const phone = document.getElementById("phone");
+  const scroll = document.getElementById("scroll");
+  const keyboard = document.getElementById("keyboard");
+  const helperStrip = document.getElementById("helper-strip");
+  const choiceInline = document.getElementById("kb-choice-inline");
+  const typeButtons = document.querySelectorAll(".type-btn");
+  const keyButtons = document.querySelectorAll(".kb-key[data-key]");
+  const flowPills = [0, 1, 2].map((index) => document.getElementById(`flow-pill-${index}`));
+  const progressPills = [0, 1, 2].map((index) => document.getElementById(`progress-${index}`));
+  const fieldCards = {
+    field1: document.getElementById("field-card-1"),
+    field2: document.getElementById("field-card-2"),
+    field3: document.getElementById("field-card-3")
+  };
+  const fieldEls = {
+    field1: {
+      label: document.getElementById("field1-label"),
+      value: document.getElementById("field1-value"),
+      hint: document.getElementById("field1-hint")
+    },
+    field2: {
+      label: document.getElementById("field2-label"),
+      value: document.getElementById("field2-value"),
+      hint: document.getElementById("field2-hint")
+    },
+    field3: {
+      label: document.getElementById("field3-label"),
+      value: document.getElementById("field3-value"),
+      hint: document.getElementById("field3-hint")
+    }
+  };
+
+  const headerEls = {
+    field1: document.getElementById("head-field1"),
+    field2: document.getElementById("head-field2"),
+    field3: document.getElementById("head-field3"),
+    info: document.getElementById("head-info")
+  };
+
+  const targetIcon = document.getElementById("target-icon");
+  const targetTitle = document.getElementById("target-title");
+  const targetText = document.getElementById("target-text");
+  const activeTag = document.getElementById("active-tag");
+  const activeInfoPill = document.getElementById("active-info-pill");
+  const activeInfoCopy = document.getElementById("active-info-copy");
+  const footerTitle = document.getElementById("footer-title");
+  const footerValue = document.getElementById("footer-value");
+  const footerCopy = document.getElementById("footer-copy");
+  const nextField1 = document.getElementById("next-field1");
+  const nextField2 = document.getElementById("next-field2");
+  const nextField3 = document.getElementById("next-field3");
+  const nextInfoPill = document.getElementById("next-info-pill");
+  const nextInfoCopy = document.getElementById("next-info-copy");
+  const kbLabel = document.getElementById("kb-label");
+  const kbTypeBadge = document.getElementById("kb-type-badge");
+  const kbHelper = document.getElementById("kb-helper");
+  const railType = document.getElementById("rail-type");
+  const decimalKey = document.getElementById("decimal-key");
+  const backspaceKey = document.getElementById("backspace-key");
+  const prevBtn = document.getElementById("prev-btn");
+  const nextBtn = document.getElementById("next-btn");
+  const doneBtn = document.getElementById("done-btn");
+  const adjustLeft = document.getElementById("adjust-left");
+  const adjustRight = document.getElementById("adjust-right");
+  const explainerTag = document.getElementById("explainer-tag");
+  const explainerTitle = document.getElementById("explainer-title");
+  const explainerPurpose = document.getElementById("explainer-purpose");
+  const explainerWhy = document.getElementById("explainer-why");
+  const activeBadge = document.getElementById("active-badge");
+
+  function currentConfig() {
+    return typeConfigs[state.currentType];
+  }
+
+  function currentDraft() {
+    return state.drafts[state.currentType];
+  }
+
+  function currentFlow() {
+    return currentConfig().flow;
+  }
+
+  function currentFieldConfig(fieldId) {
+    return currentConfig().fields[fieldId];
+  }
+
+  function focusedFieldConfig() {
+    return state.focusedField ? currentFieldConfig(state.focusedField) : null;
+  }
+
+  function isNumericField(fieldId) {
+    return currentFieldConfig(fieldId).kind === "numeric";
+  }
+
+  function formatNumericValue(value, allowDecimal) {
+    const parsed = Number.parseFloat(value);
+    if (!Number.isFinite(parsed)) return "";
+    if (!allowDecimal) return String(Math.round(parsed));
+    if (Math.abs(parsed % 1) < 0.001) return String(Math.round(parsed));
+    return parsed.toFixed(1);
+  }
+
+  function setTheme(config) {
+    phone.style.setProperty("--type-accent", config.accent);
+    phone.style.setProperty("--type-soft", config.soft);
+    phone.style.setProperty("--type-soft-2", config.soft2);
+    phone.style.setProperty("--type-glow", config.glow);
+    document.documentElement.style.setProperty("--type-accent", config.accent);
+    document.documentElement.style.setProperty("--type-soft", config.soft);
+    document.documentElement.style.setProperty("--type-soft-2", config.soft2);
+    document.documentElement.style.setProperty("--type-glow", config.glow);
+  }
+
+  function setType(type) {
+    state.currentType = type;
+    state.focusedField = null;
+    render();
+  }
+
+  function openField(fieldId) {
+    state.focusedField = fieldId;
+    render();
+  }
+
+  function closeKeyboard() {
+    state.focusedField = null;
+    render();
+  }
+
+  function currentStepIndex() {
+    return currentFlow().indexOf(state.focusedField);
+  }
+
+  function moveToNextStep() {
+    if (!state.focusedField) return;
+    const flow = currentFlow();
+    const index = flow.indexOf(state.focusedField);
+    if (index === -1) return;
+    if (index === flow.length - 1) {
+      closeKeyboard();
+      return;
+    }
+    state.focusedField = flow[index + 1];
+    render();
+  }
+
+  function moveToPreviousStep() {
+    if (!state.focusedField) return;
+    const flow = currentFlow();
+    const index = flow.indexOf(state.focusedField);
+    if (index <= 0) return;
+    state.focusedField = flow[index - 1];
+    render();
+  }
+
+  function currentValue(fieldId) {
+    return currentDraft()[fieldId] || "";
+  }
+
+  function setCurrentValue(fieldId, value) {
+    currentDraft()[fieldId] = value;
+  }
+
+  function pressKey(key) {
+    const field = focusedFieldConfig();
+    if (!field || field.kind !== "numeric") return;
+
+    let value = currentValue(state.focusedField);
+    if (key === "." && !field.allowDecimal) return;
+    if (key === "." && value.includes(".")) return;
+
+    if (value === "0" && key !== ".") {
+      value = "";
+    }
+
+    setCurrentValue(state.focusedField, value + key);
+    render();
+  }
+
+  function pressBackspace() {
+    const field = focusedFieldConfig();
+    if (!field || field.kind !== "numeric") return;
+    setCurrentValue(state.focusedField, currentValue(state.focusedField).slice(0, -1));
+    render();
+  }
+
+  function nudgeValue(direction) {
+    const field = focusedFieldConfig();
+    if (!field || field.kind !== "numeric") return;
+
+    const step = field.step || 1;
+    const current = Number.parseFloat(currentValue(state.focusedField) || "0");
+    const next = Math.max(0, (Number.isFinite(current) ? current : 0) + (direction * step));
+    setCurrentValue(state.focusedField, formatNumericValue(next, field.allowDecimal));
+    render();
+  }
+
+  function selectChoice(option) {
+    const field = focusedFieldConfig();
+    if (!field || field.kind !== "choice") return;
+    setCurrentValue(state.focusedField, option);
+    render();
+  }
+
+  function renderTypeButtons() {
+    typeButtons.forEach((button) => {
+      button.classList.toggle("active", button.dataset.type === state.currentType);
+    });
+  }
+
+  function renderHeaders(config) {
+    headerEls.field1.textContent = config.headers.field1;
+    headerEls.field2.textContent = config.headers.field2;
+    headerEls.field3.textContent = config.headers.field3;
+    headerEls.info.textContent = config.headers.info;
+  }
+
+  function renderTargetBar(config, draft) {
+    targetIcon.textContent = config.short;
+    targetTitle.textContent = config.targetTitle;
+    targetText.textContent = config.targetText(draft);
+
+    helperStrip.innerHTML = "";
+    config.helperChips(draft).forEach((chip, index) => {
+      const chipEl = document.createElement("div");
+      chipEl.className = `helper-chip${index === 0 ? " primary" : ""}`;
+      chipEl.textContent = chip;
+      helperStrip.appendChild(chipEl);
+    });
+  }
+
+  function renderActiveRow(config, draft) {
+    activeBadge.textContent = "2";
+    activeTag.textContent = config.activeTag;
+    activeInfoPill.textContent = config.infoPill;
+    activeInfoCopy.textContent = config.infoCopy(draft);
+    footerTitle.textContent = config.footerTitle;
+    footerValue.textContent = config.footerValue(draft);
+    footerCopy.textContent = config.footerCopy(draft);
+
+    Object.entries(config.fields).forEach(([fieldId, fieldConfig]) => {
+      const value = draft[fieldId] || fieldConfig.placeholder;
+      fieldEls[fieldId].label.textContent = fieldConfig.label;
+      fieldEls[fieldId].value.textContent = value;
+      fieldEls[fieldId].value.classList.toggle("choice", fieldConfig.kind === "choice");
+      fieldEls[fieldId].hint.textContent = fieldConfig.hint;
+      fieldCards[fieldId].classList.toggle("filled", Boolean(draft[fieldId]));
+      fieldCards[fieldId].classList.toggle("focused", state.focusedField === fieldId);
+    });
+  }
+
+  function renderNextRow(config) {
+    nextField1.textContent = config.nextRow.field1;
+    nextField2.textContent = config.nextRow.field2;
+    nextField3.textContent = config.nextRow.field3;
+    nextInfoPill.textContent = config.nextRow.pill;
+    nextInfoCopy.textContent = config.nextRow.note;
+  }
+
+  function renderFlow() {
+    const flow = currentFlow();
+    const index = currentStepIndex();
+
+    flowPills.forEach((pill, pillIndex) => {
+      const fieldId = flow[pillIndex];
+      pill.textContent = currentFieldConfig(fieldId).label;
+      pill.classList.remove("current", "done");
+      if (index === -1) return;
+      if (pillIndex < index) pill.classList.add("done");
+      if (pillIndex === index) pill.classList.add("current");
+    });
+
+    progressPills.forEach((pill, pillIndex) => {
+      const fieldId = flow[pillIndex];
+      pill.textContent = currentFieldConfig(fieldId).label;
+      pill.classList.remove("current", "done");
+      if (index === -1) return;
+      if (pillIndex < index) pill.classList.add("done");
+      if (pillIndex === index) pill.classList.add("current");
+    });
+  }
+
+  function renderKeyboard(config, draft) {
+    keyboard.classList.toggle("open", Boolean(state.focusedField));
+    scroll.classList.toggle("kb-open", Boolean(state.focusedField));
+    kbTypeBadge.textContent = config.name;
+    railType.textContent = config.name;
+
+    const focused = focusedFieldConfig();
+    const labelText = focused ? focused.label : config.fields[currentFlow()[0]].label;
+    kbLabel.innerHTML = `<span>Set 2</span> · ${labelText}`;
+    kbHelper.textContent = focused ? focused.helper : "Tap a field in the active row to start the type-specific flow.";
+
+    choiceInline.innerHTML = "";
+    const showChoices = focused && focused.kind === "choice";
+    choiceInline.style.display = showChoices ? "flex" : "none";
+
+    if (showChoices) {
+      focused.options.forEach((option) => {
+        const chip = document.createElement("button");
+        chip.className = "kb-choice-chip";
+        if ((draft[state.focusedField] || focused.placeholder) === option) {
+          chip.classList.add("selected");
+        }
+        chip.type = "button";
+        chip.textContent = option;
+        chip.addEventListener("click", () => selectChoice(option));
+        choiceInline.appendChild(chip);
+      });
+    }
+
+    const numericFocused = Boolean(focused && focused.kind === "numeric");
+    keyButtons.forEach((button) => {
+      button.disabled = !numericFocused;
+      button.classList.toggle("disabled", !numericFocused);
+    });
+
+    backspaceKey.disabled = !numericFocused;
+    backspaceKey.classList.toggle("disabled", !numericFocused);
+    decimalKey.disabled = !(numericFocused && focused.allowDecimal);
+    decimalKey.classList.toggle("disabled", !(numericFocused && focused.allowDecimal));
+
+    adjustLeft.disabled = !numericFocused;
+    adjustRight.disabled = !numericFocused;
+    if (numericFocused) {
+      adjustLeft.textContent = "-";
+      adjustRight.textContent = "+";
+    } else {
+      adjustLeft.textContent = "--";
+      adjustRight.textContent = "--";
+    }
+
+    const flow = currentFlow();
+    const stepIndex = currentStepIndex();
+    prevBtn.disabled = !state.focusedField || stepIndex <= 0;
+    nextBtn.disabled = !state.focusedField;
+    doneBtn.disabled = !state.focusedField;
+  }
+
+  function renderExplainer(config, draft) {
+    explainerTag.textContent = config.name;
+    explainerTitle.textContent = config.explainerTitle;
+    explainerPurpose.textContent = config.explainerPurpose(draft);
+    explainerWhy.textContent = config.explainerWhy(draft);
+  }
+
+  function render() {
+    const config = currentConfig();
+    const draft = currentDraft();
+
+    setTheme(config);
+    renderTypeButtons();
+    renderHeaders(config);
+    renderTargetBar(config, draft);
+    renderActiveRow(config, draft);
+    renderNextRow(config);
+    renderFlow();
+    renderKeyboard(config, draft);
+    renderExplainer(config, draft);
+  }
+
+  typeButtons.forEach((button) => {
+    button.addEventListener("click", () => setType(button.dataset.type));
+  });
+
+  Object.entries(fieldCards).forEach(([fieldId, card]) => {
+    card.addEventListener("click", () => openField(fieldId));
+  });
+
+  keyButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      if (!button.disabled) pressKey(button.dataset.key);
+    });
+  });
+
+  backspaceKey.addEventListener("click", () => {
+    if (!backspaceKey.disabled) pressBackspace();
+  });
+
+  prevBtn.addEventListener("click", moveToPreviousStep);
+  nextBtn.addEventListener("click", moveToNextStep);
+  doneBtn.addEventListener("click", closeKeyboard);
+  adjustLeft.addEventListener("click", () => nudgeValue(-1));
+  adjustRight.addEventListener("click", () => nudgeValue(1));
+
+  document.addEventListener("click", (event) => {
+    if (
+      !event.target.closest(".keyboard") &&
+      !event.target.closest(".active-shell") &&
+      !event.target.closest(".type-switcher")
+    ) {
+      closeKeyboard();
+    }
+  });
+
+  render();
+</script>
+</body>
+</html>

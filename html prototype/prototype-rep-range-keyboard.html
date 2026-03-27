@@ -1,0 +1,2257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workout - Rep Range Prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #111113;
+    --bg-card: #1b1b1f;
+    --bg-hover: #222228;
+    --bg-subtle: #262630;
+    --bg-input: #1f1f25;
+    --blue: #5b8def;
+    --blue-soft: rgba(91, 141, 239, 0.12);
+    --green: #5ec269;
+    --green-soft: rgba(94, 194, 105, 0.10);
+    --gold: #d4a23a;
+    --gold-soft: rgba(212, 162, 58, 0.10);
+    --red: #e05555;
+    --red-soft: rgba(224, 85, 85, 0.10);
+    --orange: #e89b3e;
+    --orange-soft: rgba(232, 155, 62, 0.10);
+    --text: #eaeaef;
+    --text-mid: #9999a8;
+    --text-dim: #5c5c6e;
+    --border: rgba(255, 255, 255, 0.06);
+    --r: 14px;
+    --r-sm: 10px;
+
+    --rir-0: #e05555;
+    --rir-1: #e07040;
+    --rir-2: #e89b3e;
+    --rir-3: #d4a23a;
+    --rir-4: #a0b83c;
+    --rir-5: #5ec269;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #060608;
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  .layout {
+    display: flex;
+    gap: 56px;
+    align-items: flex-start;
+  }
+
+  .notes-panel {
+    width: 308px;
+    padding-top: 28px;
+  }
+
+  .notes-panel h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .notes-panel .sub {
+    font-size: 13px;
+    color: var(--text-mid);
+    line-height: 1.6;
+    margin-bottom: 20px;
+  }
+
+  .variant-switch {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 18px;
+  }
+
+  .variant-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 8px 12px;
+    border-radius: 7px;
+    cursor: pointer;
+  }
+
+  .variant-btn.active {
+    background: var(--blue);
+    color: #fff;
+  }
+
+  .note-item {
+    margin-bottom: 16px;
+    padding-left: 14px;
+    border-left: 2px solid var(--border);
+  }
+
+  .note-item .tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+  }
+
+  .note-item .tag.changed { background: var(--orange-soft); color: var(--orange); }
+  .note-item .tag.new { background: var(--blue-soft); color: var(--blue); }
+  .note-item .tag.flow { background: var(--green-soft); color: var(--green); }
+
+  .note-item h4 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+
+  .note-item p {
+    font-size: 12px;
+    color: var(--text-mid);
+    line-height: 1.45;
+  }
+
+  .phone {
+    width: 393px;
+    height: 852px;
+    background: var(--bg);
+    border-radius: 44px;
+    border: 2.5px solid #232328;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 28px 6px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .status-r {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .status-r svg {
+    width: 16px;
+    height: 16px;
+    fill: var(--text);
+  }
+
+  .scroll {
+    height: calc(100% - 42px);
+    overflow-y: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    transition: height 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .scroll::-webkit-scrollbar { display: none; }
+  .scroll.kb-open { height: calc(100% - 42px - 330px); }
+
+  .compare-header {
+    padding: 10px 20px 0;
+  }
+
+  .compare-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .compare-switch {
+    display: flex;
+    gap: 6px;
+  }
+
+  .compare-switch button {
+    flex: 1;
+    padding: 9px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .compare-switch button.active {
+    background: var(--blue-soft);
+    border-color: rgba(91, 141, 239, 0.35);
+    color: var(--blue);
+  }
+
+  .mode-caption {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-mid);
+    min-height: 17px;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    padding: 10px 20px 10px;
+    gap: 10px;
+  }
+
+  .btn-back {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--blue);
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: inherit;
+  }
+
+  .btn-back svg {
+    width: 18px;
+    height: 18px;
+    stroke: var(--blue);
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .topbar-spacer { flex: 1; }
+
+  .btn-done {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--blue);
+    background: var(--blue-soft);
+    border: none;
+    padding: 7px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .ex-nav {
+    display: flex;
+    gap: 4px;
+    padding: 0 20px;
+    margin-bottom: 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .ex-nav::-webkit-scrollbar { display: none; }
+
+  .ex-tab {
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    background: var(--bg-card);
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .ex-tab.active {
+    background: var(--blue);
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .ex-title-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 20px;
+    margin-bottom: 14px;
+  }
+
+  .ex-title {
+    flex: 1;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .source-chip {
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-mid);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .target-bar {
+    margin: 0 20px 10px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(91, 141, 239, 0.10);
+    border: 1px solid rgba(91, 141, 239, 0.18);
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .target-bar-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    background: rgba(91, 141, 239, 0.18);
+    color: var(--blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .target-bar-text {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.35;
+  }
+
+  .annotation {
+    margin: 0 20px 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-mid);
+    line-height: 1.45;
+  }
+
+  .suggestion-card {
+    margin: 0 20px 12px;
+    padding: 14px;
+    border-radius: 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+  }
+
+  .suggestion-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .suggestion-main {
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 6px;
+  }
+
+  .suggestion-main .muted { color: var(--text-mid); font-weight: 600; }
+
+  .suggestion-sub {
+    font-size: 12px;
+    color: var(--text-mid);
+    line-height: 1.45;
+  }
+
+  .set-table {
+    margin: 0 20px 12px;
+    background: var(--bg-card);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+
+  .set-table-head {
+    display: grid;
+    grid-template-columns: 36px 1fr 1fr 44px 92px 40px;
+    gap: 4px;
+    padding: 10px 8px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .set-table-head span {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-align: center;
+  }
+
+  .set-table-head span:first-child { text-align: left; }
+
+  .set-row {
+    display: grid;
+    grid-template-columns: 36px 1fr 1fr 44px 92px 40px;
+    align-items: center;
+    padding: 10px 8px;
+    gap: 4px;
+    min-height: 68px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  }
+
+  .set-row:last-child { border-bottom: none; }
+  .set-row.warmup { opacity: 0.58; }
+  .set-row.completed { background: var(--green-soft); }
+  .set-row.active { background: rgba(91, 141, 239, 0.05); }
+
+  .set-num-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .set-num {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-dim);
+    background: var(--bg-subtle);
+  }
+
+  .set-num.warm {
+    background: var(--gold-soft);
+    color: var(--gold);
+  }
+
+  .field-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .field-input {
+    width: 100%;
+    height: 36px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-input);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    text-align: center;
+    padding: 0 8px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .field-input.focused {
+    border-color: var(--blue);
+    background: rgba(91, 141, 239, 0.06);
+  }
+
+  .field-input::placeholder {
+    color: var(--text-dim);
+  }
+
+  .field-subtext {
+    font-size: 10px;
+    line-height: 1.25;
+    color: var(--text-dim);
+    text-align: center;
+    min-height: 24px;
+  }
+
+  .field-subtext strong {
+    color: var(--text-mid);
+    font-weight: 700;
+  }
+
+  .rir-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-input);
+    color: var(--text-mid);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .rir-btn.focused {
+    border-color: var(--blue);
+    background: rgba(91, 141, 239, 0.06);
+  }
+
+  .rir-btn[data-rir="0"] { color: var(--rir-0); }
+  .rir-btn[data-rir="1"] { color: var(--rir-1); }
+  .rir-btn[data-rir="2"] { color: var(--rir-2); }
+  .rir-btn[data-rir="3"] { color: var(--rir-3); }
+  .rir-btn[data-rir="4"] { color: var(--rir-4); }
+  .rir-btn[data-rir="5+"] { color: var(--rir-5); }
+
+  .plan-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: stretch;
+  }
+
+  .plan-pill {
+    min-height: 26px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg-subtle);
+    color: var(--text);
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+    text-align: center;
+  }
+
+  .plan-pill.warning {
+    background: var(--orange-soft);
+    color: var(--orange);
+    border-color: rgba(232, 155, 62, 0.22);
+  }
+
+  .plan-pill.success {
+    background: var(--green-soft);
+    color: var(--green);
+    border-color: rgba(94, 194, 105, 0.22);
+  }
+
+  .plan-meta {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: center;
+    min-height: 24px;
+    line-height: 1.2;
+  }
+
+  .set-check-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .set-check {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    border: 2px solid var(--text-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: transparent;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .set-check.done {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: #fff;
+  }
+
+  .fatigue-card {
+    margin: 0 20px 12px;
+    padding: 14px;
+    border-radius: 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+  }
+
+  .fatigue-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+
+  .fatigue-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .fatigue-switch {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 999px;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+  }
+
+  .fatigue-switch button {
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 6px 8px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+
+  .fatigue-switch button.active {
+    background: var(--blue);
+    color: #fff;
+  }
+
+  .fatigue-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .fatigue-status.success {
+    background: var(--green-soft);
+    color: var(--green);
+  }
+
+  .fatigue-status.danger {
+    background: var(--red-soft);
+    color: var(--red);
+  }
+
+  .fatigue-status.warning {
+    background: var(--orange-soft);
+    color: var(--orange);
+  }
+
+  .fatigue-status.neutral {
+    background: var(--bg-subtle);
+    color: var(--text-mid);
+  }
+
+  .fatigue-copy {
+    font-size: 12px;
+    color: var(--text-mid);
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+
+  .fatigue-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .fatigue-stat {
+    border-radius: 12px;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    padding: 10px;
+  }
+
+  .fatigue-stat-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+  }
+
+  .fatigue-stat strong {
+    display: block;
+    font-size: 14px;
+    line-height: 1.2;
+  }
+
+  .flow-pill-wrap {
+    margin: 0 20px 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    display: flex;
+    gap: 6px;
+  }
+
+  .flow-pill {
+    flex: 1;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    background: var(--bg-subtle);
+    border-radius: 7px;
+    padding: 6px 4px;
+  }
+
+  .flow-pill.current {
+    color: var(--blue);
+    background: var(--blue-soft);
+  }
+
+  .flow-pill.done {
+    color: var(--green);
+    background: var(--green-soft);
+  }
+
+  .keyboard {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #1a1a1e;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 8px 10px 28px;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    z-index: 100;
+  }
+
+  .keyboard.open { transform: translateY(0); }
+
+  .kb-progress {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .kb-progress-chip {
+    flex: 1;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    background: #222228;
+    border-radius: 6px;
+    padding: 5px 4px;
+  }
+
+  .kb-progress-chip.current {
+    color: var(--blue);
+    background: var(--blue-soft);
+  }
+
+  .kb-progress-chip.done {
+    color: var(--green);
+    background: var(--green-soft);
+  }
+
+  .kb-current-tools {
+    display: none;
+    position: absolute;
+    top: -20px;
+    right: 14px;
+    gap: 6px;
+    z-index: 130;
+  }
+
+  .kb-float-btn {
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: #2b2b31;
+    color: var(--text-mid);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+  }
+
+  .kb-float-btn.active {
+    color: var(--blue);
+    background: var(--blue-soft);
+    border-color: rgba(91, 141, 239, 0.30);
+  }
+
+  .kb-float-btn:disabled {
+    color: var(--text-dim);
+    cursor: default;
+  }
+
+  .kb-proposed-toolbar {
+    display: none;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    background: #202025;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+  }
+
+  .kb-toolbar-main {
+    padding: 10px 12px 8px;
+  }
+
+  .kb-field-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-mid);
+    margin-bottom: 8px;
+  }
+
+  .kb-field-label span {
+    color: var(--blue);
+  }
+
+  .kb-context-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .kb-context-chip,
+  .kb-target-pill,
+  .kb-chosen-pill {
+    min-height: 32px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: #2a2a31;
+    color: var(--text-mid);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 0 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: default;
+  }
+
+  .kb-target-pill {
+    background: var(--blue-soft);
+    color: var(--blue);
+    border-color: rgba(91, 141, 239, 0.24);
+    cursor: pointer;
+  }
+
+  .kb-chosen-pill {
+    color: var(--text);
+  }
+
+  .kb-current-hint {
+    padding: 10px 12px 11px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    color: var(--text-mid);
+    font-size: 12px;
+    line-height: 1.4;
+    display: none;
+  }
+
+  .kb-rir-inline {
+    display: none;
+    gap: 9px;
+    padding: 10px 12px 11px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    background: #1e1f24;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .kb-rir-inline::-webkit-scrollbar { display: none; }
+
+  .kb-rir-chip {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: #2a2a31;
+    color: var(--text-mid);
+    font-family: inherit;
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: center;
+    line-height: 1;
+  }
+
+  .kb-rir-chip[data-val="0"] { color: var(--rir-0); }
+  .kb-rir-chip[data-val="1"] { color: var(--rir-1); }
+  .kb-rir-chip[data-val="2"] { color: var(--rir-2); }
+  .kb-rir-chip[data-val="3"] { color: var(--rir-3); }
+  .kb-rir-chip[data-val="4"] { color: var(--rir-4); }
+  .kb-rir-chip[data-val="5+"] { color: var(--rir-5); }
+
+  .kb-rir-chip.selected {
+    border-color: rgba(91, 141, 239, 0.35);
+    background: var(--blue-soft);
+  }
+
+  .kb-target-editor {
+    display: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 10px 12px 12px;
+    background: #1e1f24;
+  }
+
+  .kb-target-editor.open { display: block; }
+
+  .kb-mode-toggle {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 999px;
+    background: #2a2a31;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 10px;
+  }
+
+  .kb-mode-toggle button {
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 7px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+
+  .kb-mode-toggle button.active {
+    background: var(--blue);
+    color: #fff;
+  }
+
+  .kb-editor-fields {
+    display: none;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .kb-editor-fields.open { display: flex; }
+
+  .kb-mini-field {
+    width: 58px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #2a2a31;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .kb-mini-field.active {
+    border-color: var(--blue);
+    background: rgba(91, 141, 239, 0.08);
+  }
+
+  .kb-editor-separator {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-mid);
+  }
+
+  .kb-target-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .kb-target-actions button {
+    flex: 1;
+    height: 36px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #2a2a31;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .kb-target-actions button.primary {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: #fff;
+  }
+
+  .kb-target-actions button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .kb-target-error {
+    min-height: 16px;
+    margin-top: 8px;
+    color: var(--orange);
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  .kb-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .kb-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .kb-key {
+    height: 48px;
+    border-radius: 10px;
+    background: #2a2a30;
+    border: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 22px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .kb-key.disabled {
+    color: var(--text-dim);
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .kb-key.backspace {
+    background: #222228;
+    font-size: 16px;
+    color: var(--text-mid);
+  }
+
+  .kb-rail {
+    display: none;
+    width: 104px;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .kb-rail-btn {
+    min-height: 44px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: #36373d;
+    color: #f2f2f3;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 0 10px;
+  }
+
+  .kb-rail-btn.secondary {
+    background: #2b2c31;
+    font-size: 12px;
+  }
+
+  .kb-rail-btn:disabled {
+    color: #8a8a91;
+    cursor: default;
+  }
+
+  .kb-rail-primary {
+    height: 52px;
+    border-radius: 18px;
+    border: none;
+    background: #ececef;
+    color: #111115;
+    font-family: inherit;
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .kb-rail-primary:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .mode-current .kb-current-tools { display: flex; }
+  .mode-current .kb-current-hint { display: block; }
+  .mode-current.rir-step .kb-rir-inline { display: flex; }
+
+  .mode-proposed .kb-proposed-toolbar { display: block; }
+  .mode-proposed .kb-progress { display: none; }
+  .mode-proposed .kb-body { grid-template-columns: minmax(0, 1fr) 104px; }
+  .mode-proposed .kb-rail { display: flex; }
+  .mode-proposed.rir-step .kb-rir-inline { display: flex; }
+
+  .mode-current.rir-step .kb-grid,
+  .mode-proposed.rir-step .kb-grid {
+    opacity: 0.45;
+  }
+
+  @media (max-width: 860px) {
+    .layout {
+      flex-direction: column-reverse;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .notes-panel {
+      width: 100%;
+      max-width: 393px;
+      padding-top: 0;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="notes-panel">
+    <h2>Rep Range Flow</h2>
+    <div class="sub">Prototype the current rep-range behavior against a cleaner keyboard-first proposal before touching the app.</div>
+
+    <div class="variant-switch">
+      <button class="variant-btn active" data-variant="current">Current</button>
+      <button class="variant-btn" data-variant="proposed">Proposed</button>
+    </div>
+
+    <div class="note-item">
+      <span class="tag changed">CURRENT</span>
+      <h4>Reps field carries too much</h4>
+      <p>The active reps field can act like target entry and performed reps entry, so target edits and actual logging compete for the same space.</p>
+    </div>
+
+    <div class="note-item">
+      <span class="tag new">PROPOSED</span>
+      <h4>Target gets its own control</h4>
+      <p>The reps field stays single-purpose. Target editing moves into the keyboard toolbar with exact and range modes plus explicit Apply and Clear actions.</p>
+    </div>
+
+    <div class="note-item">
+      <span class="tag flow">CONTINUITY</span>
+      <h4>Template to workout stays visible</h4>
+      <p>The template source, current target, engine-chosen reps, and actual performed reps stay visible together so it is easier to reason about what the set is asking for.</p>
+    </div>
+
+    <div class="note-item">
+      <span class="tag flow">TRY IT</span>
+      <h4>Suggested checks</h4>
+      <p>Clear the target, set it to exact 10, switch back to 6-8, then enter 7 reps and 10 reps to watch the fatigue state flip between usable and skipped.</p>
+    </div>
+  </div>
+
+  <div class="phone">
+    <div class="status-bar">
+      <span>09:24</span>
+      <div class="status-r">
+        <svg viewBox="0 0 16 16"><circle cx="2" cy="8" r="1.5"/><circle cx="6" cy="8" r="1.5"/><circle cx="10" cy="8" r="1.5"/><circle cx="14" cy="8" r="1.5"/></svg>
+        <svg viewBox="0 0 16 16"><path d="M1 11.5c2-4 4.5-6.5 7-8.5M4 12c1.5-3 3.5-5 5.5-6.5M7 12.5c1-2 2.5-3.5 4-4.5M10.5 12.5c.5-.8 1.2-1.5 2-2" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <svg viewBox="0 0 24 14"><rect x="0" y="1" width="20" height="12" rx="2.5" stroke="currentColor" fill="none" stroke-width="1.5"/><rect x="2" y="3" width="14" height="8" rx="1" fill="currentColor"/><path d="M22 5v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+    </div>
+
+    <div class="scroll" id="scroll">
+      <div class="compare-header">
+        <div class="compare-title">Rep Range Prototype</div>
+        <div class="compare-switch">
+          <button class="active" data-variant="current">Current</button>
+          <button data-variant="proposed">Proposed</button>
+        </div>
+        <div class="mode-caption" id="mode-caption">Current: the reps field can still stand in for both target edits and performed reps.</div>
+      </div>
+
+      <div class="topbar">
+        <button class="btn-back">
+          <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          Back
+        </button>
+        <div class="topbar-spacer"></div>
+        <button class="btn-done">Finish</button>
+      </div>
+
+      <div class="ex-nav">
+        <div class="ex-tab active">Bench Press</div>
+        <div class="ex-tab">Incline DB</div>
+        <div class="ex-tab">Cable Fly</div>
+      </div>
+
+      <div class="ex-title-bar">
+        <div class="ex-title">Bench Press</div>
+        <div class="source-chip" id="source-chip">From template</div>
+      </div>
+
+      <div class="target-bar">
+        <div class="target-bar-icon">TPL</div>
+        <div class="target-bar-text" id="target-bar-text">Push Day template / Working sets target 6-8 reps / RIR 1 / Rest 120s</div>
+      </div>
+
+      <div class="annotation" id="annotation-copy">
+        Started from Push Day. The prototype keeps the template target visible while you experiment with in-workout target edits and fatigue outcomes.
+      </div>
+
+      <div class="suggestion-card">
+        <div class="suggestion-label">Smart Suggestion</div>
+        <div class="suggestion-main" id="suggestion-main">
+          <span id="suggestion-weight">82.5 kg</span>
+          <span class="muted" id="suggestion-detail">for 7 reps</span>
+        </div>
+        <div class="suggestion-sub" id="suggestion-sub">Chosen inside the current target so the row, keyboard, and fatigue panel can all talk about the same set plan.</div>
+      </div>
+
+      <div class="set-table">
+        <div class="set-table-head">
+          <span>Set</span>
+          <span>KG</span>
+          <span>Reps</span>
+          <span>RIR</span>
+          <span>Plan</span>
+          <span></span>
+        </div>
+
+        <div class="set-row warmup">
+          <div class="set-num-cell"><div class="set-num warm">W1</div></div>
+          <div class="field-stack">
+            <input class="field-input" value="40" readonly>
+            <div class="field-subtext">Template warmup</div>
+          </div>
+          <div class="field-stack">
+            <input class="field-input" value="12" readonly>
+            <div class="field-subtext">Target 10-12</div>
+          </div>
+          <button class="rir-btn" data-rir="5+" readonly>5+</button>
+          <div class="plan-cell">
+            <div class="plan-pill">10-12</div>
+            <div class="plan-meta">Warmup target</div>
+          </div>
+          <div class="set-check-cell"><div class="set-check done">x</div></div>
+        </div>
+
+        <div class="set-row completed">
+          <div class="set-num-cell"><div class="set-num">1</div></div>
+          <div class="field-stack">
+            <input class="field-input" value="80" readonly>
+            <div class="field-subtext">Last working set</div>
+          </div>
+          <div class="field-stack">
+            <input class="field-input" value="8" readonly>
+            <div class="field-subtext">Inside 6-8</div>
+          </div>
+          <button class="rir-btn" data-rir="2" readonly>2</button>
+          <div class="plan-cell">
+            <div class="plan-pill success">8 of 6-8</div>
+            <div class="plan-meta">Chosen 7 / performed 8</div>
+          </div>
+          <div class="set-check-cell"><div class="set-check done">x</div></div>
+        </div>
+
+        <div class="set-row active" id="active-row">
+          <div class="set-num-cell"><div class="set-num">2</div></div>
+          <div class="field-stack">
+            <input class="field-input" id="weight-input" value="82.5" readonly>
+            <div class="field-subtext" id="weight-subtext">Tap to adjust weight</div>
+          </div>
+          <div class="field-stack">
+            <input class="field-input" id="reps-input" value="" readonly>
+            <div class="field-subtext" id="reps-subtext">Target 6-8 / chosen 7</div>
+          </div>
+          <button class="rir-btn" id="rir-btn" data-rir="1">1</button>
+          <div class="plan-cell">
+            <div class="plan-pill" id="active-plan-pill">7 in 6-8</div>
+            <div class="plan-meta" id="active-plan-meta">Template target</div>
+          </div>
+          <div class="set-check-cell"><div class="set-check" id="active-check">x</div></div>
+        </div>
+
+        <div class="set-row">
+          <div class="set-num-cell"><div class="set-num">3</div></div>
+          <div class="field-stack">
+            <input class="field-input" value="" placeholder="--" readonly>
+            <div class="field-subtext">Future set</div>
+          </div>
+          <div class="field-stack">
+            <input class="field-input" value="" placeholder="--" readonly>
+            <div class="field-subtext" id="future-reps-copy">Target 6-8</div>
+          </div>
+          <button class="rir-btn" data-rir="1" readonly>1</button>
+          <div class="plan-cell">
+            <div class="plan-pill" id="future-plan-pill">7 in 6-8</div>
+            <div class="plan-meta">Next planned set</div>
+          </div>
+          <div class="set-check-cell"><div class="set-check">x</div></div>
+        </div>
+      </div>
+
+      <div class="fatigue-card">
+        <div class="fatigue-head">
+          <div class="fatigue-title">Fatigue learning snapshot</div>
+          <div class="fatigue-switch">
+            <button class="active" data-fatigue-mode="ready">Ready</button>
+            <button data-fatigue-mode="baseline">Baseline</button>
+            <button data-fatigue-mode="unavailable">Unavailable</button>
+          </div>
+        </div>
+
+        <div class="fatigue-status success" id="fatigue-status">Waiting for performed reps</div>
+        <div class="fatigue-copy" id="fatigue-copy">This panel is simulated. It explains how the current target and the actual reps would be interpreted by fatigue learning.</div>
+
+        <div class="fatigue-grid">
+          <div class="fatigue-stat">
+            <div class="fatigue-stat-label">Target</div>
+            <strong id="fatigue-target">6-8</strong>
+          </div>
+          <div class="fatigue-stat">
+            <div class="fatigue-stat-label">Chosen</div>
+            <strong id="fatigue-chosen">7 reps</strong>
+          </div>
+          <div class="fatigue-stat">
+            <div class="fatigue-stat-label">Actual</div>
+            <strong id="fatigue-actual">Pending</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-pill-wrap">
+        <div class="flow-pill" data-step="weight">Weight</div>
+        <div class="flow-pill" data-step="reps">Reps</div>
+        <div class="flow-pill" data-step="rir">RIR</div>
+      </div>
+    </div>
+
+    <div class="keyboard" id="keyboard">
+      <div class="kb-current-tools">
+        <button class="kb-float-btn" id="current-actual-btn">Actual</button>
+        <button class="kb-float-btn" id="current-target-btn">Target</button>
+        <button class="kb-float-btn" id="current-done-btn">Done</button>
+      </div>
+
+      <div class="kb-progress">
+        <div class="kb-progress-chip" data-step="weight">Weight</div>
+        <div class="kb-progress-chip" data-step="reps">Reps</div>
+        <div class="kb-progress-chip" data-step="rir">RIR</div>
+      </div>
+
+      <div class="kb-proposed-toolbar">
+        <div class="kb-toolbar-main">
+          <div class="kb-field-label" id="kb-label"><span id="kb-label-set">Set 2</span> / <span id="kb-label-field">Reps</span></div>
+          <div class="kb-context-row">
+            <div class="kb-context-chip" id="kb-source-context">Template target</div>
+            <button class="kb-target-pill" id="kb-target-pill">Target 6-8</button>
+            <div class="kb-chosen-pill" id="kb-chosen-pill">Chosen 7</div>
+          </div>
+        </div>
+
+        <div class="kb-target-editor" id="kb-target-editor">
+          <div class="kb-mode-toggle">
+            <button class="active" id="target-mode-range">Range</button>
+            <button id="target-mode-exact">Exact</button>
+          </div>
+
+          <div class="kb-editor-fields open" id="target-range-fields">
+            <button class="kb-mini-field active" id="target-min-box">6</button>
+            <div class="kb-editor-separator">-</div>
+            <button class="kb-mini-field" id="target-max-box">8</button>
+          </div>
+
+          <div class="kb-editor-fields" id="target-exact-fields">
+            <button class="kb-mini-field active" id="target-exact-box">10</button>
+          </div>
+
+          <div class="kb-target-actions">
+            <button id="target-clear-btn">Clear</button>
+            <button class="primary" id="target-apply-btn">Apply</button>
+          </div>
+          <div class="kb-target-error" id="target-error"></div>
+        </div>
+
+        <div class="kb-rir-inline" id="kb-rir-inline">
+          <button class="kb-rir-chip" data-val="--">--</button>
+          <button class="kb-rir-chip" data-val="0">0</button>
+          <button class="kb-rir-chip" data-val="1">1</button>
+          <button class="kb-rir-chip" data-val="2">2</button>
+          <button class="kb-rir-chip" data-val="3">3</button>
+          <button class="kb-rir-chip" data-val="4">4</button>
+          <button class="kb-rir-chip" data-val="5+">5+</button>
+        </div>
+
+        <div class="kb-current-hint" id="kb-current-hint">Current behavior keeps target edits close to the reps field, so target and performed reps still compete for the same slot.</div>
+      </div>
+
+      <div class="kb-body">
+        <div class="kb-grid">
+          <button class="kb-key" data-key="1">1</button>
+          <button class="kb-key" data-key="2">2</button>
+          <button class="kb-key" data-key="3">3</button>
+          <button class="kb-key" data-key="4">4</button>
+          <button class="kb-key" data-key="5">5</button>
+          <button class="kb-key" data-key="6">6</button>
+          <button class="kb-key" data-key="7">7</button>
+          <button class="kb-key" data-key="8">8</button>
+          <button class="kb-key" data-key="9">9</button>
+          <button class="kb-key" id="special-key" data-key=".">.</button>
+          <button class="kb-key" data-key="0">0</button>
+          <button class="kb-key backspace" id="kb-backspace">Delete</button>
+        </div>
+
+        <div class="kb-rail">
+          <button class="kb-rail-btn" id="rail-target-btn">Target</button>
+          <button class="kb-rail-btn secondary" id="rail-prev-btn">Prev</button>
+          <button class="kb-rail-btn secondary" id="rail-next-btn">Next</button>
+          <button class="kb-rail-primary" id="rail-done-btn">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const originalTarget = { kind: 'range', min: 6, max: 8 };
+
+  const state = {
+    variant: 'current',
+    focusedField: null,
+    currentRepsMode: 'actual',
+    fatigueMode: 'ready',
+    values: {
+      weight: '82.5',
+      actualReps: '',
+      rir: '1'
+    },
+    target: { kind: 'range', min: 6, max: 8 },
+    currentTargetInput: '6-8',
+    proposedTargetEdit: false,
+    proposedTargetMode: 'range',
+    proposedTargetField: 'min',
+    proposedDraft: {
+      min: '6',
+      max: '8',
+      exact: '10'
+    }
+  };
+
+  const phone = document.querySelector('.phone');
+  const scroll = document.getElementById('scroll');
+  const keyboard = document.getElementById('keyboard');
+  const modeCaption = document.getElementById('mode-caption');
+
+  const weightInput = document.getElementById('weight-input');
+  const repsInput = document.getElementById('reps-input');
+  const rirBtn = document.getElementById('rir-btn');
+  const repsSubtext = document.getElementById('reps-subtext');
+  const weightSubtext = document.getElementById('weight-subtext');
+  const sourceChip = document.getElementById('source-chip');
+  const targetBarText = document.getElementById('target-bar-text');
+  const annotationCopy = document.getElementById('annotation-copy');
+  const suggestionWeightText = document.getElementById('suggestion-weight');
+  const suggestionDetailText = document.getElementById('suggestion-detail');
+  const suggestionSub = document.getElementById('suggestion-sub');
+  const activePlanPill = document.getElementById('active-plan-pill');
+  const activePlanMeta = document.getElementById('active-plan-meta');
+  const futurePlanPill = document.getElementById('future-plan-pill');
+  const futureRepsCopy = document.getElementById('future-reps-copy');
+  const activeCheck = document.getElementById('active-check');
+
+  const fatigueStatus = document.getElementById('fatigue-status');
+  const fatigueCopy = document.getElementById('fatigue-copy');
+  const fatigueTarget = document.getElementById('fatigue-target');
+  const fatigueChosen = document.getElementById('fatigue-chosen');
+  const fatigueActual = document.getElementById('fatigue-actual');
+
+  const kbLabelSet = document.getElementById('kb-label-set');
+  const kbLabelField = document.getElementById('kb-label-field');
+  const kbSourceContext = document.getElementById('kb-source-context');
+  const kbTargetPill = document.getElementById('kb-target-pill');
+  const kbChosenPill = document.getElementById('kb-chosen-pill');
+  const kbCurrentHint = document.getElementById('kb-current-hint');
+  const kbTargetEditor = document.getElementById('kb-target-editor');
+  const targetRangeFields = document.getElementById('target-range-fields');
+  const targetExactFields = document.getElementById('target-exact-fields');
+  const targetMinBox = document.getElementById('target-min-box');
+  const targetMaxBox = document.getElementById('target-max-box');
+  const targetExactBox = document.getElementById('target-exact-box');
+  const targetApplyBtn = document.getElementById('target-apply-btn');
+  const targetClearBtn = document.getElementById('target-clear-btn');
+  const targetError = document.getElementById('target-error');
+  const targetModeRange = document.getElementById('target-mode-range');
+  const targetModeExact = document.getElementById('target-mode-exact');
+
+  const currentActualBtn = document.getElementById('current-actual-btn');
+  const currentTargetBtn = document.getElementById('current-target-btn');
+  const currentDoneBtn = document.getElementById('current-done-btn');
+
+  const railTargetBtn = document.getElementById('rail-target-btn');
+  const railPrevBtn = document.getElementById('rail-prev-btn');
+  const railNextBtn = document.getElementById('rail-next-btn');
+  const railDoneBtn = document.getElementById('rail-done-btn');
+
+  const specialKey = document.getElementById('special-key');
+  const keyButtons = Array.from(document.querySelectorAll('.kb-key[data-key]'));
+  const backspaceButton = document.getElementById('kb-backspace');
+  const variantButtons = Array.from(document.querySelectorAll('[data-variant]'));
+  const fatigueButtons = Array.from(document.querySelectorAll('[data-fatigue-mode]'));
+  const flowPills = Array.from(document.querySelectorAll('.flow-pill'));
+  const progressChips = Array.from(document.querySelectorAll('.kb-progress-chip'));
+  const rirChips = Array.from(document.querySelectorAll('.kb-rir-chip'));
+
+  function cloneTarget(target) {
+    if (!target) { return null; }
+    if (target.kind === 'exact') {
+      return { kind: 'exact', value: target.value };
+    }
+    return { kind: 'range', min: target.min, max: target.max };
+  }
+
+  function targetEquals(a, b) {
+    if (!a && !b) { return true; }
+    if (!a || !b || a.kind !== b.kind) { return false; }
+    if (a.kind === 'exact') { return a.value === b.value; }
+    return a.min === b.min && a.max === b.max;
+  }
+
+  function targetLabel(target = state.target) {
+    if (!target) { return 'No target'; }
+    if (target.kind === 'exact') { return String(target.value); }
+    return target.min + '-' + target.max;
+  }
+
+  function targetInputText(target = state.target) {
+    if (!target) { return ''; }
+    if (target.kind === 'exact') { return String(target.value); }
+    return target.min + '-' + target.max;
+  }
+
+  function chosenReps(target = state.target) {
+    if (!target) { return null; }
+    if (target.kind === 'exact') { return target.value; }
+    return Math.round((target.min + target.max) / 2);
+  }
+
+  function suggestionWeight(reps) {
+    if (!Number.isFinite(reps)) { return null; }
+    return Math.max(60, 100 - (reps * 2.5));
+  }
+
+  function formatWeight(value) {
+    if (!Number.isFinite(value)) { return '--'; }
+    if (Math.abs(value % 1) < 0.001) { return String(Math.round(value)); }
+    return value.toFixed(1);
+  }
+
+  function parseTargetText(text) {
+    const trimmed = text.trim();
+    if (!trimmed) { return { status: 'empty', target: null }; }
+    if (/^\d+$/.test(trimmed)) {
+      const value = Number.parseInt(trimmed, 10);
+      return value > 0 ? { status: 'valid', target: { kind: 'exact', value: value } } : { status: 'invalid' };
+    }
+
+    const parts = trimmed.split('-').map((item) => item.trim());
+    if (parts.length !== 2) {
+      return { status: 'invalid' };
+    }
+
+    const min = Number.parseInt(parts[0], 10);
+    const max = Number.parseInt(parts[1], 10);
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      return { status: 'partial' };
+    }
+    if (min <= 0 || max <= 0 || min >= max) {
+      return { status: 'invalid' };
+    }
+    return { status: 'valid', target: { kind: 'range', min: min, max: max } };
+  }
+
+  function loadDraftFromTarget() {
+    if (!state.target) {
+      state.proposedTargetMode = 'range';
+      state.proposedDraft.min = '';
+      state.proposedDraft.max = '';
+      state.proposedDraft.exact = '10';
+      return;
+    }
+
+    if (state.target.kind === 'exact') {
+      state.proposedTargetMode = 'exact';
+      state.proposedDraft.exact = String(state.target.value);
+    } else {
+      state.proposedTargetMode = 'range';
+      state.proposedDraft.min = String(state.target.min);
+      state.proposedDraft.max = String(state.target.max);
+    }
+  }
+
+  function commitTarget(target) {
+    state.target = cloneTarget(target);
+    state.currentTargetInput = targetInputText(state.target);
+  }
+
+  function sourceLabel() {
+    if (targetEquals(state.target, originalTarget)) {
+      return 'From template';
+    }
+    if (!state.target) {
+      return 'Target cleared';
+    }
+    return 'Edited in workout';
+  }
+
+  function sourceContextCopy() {
+    if (targetEquals(state.target, originalTarget)) {
+      return 'Push Day template';
+    }
+    if (!state.target) {
+      return 'Template target removed';
+    }
+    return 'Workout override';
+  }
+
+  function actualRepsNumber() {
+    const value = Number.parseInt(state.values.actualReps, 10);
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+
+  function fatigueOutcome() {
+    if (state.fatigueMode === 'baseline') {
+      return {
+        tone: 'neutral',
+        title: 'Baseline / first working set',
+        detail: 'This set would establish a fatigue-free baseline, so no rep-range comparison is used for learning yet.'
+      };
+    }
+
+    if (state.fatigueMode === 'unavailable') {
+      return {
+        tone: 'warning',
+        title: 'Suggestion unavailable',
+        detail: 'No usable prediction snapshot was captured, so fatigue learning would skip this set regardless of the entered reps.'
+      };
+    }
+
+    if (!state.target) {
+      return {
+        tone: 'warning',
+        title: 'Skipped: no rep target',
+        detail: 'The target was cleared, so there is no range-aware rep snapshot to compare against.'
+      };
+    }
+
+    const actual = actualRepsNumber();
+    if (!actual) {
+      return {
+        tone: 'neutral',
+        title: 'Waiting for performed reps',
+        detail: 'Enter the performed reps on Set 2 to preview whether fatigue learning would use or skip the set.'
+      };
+    }
+
+    if (state.target.kind === 'range') {
+      if (actual < state.target.min || actual > state.target.max) {
+        return {
+          tone: 'danger',
+          title: 'Skipped: outside target range',
+          detail: 'Actual ' + actual + ' reps sits outside ' + targetLabel() + ', so the set would be audited but skipped for fatigue learning.'
+        };
+      }
+
+      return {
+        tone: 'success',
+        title: 'Used for learning',
+        detail: 'Actual ' + actual + ' reps stays inside ' + targetLabel() + '. Learning can compare the performed set against the chosen ' + chosenReps() + '-rep snapshot.'
+      };
+    }
+
+    return {
+      tone: 'success',
+      title: 'Used for learning',
+      detail: 'Exact target ' + state.target.value + ' is active. The set would capture the chosen target and the performed reps together for learning.'
+    };
+  }
+
+  function specialKeyConfig() {
+    const editingCurrentTarget = state.variant === 'current' && state.focusedField === 'reps' && state.currentRepsMode === 'target';
+    const editingProposedTarget = state.variant === 'proposed' && state.proposedTargetEdit;
+
+    if (state.focusedField === 'weight') {
+      return { label: '.', value: '.', disabled: false };
+    }
+
+    if (editingCurrentTarget) {
+      return { label: '-', value: '-', disabled: false };
+    }
+
+    if (editingProposedTarget) {
+      if (state.proposedTargetMode === 'range') {
+        return { label: '-', value: '-', disabled: false };
+      }
+      return { label: '.', value: '.', disabled: true };
+    }
+
+    return { label: '.', value: '.', disabled: true };
+  }
+
+  function activeDisplayRepsValue() {
+    if (state.variant === 'current' && state.focusedField === 'reps' && state.currentRepsMode === 'target') {
+      return state.currentTargetInput;
+    }
+    return state.values.actualReps;
+  }
+
+  function activeDisplayRepsPlaceholder() {
+    if (state.variant === 'current') {
+      return state.currentRepsMode === 'target'
+        ? 'Set target'
+        : (state.target ? targetLabel() : 'Do reps');
+    }
+    return 'Do reps';
+  }
+
+  function targetDraftValidation() {
+    if (state.proposedTargetMode === 'exact') {
+      const exactValue = Number.parseInt(state.proposedDraft.exact, 10);
+      if (!state.proposedDraft.exact.trim()) {
+        return { valid: false, error: 'Enter exact reps to commit an exact target.' };
+      }
+      if (!Number.isFinite(exactValue) || exactValue <= 0) {
+        return { valid: false, error: 'Exact reps must be greater than 0.' };
+      }
+      return { valid: true, target: { kind: 'exact', value: exactValue } };
+    }
+
+    const minText = state.proposedDraft.min.trim();
+    const maxText = state.proposedDraft.max.trim();
+    if (!minText || !maxText) {
+      return { valid: false, error: 'Enter both min and max before applying a range.' };
+    }
+    const minValue = Number.parseInt(minText, 10);
+    const maxValue = Number.parseInt(maxText, 10);
+    if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) {
+      return { valid: false, error: 'Range values must be whole numbers.' };
+    }
+    if (minValue <= 0 || maxValue <= 0) {
+      return { valid: false, error: 'Range values must be greater than 0.' };
+    }
+    if (minValue >= maxValue) {
+      return { valid: false, error: 'Min reps must stay lower than max reps.' };
+    }
+    return { valid: true, target: { kind: 'range', min: minValue, max: maxValue } };
+  }
+
+  function openField(field) {
+    state.focusedField = field;
+    if (field !== 'reps') {
+      state.proposedTargetEdit = false;
+    }
+    render();
+  }
+
+  function closeKeyboard() {
+    state.focusedField = null;
+    state.proposedTargetEdit = false;
+    render();
+  }
+
+  function moveFocus(delta) {
+    const order = ['weight', 'reps', 'rir'];
+    const index = order.indexOf(state.focusedField);
+    if (index === -1) {
+      state.focusedField = order[0];
+    } else {
+      const nextIndex = Math.max(0, Math.min(order.length - 1, index + delta));
+      state.focusedField = order[nextIndex];
+    }
+    if (state.focusedField !== 'reps') {
+      state.proposedTargetEdit = false;
+    }
+    render();
+  }
+
+  function setCurrentRepsMode(mode) {
+    state.currentRepsMode = mode;
+    if (mode === 'target') {
+      state.currentTargetInput = targetInputText();
+    }
+    openField('reps');
+  }
+
+  function toggleProposedTargetEditor() {
+    if (state.focusedField !== 'reps') {
+      state.focusedField = 'reps';
+    }
+    state.proposedTargetEdit = !state.proposedTargetEdit;
+    if (state.proposedTargetEdit) {
+      loadDraftFromTarget();
+      state.proposedTargetField = state.proposedTargetMode === 'exact' ? 'exact' : 'min';
+    }
+    render();
+  }
+
+  function setProposedTargetMode(mode) {
+    state.proposedTargetMode = mode;
+    state.proposedTargetField = mode === 'exact' ? 'exact' : 'min';
+    if (mode === 'exact' && state.target && state.target.kind === 'exact') {
+      state.proposedDraft.exact = String(state.target.value);
+    }
+    render();
+  }
+
+  function setProposedTargetField(field) {
+    state.proposedTargetField = field;
+    render();
+  }
+
+  function handleDigit(key) {
+    if (!state.focusedField) {
+      return;
+    }
+
+    if (state.focusedField === 'rir') {
+      return;
+    }
+
+    const config = specialKeyConfig();
+    if (key === config.value && config.disabled) {
+      return;
+    }
+
+    if (state.focusedField === 'weight') {
+      if (key === '.') {
+        if (state.values.weight.includes('.')) { return; }
+        state.values.weight = state.values.weight ? state.values.weight + '.' : '0.';
+      } else {
+        state.values.weight = state.values.weight === '0' ? key : state.values.weight + key;
+      }
+      render();
+      return;
+    }
+
+    const editingCurrentTarget = state.variant === 'current' && state.currentRepsMode === 'target';
+    const editingProposedTarget = state.variant === 'proposed' && state.proposedTargetEdit;
+
+    if (editingCurrentTarget) {
+      if (key === '-') {
+        if (!state.currentTargetInput || state.currentTargetInput.includes('-')) { return; }
+        state.currentTargetInput += '-';
+      } else {
+        state.currentTargetInput += key;
+      }
+      const parsed = parseTargetText(state.currentTargetInput);
+      if (parsed.status === 'valid') {
+        commitTarget(parsed.target);
+      } else if (parsed.status === 'empty') {
+        commitTarget(null);
+      }
+      render();
+      return;
+    }
+
+    if (editingProposedTarget) {
+      if (state.proposedTargetMode === 'exact') {
+        state.proposedDraft.exact += key;
+      } else {
+        if (key === '-') {
+          state.proposedTargetField = 'max';
+        } else if (state.proposedTargetField === 'min') {
+          state.proposedDraft.min += key;
+        } else {
+          state.proposedDraft.max += key;
+        }
+      }
+      render();
+      return;
+    }
+
+    if (key === '.') {
+      return;
+    }
+
+    state.values.actualReps += key;
+    render();
+  }
+
+  function handleBackspace() {
+    if (!state.focusedField) {
+      return;
+    }
+
+    if (state.focusedField === 'rir') {
+      return;
+    }
+
+    if (state.focusedField === 'weight') {
+      state.values.weight = state.values.weight.slice(0, -1);
+      render();
+      return;
+    }
+
+    const editingCurrentTarget = state.variant === 'current' && state.currentRepsMode === 'target';
+    const editingProposedTarget = state.variant === 'proposed' && state.proposedTargetEdit;
+
+    if (editingCurrentTarget) {
+      state.currentTargetInput = state.currentTargetInput.slice(0, -1);
+      const parsed = parseTargetText(state.currentTargetInput);
+      if (parsed.status === 'valid') {
+        commitTarget(parsed.target);
+      } else if (parsed.status === 'empty') {
+        commitTarget(null);
+      }
+      render();
+      return;
+    }
+
+    if (editingProposedTarget) {
+      if (state.proposedTargetMode === 'exact') {
+        state.proposedDraft.exact = state.proposedDraft.exact.slice(0, -1);
+      } else if (state.proposedTargetField === 'min') {
+        state.proposedDraft.min = state.proposedDraft.min.slice(0, -1);
+      } else {
+        state.proposedDraft.max = state.proposedDraft.max.slice(0, -1);
+      }
+      render();
+      return;
+    }
+
+    state.values.actualReps = state.values.actualReps.slice(0, -1);
+    render();
+  }
+
+  function applyDraftTarget() {
+    const validation = targetDraftValidation();
+    if (!validation.valid) {
+      render();
+      return;
+    }
+    commitTarget(validation.target);
+    state.proposedTargetEdit = false;
+    render();
+  }
+
+  function clearTarget() {
+    commitTarget(null);
+    state.proposedTargetEdit = false;
+    render();
+  }
+
+  function setRir(value) {
+    state.values.rir = value;
+    render();
+  }
+
+  function setVariant(variant) {
+    state.variant = variant;
+    if (variant === 'proposed') {
+      state.currentRepsMode = 'actual';
+    } else {
+      state.proposedTargetEdit = false;
+    }
+    render();
+  }
+
+  function renderFlow() {
+    const order = ['weight', 'reps', 'rir'];
+    const currentIndex = order.indexOf(state.focusedField);
+
+    flowPills.forEach((pill, index) => {
+      pill.classList.remove('current', 'done');
+      if (currentIndex === -1) { return; }
+      if (index < currentIndex) { pill.classList.add('done'); }
+      if (index === currentIndex) { pill.classList.add('current'); }
+    });
+
+    progressChips.forEach((pill, index) => {
+      pill.classList.remove('current', 'done');
+      if (currentIndex === -1) { return; }
+      if (index < currentIndex) { pill.classList.add('done'); }
+      if (index === currentIndex) { pill.classList.add('current'); }
+    });
+  }
+
+  function render() {
+    const chosen = chosenReps();
+    const suggested = suggestionWeight(chosen);
+    const outcome = fatigueOutcome();
+    const displayRepsValue = activeDisplayRepsValue();
+
+    phone.classList.toggle('mode-current', state.variant === 'current');
+    phone.classList.toggle('mode-proposed', state.variant === 'proposed');
+    phone.classList.toggle('weight-step', state.focusedField === 'weight');
+    phone.classList.toggle('reps-step', state.focusedField === 'reps');
+    phone.classList.toggle('rir-step', state.focusedField === 'rir');
+
+    keyboard.classList.toggle('open', !!state.focusedField);
+    scroll.classList.toggle('kb-open', !!state.focusedField);
+
+    variantButtons.forEach((button) => {
+      button.classList.toggle('active', button.dataset.variant === state.variant);
+    });
+
+    fatigueButtons.forEach((button) => {
+      button.classList.toggle('active', button.dataset.fatigueMode === state.fatigueMode);
+    });
+
+    modeCaption.textContent = state.variant === 'current'
+      ? 'Current: the reps field can still stand in for both target edits and performed reps.'
+      : 'Proposed: target editing moves into the keyboard toolbar, so the reps field stays single-purpose.';
+
+    sourceChip.textContent = sourceLabel();
+    targetBarText.textContent = state.target
+      ? 'Push Day template / Current target ' + targetLabel() + ' / RIR 1 / Rest 120s'
+      : 'Push Day template / Target cleared in workout / RIR 1 / Rest 120s';
+    annotationCopy.textContent = state.target
+      ? 'Started from Push Day. ' + sourceContextCopy() + ' is visible here, in the active row, and in the keyboard so the rep target never becomes hidden state.'
+      : 'Started from Push Day. The template target has been cleared in-workout, so the prototype shows how suggestions and fatigue guidance degrade when the target disappears.';
+
+    if (suggested === null || chosen === null) {
+      suggestionWeightText.textContent = 'No suggestion';
+      suggestionDetailText.textContent = 'until a target exists';
+      suggestionSub.textContent = 'Clearing the target removes the chosen-reps snapshot. Fatigue learning falls back to an unavailable-style state because there is no target context to compare.';
+    } else {
+      suggestionWeightText.textContent = formatWeight(suggested) + ' kg';
+      suggestionDetailText.textContent = 'for ' + chosen + ' reps';
+      suggestionSub.textContent = state.target.kind === 'range'
+        ? 'Chosen inside ' + targetLabel() + ' so the suggestion card, set row, and fatigue panel all point at the same rep intent.'
+        : 'Exact target ' + targetLabel() + ' makes the chosen-reps snapshot fully explicit.';
+    }
+
+    weightInput.value = state.values.weight;
+    repsInput.value = displayRepsValue;
+    repsInput.placeholder = activeDisplayRepsPlaceholder();
+    rirBtn.textContent = state.values.rir;
+
+    if (state.values.rir === '--') {
+      rirBtn.removeAttribute('data-rir');
+    } else {
+      rirBtn.setAttribute('data-rir', state.values.rir);
+    }
+
+    weightInput.classList.toggle('focused', state.focusedField === 'weight');
+    repsInput.classList.toggle('focused', state.focusedField === 'reps');
+    rirBtn.classList.toggle('focused', state.focusedField === 'rir');
+
+    weightSubtext.textContent = state.variant === 'current'
+      ? 'Same keyboard flow as today'
+      : 'Weight stays separate from target edits';
+
+    if (state.variant === 'current' && state.currentRepsMode === 'target') {
+      const parsed = parseTargetText(state.currentTargetInput);
+      if (parsed.status === 'valid') {
+        repsSubtext.textContent = 'Editing target in reps field / committed';
+      } else if (parsed.status === 'empty') {
+        repsSubtext.textContent = 'Target cleared in reps field / no snapshot';
+      } else {
+        repsSubtext.textContent = 'Editing target in reps field / draft only';
+      }
+    } else {
+      repsSubtext.textContent = state.target
+        ? 'Target ' + targetLabel() + ' / chosen ' + (chosen === null ? '--' : chosen)
+        : 'No target / actual reps only';
+    }
+
+    if (!state.target) {
+      activePlanPill.textContent = 'Need target';
+      activePlanPill.className = 'plan-pill warning';
+      activePlanMeta.textContent = 'No chosen reps available';
+      futurePlanPill.textContent = 'Need target';
+      futurePlanPill.className = 'plan-pill warning';
+      futureRepsCopy.textContent = 'No target';
+    } else if (state.target.kind === 'exact') {
+      activePlanPill.textContent = chosen + ' exact';
+      activePlanPill.className = 'plan-pill';
+      activePlanMeta.textContent = sourceContextCopy();
+      futurePlanPill.textContent = chosen + ' exact';
+      futurePlanPill.className = 'plan-pill';
+      futureRepsCopy.textContent = 'Exact ' + targetLabel();
+    } else {
+      activePlanPill.textContent = chosen + ' in ' + targetLabel();
+      activePlanPill.className = 'plan-pill';
+      activePlanMeta.textContent = sourceContextCopy();
+      futurePlanPill.textContent = chosen + ' in ' + targetLabel();
+      futurePlanPill.className = 'plan-pill';
+      futureRepsCopy.textContent = 'Target ' + targetLabel();
+    }
+
+    const actual = actualRepsNumber();
+    const canComplete = Boolean(actual);
+    activeCheck.classList.toggle('done', canComplete);
+    activeCheck.textContent = 'x';
+
+    fatigueStatus.className = 'fatigue-status ' + outcome.tone;
+    fatigueStatus.textContent = outcome.title;
+    fatigueCopy.textContent = outcome.detail;
+    fatigueTarget.textContent = state.target ? targetLabel() : 'None';
+    fatigueChosen.textContent = chosen === null ? 'None' : chosen + ' reps';
+    fatigueActual.textContent = actual === null ? 'Pending' : actual + ' reps';
+
+    kbLabelSet.textContent = 'Set 2';
+    kbLabelField.textContent = state.proposedTargetEdit ? 'Target' :
+      (state.focusedField === 'weight' ? 'Weight' :
+      (state.focusedField === 'rir' ? 'RIR' : 'Reps'));
+    kbSourceContext.textContent = sourceContextCopy();
+    kbTargetPill.textContent = state.target ? 'Target ' + targetLabel() : 'Set target';
+    kbChosenPill.textContent = chosen === null ? 'Chosen --' : 'Chosen ' + chosen;
+
+    kbCurrentHint.textContent = state.currentRepsMode === 'target'
+      ? 'Current target editing still reuses the reps field. Switch back to Actual to log performed reps.'
+      : 'Current mode keeps the target near the reps field, but the reps slot still has to juggle both target edits and performed reps.';
+
+    kbTargetEditor.classList.toggle('open', state.proposedTargetEdit);
+    targetModeRange.classList.toggle('active', state.proposedTargetMode === 'range');
+    targetModeExact.classList.toggle('active', state.proposedTargetMode === 'exact');
+    targetRangeFields.classList.toggle('open', state.proposedTargetMode === 'range');
+    targetExactFields.classList.toggle('open', state.proposedTargetMode === 'exact');
+    targetMinBox.textContent = state.proposedDraft.min || 'Min';
+    targetMaxBox.textContent = state.proposedDraft.max || 'Max';
+    targetExactBox.textContent = state.proposedDraft.exact || 'Reps';
+    targetMinBox.classList.toggle('active', state.proposedTargetField === 'min');
+    targetMaxBox.classList.toggle('active', state.proposedTargetField === 'max');
+    targetExactBox.classList.toggle('active', state.proposedTargetField === 'exact');
+
+    const draftValidation = targetDraftValidation();
+    targetApplyBtn.disabled = !draftValidation.valid;
+    targetError.textContent = state.proposedTargetEdit && !draftValidation.valid ? draftValidation.error : '';
+
+    currentActualBtn.classList.toggle('active', state.currentRepsMode === 'actual');
+    currentTargetBtn.classList.toggle('active', state.currentRepsMode === 'target');
+
+    const special = specialKeyConfig();
+    specialKey.textContent = special.label;
+    specialKey.dataset.key = special.value;
+    specialKey.classList.toggle('disabled', special.disabled);
+
+    rirChips.forEach((chip) => {
+      chip.classList.toggle('selected', chip.dataset.val === state.values.rir);
+    });
+
+    railPrevBtn.disabled = !state.focusedField || state.focusedField === 'weight';
+    railNextBtn.disabled = !state.focusedField || state.focusedField === 'rir';
+    railDoneBtn.disabled = !state.focusedField;
+    railTargetBtn.disabled = state.focusedField !== 'reps';
+
+    renderFlow();
+  }
+
+  variantButtons.forEach((button) => {
+    button.addEventListener('click', () => setVariant(button.dataset.variant));
+  });
+
+  fatigueButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      state.fatigueMode = button.dataset.fatigueMode;
+      render();
+    });
+  });
+
+  weightInput.addEventListener('click', () => openField('weight'));
+  repsInput.addEventListener('click', () => openField('reps'));
+  rirBtn.addEventListener('click', () => openField('rir'));
+
+  currentActualBtn.addEventListener('click', () => setCurrentRepsMode('actual'));
+  currentTargetBtn.addEventListener('click', () => setCurrentRepsMode('target'));
+  currentDoneBtn.addEventListener('click', closeKeyboard);
+
+  kbTargetPill.addEventListener('click', () => {
+    if (state.variant === 'proposed') {
+      toggleProposedTargetEditor();
+    }
+  });
+
+  railTargetBtn.addEventListener('click', toggleProposedTargetEditor);
+  railPrevBtn.addEventListener('click', () => moveFocus(-1));
+  railNextBtn.addEventListener('click', () => moveFocus(1));
+  railDoneBtn.addEventListener('click', closeKeyboard);
+
+  targetModeRange.addEventListener('click', () => setProposedTargetMode('range'));
+  targetModeExact.addEventListener('click', () => setProposedTargetMode('exact'));
+  targetMinBox.addEventListener('click', () => setProposedTargetField('min'));
+  targetMaxBox.addEventListener('click', () => setProposedTargetField('max'));
+  targetExactBox.addEventListener('click', () => setProposedTargetField('exact'));
+  targetApplyBtn.addEventListener('click', applyDraftTarget);
+  targetClearBtn.addEventListener('click', clearTarget);
+
+  keyButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      if (button.classList.contains('disabled')) { return; }
+      handleDigit(button.dataset.key);
+    });
+  });
+
+  backspaceButton.addEventListener('click', handleBackspace);
+
+  rirChips.forEach((chip) => {
+    chip.addEventListener('click', () => {
+      setRir(chip.dataset.val);
+      openField('rir');
+    });
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('.keyboard') &&
+        !event.target.closest('#active-row') &&
+        !event.target.closest('.compare-switch') &&
+        !event.target.closest('.variant-switch') &&
+        !event.target.closest('.fatigue-switch')) {
+      closeKeyboard();
+    }
+  });
+
+  loadDraftFromTarget();
+  render();
+</script>
+</body>
+</html>

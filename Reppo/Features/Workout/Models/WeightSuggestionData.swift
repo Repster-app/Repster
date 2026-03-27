@@ -388,9 +388,7 @@ enum SuggestionCoordinator {
                     var parts = base + [
                         "eligible",
                         "r\(target.reps)",
-                        "rir\(signatureNumber(target.rir))",
-                        "repsrc\(target.repsSource.rawValue)",
-                        "rirsrc\(target.rirSource.rawValue)"
+                        "rir\(signatureNumber(target.rir))"
                     ]
                     if let range = target.repRange {
                         parts.append("rng\(range.lowerBound)-\(range.upperBound)")

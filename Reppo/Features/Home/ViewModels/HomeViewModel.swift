@@ -76,7 +76,6 @@ final class HomeViewModel {
 
     // Section customization
     var sectionConfig: HomeSectionConfig = HomeSectionConfig.load()
-    var isEditMode: Bool = false
     var showCustomizeSheet: Bool = false
 
     // Loading
@@ -261,7 +260,7 @@ final class HomeViewModel {
     private func loadRecentPRs() async {
         do {
             let fourteenDaysAgo = Calendar.current.date(byAdding: .day, value: -14, to: Date()) ?? Date()
-            let records = try await statsService.fetchRecentPRs(since: fourteenDaysAgo, limit: 3)
+            let records = try await statsService.fetchRecentPRs(since: fourteenDaysAgo, limit: sectionConfig.prDisplayMode.fetchLimit)
 
             var prs: [RecentPR] = []
             for record in records {
@@ -297,7 +296,7 @@ final class HomeViewModel {
             let completed = allWorkouts
                 .filter { $0.status == .completed }
                 .sorted { $0.date > $1.date }
-                .prefix(5)
+                .prefix(sectionConfig.recentWorkoutsCount)
 
             var summaries: [RecentWorkoutSummary] = []
             for workout in completed {
@@ -348,10 +347,6 @@ final class HomeViewModel {
         }
     }
 
-    func exitEditMode() {
-        isEditMode = false
-        sectionConfig.save()
-    }
 
     // MARK: - Cache Helper
 

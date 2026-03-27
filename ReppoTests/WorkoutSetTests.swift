@@ -279,8 +279,8 @@ final class WorkoutSetTests: XCTestCase {
             setFocusedField: { focusedField = $0 },
             getFieldValue: { _ in "" },
             setFieldValue: { _, _ in },
-            getRIRValue: { nil },
-            setRIRValue: { _ in },
+            getBilateralRIRValue: { nil },
+            setBilateralRIRValue: { _ in },
             getSuggestedWeight: { nil },
             canMovePrevious: { false },
             canMoveNext: { true },
@@ -312,8 +312,8 @@ final class WorkoutSetTests: XCTestCase {
             setFocusedField: { focusedField = $0 },
             getFieldValue: { _ in "" },
             setFieldValue: { _, _ in },
-            getRIRValue: { nil },
-            setRIRValue: { _ in },
+            getBilateralRIRValue: { nil },
+            setBilateralRIRValue: { _ in },
             getSuggestedWeight: { nil },
             canMovePrevious: { true },
             canMoveNext: { false },
@@ -331,6 +331,166 @@ final class WorkoutSetTests: XCTestCase {
         XCTAssertEqual(focusedField, .distance)
         XCTAssertTrue(context.canMoveNextInTrackedOrder)
         XCTAssertFalse(context.canMovePreviousInTrackedOrder)
+    }
+
+    func testKeyboardContextResolvesSharedRIRForBilateralReps() {
+        var focusedField: SetRowInputField? = .reps
+        var bilateralRIR: Double? = 2
+        var leftRIR: Double? = 1
+        var rightRIR: Double? = 4
+        let context = SetEntryKeyboardContext(
+            ownerSetID: UUID(),
+            trackingType: .weightReps,
+            equipmentType: .dumbbell,
+            inputOrder: [.weight, .reps],
+            activeField: .reps,
+            getFocusedField: { focusedField },
+            setFocusedField: { focusedField = $0 },
+            getFieldValue: { _ in "" },
+            setFieldValue: { _, _ in },
+            getBilateralRIRValue: { bilateralRIR },
+            setBilateralRIRValue: { bilateralRIR = $0 },
+            getLeftRIRValue: { leftRIR },
+            setLeftRIRValue: { leftRIR = $0 },
+            getRightRIRValue: { rightRIR },
+            setRightRIRValue: { rightRIR = $0 },
+            getSuggestedWeight: { nil },
+            canMovePrevious: { true },
+            canMoveNext: { false },
+            movePrevious: {},
+            moveNext: {},
+            dismiss: {}
+        )
+
+        XCTAssertTrue(context.canEditActiveRIR)
+        XCTAssertEqual(context.resolvedRIRField, .reps)
+        XCTAssertEqual(context.resolvedRIRValue(), 2)
+
+        context.setResolvedRIRValue(3)
+
+        XCTAssertEqual(bilateralRIR, 3)
+        XCTAssertEqual(leftRIR, 1)
+        XCTAssertEqual(rightRIR, 4)
+    }
+
+    func testKeyboardContextResolvesLeftRIRForLeftReps() {
+        var focusedField: SetRowInputField? = .leftReps
+        var bilateralRIR: Double? = 2
+        var leftRIR: Double? = 1
+        var rightRIR: Double? = 4
+        let context = SetEntryKeyboardContext(
+            ownerSetID: UUID(),
+            trackingType: .weightReps,
+            equipmentType: .dumbbell,
+            inputOrder: [.weight, .leftReps, .rightReps],
+            activeField: .leftReps,
+            getFocusedField: { focusedField },
+            setFocusedField: { focusedField = $0 },
+            getFieldValue: { _ in "" },
+            setFieldValue: { _, _ in },
+            getBilateralRIRValue: { bilateralRIR },
+            setBilateralRIRValue: { bilateralRIR = $0 },
+            getLeftRIRValue: { leftRIR },
+            setLeftRIRValue: { leftRIR = $0 },
+            getRightRIRValue: { rightRIR },
+            setRightRIRValue: { rightRIR = $0 },
+            getSuggestedWeight: { nil },
+            canMovePrevious: { true },
+            canMoveNext: { true },
+            movePrevious: {},
+            moveNext: {},
+            dismiss: {}
+        )
+
+        XCTAssertTrue(context.canEditActiveRIR)
+        XCTAssertEqual(context.resolvedRIRField, .leftReps)
+        XCTAssertEqual(context.resolvedRIRValue(), 1)
+
+        context.setResolvedRIRValue(0)
+
+        XCTAssertEqual(bilateralRIR, 2)
+        XCTAssertEqual(leftRIR, 0)
+        XCTAssertEqual(rightRIR, 4)
+    }
+
+    func testKeyboardContextResolvesRightRIRForRightReps() {
+        var focusedField: SetRowInputField? = .rightReps
+        var bilateralRIR: Double? = 2
+        var leftRIR: Double? = 1
+        var rightRIR: Double? = 4
+        let context = SetEntryKeyboardContext(
+            ownerSetID: UUID(),
+            trackingType: .weightReps,
+            equipmentType: .dumbbell,
+            inputOrder: [.weight, .leftReps, .rightReps],
+            activeField: .rightReps,
+            getFocusedField: { focusedField },
+            setFocusedField: { focusedField = $0 },
+            getFieldValue: { _ in "" },
+            setFieldValue: { _, _ in },
+            getBilateralRIRValue: { bilateralRIR },
+            setBilateralRIRValue: { bilateralRIR = $0 },
+            getLeftRIRValue: { leftRIR },
+            setLeftRIRValue: { leftRIR = $0 },
+            getRightRIRValue: { rightRIR },
+            setRightRIRValue: { rightRIR = $0 },
+            getSuggestedWeight: { nil },
+            canMovePrevious: { true },
+            canMoveNext: { false },
+            movePrevious: {},
+            moveNext: {},
+            dismiss: {}
+        )
+
+        XCTAssertTrue(context.canEditActiveRIR)
+        XCTAssertEqual(context.resolvedRIRField, .rightReps)
+        XCTAssertEqual(context.resolvedRIRValue(), 4)
+
+        context.setResolvedRIRValue(5)
+
+        XCTAssertEqual(bilateralRIR, 2)
+        XCTAssertEqual(leftRIR, 1)
+        XCTAssertEqual(rightRIR, 5)
+    }
+
+    func testKeyboardContextDoesNotExposeRIRForNonRepFields() {
+        var focusedField: SetRowInputField? = .weight
+        var bilateralRIR: Double? = 2
+        var leftRIR: Double? = 1
+        var rightRIR: Double? = 4
+        let context = SetEntryKeyboardContext(
+            ownerSetID: UUID(),
+            trackingType: .weightReps,
+            equipmentType: .barbell,
+            inputOrder: [.weight, .reps],
+            activeField: .weight,
+            getFocusedField: { focusedField },
+            setFocusedField: { focusedField = $0 },
+            getFieldValue: { _ in "" },
+            setFieldValue: { _, _ in },
+            getBilateralRIRValue: { bilateralRIR },
+            setBilateralRIRValue: { bilateralRIR = $0 },
+            getLeftRIRValue: { leftRIR },
+            setLeftRIRValue: { leftRIR = $0 },
+            getRightRIRValue: { rightRIR },
+            setRightRIRValue: { rightRIR = $0 },
+            getSuggestedWeight: { nil },
+            canMovePrevious: { false },
+            canMoveNext: { true },
+            movePrevious: {},
+            moveNext: {},
+            dismiss: {}
+        )
+
+        XCTAssertFalse(context.canEditActiveRIR)
+        XCTAssertNil(context.resolvedRIRField)
+        XCTAssertNil(context.resolvedRIRValue())
+
+        context.setResolvedRIRValue(0)
+
+        XCTAssertEqual(bilateralRIR, 2)
+        XCTAssertEqual(leftRIR, 1)
+        XCTAssertEqual(rightRIR, 4)
     }
 
     func testMuscleGroupCatalogNormalizesLegacyAliases() {

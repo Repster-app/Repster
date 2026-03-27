@@ -656,7 +656,9 @@ struct SetRowView: View {
         let rightRepsBinding = $rightRepsText
         let durationBinding = $durationText
         let distanceBinding = $distanceText
-        let rirBinding = $rirValue
+        let bilateralRIRBinding = $rirValue
+        let leftRIRBinding = $leftRIRValue
+        let rightRIRBinding = $rightRIRValue
 
         return SetEntryKeyboardContext(
             ownerSetID: setID,
@@ -698,8 +700,12 @@ struct SetRowView: View {
                     distanceBinding.wrappedValue = newValue
                 }
             },
-            getRIRValue: { rirBinding.wrappedValue },
-            setRIRValue: { rirBinding.wrappedValue = $0 },
+            getBilateralRIRValue: { bilateralRIRBinding.wrappedValue },
+            setBilateralRIRValue: { bilateralRIRBinding.wrappedValue = $0 },
+            getLeftRIRValue: { leftRIRBinding.wrappedValue },
+            setLeftRIRValue: { leftRIRBinding.wrappedValue = $0 },
+            getRightRIRValue: { rightRIRBinding.wrappedValue },
+            setRightRIRValue: { rightRIRBinding.wrappedValue = $0 },
             getSuggestedWeight: { suggestedWeight },
             getWeightIncrement: { exercise.weightIncrement ?? 2.5 },
             getTargetRepRange: {

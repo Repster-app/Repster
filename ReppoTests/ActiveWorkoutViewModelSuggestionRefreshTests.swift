@@ -1440,7 +1440,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
                 freshnessPercent: 0.03,
                 baseFatigueRate: 0.04,
                 recoveryConstant: 180.0,
-                sessionCapabilityPolicy: .defaultBlended
+                sessionCapabilityPolicy: .observed
             ),
             calibrationAdjustment: .neutral
         )
@@ -1468,7 +1468,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
             fatigueDiscount: 1.0,
             freshnessApplied: false,
             e1RMSource: .recentPerformance,
-            sessionCapabilitySourceLabel: SessionCapabilityPolicy.defaultBlended.label,
+            sessionCapabilitySourceLabel: SessionCapabilityPolicy.observed.label,
             bestReps: nil,
             calibrationAdjustment: .neutral,
             projectedSessionFatigue: 0.0
@@ -2790,7 +2790,7 @@ private final class LoadPrescriptionServiceSpy: @unchecked Sendable, LoadPrescri
                 freshnessPercent: 0.03,
                 baseFatigueRate: 0.04,
                 recoveryConstant: 180.0,
-                sessionCapabilityPolicy: .defaultBlended
+                sessionCapabilityPolicy: .observed
             ),
             calibrationAdjustment: .neutral
         )
@@ -3375,15 +3375,16 @@ final class FatigueModelV2Tests: XCTestCase {
                 freshnessPercent: 0.03,
                 baseFatigueRate: 0.04,
                 recoveryConstant: 180.0,
-                sessionCapabilityPolicy: .defaultBlended
+                sessionCapabilityPolicy: .observed
             ),
             calibrationAdjustment: .neutral
         )
 
         let decision = try! XCTUnwrap(SuggestionEngine.evaluate(input).first)
-        XCTAssertEqual(decision.sessionCapabilityE1RM, 54.401, accuracy: 0.001)
-        XCTAssertEqual(decision.prescribedWeight, 42.5, accuracy: 0.001)
-        XCTAssertEqual(decision.bestReps, 7)
+        // With .observed policy, sessionCapability = observed e1RM directly (no blend with prior)
+        // 40kg × (8+4) reps Epley = 40 × (1 + 12/30) = 56.0
+        XCTAssertEqual(decision.sessionCapabilityE1RM, 56.0, accuracy: 0.001)
+        XCTAssertEqual(decision.bestReps, 8)
     }
 
     func testSessionCapabilityBlendLowersRecommendationAfterMissedTopSet() {
@@ -3424,15 +3425,14 @@ final class FatigueModelV2Tests: XCTestCase {
                 freshnessPercent: 0.03,
                 baseFatigueRate: 0.04,
                 recoveryConstant: 180.0,
-                sessionCapabilityPolicy: .defaultBlended
+                sessionCapabilityPolicy: .observed
             ),
             calibrationAdjustment: .neutral
         )
 
         let decision = try! XCTUnwrap(SuggestionEngine.evaluate(input).first)
-        XCTAssertEqual(decision.sessionCapabilityE1RM, 83.634, accuracy: 0.001)
-        XCTAssertEqual(decision.prescribedWeight, 65, accuracy: 0.001)
-        XCTAssertEqual(decision.bestReps, 6)
+        // With .observed policy: 65kg × (8+0) reps Epley = 65 × (1 + 8/30) = 82.333
+        XCTAssertEqual(decision.sessionCapabilityE1RM, 82.333, accuracy: 0.001)
     }
 
     func testSessionCapabilityBlendMovesUpAndDownSymmetrically() {
@@ -3474,7 +3474,7 @@ final class FatigueModelV2Tests: XCTestCase {
                 freshnessPercent: 0.03,
                 baseFatigueRate: 0.04,
                 recoveryConstant: 180.0,
-                sessionCapabilityPolicy: .defaultBlended
+                sessionCapabilityPolicy: .observed
             ),
             calibrationAdjustment: .neutral
         )
@@ -3500,8 +3500,9 @@ final class FatigueModelV2Tests: XCTestCase {
         let strongerDecision = try! XCTUnwrap(SuggestionEngine.evaluate(stronger).first)
         let weakerDecision = try! XCTUnwrap(SuggestionEngine.evaluate(weaker).first)
 
-        XCTAssertEqual(strongerDecision.sessionCapabilityE1RM, 103.5, accuracy: 0.001)
-        XCTAssertEqual(weakerDecision.sessionCapabilityE1RM, 96.5, accuracy: 0.001)
+        // With .observed: stronger = 78.75 × (1 + 10/30) = 105.0, weaker = 71.25 × (1 + 10/30) = 95.0
+        XCTAssertEqual(strongerDecision.sessionCapabilityE1RM, 105.0, accuracy: 0.001)
+        XCTAssertEqual(weakerDecision.sessionCapabilityE1RM, 95.0, accuracy: 0.001)
         XCTAssertEqual(
             strongerDecision.sessionCapabilityE1RM - 100,
             100 - weakerDecision.sessionCapabilityE1RM,
@@ -3557,7 +3558,7 @@ final class FatigueModelV2Tests: XCTestCase {
                 freshnessPercent: 0.03,
                 baseFatigueRate: 0.04,
                 recoveryConstant: 180.0,
-                sessionCapabilityPolicy: .defaultBlended
+                sessionCapabilityPolicy: .observed
             ),
             calibrationAdjustment: .neutral
         )
@@ -3602,7 +3603,7 @@ final class FatigueModelV2Tests: XCTestCase {
                 freshnessPercent: 0.03,
                 baseFatigueRate: 0.04,
                 recoveryConstant: 180.0,
-                sessionCapabilityPolicy: .defaultBlended
+                sessionCapabilityPolicy: .observed
             ),
             calibrationAdjustment: .neutral
         )
@@ -3750,10 +3751,10 @@ final class FatigueModelV2Tests: XCTestCase {
         XCTAssertLessThan(firstTransitionFatigue, shiftedTransitionFatigue)
     }
 
-    // MARK: - Readiness clamp
+    // MARK: - Readiness (no clamp)
 
-    func testReadinessClampAllowsUp12PercentReduction() {
-        // With enough fatigue, readiness should be able to go down to 88%
+    func testReadinessCanDropBelowOldClampFloor() {
+        // Without readiness clamp, fatigue can push readiness below the old 88% floor
         let completedSets = (0..<5).map { _ in
             SessionSetContext(
                 weight: 100, reps: 8, rir: 0.0,
@@ -3787,7 +3788,7 @@ final class FatigueModelV2Tests: XCTestCase {
                 freshnessPercent: 0.03,
                 baseFatigueRate: 0.04,
                 recoveryConstant: 180.0,
-                sessionCapabilityPolicy: .defaultBlended
+                sessionCapabilityPolicy: .observed
             ),
             calibrationAdjustment: .neutral
         )
@@ -3796,9 +3797,8 @@ final class FatigueModelV2Tests: XCTestCase {
         let decision = decisions[0]
         let readinessPercent = decision.effectiveE1RM / decision.baseE1RM
 
-        // Should be at or near 88% (the new floor)
-        XCTAssertGreaterThanOrEqual(readinessPercent, 0.88 - 0.001)
-        XCTAssertLessThan(readinessPercent, 0.95) // v1 floor was 0.95, v2 goes lower
+        // With no clamp, heavy fatigue can push readiness well below the old 88% floor
+        XCTAssertLessThan(readinessPercent, 0.88)
     }
 
     // MARK: - Worked example from design doc
@@ -3846,7 +3846,7 @@ final class FatigueModelV2Tests: XCTestCase {
                 freshnessPercent: 0.03,
                 baseFatigueRate: 0.04,
                 recoveryConstant: 210.0,
-                sessionCapabilityPolicy: .defaultBlended
+                sessionCapabilityPolicy: .observed
             ),
             calibrationAdjustment: .neutral
         )

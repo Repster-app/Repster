@@ -1,8 +1,0 @@
-{
-  "feature_number": "010",
-  "slug": "010-settings-and-onboarding",
-  "friendly_name": "Settings + Onboarding",
-  "mission": "software-dev",
-  "source_description": "Settings from screen_tree Section 5. Onboarding (5 screens) from screen_tree Section 6. User settings per specdoc Section 9. Onboarding rules per AGENT_RULES Section 11.",
-  "created_at": "2026-02-19T10:00:00Z"
-}

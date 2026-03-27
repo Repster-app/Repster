@@ -1,8 +1,0 @@
-{
-  "feature_number": "011",
-  "slug": "011-csv-import-export",
-  "friendly_name": "CSV Import + Export",
-  "mission": "software-dev",
-  "source_description": "Export format per specdoc Section 12. Import mapping per tech_stack Section 11 (NOTE: Kind column maps to Exercise.trackingType, NOT Set.setType - all imported sets default to setType=working). Import rules per AGENT_RULES Section 9.",
-  "created_at": "2026-02-19T10:00:00Z"
-}

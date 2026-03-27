@@ -92,8 +92,6 @@ struct WorkoutSummarySheet: View {
                         }
 
                         secondaryActionsSection
-                        notesSection
-                        effortSection
                     }
                     .padding(.horizontal, 14)
                     .padding(.top, 16)

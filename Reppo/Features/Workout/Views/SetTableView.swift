@@ -675,8 +675,12 @@ final class SetEntryKeyboardContext {
     let setFocusedField: (SetRowInputField?) -> Void
     let getFieldValue: (SetRowInputField) -> String
     let setFieldValue: (SetRowInputField, String) -> Void
-    let getRIRValue: () -> Double?
-    let setRIRValue: (Double?) -> Void
+    private let getBilateralRIRValue: () -> Double?
+    private let setBilateralRIRValue: (Double?) -> Void
+    private let getLeftRIRValue: () -> Double?
+    private let setLeftRIRValue: (Double?) -> Void
+    private let getRightRIRValue: () -> Double?
+    private let setRightRIRValue: (Double?) -> Void
     let getSuggestedWeight: () -> Double?
     let getWeightIncrement: () -> Double
     let getTargetRepRange: () -> (min: Int?, max: Int?)
@@ -699,8 +703,12 @@ final class SetEntryKeyboardContext {
         setFocusedField: @escaping (SetRowInputField?) -> Void,
         getFieldValue: @escaping (SetRowInputField) -> String,
         setFieldValue: @escaping (SetRowInputField, String) -> Void,
-        getRIRValue: @escaping () -> Double?,
-        setRIRValue: @escaping (Double?) -> Void,
+        getBilateralRIRValue: @escaping () -> Double?,
+        setBilateralRIRValue: @escaping (Double?) -> Void,
+        getLeftRIRValue: @escaping () -> Double? = { nil },
+        setLeftRIRValue: @escaping (Double?) -> Void = { _ in },
+        getRightRIRValue: @escaping () -> Double? = { nil },
+        setRightRIRValue: @escaping (Double?) -> Void = { _ in },
         getSuggestedWeight: @escaping () -> Double?,
         getWeightIncrement: @escaping () -> Double = { 2.5 },
         getTargetRepRange: @escaping () -> (min: Int?, max: Int?) = { (nil, nil) },
@@ -721,8 +729,12 @@ final class SetEntryKeyboardContext {
         self.setFocusedField = setFocusedField
         self.getFieldValue = getFieldValue
         self.setFieldValue = setFieldValue
-        self.getRIRValue = getRIRValue
-        self.setRIRValue = setRIRValue
+        self.getBilateralRIRValue = getBilateralRIRValue
+        self.setBilateralRIRValue = setBilateralRIRValue
+        self.getLeftRIRValue = getLeftRIRValue
+        self.setLeftRIRValue = setLeftRIRValue
+        self.getRightRIRValue = getRightRIRValue
+        self.setRightRIRValue = setRightRIRValue
         self.getSuggestedWeight = getSuggestedWeight
         self.getWeightIncrement = getWeightIncrement
         self.getTargetRepRange = getTargetRepRange
@@ -763,6 +775,49 @@ final class SetEntryKeyboardContext {
         let nextField = inputOrder[index + 1]
         self.trackedField = nextField
         setFocusedField(nextField)
+    }
+
+    var canEditActiveRIR: Bool {
+        resolvedRIRField != nil
+    }
+
+    var resolvedRIRField: SetRowInputField? {
+        Self.rirField(for: trackedField)
+    }
+
+    func resolvedRIRValue(for field: SetRowInputField? = nil) -> Double? {
+        switch Self.rirField(for: field ?? trackedField) {
+        case .some(.reps):
+            return getBilateralRIRValue()
+        case .some(.leftReps):
+            return getLeftRIRValue()
+        case .some(.rightReps):
+            return getRightRIRValue()
+        case .some(.weight), .some(.duration), .some(.distance), .none:
+            return nil
+        }
+    }
+
+    func setResolvedRIRValue(_ value: Double?, for field: SetRowInputField? = nil) {
+        switch Self.rirField(for: field ?? trackedField) {
+        case .some(.reps):
+            setBilateralRIRValue(value)
+        case .some(.leftReps):
+            setLeftRIRValue(value)
+        case .some(.rightReps):
+            setRightRIRValue(value)
+        case .some(.weight), .some(.duration), .some(.distance), .none:
+            break
+        }
+    }
+
+    private static func rirField(for field: SetRowInputField?) -> SetRowInputField? {
+        switch field {
+        case .some(.reps), .some(.leftReps), .some(.rightReps):
+            return field
+        case .some(.weight), .some(.duration), .some(.distance), .none:
+            return nil
+        }
     }
 }
 
@@ -984,9 +1039,10 @@ struct SetEntryKeyboardOverlay: View {
     }
 
     private func rirChip(_ context: SetEntryKeyboardContext, label: String, value: Double?) -> some View {
-        let selected = (context.getRIRValue() == value) || (context.getRIRValue() == nil && value == nil)
+        let currentValue = context.resolvedRIRValue()
+        let selected = (currentValue == value) || (currentValue == nil && value == nil)
         return Button {
-            context.setRIRValue(value)
+            context.setResolvedRIRValue(value)
             refreshTick += 1
         } label: {
             Text(label)
@@ -1309,9 +1365,9 @@ struct SetEntryKeyboardOverlay: View {
     private func showRIRChips(for context: SetEntryKeyboardContext) -> Bool {
         if repRangeEditMode { return false }
         if rirMode {
-            return true
+            return context.canEditActiveRIR
         }
-        return context.trackedField == .reps
+        return context.canEditActiveRIR
     }
 
     private func shouldShowWeightHelper(for context: SetEntryKeyboardContext) -> Bool {

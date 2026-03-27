@@ -1,8 +1,8 @@
 {
   "_meta": {
     "description": "Default exercise library for the Strength Training App. Loaded on first launch.",
-    "version": "1.0",
-    "lastUpdated": "2026-02",
+    "version": "1.1",
+    "lastUpdated": "2026-03",
     "notes": "All weights in kg. bodyweightFactor: 0.0 = no bodyweight component, 0.65 = ~65% of bodyweight. trackingType is IMMUTABLE once sets exist."
   },
   "exercises": [
@@ -61,6 +61,18 @@
       "primaryMuscle": "shoulders",
       "secondaryMuscles": ["triceps", "core"],
       "movementPattern": "press",
+      "unilateral": false,
+      "bodyweightFactor": 0.0,
+      "weightIncrement": 2.5,
+      "defaultRestTime": 150
+    },
+    {
+      "name": "Barbell Thruster",
+      "equipmentType": "barbell",
+      "trackingType": "WEIGHT_REPS",
+      "primaryMuscle": "full body",
+      "secondaryMuscles": ["shoulders", "legs", "triceps"],
+      "movementPattern": "other",
       "unilateral": false,
       "bodyweightFactor": 0.0,
       "weightIncrement": 2.5,
@@ -595,6 +607,18 @@
       "defaultRestTime": 90
     },
     {
+      "name": "Running",
+      "equipmentType": "bodyweight",
+      "trackingType": "DURATION_DISTANCE",
+      "primaryMuscle": "cardio",
+      "secondaryMuscles": ["legs"],
+      "movementPattern": "other",
+      "unilateral": false,
+      "bodyweightFactor": 0.0,
+      "weightIncrement": 0.0,
+      "defaultRestTime": 60
+    },
+    {
       "name": "T-Bar Row",
       "equipmentType": "barbell",
       "trackingType": "WEIGHT_REPS",
@@ -790,7 +814,7 @@
       "name": "Wrist Curl",
       "equipmentType": "dumbbell",
       "trackingType": "WEIGHT_REPS",
-      "primaryMuscle": "biceps",
+      "primaryMuscle": "forearms",
       "secondaryMuscles": [],
       "movementPattern": "other",
       "unilateral": false,

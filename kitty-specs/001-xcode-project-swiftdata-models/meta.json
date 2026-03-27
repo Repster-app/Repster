@@ -1,8 +1,0 @@
-{
-  "feature_number": "001",
-  "slug": "001-xcode-project-swiftdata-models",
-  "friendly_name": "Xcode Project + SwiftData Models",
-  "mission": "software-dev",
-  "source_description": "Create the Xcode project (iOS 17+, SwiftUI, bundle ID TBD). Then implement all SwiftData @Model classes from specdoc Section 6 (all tables), all enums from Appendix A, following AGENT_RULES Section 3 (naming, units, effectiveWeight). File structure per AGENT_RULES Section 2.",
-  "created_at": "2026-02-19T09:55:00Z"
-}

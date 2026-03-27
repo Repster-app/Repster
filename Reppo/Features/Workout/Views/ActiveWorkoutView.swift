@@ -150,7 +150,7 @@ struct ActiveWorkoutView: View {
 
     /// Segmented picker for [Sets | History | Charts] with exercise settings gear icon.
     private var subTabPicker: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             WorkoutSubTabBar(selectedTab: $selectedSubTab)
                 .frame(maxWidth: .infinity)
 
@@ -159,9 +159,9 @@ struct ActiveWorkoutView: View {
                 showExerciseSettingsSheet = true
             } label: {
                 Image(systemName: "gearshape")
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.textTertiary)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 36, height: 36)
             }
             .buttonStyle(.plain)
             .sheet(isPresented: $showExerciseSettingsSheet) {
@@ -173,8 +173,8 @@ struct ActiveWorkoutView: View {
                 }
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
     }
 
     // MARK: - Sub-Tab Content (T025/T026/T027)
@@ -414,22 +414,22 @@ private struct WorkoutSubTabBar: View {
                     }
                 } label: {
                     Text(tab.rawValue)
-                        .font(.system(size: 14, weight: selectedTab == tab ? .semibold : .medium))
+                        .font(.system(size: 12, weight: selectedTab == tab ? .semibold : .medium))
                         .foregroundStyle(selectedTab == tab ? Color.textPrimary : Color.textSecondary)
                         .frame(maxWidth: .infinity)
-                        .frame(minHeight: 44)
+                        .frame(minHeight: 36)
                         .background(selectedTab == tab ? Color.bgSubtle : Color.clear)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(4)
+        .padding(3)
         .background(Color.bgCard.opacity(0.9))
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: 11)
                 .stroke(Color.border, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .clipShape(RoundedRectangle(cornerRadius: 11))
     }
 }

@@ -168,13 +168,17 @@ struct NeutralSuggestionCalibrationProvider: SuggestionCalibrationProviderProtoc
 /// How completed-set performance should update the session capability baseline.
 enum SessionCapabilityPolicy: Sendable, Equatable {
     case blended(observedWeight: Double, priorWeight: Double)
+    case observed
 
     static let defaultBlended: SessionCapabilityPolicy = .blended(observedWeight: 0.7, priorWeight: 0.3)
+    static let defaultObserved: SessionCapabilityPolicy = .observed
 
     var label: String {
         switch self {
         case .blended:
             return "session blend"
+        case .observed:
+            return "observed"
         }
     }
 
@@ -182,6 +186,8 @@ enum SessionCapabilityPolicy: Sendable, Equatable {
         switch self {
         case let .blended(observedWeight, priorWeight):
             return "blend-\(String(format: "%.3f", observedWeight))-\(String(format: "%.3f", priorWeight))"
+        case .observed:
+            return "observed"
         }
     }
 
@@ -191,6 +197,8 @@ enum SessionCapabilityPolicy: Sendable, Equatable {
             let totalWeight = observedWeight + priorWeight
             guard totalWeight > 0 else { return observedCapability }
             return ((observedCapability * observedWeight) + (priorCapability * priorWeight)) / totalWeight
+        case .observed:
+            return observedCapability
         }
     }
 }
@@ -375,8 +383,6 @@ enum SuggestionEngine {
     private static let defaultBaseFatigueRate: Double = 0.04
     private static let defaultRecoveryConstant: Double = 180.0
     private static let maxFatigue: Double = 0.25
-    private static let readinessMinFactor: Double = 0.88
-    private static let readinessMaxFactor: Double = 1.05
     private static let missingRIRDefault: Double = 1.0
 
     private struct CompletedSessionState: Sendable {
@@ -684,9 +690,7 @@ enum SuggestionEngine {
         let normalizationMultiplier = readinessMultiplier * freshnessMultiplier
         let readinessRawE1RM = capabilityE1RM * normalizationMultiplier
 
-        let minReadiness = capabilityE1RM * Self.readinessMinFactor
-        let maxReadiness = capabilityE1RM * Self.readinessMaxFactor
-        let effectiveE1RM = min(max(readinessRawE1RM, minReadiness), maxReadiness)
+        let effectiveE1RM = readinessRawE1RM
 
         return ReadinessState(
             effectiveE1RM: effectiveE1RM,

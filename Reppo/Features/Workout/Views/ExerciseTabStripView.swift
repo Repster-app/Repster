@@ -37,7 +37,7 @@ struct ExerciseTabStripView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                HStack(spacing: 7) {
                     ForEach(Array(dataSource.exercises.enumerated()), id: \.element.id) { index, exercise in
                         ExerciseTab(
                             name: exercise.name,
@@ -87,8 +87,8 @@ struct ExerciseTabStripView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 7)
             }
             .onChange(of: dataSource.selectedExerciseIndex) { _, newIndex in
                 // Auto-scroll to keep active tab visible
@@ -139,20 +139,20 @@ private struct ExerciseTab: View {
     var body: some View {
         HStack(spacing: 6) {
             Text(name)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .lineLimit(1)
 
             if isCompleted {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 12))
+                    .font(.system(size: 11))
                     .foregroundColor(isActive ? .white.opacity(0.8) : .success)
             }
         }
         .foregroundColor(isActive ? .white : .textTertiary)
-        .padding(.horizontal, 16)
-        .frame(minHeight: 44)
+        .padding(.horizontal, 14)
+        .frame(minHeight: 40)
             .background(isActive ? Color.accent : Color.bgCard)
-            .cornerRadius(8)
+            .cornerRadius(7)
             .contentShape(Rectangle())
     }
 }

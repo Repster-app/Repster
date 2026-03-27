@@ -1,8 +1,0 @@
-{
-  "feature_number": "013",
-  "slug": "013-home-screen",
-  "friendly_name": "Home Screen",
-  "mission": "software-dev",
-  "source_description": "Replace the Programs placeholder tab with a full Home screen. The Home tab (house icon) becomes the app's landing page with: week strip calendar, start workout CTA, copy previous and templates quick actions, this week activity tracker, and recent workouts list. Renames MainTab.programs to MainTab.home.",
-  "created_at": "2026-03-01T18:00:00Z"
-}

@@ -14,6 +14,7 @@ struct RecentPR: Identifiable {
 
 struct RecentPRsView: View {
     let prs: [RecentPR]
+    var displayMode: PRDisplayMode = .standard
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -22,15 +23,28 @@ struct RecentPRsView: View {
                 .foregroundStyle(Color.textTertiary)
                 .kerning(0.8)
 
-            ForEach(prs) { pr in
-                prCard(pr)
+            switch displayMode {
+            case .standard:
+                ForEach(prs) { pr in
+                    prCard(pr)
+                }
+            case .compact:
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 10),
+                    GridItem(.flexible(), spacing: 10)
+                ], spacing: 10) {
+                    ForEach(prs) { pr in
+                        compactPRCard(pr)
+                    }
+                }
             }
         }
     }
 
+    // MARK: - Standard Card (full-width)
+
     private func prCard(_ pr: RecentPR) -> some View {
         HStack(spacing: 12) {
-            // Trophy icon
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color.gold.opacity(0.1))
                 .frame(width: 36, height: 36)
@@ -65,6 +79,43 @@ struct RecentPRsView: View {
         .background(Color.bgCard)
         .cornerRadius(14)
     }
+
+    // MARK: - Compact Card (half-width, 2-column grid)
+
+    private func compactPRCard(_ pr: RecentPR) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "trophy.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.gold)
+                Text(pr.exerciseName)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.textPrimary)
+                    .lineLimit(1)
+            }
+
+            Text("\(formattedWeight(pr.weight)) x \(pr.reps) reps")
+                .font(.system(size: 12))
+                .foregroundStyle(Color.textSecondary)
+
+            HStack(spacing: 4) {
+                Text(relativeDate(pr.date))
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.textTertiary)
+                if pr.isPerSide {
+                    Text("· Per side")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.textTertiary)
+                }
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.bgCard)
+        .cornerRadius(14)
+    }
+
+    // MARK: - Helpers
 
     private func formattedWeight(_ weight: Double) -> String {
         if weight == weight.rounded() {

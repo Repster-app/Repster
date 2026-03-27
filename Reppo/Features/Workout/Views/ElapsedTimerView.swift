@@ -30,12 +30,12 @@ struct ElapsedTimerView: View {
 
                     if isPaused {
                         Image(systemName: "pause.fill")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.system(size: 7, weight: .bold))
                     }
                 }
-                .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                .font(.system(size: 14, weight: .semibold, design: .monospaced))
                 .foregroundColor(.textPrimary)
-                .frame(minWidth: 72, minHeight: 44)
+                .frame(minWidth: 60, minHeight: 36)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
