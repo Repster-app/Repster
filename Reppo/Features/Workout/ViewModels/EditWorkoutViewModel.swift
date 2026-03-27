@@ -359,6 +359,39 @@ final class EditWorkoutViewModel {
         }
     }
 
+    func updateProgressionExclusions(
+        excludeWorkout: Bool,
+        excludedExerciseIds: Set<UUID>
+    ) async throws {
+        guard let workout else { return }
+
+        try await workoutService.updateProgressionExclusions(
+            workout.id,
+            excludeWorkout: excludeWorkout,
+            excludedExerciseIds: excludedExerciseIds
+        )
+
+        workout.excludeFromPRsAndSuggestions = excludeWorkout
+        workout.excludedExerciseIdsFromPRsAndSuggestions = Array(excludedExerciseIds).sorted {
+            $0.uuidString < $1.uuidString
+        }
+
+        try await refreshPersistedWorkoutPRState()
+    }
+
+    private func refreshPersistedWorkoutPRState() async throws {
+        guard let workout else { return }
+        let persistedSets = try await setService.fetchSets(for: workout.id)
+        let statusesBySetId = Dictionary(uniqueKeysWithValues: persistedSets.map { ($0.id, $0.cachedPRStatus) })
+
+        for (exerciseId, sets) in setsByExercise {
+            for set in sets {
+                set.cachedPRStatus = statusesBySetId[set.id] ?? nil
+            }
+            setsByExercise[exerciseId] = sets
+        }
+    }
+
     // MARK: - Dirty Set Tracking
 
     /// Mark a set as having unsaved text changes.

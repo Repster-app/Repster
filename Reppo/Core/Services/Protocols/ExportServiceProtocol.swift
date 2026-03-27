@@ -69,6 +69,8 @@ struct WorkoutHistoryArchiveWorkout: Codable, Sendable {
     let notes: String?
     let programId: UUID?
     let status: WorkoutStatus
+    let excludeFromPRsAndSuggestions: Bool?
+    let excludedExerciseIdsFromPRsAndSuggestions: [UUID]?
     let createdAt: Date
     let updatedAt: Date
 }

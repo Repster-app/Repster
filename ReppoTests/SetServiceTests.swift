@@ -190,6 +190,131 @@ final class SetServiceTests: XCTestCase {
         XCTAssertEqual(persistedSet?.cachedPRStatus, .current)
     }
 
+    func testSaveWeightRepsSetInExcludedWorkoutDoesNotCreatePRRecordOrBadge() async throws {
+        let context = try makeContext()
+        let workoutDate = makeDate(2026, 3, 22, 9, 10)
+        let exercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest"
+        )
+        let workout = Workout(
+            date: workoutDate,
+            title: "Hotel Gym",
+            startTime: workoutDate,
+            endTime: workoutDate.addingTimeInterval(1_800),
+            duration: 1_800,
+            status: .completed,
+            excludeFromPRsAndSuggestions: true
+        )
+        let set = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            date: workoutDate,
+            completedAt: workoutDate.addingTimeInterval(300),
+            weight: 100,
+            reps: 5,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(workout)
+
+        let result = try await context.setService.save(set)
+        let performanceRecords = try await context.performanceRecordRepo.fetchAll(
+            for: exercise.id,
+            recordType: .repMax
+        )
+        let persistedSet = try await context.setRepo.fetch(byId: set.id)
+
+        XCTAssertNil(result.prResult.newStatus)
+        XCTAssertFalse(result.prResult.prRecordChanged)
+        XCTAssertTrue(performanceRecords.isEmpty)
+        XCTAssertNil(persistedSet?.cachedPRStatus)
+    }
+
+    func testExerciseScopedWorkoutExclusionStillAllowsOtherExercisesToCreatePRs() async throws {
+        let context = try makeContext()
+        let workoutDate = makeDate(2026, 3, 22, 9, 20)
+        let excludedExercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest"
+        )
+        let allowedExercise = Exercise(
+            name: "Barbell Row",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "back"
+        )
+        let workout = Workout(
+            date: workoutDate,
+            title: "Mixed Session",
+            startTime: workoutDate,
+            endTime: workoutDate.addingTimeInterval(1_800),
+            duration: 1_800,
+            status: .completed,
+            excludedExerciseIdsFromPRsAndSuggestions: [excludedExercise.id]
+        )
+        let excludedSet = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: excludedExercise.id,
+            date: workoutDate,
+            completedAt: workoutDate.addingTimeInterval(240),
+            weight: 95,
+            reps: 5,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+        let allowedSet = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: allowedExercise.id,
+            date: workoutDate,
+            completedAt: workoutDate.addingTimeInterval(420),
+            weight: 85,
+            reps: 8,
+            setType: .working,
+            orderInWorkout: 2,
+            orderInExercise: 1,
+            completed: true
+        )
+
+        try await context.exerciseRepo.save(excludedExercise)
+        try await context.exerciseRepo.save(allowedExercise)
+        try await context.workoutRepo.save(workout)
+
+        let excludedResult = try await context.setService.save(excludedSet)
+        let allowedResult = try await context.setService.save(allowedSet)
+        let excludedRecords = try await context.performanceRecordRepo.fetchAll(
+            for: excludedExercise.id,
+            recordType: .repMax
+        )
+        let allowedRecords = try await context.performanceRecordRepo.fetchAll(
+            for: allowedExercise.id,
+            recordType: .repMax
+        )
+        let persistedExcludedSet = try await context.setRepo.fetch(byId: excludedSet.id)
+        let persistedAllowedSet = try await context.setRepo.fetch(byId: allowedSet.id)
+
+        XCTAssertNil(excludedResult.prResult.newStatus)
+        XCTAssertFalse(excludedResult.prResult.prRecordChanged)
+        XCTAssertTrue(excludedRecords.isEmpty)
+        XCTAssertNil(persistedExcludedSet?.cachedPRStatus)
+
+        XCTAssertEqual(allowedResult.prResult.newStatus, .current)
+        XCTAssertEqual(allowedRecords.count, 1)
+        XCTAssertEqual(allowedRecords.first?.reps, 8)
+        XCTAssertEqual(allowedRecords.first?.value ?? 0, 85, accuracy: 0.001)
+        XCTAssertEqual(persistedAllowedSet?.cachedPRStatus, .current)
+    }
+
     func testSaveWeightRepsDurationSetDoesNotCreatePRRecordOrBadge() async throws {
         let context = try makeContext()
         let workoutDate = makeDate(2026, 3, 22, 9, 15)
@@ -470,6 +595,7 @@ final class SetServiceTests: XCTestCase {
         let prService = PRService(
             performanceRecordRepository: performanceRecordRepo,
             setRepository: setRepo,
+            workoutRepository: workoutRepo,
             healthProfileRepository: healthProfileRepo,
             exerciseRepository: exerciseRepo
         )

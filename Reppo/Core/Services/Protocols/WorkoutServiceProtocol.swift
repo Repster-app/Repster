@@ -94,6 +94,18 @@ protocol WorkoutServiceProtocol: Sendable {
     ///   - perceivedEffort: Updated RPE value (nil to clear).
     func updateWorkoutMetadata(_ workoutId: UUID, notes: String?, perceivedEffort: Double?) async throws
 
+    /// Update workout-scoped PR / Smart Suggest exclusions.
+    ///
+    /// - Parameters:
+    ///   - workoutId: Workout to update.
+    ///   - excludeWorkout: When true, the entire workout is ignored for PRs and Smart Suggestions.
+    ///   - excludedExerciseIds: Exercise IDs to ignore within this workout only.
+    func updateProgressionExclusions(
+        _ workoutId: UUID,
+        excludeWorkout: Bool,
+        excludedExerciseIds: Set<UUID>
+    ) async throws
+
     // MARK: - Deletion (FR-010)
 
     /// Delete a workout with full cascade.

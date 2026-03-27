@@ -297,6 +297,67 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
         XCTAssertEqual(records.count, 1)
     }
 
+    func testBackupExportAndRestorePreservesWorkoutProgressionExclusions() async throws {
+        let context = try makeBackupServiceContext()
+        let exercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest"
+        )
+        try await context.exerciseRepo.save(exercise)
+
+        let workoutDate = makeDate(2026, 3, 20, 9, 0)
+        let workout = Workout(
+            date: workoutDate,
+            title: "Travel Session",
+            startTime: workoutDate,
+            endTime: makeDate(2026, 3, 20, 10, 0),
+            duration: 3600,
+            status: .completed,
+            excludeFromPRsAndSuggestions: true,
+            excludedExerciseIdsFromPRsAndSuggestions: [exercise.id]
+        )
+        try await context.workoutRepo.save(workout)
+
+        let set = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            date: workoutDate,
+            completedAt: makeDate(2026, 3, 20, 9, 20),
+            weight: 90,
+            effectiveWeight: 90,
+            reps: 5,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+        try await context.setRepo.save(set)
+
+        let backupData = try await context.service.exportBackup()
+        let archive = try decodeBackupArchive(backupData)
+        let archivedWorkout = try XCTUnwrap(archive.workouts.first(where: { $0.id == workout.id }))
+
+        XCTAssertEqual(archivedWorkout.excludeFromPRsAndSuggestions, true)
+        XCTAssertEqual(
+            Set(archivedWorkout.excludedExerciseIdsFromPRsAndSuggestions ?? []),
+            [exercise.id]
+        )
+
+        let restoredContext = try makeBackupServiceContext()
+        let restoreResult = try await restoredContext.service.restoreBackup(data: backupData)
+        let restoredWorkout = try await restoredContext.workoutRepo.fetch(byId: workout.id)
+
+        XCTAssertEqual(restoreResult.workoutsRestored, 1)
+        XCTAssertEqual(restoredWorkout?.excludeFromPRsAndSuggestions, true)
+        XCTAssertEqual(
+            Set(restoredWorkout?.excludedExerciseIdsFromPRsAndSuggestions ?? []),
+            [exercise.id]
+        )
+        XCTAssertTrue(restoredWorkout?.excludesFromPRsAndSuggestions(exerciseId: exercise.id) == true)
+    }
+
     func testBackupRoundTripPreservesFatigueLearningAuditsAndGlobalProfileLearning() async throws {
         let context = try makeBackupServiceContext()
         let exercise = Exercise(
@@ -881,6 +942,7 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
         let prService = PRService(
             performanceRecordRepository: performanceRecordRepo,
             setRepository: setRepo,
+            workoutRepository: workoutRepo,
             healthProfileRepository: healthProfileRepo,
             exerciseRepository: exerciseRepo
         )
@@ -1563,6 +1625,7 @@ private func makeResetContext() throws -> SettingsResetTestContext {
     let prService = PRService(
         performanceRecordRepository: performanceRecordRepo,
         setRepository: setRepo,
+        workoutRepository: workoutRepo,
         healthProfileRepository: healthProfileRepo,
         exerciseRepository: exerciseRepo
     )

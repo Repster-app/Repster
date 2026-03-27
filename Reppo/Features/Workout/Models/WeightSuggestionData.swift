@@ -188,6 +188,7 @@ struct SuggestionPreparation: Sendable {
 enum SuggestionCoordinator {
     static func prepare(
         exercise: Exercise?,
+        workout: Workout? = nil,
         sets: [WorkoutSet],
         profile: HealthProfile?
     ) -> SuggestionPreparation {
@@ -200,6 +201,8 @@ enum SuggestionCoordinator {
             unavailableReason = .missingExercise
         } else if !(profile?.prescriptionEnabled ?? true) {
             unavailableReason = .featureDisabled
+        } else if let exercise, let workout, workout.excludesFromPRsAndSuggestions(exerciseId: exercise.id) {
+            unavailableReason = .excludedFromPRsAndSuggestions
         } else if let exercise, !supportsSuggestions(for: exercise) {
             unavailableReason = .unsupportedExercise
         } else if setResolutions.isEmpty {
@@ -213,6 +216,7 @@ enum SuggestionCoordinator {
         return SuggestionPreparation(
             cacheKey: cacheKey(
                 exercise: exercise,
+                workout: workout,
                 completedWorking: sets.filter { $0.completed && $0.setType != .warmup },
                 setResolutions: setResolutions,
                 profile: profile,
@@ -353,6 +357,7 @@ enum SuggestionCoordinator {
 
     private static func cacheKey(
         exercise: Exercise?,
+        workout: Workout?,
         completedWorking: [WorkoutSet],
         setResolutions: [SuggestionSetResolution],
         profile: HealthProfile?,
@@ -435,6 +440,7 @@ enum SuggestionCoordinator {
 
         return [
             exerciseSignature,
+            workoutExclusionSignature(workout: workout, exercise: exercise),
             profileSignature,
             "reason:\(unavailableReason?.rawValue ?? "none")",
             completedSignature,
@@ -449,6 +455,29 @@ enum SuggestionCoordinator {
     private static func signatureOptionalNumber(_ value: Double?) -> String {
         guard let value else { return "nil" }
         return signatureNumber(value)
+    }
+
+    private static func workoutExclusionSignature(
+        workout: Workout?,
+        exercise: Exercise?
+    ) -> String {
+        guard let workout else { return "workout:none" }
+        let excludedIds = (workout.excludedExerciseIdsFromPRsAndSuggestions ?? [])
+            .map(\.uuidString)
+            .sorted()
+            .joined(separator: ",")
+        let currentExerciseExcluded: Bool
+        if let exercise {
+            currentExerciseExcluded = workout.excludesFromPRsAndSuggestions(exerciseId: exercise.id)
+        } else {
+            currentExerciseExcluded = false
+        }
+        return [
+            workout.id.uuidString,
+            "all\(workout.excludesEntireWorkoutFromPRsAndSuggestions)",
+            "current\(currentExerciseExcluded)",
+            "ids\(excludedIds)"
+        ].joined(separator: ":")
     }
 
     private static func normalizedDefaultTargetReps(from profile: HealthProfile?) -> Int? {

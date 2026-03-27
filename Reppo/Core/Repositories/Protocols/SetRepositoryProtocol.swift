@@ -101,11 +101,13 @@ protocol SetRepositoryProtocol: Sendable {
     ///   - reps: The rep count to match.
     ///   - excludeWarmups: Whether warmup sets should be excluded (based on user setting).
     ///   - excludingSetId: Optional set ID to exclude from results (the deleted/edited set).
+    ///   - excludedWorkoutIds: Workouts to exclude entirely for this PR search.
     /// - Returns: The best eligible set, or nil if no eligible sets exist.
     func fetchBestEligibleSet(
         for exerciseId: UUID,
         reps: Int,
         excludeWarmups: Bool,
-        excludingSetId: UUID?
+        excludingSetId: UUID?,
+        excludedWorkoutIds: Set<UUID>
     ) async throws -> WorkoutSet?
 }

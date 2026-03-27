@@ -47,6 +47,7 @@ final class ServiceContainer {
         let prService = PRService(
             performanceRecordRepository: repositoryContainer.performanceRecordRepository,
             setRepository: repositoryContainer.setRepository,
+            workoutRepository: repositoryContainer.workoutRepository,
             healthProfileRepository: repositoryContainer.healthProfileRepository,
             exerciseRepository: repositoryContainer.exerciseRepository
         )
@@ -149,6 +150,7 @@ final class ServiceContainer {
         let loadPrescriptionService = LoadPrescriptionService(
             setRepository: repositoryContainer.setRepository,
             exerciseRepository: repositoryContainer.exerciseRepository,
+            workoutRepository: repositoryContainer.workoutRepository,
             performanceRecordRepository: repositoryContainer.performanceRecordRepository,
             healthProfileRepository: repositoryContainer.healthProfileRepository
         )

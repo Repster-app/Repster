@@ -199,6 +199,7 @@
 		AW0005 /* WeightSuggestionData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0005 /* WeightSuggestionData.swift */; };
 		AW0006 /* WeightSuggestionCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0006 /* WeightSuggestionCardView.swift */; };
 		AW0007 /* WeightSuggestionModuleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0007 /* WeightSuggestionModuleView.swift */; };
+		AW0008 /* WorkoutExclusionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0008 /* WorkoutExclusionSheet.swift */; };
 		RC0002 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = RC2002 /* RevenueCat */; };
 		RC0003 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = RC2003 /* RevenueCatUI */; };
 		AX0001 /* ExerciseMuscleGroupCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BX0001 /* ExerciseMuscleGroupCatalog.swift */; };
@@ -453,6 +454,7 @@
 		BW0005 /* WeightSuggestionData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightSuggestionData.swift; sourceTree = "<group>"; };
 		BW0006 /* WeightSuggestionCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightSuggestionCardView.swift; sourceTree = "<group>"; };
 		BW0007 /* WeightSuggestionModuleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightSuggestionModuleView.swift; sourceTree = "<group>"; };
+		BW0008 /* WorkoutExclusionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutExclusionSheet.swift; sourceTree = "<group>"; };
 		BX0001 /* ExerciseMuscleGroupCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMuscleGroupCatalog.swift; sourceTree = "<group>"; };
 		BX0002 /* WorkoutSetPerformanceFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSetPerformanceFormatter.swift; sourceTree = "<group>"; };
 		ZB0001 /* TrendLineCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendLineCalculator.swift; sourceTree = "<group>"; };
@@ -1137,6 +1139,7 @@
 				BC0019 /* EstimatedRepsCardView.swift */,
 				BC0020 /* ExerciseInfoSectionView.swift */,
 				BW0003 /* ExerciseSettingsSheet.swift */,
+				BW0008 /* WorkoutExclusionSheet.swift */,
 				BW0006 /* WeightSuggestionCardView.swift */,
 				BW0007 /* WeightSuggestionModuleView.swift */,
 			);
@@ -1534,6 +1537,7 @@
 				AW0005 /* WeightSuggestionData.swift in Sources */,
 				AW0006 /* WeightSuggestionCardView.swift in Sources */,
 				AW0007 /* WeightSuggestionModuleView.swift in Sources */,
+				AW0008 /* WorkoutExclusionSheet.swift in Sources */,
 				AX0002 /* WorkoutSetPerformanceFormatter.swift in Sources */,
 				AJ0004 /* SettingsViewModel.swift in Sources */,
 				AJ0005 /* SettingsView.swift in Sources */,

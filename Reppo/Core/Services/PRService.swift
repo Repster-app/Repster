@@ -13,17 +13,20 @@ actor PRService: PRServiceProtocol {
 
     private let performanceRecordRepo: PerformanceRecordRepositoryProtocol
     private let setRepo: SetRepositoryProtocol
+    private let workoutRepo: WorkoutRepositoryProtocol
     private let healthProfileRepo: HealthProfileRepositoryProtocol
     private let exerciseRepo: ExerciseRepositoryProtocol
 
     init(
         performanceRecordRepository: PerformanceRecordRepositoryProtocol,
         setRepository: SetRepositoryProtocol,
+        workoutRepository: WorkoutRepositoryProtocol,
         healthProfileRepository: HealthProfileRepositoryProtocol,
         exerciseRepository: ExerciseRepositoryProtocol
     ) {
         self.performanceRecordRepo = performanceRecordRepository
         self.setRepo = setRepository
+        self.workoutRepo = workoutRepository
         self.healthProfileRepo = healthProfileRepository
         self.exerciseRepo = exerciseRepository
     }
@@ -51,7 +54,9 @@ actor PRService: PRServiceProtocol {
         guard try await isEligible(
             hasData: hasData,
             excludeFromPRs: excludeFromPRs,
-            setType: setType
+            setType: setType,
+            workoutId: workoutId,
+            exerciseId: exerciseId
         ) else {
             return PREvaluationResult(
                 setId: setId,
@@ -200,7 +205,13 @@ actor PRService: PRServiceProtocol {
 
         // CASE 2: Edited set WAS the PR owner (.current or .dominated)
         // Check if it's still eligible
-        guard try await isEligible(hasData: hasData, excludeFromPRs: excludeFromPRs, setType: setType) else {
+        guard try await isEligible(
+            hasData: hasData,
+            excludeFromPRs: excludeFromPRs,
+            setType: setType,
+            workoutId: workoutId,
+            exerciseId: exerciseId
+        ) else {
             // Was PR owner but now ineligible — find new winner
             return try await findNewPROwner(
                 exerciseId: exerciseId,
@@ -249,15 +260,17 @@ actor PRService: PRServiceProtocol {
         }
 
         // CASE 2b: Edited weight < PR value — need to find new best
-        // Read warmup setting for eligible-set query
+        // Read warmup setting for eligible-set query.
         let profile = try await healthProfileRepo.fetchOrCreate()
         let excludeWarmups = !profile.includeWarmupsInPRs
+        let excludedWorkoutIds = try await excludedWorkoutIdsForSearch(exerciseId: exerciseId, reps: reps)
 
         let bestCandidate = try await setRepo.fetchBestEligibleSet(
             for: exerciseId,
             reps: reps,
             excludeWarmups: excludeWarmups,
-            excludingSetId: nil  // don't exclude — all sets are candidates
+            excludingSetId: nil,  // don't exclude — all sets are candidates
+            excludedWorkoutIds: excludedWorkoutIds
         )
 
         guard let winner = bestCandidate else {
@@ -465,6 +478,10 @@ actor PRService: PRServiceProtocol {
 
         let profile = try await healthProfileRepo.fetchOrCreate()
         let excludeWarmups = !profile.includeWarmupsInPRs
+        let excludedWorkoutIds = try await excludedWorkoutIds(
+            for: exerciseId,
+            workoutIds: Set(allSets.map(\.workoutId))
+        )
 
         // Step 3: Collect unique rep counts from eligible sets
         // Group eligible sets by reps, find best for each rep count
@@ -480,7 +497,8 @@ actor PRService: PRServiceProtocol {
                 for: exerciseId,
                 reps: reps,
                 excludeWarmups: excludeWarmups,
-                excludingSetId: nil
+                excludingSetId: nil,
+                excludedWorkoutIds: excludedWorkoutIds
             )
 
             guard let winner = best, let ew = winner.effectiveWeight else { continue }
@@ -515,6 +533,7 @@ actor PRService: PRServiceProtocol {
                     guard otherSet.hasData else { continue }
                     guard otherSet.excludeFromPRs != true else { continue }
                     guard otherSet.setType != .partial else { continue }
+                    guard !excludedWorkoutIds.contains(otherSet.workoutId) else { continue }
                     if excludeWarmups && otherSet.setType == .warmup { continue }
 
                     otherSet.cachedPRStatus = .matched
@@ -609,12 +628,14 @@ actor PRService: PRServiceProtocol {
     ) async throws -> PREvaluationResult {
         let profile = try await healthProfileRepo.fetchOrCreate()
         let excludeWarmups = !profile.includeWarmupsInPRs
+        let excludedWorkoutIds = try await excludedWorkoutIdsForSearch(exerciseId: exerciseId, reps: reps)
 
         let bestCandidate = try await setRepo.fetchBestEligibleSet(
             for: exerciseId,
             reps: reps,
             excludeWarmups: excludeWarmups,
-            excludingSetId: excludingSetId
+            excludingSetId: excludingSetId,
+            excludedWorkoutIds: excludedWorkoutIds
         )
 
         guard let winner = bestCandidate else {
@@ -682,13 +703,21 @@ actor PRService: PRServiceProtocol {
     private func isEligible(
         hasData: Bool,
         excludeFromPRs: Bool,
-        setType: SetType
+        setType: SetType,
+        workoutId: UUID,
+        exerciseId: UUID
     ) async throws -> Bool {
         // Rule 1: Must have actual data
         guard hasData else { return false }
 
         // Rule 2: Must not be explicitly excluded
         guard !excludeFromPRs else { return false }
+
+        // Rule 2b: Workout or workout-exercise exclusion also makes the set ineligible.
+        guard try await !isWorkoutExcludedFromPRsAndSuggestions(
+            workoutId: workoutId,
+            exerciseId: exerciseId
+        ) else { return false }
 
         // Rule 3: Partial sets ALWAYS excluded (regardless of settings)
         guard setType != .partial else { return false }
@@ -702,6 +731,43 @@ actor PRService: PRServiceProtocol {
         }
 
         return true
+    }
+
+    private func isWorkoutExcludedFromPRsAndSuggestions(
+        workoutId: UUID,
+        exerciseId: UUID
+    ) async throws -> Bool {
+        guard let workout = try await workoutRepo.fetch(byId: workoutId) else {
+            return false
+        }
+        return workout.excludesFromPRsAndSuggestions(exerciseId: exerciseId)
+    }
+
+    private func excludedWorkoutIdsForSearch(
+        exerciseId: UUID,
+        reps: Int
+    ) async throws -> Set<UUID> {
+        let candidateSets = try await setRepo.fetchSets(
+            for: exerciseId,
+            reps: reps,
+            orderedBy: .effectiveWeightDesc
+        )
+        return try await excludedWorkoutIds(
+            for: exerciseId,
+            workoutIds: Set(candidateSets.map(\.workoutId))
+        )
+    }
+
+    private func excludedWorkoutIds(
+        for exerciseId: UUID,
+        workoutIds: Set<UUID>
+    ) async throws -> Set<UUID> {
+        let workouts = try await workoutRepo.fetch(byIds: workoutIds)
+        return Set(
+            workouts.compactMap { workout in
+                workout.excludesFromPRsAndSuggestions(exerciseId: exerciseId) ? workout.id : nil
+            }
+        )
     }
 
     private func supportsRepPRs(for exerciseId: UUID) async throws -> Bool {

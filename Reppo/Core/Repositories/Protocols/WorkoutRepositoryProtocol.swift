@@ -13,6 +13,7 @@ protocol WorkoutRepositoryProtocol: Sendable {
     func save(_ workout: Workout) async throws
     func delete(_ workout: Workout) async throws
     func fetch(byId id: UUID) async throws -> Workout?
+    func fetch(byIds ids: Set<UUID>) async throws -> [Workout]
 
     // MARK: - Specialized Queries
 

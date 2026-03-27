@@ -24,6 +24,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
 
     private let setRepo: SetRepositoryProtocol
     private let exerciseRepo: ExerciseRepositoryProtocol
+    private let workoutRepo: WorkoutRepositoryProtocol
     private let performanceRecordRepo: PerformanceRecordRepositoryProtocol
     private let healthProfileRepo: HealthProfileRepositoryProtocol
     private let calibrationProvider: any SuggestionCalibrationProviderProtocol
@@ -39,12 +40,14 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
     init(
         setRepository: SetRepositoryProtocol,
         exerciseRepository: ExerciseRepositoryProtocol,
+        workoutRepository: WorkoutRepositoryProtocol,
         performanceRecordRepository: PerformanceRecordRepositoryProtocol,
         healthProfileRepository: HealthProfileRepositoryProtocol,
         calibrationProvider: any SuggestionCalibrationProviderProtocol = NeutralSuggestionCalibrationProvider()
     ) {
         self.setRepo = setRepository
         self.exerciseRepo = exerciseRepository
+        self.workoutRepo = workoutRepository
         self.performanceRecordRepo = performanceRecordRepository
         self.healthProfileRepo = healthProfileRepository
         self.calibrationProvider = calibrationProvider
@@ -214,10 +217,15 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
             from: windowStart,
             to: now
         )
+        let excludedWorkoutIds = try await excludedWorkoutIds(
+            for: exerciseId,
+            workoutIds: Set(recentSets.map(\.workoutId))
+        )
 
         // Filter to completed non-warmup sets with stored e1RM snapshots.
         let eligibleSets = recentSets.filter { set in
             return set.completed &&
+                !excludedWorkoutIds.contains(set.workoutId) &&
                 set.setType != .warmup &&
                 set.setType != .partial &&
                 (set.e1RM ?? 0) > 0
@@ -277,6 +285,18 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         }
 
         return bestE1RM > 0 ? bestE1RM : nil
+    }
+
+    private func excludedWorkoutIds(
+        for exerciseId: UUID,
+        workoutIds: Set<UUID>
+    ) async throws -> Set<UUID> {
+        let workouts = try await workoutRepo.fetch(byIds: workoutIds)
+        return Set(
+            workouts.compactMap { workout in
+                workout.excludesFromPRsAndSuggestions(exerciseId: exerciseId) ? workout.id : nil
+            }
+        )
     }
 
 }

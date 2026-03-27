@@ -1425,6 +1425,103 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         XCTAssertEqual(preparation.unavailableReason, .missingTarget)
     }
 
+    func testWholeWorkoutExclusionMarksSuggestionsUnavailableAndChangesCacheKey() {
+        let exercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps
+        )
+        let workoutId = UUID()
+        let set = WorkoutSet(
+            workoutId: workoutId,
+            exerciseId: exercise.id,
+            reps: 8,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: false
+        )
+        let profile = HealthProfile()
+        let includedWorkout = Workout(
+            id: workoutId,
+            date: Date(),
+            excludeFromPRsAndSuggestions: false
+        )
+        let excludedWorkout = Workout(
+            id: workoutId,
+            date: Date(),
+            excludeFromPRsAndSuggestions: true
+        )
+
+        let included = SuggestionCoordinator.prepare(
+            exercise: exercise,
+            workout: includedWorkout,
+            sets: [set],
+            profile: profile
+        )
+        let excluded = SuggestionCoordinator.prepare(
+            exercise: exercise,
+            workout: excludedWorkout,
+            sets: [set],
+            profile: profile
+        )
+
+        XCTAssertNil(included.unavailableReason)
+        XCTAssertEqual(excluded.unavailableReason, .excludedFromPRsAndSuggestions)
+        XCTAssertNotEqual(included.cacheKey, excluded.cacheKey)
+    }
+
+    func testExerciseScopedExclusionOnlyBlocksMatchingExercise() {
+        let excludedExercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps
+        )
+        let allowedExercise = Exercise(
+            name: "Incline Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps
+        )
+        let workoutId = UUID()
+        let workout = Workout(
+            id: workoutId,
+            date: Date(),
+            excludedExerciseIdsFromPRsAndSuggestions: [excludedExercise.id]
+        )
+        let excludedSet = WorkoutSet(
+            workoutId: workoutId,
+            exerciseId: excludedExercise.id,
+            reps: 8,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: false
+        )
+        let allowedSet = WorkoutSet(
+            workoutId: workoutId,
+            exerciseId: allowedExercise.id,
+            reps: 8,
+            orderInWorkout: 2,
+            orderInExercise: 1,
+            completed: false
+        )
+        let profile = HealthProfile()
+
+        let excluded = SuggestionCoordinator.prepare(
+            exercise: excludedExercise,
+            workout: workout,
+            sets: [excludedSet],
+            profile: profile
+        )
+        let allowed = SuggestionCoordinator.prepare(
+            exercise: allowedExercise,
+            workout: workout,
+            sets: [allowedSet],
+            profile: profile
+        )
+
+        XCTAssertEqual(excluded.unavailableReason, .excludedFromPRsAndSuggestions)
+        XCTAssertNil(allowed.unavailableReason)
+    }
+
     private func makeInput(pendingSets: [SuggestionPendingSetInput]) -> SuggestionEngineInput {
         SuggestionEngineInput(
             baseE1RM: 100,
@@ -2502,6 +2599,7 @@ final class WorkoutHistoryBackupServiceTests: XCTestCase {
         let prService = PRService(
             performanceRecordRepository: performanceRecordRepo,
             setRepository: setRepo,
+            workoutRepository: workoutRepo,
             healthProfileRepository: healthProfileRepo,
             exerciseRepository: exerciseRepo
         )
@@ -2992,6 +3090,15 @@ private final class WorkoutServiceStub: @unchecked Sendable, WorkoutServiceProto
         let _ = notes
         let _ = perceivedEffort
     }
+    func updateProgressionExclusions(
+        _ workoutId: UUID,
+        excludeWorkout: Bool,
+        excludedExerciseIds: Set<UUID>
+    ) async throws {
+        let _ = workoutId
+        let _ = excludeWorkout
+        let _ = excludedExerciseIds
+    }
     func deleteWorkout(_ workoutId: UUID) async throws {
         let _ = workoutId
     }
@@ -3229,6 +3336,10 @@ private final class ImportWorkoutRepositoryStub: @unchecked Sendable, WorkoutRep
     func fetch(byId id: UUID) async throws -> Workout? {
         let _ = id
         return nil
+    }
+    func fetch(byIds ids: Set<UUID>) async throws -> [Workout] {
+        let _ = ids
+        return []
     }
     func fetchInProgress() async throws -> Workout? { nil }
     func fetchWorkouts(for dateRange: ClosedRange<Date>) async throws -> [Workout] {
@@ -4040,6 +4151,7 @@ private func makeExerciseTrackingTypeServiceContext() throws -> ExerciseTracking
     let prService = PRService(
         performanceRecordRepository: performanceRecordRepo,
         setRepository: setRepo,
+        workoutRepository: workoutRepo,
         healthProfileRepository: healthProfileRepo,
         exerciseRepository: exerciseRepo
     )

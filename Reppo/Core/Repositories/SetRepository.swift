@@ -154,7 +154,8 @@ actor SetRepository: SetRepositoryProtocol {
         for exerciseId: UUID,
         reps: Int,
         excludeWarmups: Bool,
-        excludingSetId: UUID?
+        excludingSetId: UUID?,
+        excludedWorkoutIds: Set<UUID>
     ) throws -> WorkoutSet? {
         // Step 1: Database-level filter on exerciseId + reps, sorted for PR priority
         let descriptor = FetchDescriptor<WorkoutSet>(
@@ -174,6 +175,7 @@ actor SetRepository: SetRepositoryProtocol {
             guard set.hasData else { return false }
             guard set.excludeFromPRs != true else { return false }
             guard set.setType != .partial else { return false }
+            if excludedWorkoutIds.contains(set.workoutId) { return false }
             if excludeWarmups && set.setType == .warmup { return false }
             if let excludeId = excludingSetId, set.id == excludeId { return false }
             return true

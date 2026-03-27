@@ -119,6 +119,42 @@ actor WorkoutService: WorkoutServiceProtocol {
         try await workoutRepo.save(workout)
     }
 
+    func updateProgressionExclusions(
+        _ workoutId: UUID,
+        excludeWorkout: Bool,
+        excludedExerciseIds: Set<UUID>
+    ) async throws {
+        guard let workout = try await workoutRepo.fetch(byId: workoutId) else {
+            throw WorkoutServiceError.workoutNotFound(workoutId)
+        }
+
+        let workoutExerciseIds = try await setRepo.fetchExerciseIds(for: workoutId)
+        let sanitizedExcludedExerciseIds = workoutExerciseIds.intersection(excludedExerciseIds)
+
+        let previousExcludedExerciseIds = workout.excludedExerciseIdsForPRsAndSuggestions
+        let previousExcludeWorkout = workout.excludesEntireWorkoutFromPRsAndSuggestions
+
+        workout.excludeFromPRsAndSuggestions = excludeWorkout
+        workout.excludedExerciseIdsFromPRsAndSuggestions = Array(sanitizedExcludedExerciseIds).sorted {
+            $0.uuidString < $1.uuidString
+        }
+        workout.updatedAt = Date()
+        try await workoutRepo.save(workout)
+
+        let affectedExerciseIds: Set<UUID>
+        if previousExcludeWorkout != excludeWorkout {
+            affectedExerciseIds = workoutExerciseIds
+        } else {
+            affectedExerciseIds = previousExcludedExerciseIds.symmetricDifference(sanitizedExcludedExerciseIds)
+        }
+
+        guard !affectedExerciseIds.isEmpty else { return }
+
+        for exerciseId in affectedExerciseIds {
+            try await prService.rebuild(for: exerciseId)
+        }
+    }
+
     // MARK: - Deletion (FR-010)
 
     /// Delete a workout with full cascade.

@@ -80,6 +80,7 @@ enum SuggestionUnavailableReason: String, Sendable, Equatable {
     case missingExercise
     case unsupportedExercise
     case featureDisabled
+    case excludedFromPRsAndSuggestions
     case noPendingSets
     case missingTarget
     case noStrengthData
@@ -93,6 +94,8 @@ enum SuggestionUnavailableReason: String, Sendable, Equatable {
             return "Suggestions unavailable"
         case .featureDisabled:
             return "Smart Suggestions disabled"
+        case .excludedFromPRsAndSuggestions:
+            return "Excluded for this workout"
         case .noPendingSets:
             return "No pending sets"
         case .missingTarget:
@@ -112,6 +115,8 @@ enum SuggestionUnavailableReason: String, Sendable, Equatable {
             return "Smart Suggestions currently support weight-based exercises only."
         case .featureDisabled:
             return "Enable Smart Suggestions in Settings to show recommendations here."
+        case .excludedFromPRsAndSuggestions:
+            return "This workout or exercise is excluded from PRs and Smart Suggestions."
         case .noPendingSets:
             return "All working sets are complete or there are no remaining sets to suggest."
         case .missingTarget:

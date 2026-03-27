@@ -23,6 +23,12 @@ actor WorkoutRepository: WorkoutRepositoryProtocol {
         return try modelContext.fetch(descriptor).first
     }
 
+    func fetch(byIds ids: Set<UUID>) throws -> [Workout] {
+        guard !ids.isEmpty else { return [] }
+        let descriptor = FetchDescriptor<Workout>()
+        return try modelContext.fetch(descriptor).filter { ids.contains($0.id) }
+    }
+
     // MARK: - Specialized Queries
 
     func fetchInProgress() throws -> Workout? {
