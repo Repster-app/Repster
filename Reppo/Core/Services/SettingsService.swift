@@ -26,7 +26,9 @@ actor SettingsService: SettingsServiceProtocol {
         statsService: any StatsServiceProtocol,
         modelContainer: ModelContainer,
         userDefaults: UserDefaults = .standard,
-        seedExercises: @escaping @Sendable (ModelContext) -> Void = SeedService.seedIfNeeded
+        seedExercises: @escaping @Sendable (ModelContext) -> Void = { context in
+            SeedService.seedIfNeeded(modelContext: context)
+        }
     ) {
         self.healthProfileRepository = healthProfileRepository
         self.prService = prService

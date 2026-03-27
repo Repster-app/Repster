@@ -90,6 +90,7 @@ final class ActiveWorkoutViewModel {
     private let healthProfileRepo: any HealthProfileRepositoryProtocol
     private let settingsService: any SettingsServiceProtocol
     private let loadPrescriptionService: any LoadPrescriptionServiceProtocol
+    private let accessControlService: any AccessControlServiceProtocol
     let fatigueLearningService: FatigueLearningService
 
     /// Exercise IDs that had at least one prediction snapshot recorded during this workout.
@@ -252,6 +253,7 @@ final class ActiveWorkoutViewModel {
         healthProfileRepo: any HealthProfileRepositoryProtocol,
         settingsService: any SettingsServiceProtocol,
         loadPrescriptionService: any LoadPrescriptionServiceProtocol,
+        accessControlService: any AccessControlServiceProtocol = NoopAccessControlService(),
         fatigueLearningService: FatigueLearningService
     ) {
         self.workoutService = workoutService
@@ -262,6 +264,7 @@ final class ActiveWorkoutViewModel {
         self.healthProfileRepo = healthProfileRepo
         self.settingsService = settingsService
         self.loadPrescriptionService = loadPrescriptionService
+        self.accessControlService = accessControlService
         self.fatigueLearningService = fatigueLearningService
     }
 
@@ -1720,6 +1723,8 @@ final class ActiveWorkoutViewModel {
                 perceivedEffort: perceivedEffort,
                 durationSecondsOverride: durationSeconds
             )
+
+            _ = await accessControlService.recordCompletedWorkoutIfNeeded()
 
             // Run adaptive fatigue learning before clearing local state
             await fatigueLearningService.processSessionEnd(workoutId: workout.id)

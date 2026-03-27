@@ -25,10 +25,15 @@ final class ServiceContainer {
     let workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol
     let templateService: any TemplateServiceProtocol
     let loadPrescriptionService: any LoadPrescriptionServiceProtocol
+    let subscriptionService: any SubscriptionServiceProtocol
+    let accessControlService: any AccessControlServiceProtocol
     let fatigueLearningService: FatigueLearningService
     let healthProfileRepo: any HealthProfileRepositoryProtocol
 
     init(repositoryContainer: RepositoryContainer) {
+        let subscriptionService = SubscriptionService()
+        let accessControlService = AccessControlService(subscriptionService: subscriptionService)
+
         // 1. StatsService — depends on repos only
         let statsService = StatsService(
             exerciseStatsRepository: repositoryContainer.exerciseStatsRepository,
@@ -160,6 +165,8 @@ final class ServiceContainer {
         self.workoutHistoryBackupService = workoutHistoryBackupService
         self.templateService = templateService
         self.loadPrescriptionService = loadPrescriptionService
+        self.subscriptionService = subscriptionService
+        self.accessControlService = accessControlService
         self.fatigueLearningService = fatigueLearningService
         self.healthProfileRepo = repositoryContainer.healthProfileRepository
     }

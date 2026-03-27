@@ -35,7 +35,7 @@ final class MonetizationServiceTests: XCTestCase {
     }
 
     func testSubscribedUserBypassesQuotaAndDoesNotConsumeWorkout() async {
-        let subscription = StubSubscriptionService(snapshot: .active)
+        let subscription = StubSubscriptionService(snapshot: .active, accessSource: .monthly)
         let store = InMemoryWorkoutQuotaStore(consumed: 5)
         let service = AccessControlService(
             subscriptionService: subscription,
@@ -56,11 +56,13 @@ private actor StubSubscriptionService: SubscriptionServiceProtocol {
     let entitlementIdentifier = RevenueCatConfiguration.entitlementIdentifier
     private let snapshot: SubscriptionSnapshot
 
-    init(snapshot status: SubscriptionStatus) {
+    init(snapshot status: SubscriptionStatus, accessSource: SubscriptionAccessSource = .none) {
         self.snapshot = SubscriptionSnapshot(
             status: status,
             entitlementIdentifier: RevenueCatConfiguration.entitlementIdentifier,
-            expirationDate: nil
+            expirationDate: nil,
+            accessSource: accessSource,
+            managementURL: nil
         )
     }
 
@@ -69,6 +71,10 @@ private actor StubSubscriptionService: SubscriptionServiceProtocol {
     }
 
     func currentSubscriptionSnapshot() async -> SubscriptionSnapshot {
+        snapshot
+    }
+
+    func purchaseLifetime() async throws -> SubscriptionSnapshot {
         snapshot
     }
 

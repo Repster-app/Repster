@@ -9,6 +9,7 @@ struct StartWorkoutCardView: View {
     let activeWorkoutStartTime: Date?
     let activeExerciseCount: Int
     let activeSetCount: Int
+    let accessMessage: String?
     let onCardTapped: () -> Void
     let onPlusTapped: () -> Void
 
@@ -104,6 +105,12 @@ struct StartWorkoutCardView: View {
                     Text("Log exercises, sets & reps")
                         .font(.system(size: 13, weight: .regular))
                         .foregroundStyle(Color.textSecondary)
+
+                    if let accessMessage, !accessMessage.isEmpty {
+                        Text(accessMessage)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Color.accent)
+                    }
                 }
 
                 Spacer()

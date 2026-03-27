@@ -5,6 +5,7 @@
 // Feature: 007-exercise-list-and-detail WP01, WP07 T030/T032
 
 import SwiftUI
+import RevenueCatUI
 
 enum StartupPRRebuildMaintenance {
     static let currentVersion = 1
@@ -30,6 +31,7 @@ struct ContentView: View {
     // MARK: - Environment
 
     @Environment(ServiceContainer.self) private var services
+    @Environment(\.scenePhase) private var scenePhase
 
     // MARK: - State
 
@@ -87,6 +89,12 @@ struct ContentView: View {
     /// Exercise IDs to pre-add when starting a workout from browse mode (T032).
     @State private var pendingWorkoutExerciseIds: [UUID] = []
 
+    /// Cached monetization state used to drive messaging and gating.
+    @State private var accessSnapshot = AccessSnapshot.placeholder(limit: RevenueCatConfiguration.freeWorkoutLimit)
+
+    /// Whether the RevenueCat paywall is presented.
+    @State private var showPaywall = false
+
     // MARK: - Tab Selection
 
     /// Custom binding that detects re-selecting the home tab to pop its navigation to root.
@@ -115,6 +123,7 @@ struct ContentView: View {
                     statsService: services.statsService,
                     refreshTrigger: homeRefreshTrigger,
                     popToRootTrigger: homePopToRootTrigger,
+                    workoutAccessMessage: workoutAccessMessage,
                     onStartWorkout: { showActiveWorkout = true },
                     onShowStartWorkoutSheet: { showStartWorkoutSheet = true },
                     onShowExerciseList: { showExerciseList = true },
@@ -150,10 +159,13 @@ struct ContentView: View {
                     .tag(MainTab.charts)
 
                 SettingsView(
+                    accessSnapshot: $accessSnapshot,
                     settingsService: services.settingsService,
                     bodyweightService: services.bodyweightService,
                     importService: services.importService,
                     workoutHistoryBackupService: services.workoutHistoryBackupService,
+                    subscriptionService: services.subscriptionService,
+                    accessControlService: services.accessControlService,
                     fatigueLearningService: services.fatigueLearningService
                 )
                     .tabItem {
@@ -180,18 +192,37 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $showActiveWorkout) {
             ActiveWorkoutView(services: services)
         }
+        .sheet(isPresented: $showPaywall, onDismiss: {
+            Task { await refreshMonetizationState(forceSubscriptionRefresh: true) }
+        }) {
+            PaywallView()
+        }
         // Refresh active workout state and HomeView when returning from fullScreenCover
         .onChange(of: showActiveWorkout) { _, isShowing in
             if !isShowing {
                 homeRefreshTrigger = UUID()
-                Task { await refreshActiveWorkoutState() }
+                Task {
+                    await refreshActiveWorkoutState()
+                    await refreshMonetizationState(forceSubscriptionRefresh: true)
+                }
             }
         }
         .onChange(of: showExerciseList) { _, isShowing in
             if !isShowing {
                 homeRefreshTrigger = UUID()
-                Task { await refreshActiveWorkoutState() }
+                Task {
+                    await refreshActiveWorkoutState()
+                    await refreshMonetizationState(forceSubscriptionRefresh: false)
+                }
             }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            Task { await refreshMonetizationState(forceSubscriptionRefresh: true) }
+        }
+        .onChange(of: selectedTab) { oldTab, newTab in
+            guard oldTab == .settings, newTab == .home else { return }
+            Task { await refreshMonetizationState(forceSubscriptionRefresh: true) }
         }
         .task {
             if !hasScheduledStartupPRMaintenance {
@@ -206,6 +237,7 @@ struct ContentView: View {
             guard !hasCheckedForActive else { return }
             hasCheckedForActive = true
             await refreshActiveWorkoutState()
+            await refreshMonetizationState(forceSubscriptionRefresh: true)
             if hasActiveWorkout {
                 showActiveWorkout = true
             }
@@ -220,23 +252,15 @@ struct ContentView: View {
             }
         }) {
             StartWorkoutSheet(
+                accessMessage: workoutAccessMessage,
                 onStartEmpty: {
-                    Task {
-                        do {
-                            _ = try await services.workoutService.startWorkout()
-                            hasActiveWorkout = true
-                            showActiveWorkout = true
-                        } catch {
-                            print("[ContentView] Start empty workout failed: \(error)")
-                        }
-                    }
+                    Task { await startEmptyWorkout() }
                 },
                 onCopyPrevious: {
-                    Task { await loadCopyPreviousWorkouts() }
-                    showCopyPreviousSheet = true
+                    Task { await beginCopyPreviousFlow() }
                 },
                 onTemplates: {
-                    pendingTemplateFlow = true
+                    Task { await beginTemplateFlow() }
                 }
             )
         }
@@ -266,6 +290,11 @@ struct ContentView: View {
             TemplateFlowView(
                 templateService: services.templateService,
                 exerciseService: services.exerciseService,
+                beforeStartWorkout: {
+                    await ensureWorkoutCreationAccess {
+                        showTemplateFlow = false
+                    }
+                },
                 onStartWorkout: {
                     shouldResumeActiveWorkoutAfterTemplateFlow = true
                     showTemplateFlow = false
@@ -293,8 +322,28 @@ struct ContentView: View {
     // MARK: - Actions
 
     /// Refresh whether an active workout exists. Called on launch and when covers dismiss.
+    @MainActor
     private func refreshActiveWorkoutState() async {
         hasActiveWorkout = (try? await services.workoutService.getActiveWorkout()) != nil
+    }
+
+    @MainActor
+    private func refreshMonetizationState(forceSubscriptionRefresh: Bool) async {
+        if forceSubscriptionRefresh {
+            _ = await services.subscriptionService.refreshSubscriptionStatus()
+        }
+        accessSnapshot = await services.accessControlService.currentAccessSnapshot()
+    }
+
+    private var workoutAccessMessage: String? {
+        switch accessSnapshot.state {
+        case .subscribed:
+            return nil
+        case .free(let remaining):
+            return remaining == 1 ? "1 free workout left" : "\(remaining) free workouts left"
+        case .paywallRequired:
+            return "Unlock Reppo to start a new workout"
+        }
     }
 
     /// FAB tap handler — if active workout exists, resume it; otherwise show Start Workout sheet.
@@ -306,13 +355,58 @@ struct ContentView: View {
         }
     }
 
+    @MainActor
+    private func ensureWorkoutCreationAccess(dismissBeforePaywall: (() -> Void)? = nil) async -> Bool {
+        let canStart = await services.accessControlService.canStartNewWorkout()
+        await refreshMonetizationState(forceSubscriptionRefresh: false)
+
+        guard canStart else {
+            dismissBeforePaywall?()
+            showPaywall = true
+            return false
+        }
+
+        return true
+    }
+
+    @MainActor
+    private func startEmptyWorkout() async {
+        guard await ensureWorkoutCreationAccess() else { return }
+
+        do {
+            _ = try await services.workoutService.startWorkout()
+            hasActiveWorkout = true
+            showActiveWorkout = true
+        } catch {
+            print("[ContentView] Start empty workout failed: \(error)")
+        }
+    }
+
+    @MainActor
+    private func beginCopyPreviousFlow() async {
+        guard await ensureWorkoutCreationAccess() else { return }
+        await loadCopyPreviousWorkouts()
+        showCopyPreviousSheet = true
+    }
+
+    @MainActor
+    private func beginTemplateFlow() async {
+        guard await ensureWorkoutCreationAccess() else { return }
+        pendingTemplateFlow = true
+    }
+
     /// Start a workout with selected exercises from browse mode (T032).
     ///
     /// Creates a new workout via WorkoutService, stores the exercise IDs
     /// to be added by ActiveWorkoutView, dismisses the exercise list,
     /// and presents the active workout fullScreenCover.
+    @MainActor
     private func startWorkoutWithExercises(_ exerciseIds: [UUID]) {
         Task {
+            guard await ensureWorkoutCreationAccess(dismissBeforePaywall: {
+                showExerciseList = false
+            }) else { return }
+
             do {
                 // 1. Create a new workout
                 let workout = try await services.workoutService.startWorkout()
@@ -347,6 +441,7 @@ struct ContentView: View {
     // MARK: - Copy Previous
 
     /// Load completed workouts for the Copy Previous sheet.
+    @MainActor
     private func loadCopyPreviousWorkouts() async {
         do {
             let allWorkouts = try await services.workoutService.fetchAllWorkouts(limit: nil, offset: nil)

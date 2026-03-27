@@ -78,6 +78,7 @@ struct ActiveWorkoutView: View {
             healthProfileRepo: services.healthProfileRepo,
             settingsService: services.settingsService,
             loadPrescriptionService: services.loadPrescriptionService,
+            accessControlService: services.accessControlService,
             fatigueLearningService: services.fatigueLearningService
         ))
         self.services = services

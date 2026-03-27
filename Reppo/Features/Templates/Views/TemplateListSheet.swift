@@ -45,16 +45,19 @@ struct TemplateFlowView: View {
     @State private var pendingImportReview: PendingTemplateImportReview? = nil
     @Environment(\.dismiss) private var dismiss
 
+    let beforeStartWorkout: () async -> Bool
     let onStartWorkout: () -> Void
 
     init(
         templateService: any TemplateServiceProtocol,
         exerciseService: any ExerciseServiceProtocol,
+        beforeStartWorkout: @escaping () async -> Bool,
         onStartWorkout: @escaping () -> Void
     ) {
         self.templateService = templateService
         self.exerciseService = exerciseService
         _viewModel = State(initialValue: TemplateListViewModel(templateService: templateService))
+        self.beforeStartWorkout = beforeStartWorkout
         self.onStartWorkout = onStartWorkout
     }
 
@@ -372,6 +375,7 @@ struct TemplateFlowView: View {
     private func startWorkout(from template: TemplateSummary) {
         Task {
             do {
+                guard await beforeStartWorkout() else { return }
                 _ = try await viewModel.startWorkoutFromTemplate(template.id)
                 onStartWorkout()
             } catch {

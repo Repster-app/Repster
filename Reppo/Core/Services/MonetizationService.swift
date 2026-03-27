@@ -15,21 +15,79 @@ enum SubscriptionStatus: Equatable {
     case active
 }
 
+enum SubscriptionAccessSource: Equatable {
+    case none
+    case monthly
+    case lifetime
+    case monthlyAndLifetime
+
+    var hasMonthlySubscription: Bool {
+        switch self {
+        case .monthly, .monthlyAndLifetime:
+            return true
+        case .none, .lifetime:
+            return false
+        }
+    }
+
+    var hasLifetimePurchase: Bool {
+        switch self {
+        case .lifetime, .monthlyAndLifetime:
+            return true
+        case .none, .monthly:
+            return false
+        }
+    }
+}
+
 struct SubscriptionSnapshot: Equatable {
     let status: SubscriptionStatus
     let entitlementIdentifier: String
     let expirationDate: Date?
+    let accessSource: SubscriptionAccessSource
+    let managementURL: URL?
 
     var hasFullAccess: Bool {
         status == .active
+    }
+
+    var hasMonthlySubscription: Bool {
+        accessSource.hasMonthlySubscription
+    }
+
+    var hasLifetimePurchase: Bool {
+        accessSource.hasLifetimePurchase
+    }
+
+    var requiresMonthlyCancellationReminder: Bool {
+        accessSource == .monthlyAndLifetime
     }
 
     static func unknown(entitlementIdentifier: String) -> SubscriptionSnapshot {
         SubscriptionSnapshot(
             status: .unknown,
             entitlementIdentifier: entitlementIdentifier,
-            expirationDate: nil
+            expirationDate: nil,
+            accessSource: .none,
+            managementURL: nil
         )
+    }
+}
+
+enum MonetizationError: LocalizedError {
+    case missingCurrentOffering
+    case missingLifetimePackage
+    case purchaseCancelled
+
+    var errorDescription: String? {
+        switch self {
+        case .missingCurrentOffering:
+            return "Lifetime purchase is not available right now. Please try again shortly."
+        case .missingLifetimePackage:
+            return "Lifetime access is not configured in the current offering yet."
+        case .purchaseCancelled:
+            return nil
+        }
     }
 }
 
@@ -71,6 +129,7 @@ protocol SubscriptionServiceProtocol: Sendable {
     var entitlementIdentifier: String { get }
     func refreshSubscriptionStatus() async -> SubscriptionSnapshot
     func currentSubscriptionSnapshot() async -> SubscriptionSnapshot
+    func purchaseLifetime() async throws -> SubscriptionSnapshot
     func restorePurchases() async throws -> SubscriptionSnapshot
     func openManageSubscriptions() async
 }
@@ -156,10 +215,16 @@ final class KeychainWorkoutQuotaStore: WorkoutQuotaStoreProtocol, @unchecked Sen
 actor SubscriptionService: SubscriptionServiceProtocol {
     let entitlementIdentifier: String
     private var cachedSnapshot: SubscriptionSnapshot
+    private var customerInfoObservationTask: Task<Void, Never>?
 
     init(entitlementIdentifier: String = RevenueCatConfiguration.entitlementIdentifier) {
         self.entitlementIdentifier = entitlementIdentifier
         self.cachedSnapshot = .unknown(entitlementIdentifier: entitlementIdentifier)
+        Task { await startCustomerInfoObservation() }
+    }
+
+    deinit {
+        customerInfoObservationTask?.cancel()
     }
 
     func refreshSubscriptionStatus() async -> SubscriptionSnapshot {
@@ -190,19 +255,93 @@ actor SubscriptionService: SubscriptionServiceProtocol {
         return snapshot
     }
 
+    func purchaseLifetime() async throws -> SubscriptionSnapshot {
+        let offerings = try await Purchases.shared.offerings()
+        guard let currentOffering = offerings.current else {
+            throw MonetizationError.missingCurrentOffering
+        }
+
+        guard let lifetimePackage = currentOffering.lifetime
+            ?? currentOffering.availablePackages.first(where: { $0.packageType == .lifetime }) else {
+            throw MonetizationError.missingLifetimePackage
+        }
+
+        let purchaseResult = try await Purchases.shared.purchase(package: lifetimePackage)
+        if purchaseResult.userCancelled {
+            throw MonetizationError.purchaseCancelled
+        }
+
+        let snapshot = snapshot(from: purchaseResult.customerInfo)
+        cachedSnapshot = snapshot
+        return snapshot
+    }
+
     func openManageSubscriptions() async {
-        guard let url = URL(string: "https://apps.apple.com/account/subscriptions") else { return }
-        await MainActor.run {
-            UIApplication.shared.open(url)
+        do {
+            try await Purchases.shared.showManageSubscriptions()
+            return
+        } catch {
+            let fallbackURL = cachedSnapshot.managementURL
+                ?? URL(string: "https://apps.apple.com/account/subscriptions")
+
+            guard let fallbackURL else { return }
+            await MainActor.run {
+                UIApplication.shared.open(fallbackURL)
+            }
         }
     }
 
     private func snapshot(from customerInfo: CustomerInfo) -> SubscriptionSnapshot {
+        Self.makeSnapshot(from: customerInfo, entitlementIdentifier: entitlementIdentifier)
+    }
+
+    private func startCustomerInfoObservation() {
+        guard customerInfoObservationTask == nil else { return }
+
+        customerInfoObservationTask = Task { [entitlementIdentifier] in
+            for await customerInfo in Purchases.shared.customerInfoStream {
+                let snapshot = Self.makeSnapshot(
+                    from: customerInfo,
+                    entitlementIdentifier: entitlementIdentifier
+                )
+                self.storeCachedSnapshot(snapshot)
+            }
+        }
+    }
+
+    private func storeCachedSnapshot(_ snapshot: SubscriptionSnapshot) {
+        cachedSnapshot = snapshot
+    }
+
+    private static func makeSnapshot(
+        from customerInfo: CustomerInfo,
+        entitlementIdentifier: String
+    ) -> SubscriptionSnapshot {
         let entitlement = customerInfo.entitlements.all[entitlementIdentifier]
+        let hasFullAccess = entitlement?.isActive == true
+        let hasLifetimePurchase = hasFullAccess
+            && entitlement?.expirationDate == nil
+            && entitlement?.willRenew == false
+        let hasMonthlySubscription = hasFullAccess && !customerInfo.activeSubscriptions.isEmpty
+        let accessSource: SubscriptionAccessSource
+
+        switch (hasMonthlySubscription, hasLifetimePurchase) {
+        case (true, true):
+            accessSource = .monthlyAndLifetime
+        case (true, false):
+            accessSource = .monthly
+        case (false, true):
+            accessSource = .lifetime
+        case (false, false):
+            accessSource = .none
+        }
+
         return SubscriptionSnapshot(
-            status: entitlement?.isActive == true ? .active : .inactive,
+            status: hasFullAccess ? .active : .inactive,
             entitlementIdentifier: entitlementIdentifier,
-            expirationDate: entitlement?.expirationDate
+            expirationDate: entitlement?.expirationDate,
+            accessSource: accessSource,
+            managementURL: customerInfo.managementURL
         )
     }
 }

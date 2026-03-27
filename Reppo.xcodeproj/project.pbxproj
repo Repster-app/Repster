@@ -26,6 +26,7 @@
 		TT0005 /* SetServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2006 /* SetServiceTests.swift */; };
 		TT0006 /* WorkoutSetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2007 /* WorkoutSetTests.swift */; };
 		TT0007 /* SeedExerciseLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2008 /* SeedExerciseLibraryTests.swift */; };
+		TT0008 /* MonetizationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2009 /* MonetizationServiceTests.swift */; };
 		A10001 /* TrackingType.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001 /* TrackingType.swift */; };
 		A10002 /* SetType.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002 /* SetType.swift */; };
 		A10003 /* EquipmentType.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10003 /* EquipmentType.swift */; };
@@ -77,6 +78,7 @@
 		A70005 /* SetServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70005 /* SetServiceProtocol.swift */; };
 		A70006 /* StatsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70006 /* StatsService.swift */; };
 		A70007 /* SetService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70007 /* SetService.swift */; };
+		A70008 /* MonetizationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70008 /* MonetizationService.swift */; };
 		A80001 /* WorkoutServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80001 /* WorkoutServiceProtocol.swift */; };
 		A80002 /* ExerciseServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80002 /* ExerciseServiceProtocol.swift */; };
 		A80003 /* BodyweightServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80003 /* BodyweightServiceProtocol.swift */; };
@@ -197,6 +199,8 @@
 		AW0005 /* WeightSuggestionData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0005 /* WeightSuggestionData.swift */; };
 		AW0006 /* WeightSuggestionCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0006 /* WeightSuggestionCardView.swift */; };
 		AW0007 /* WeightSuggestionModuleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0007 /* WeightSuggestionModuleView.swift */; };
+		RC0002 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = RC2002 /* RevenueCat */; };
+		RC0003 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = RC2003 /* RevenueCatUI */; };
 		AX0001 /* ExerciseMuscleGroupCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BX0001 /* ExerciseMuscleGroupCatalog.swift */; };
 		AX0002 /* WorkoutSetPerformanceFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BX0002 /* WorkoutSetPerformanceFormatter.swift */; };
 		ZA0001 /* TrendLineCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZB0001 /* TrendLineCalculator.swift */; };
@@ -274,6 +278,7 @@
 		TT2006 /* SetServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetServiceTests.swift; sourceTree = "<group>"; };
 		TT2007 /* WorkoutSetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSetTests.swift; sourceTree = "<group>"; };
 		TT2008 /* SeedExerciseLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedExerciseLibraryTests.swift; sourceTree = "<group>"; };
+		TT2009 /* MonetizationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonetizationServiceTests.swift; sourceTree = "<group>"; };
 		B10001 /* TrackingType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingType.swift; sourceTree = "<group>"; };
 		B10002 /* SetType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetType.swift; sourceTree = "<group>"; };
 		B10003 /* EquipmentType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentType.swift; sourceTree = "<group>"; };
@@ -326,6 +331,7 @@
 		B70005 /* SetServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetServiceProtocol.swift; sourceTree = "<group>"; };
 		B70006 /* StatsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsService.swift; sourceTree = "<group>"; };
 		B70007 /* SetService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetService.swift; sourceTree = "<group>"; };
+		B70008 /* MonetizationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonetizationService.swift; sourceTree = "<group>"; };
 		B80001 /* WorkoutServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutServiceProtocol.swift; sourceTree = "<group>"; };
 		B80002 /* ExerciseServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseServiceProtocol.swift; sourceTree = "<group>"; };
 		B80003 /* BodyweightServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyweightServiceProtocol.swift; sourceTree = "<group>"; };
@@ -501,6 +507,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				RC0002 /* RevenueCat in Frameworks */,
+				RC0003 /* RevenueCatUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -545,6 +553,7 @@
 				TT2006 /* SetServiceTests.swift */,
 				TT2008 /* SeedExerciseLibraryTests.swift */,
 				TT2007 /* WorkoutSetTests.swift */,
+				TT2009 /* MonetizationServiceTests.swift */,
 				FL1005 /* FatigueLearningServiceTests.swift */,
 			);
 			path = ReppoTests;
@@ -968,6 +977,7 @@
 				B70002 /* PRService.swift */,
 				B70006 /* StatsService.swift */,
 				B70007 /* SetService.swift */,
+				B70008 /* MonetizationService.swift */,
 				B80004 /* BodyweightService.swift */,
 				B80005 /* WorkoutService.swift */,
 				B80006 /* ExerciseService.swift */,
@@ -1266,6 +1276,10 @@
 				0823BF9F2F5D608500A513BE /* PBXTargetDependency */,
 			);
 			name = Reppo;
+			packageProductDependencies = (
+				RC2002 /* RevenueCat */,
+				RC2003 /* RevenueCatUI */,
+			);
 			productName = Reppo;
 			productReference = B90001 /* Reppo.app */;
 			productType = "com.apple.product-type.application";
@@ -1321,6 +1335,9 @@
 				Base,
 			);
 			mainGroup = D00001;
+			packageReferences = (
+				RC2001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */,
+			);
 			productRefGroup = D90001 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -1421,6 +1438,7 @@
 				A70005 /* SetServiceProtocol.swift in Sources */,
 				A70006 /* StatsService.swift in Sources */,
 				A70007 /* SetService.swift in Sources */,
+				A70008 /* MonetizationService.swift in Sources */,
 				A80001 /* WorkoutServiceProtocol.swift in Sources */,
 				A80002 /* ExerciseServiceProtocol.swift in Sources */,
 				A80003 /* BodyweightServiceProtocol.swift in Sources */,
@@ -1584,6 +1602,7 @@
 				TT0005 /* SetServiceTests.swift in Sources */,
 				TT0007 /* SeedExerciseLibraryTests.swift in Sources */,
 				TT0006 /* WorkoutSetTests.swift in Sources */,
+				TT0008 /* MonetizationServiceTests.swift in Sources */,
 				FL0005 /* FatigueLearningServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1602,6 +1621,17 @@
 			targetProxy = TT1001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		RC2001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RevenueCat/purchases-ios-spm.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.27.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCBuildConfiguration section */
 		0823BFA32F5D608500A513BE /* Debug */ = {
@@ -1894,6 +1924,19 @@
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		RC2002 /* RevenueCat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = RC2001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
+			productName = RevenueCat;
+		};
+		RC2003 /* RevenueCatUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = RC2001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
+			productName = RevenueCatUI;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCConfigurationList section */
 		0823BFA22F5D608500A513BE /* Build configuration list for PBXNativeTarget "WorkoutLiveActivityExtension" */ = {

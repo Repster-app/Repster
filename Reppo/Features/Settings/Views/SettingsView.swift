@@ -4,6 +4,8 @@
 // Feature: 010-settings-and-onboarding WP02 T007/T011/T012
 
 import SwiftUI
+import RevenueCat
+import RevenueCatUI
 
 enum SettingsDataDestination: CaseIterable {
     case importCSV
@@ -43,24 +45,33 @@ struct SettingsView: View {
     // MARK: - State
 
     @State private var viewModel: SettingsViewModel
+    @Binding private var accessSnapshot: AccessSnapshot
     private let settingsService: any SettingsServiceProtocol
     private let bodyweightService: any BodyweightServiceProtocol
     private let importService: any ImportServiceProtocol
     private let workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol
+    private let subscriptionService: any SubscriptionServiceProtocol
+    private let accessControlService: any AccessControlServiceProtocol
     private let fatigueLearningService: FatigueLearningService
 
     // MARK: - Init
 
-    init(settingsService: any SettingsServiceProtocol,
+    init(accessSnapshot: Binding<AccessSnapshot>,
+         settingsService: any SettingsServiceProtocol,
          bodyweightService: any BodyweightServiceProtocol,
          importService: any ImportServiceProtocol,
          workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol,
+         subscriptionService: any SubscriptionServiceProtocol,
+         accessControlService: any AccessControlServiceProtocol,
          fatigueLearningService: FatigueLearningService) {
         _viewModel = State(initialValue: SettingsViewModel(settingsService: settingsService))
+        _accessSnapshot = accessSnapshot
         self.settingsService = settingsService
         self.bodyweightService = bodyweightService
         self.importService = importService
         self.workoutHistoryBackupService = workoutHistoryBackupService
+        self.subscriptionService = subscriptionService
+        self.accessControlService = accessControlService
         self.fatigueLearningService = fatigueLearningService
     }
 
@@ -71,6 +82,7 @@ struct SettingsView: View {
             Form {
                 generalSection
                 workoutSection
+                membershipSection
                 dataSection
                 bodySection
                 aboutSection
@@ -78,10 +90,16 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
             .background(Color.bg)
             .navigationTitle("Settings")
-            .task { await viewModel.loadProfile() }
+            .task {
+                await viewModel.loadProfile()
+                await refreshMembershipStatus(forceSubscriptionRefresh: true)
+            }
             .onAppear {
                 guard viewModel.profile != nil else { return }
-                Task { await viewModel.refreshProfile() }
+                Task {
+                    await viewModel.refreshProfile()
+                    await refreshMembershipStatus(forceSubscriptionRefresh: true)
+                }
             }
             .sheet(isPresented: $viewModel.showUnitsSheet) {
                 UnitPickerSheet(
@@ -193,6 +211,27 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - MEMBERSHIP Section
+
+    private var membershipSection: some View {
+        Section("Membership") {
+            NavigationLink {
+                MembershipSettingsView(
+                    accessSnapshot: $accessSnapshot,
+                    subscriptionService: subscriptionService,
+                    accessControlService: accessControlService
+                )
+            } label: {
+                SettingsNavigationRow(
+                    title: "Membership",
+                    systemImage: accessSnapshot.hasFullAccess ? "checkmark.seal" : "lock",
+                    summary: membershipSummary,
+                    showChevron: false
+                )
+            }
+        }
+    }
+
     // MARK: - BODY Section
 
     private var bodySection: some View {
@@ -234,6 +273,27 @@ struct SettingsView: View {
             }
         }
     }
+
+    private var membershipSummary: String {
+        switch accessSnapshot.state {
+        case .subscribed:
+            return "Unlocked"
+        case .free(let remaining):
+            return remaining == 1 ? "1 free workout left" : "\(remaining) free workouts left"
+        case .paywallRequired:
+            return "Unlock required"
+        }
+    }
+
+    @MainActor
+    private func refreshMembershipStatus(forceSubscriptionRefresh: Bool) async {
+        if forceSubscriptionRefresh {
+            _ = await subscriptionService.refreshSubscriptionStatus()
+        } else {
+            _ = await subscriptionService.currentSubscriptionSnapshot()
+        }
+        accessSnapshot = await accessControlService.currentAccessSnapshot()
+    }
 }
 
 private struct SettingsNavigationRow: View {
@@ -264,6 +324,236 @@ private struct SettingsNavigationRow: View {
                     .font(.caption)
                     .foregroundStyle(Color.textTertiary)
             }
+        }
+    }
+}
+
+private struct MembershipSettingsView: View {
+    @Binding var accessSnapshot: AccessSnapshot
+    let subscriptionService: any SubscriptionServiceProtocol
+    let accessControlService: any AccessControlServiceProtocol
+
+    @State private var subscriptionSnapshot = SubscriptionSnapshot.unknown(
+        entitlementIdentifier: RevenueCatConfiguration.entitlementIdentifier
+    )
+    @State private var showPaywall = false
+    @State private var showLifetimeConfirmation = false
+    @State private var showMembershipAlert = false
+    @State private var membershipAlertTitle = ""
+    @State private var membershipAlertMessage = ""
+    @State private var showManageSubscriptionAction = false
+    @State private var isPurchasingLifetime = false
+    @State private var isRestoringPurchases = false
+
+    var body: some View {
+        Form {
+            Section {
+                SettingsNavigationRow(
+                    title: "Access",
+                    systemImage: accessSnapshot.hasFullAccess ? "checkmark.seal" : "lock",
+                    summary: membershipSummary,
+                    showChevron: false
+                )
+
+                if shouldShowLifetimePurchase {
+                    Button {
+                        showLifetimeConfirmation = true
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "Buy Lifetime",
+                            systemImage: "infinity.circle"
+                        )
+                    }
+                    .disabled(isWorking)
+                }
+
+                if !accessSnapshot.hasFullAccess {
+                    Button {
+                        showPaywall = true
+                    } label: {
+                        SettingsNavigationRow(
+                            title: "Unlock Reppo",
+                            systemImage: "sparkles"
+                        )
+                    }
+                }
+
+                Button {
+                    Task { await restorePurchases() }
+                } label: {
+                    SettingsNavigationRow(
+                        title: "Restore Purchases",
+                        systemImage: "arrow.clockwise.circle"
+                    )
+                }
+                .disabled(isWorking)
+
+                Button {
+                    Task { await subscriptionService.openManageSubscriptions() }
+                } label: {
+                    SettingsNavigationRow(
+                        title: "Manage Subscription",
+                        systemImage: "creditcard"
+                    )
+                }
+            }
+
+            if shouldShowMonthlyCancellationReminder {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Lifetime access is active", systemImage: "checkmark.seal.fill")
+                            .font(.headline)
+                            .foregroundStyle(Color.textPrimary)
+
+                        Text("Your monthly subscription can still renew until you cancel it in Apple subscriptions.")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(Color.bg)
+        .navigationTitle("Membership")
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await refreshMembershipStatus(forceSubscriptionRefresh: true)
+        }
+        .task {
+            await observeCustomerInfoUpdates()
+        }
+        .alert(membershipAlertTitle, isPresented: $showMembershipAlert) {
+            if showManageSubscriptionAction {
+                Button("Manage Subscription") {
+                    Task { await subscriptionService.openManageSubscriptions() }
+                }
+                Button("Not Now", role: .cancel) {}
+            } else {
+                Button("OK") {}
+            }
+        } message: {
+            Text(membershipAlertMessage)
+        }
+        .confirmationDialog(
+            "Buy Lifetime",
+            isPresented: $showLifetimeConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Buy Lifetime") {
+                Task { await purchaseLifetime() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Lifetime access unlocks Reppo permanently. Your monthly subscription will keep renewing until you cancel it in Apple subscriptions.")
+        }
+        .sheet(isPresented: $showPaywall, onDismiss: {
+            Task { await refreshMembershipStatus(forceSubscriptionRefresh: true) }
+        }) {
+            PaywallView()
+        }
+    }
+
+    private var isWorking: Bool {
+        isPurchasingLifetime || isRestoringPurchases
+    }
+
+    private var shouldShowLifetimePurchase: Bool {
+        subscriptionSnapshot.accessSource == .monthly
+    }
+
+    private var shouldShowMonthlyCancellationReminder: Bool {
+        subscriptionSnapshot.requiresMonthlyCancellationReminder
+    }
+
+    private var membershipSummary: String {
+        switch accessSnapshot.state {
+        case .subscribed:
+            switch subscriptionSnapshot.accessSource {
+            case .monthly:
+                return "Monthly active"
+            case .lifetime:
+                return "Lifetime active"
+            case .monthlyAndLifetime:
+                return "Lifetime active"
+            case .none:
+                return "Unlocked"
+            }
+        case .free(let remaining):
+            return remaining == 1 ? "1 free workout left" : "\(remaining) free workouts left"
+        case .paywallRequired:
+            return "Unlock required"
+        }
+    }
+
+    @MainActor
+    private func refreshMembershipStatus(forceSubscriptionRefresh: Bool) async {
+        let subscription: SubscriptionSnapshot
+        if forceSubscriptionRefresh {
+            subscription = await subscriptionService.refreshSubscriptionStatus()
+        } else {
+            subscription = await subscriptionService.currentSubscriptionSnapshot()
+        }
+        subscriptionSnapshot = subscription
+        accessSnapshot = await accessControlService.currentAccessSnapshot()
+    }
+
+    @MainActor
+    private func restorePurchases() async {
+        guard !isRestoringPurchases else { return }
+        isRestoringPurchases = true
+        defer { isRestoringPurchases = false }
+        showManageSubscriptionAction = false
+
+        do {
+            let subscriptionSnapshot = try await subscriptionService.restorePurchases()
+            self.subscriptionSnapshot = subscriptionSnapshot
+            accessSnapshot = await accessControlService.currentAccessSnapshot()
+
+            if subscriptionSnapshot.hasFullAccess {
+                membershipAlertTitle = "Purchases Restored"
+                membershipAlertMessage = "Reppo is now unlocked on this device."
+            } else {
+                membershipAlertTitle = "No Purchases Found"
+                membershipAlertMessage = "No active Reppo purchase was found for this Apple ID."
+            }
+        } catch {
+            membershipAlertTitle = "Restore Failed"
+            membershipAlertMessage = error.localizedDescription
+        }
+
+        showMembershipAlert = true
+    }
+
+    @MainActor
+    private func purchaseLifetime() async {
+        guard !isPurchasingLifetime else { return }
+        isPurchasingLifetime = true
+        defer { isPurchasingLifetime = false }
+        showManageSubscriptionAction = false
+
+        do {
+            let subscriptionSnapshot = try await subscriptionService.purchaseLifetime()
+            self.subscriptionSnapshot = subscriptionSnapshot
+            accessSnapshot = await accessControlService.currentAccessSnapshot()
+            showManageSubscriptionAction = true
+            membershipAlertTitle = "Lifetime Access Active"
+            membershipAlertMessage = "Reppo now has lifetime access. Your monthly subscription may still renew until you cancel it in Apple subscriptions."
+            showMembershipAlert = true
+        } catch MonetizationError.purchaseCancelled {
+            await refreshMembershipStatus(forceSubscriptionRefresh: true)
+        } catch {
+            showManageSubscriptionAction = false
+            membershipAlertTitle = "Lifetime Purchase Failed"
+            membershipAlertMessage = error.localizedDescription
+            showMembershipAlert = true
+        }
+    }
+
+    @MainActor
+    private func observeCustomerInfoUpdates() async {
+        for await _ in Purchases.shared.customerInfoStream {
+            await refreshMembershipStatus(forceSubscriptionRefresh: false)
         }
     }
 }

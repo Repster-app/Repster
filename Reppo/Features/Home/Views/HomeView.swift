@@ -12,6 +12,7 @@ struct HomeView: View {
 
     let refreshTrigger: UUID
     let popToRootTrigger: UUID
+    let workoutAccessMessage: String?
     let onStartWorkout: () -> Void
     let onShowStartWorkoutSheet: () -> Void
     let onShowExerciseList: () -> Void
@@ -25,6 +26,7 @@ struct HomeView: View {
         statsService: any StatsServiceProtocol,
         refreshTrigger: UUID,
         popToRootTrigger: UUID = UUID(),
+        workoutAccessMessage: String? = nil,
         onStartWorkout: @escaping () -> Void,
         onShowStartWorkoutSheet: @escaping () -> Void,
         onShowExerciseList: @escaping () -> Void,
@@ -39,6 +41,7 @@ struct HomeView: View {
         ))
         self.refreshTrigger = refreshTrigger
         self.popToRootTrigger = popToRootTrigger
+        self.workoutAccessMessage = workoutAccessMessage
         self.onStartWorkout = onStartWorkout
         self.onShowStartWorkoutSheet = onShowStartWorkoutSheet
         self.onShowExerciseList = onShowExerciseList
@@ -154,6 +157,7 @@ struct HomeView: View {
             activeWorkoutStartTime: viewModel.activeWorkoutStartTime,
             activeExerciseCount: viewModel.activeWorkoutExerciseCount,
             activeSetCount: viewModel.activeWorkoutSetCount,
+            accessMessage: workoutAccessMessage,
             onCardTapped: {
                 if viewModel.hasActiveWorkout {
                     onStartWorkout()

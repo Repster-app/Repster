@@ -1,4 +1,5 @@
 import ActivityKit
+import RevenueCat
 import SwiftData
 import SwiftUI
 import UserNotifications
@@ -12,6 +13,11 @@ struct ReppoApp: App {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
     init() {
+        #if DEBUG
+        Purchases.logLevel = .debug
+        #endif
+        Purchases.configure(withAPIKey: RevenueCatConfiguration.apiKey)
+
         do {
             let container = try ModelContainerSetup.createContainer()
             self.modelContainer = container

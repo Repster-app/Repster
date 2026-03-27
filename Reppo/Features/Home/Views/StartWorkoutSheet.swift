@@ -6,6 +6,7 @@
 import SwiftUI
 
 struct StartWorkoutSheet: View {
+    let accessMessage: String?
     let onStartEmpty: () -> Void
     let onCopyPrevious: () -> Void
     let onTemplates: () -> Void
@@ -31,6 +32,14 @@ struct StartWorkoutSheet: View {
                 .font(.system(size: 14, weight: .regular))
                 .foregroundStyle(Color.textSecondary)
                 .padding(.bottom, 24)
+
+            if let accessMessage, !accessMessage.isEmpty {
+                Text(accessMessage)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.accent)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 18)
+            }
 
             // Primary: Empty Workout
             Button {
