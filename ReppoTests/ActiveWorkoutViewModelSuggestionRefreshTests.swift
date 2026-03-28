@@ -838,6 +838,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         context.viewModel.markSetDirty(context.pendingSet, field: .reps)
 
         XCTAssertFalse(context.viewModel.isLoadingWeightSuggestions)
+        XCTAssertTrue(context.viewModel.isRefreshingWeightSuggestions)
         XCTAssertEqual(context.viewModel.weightSuggestionData?.suggestions.first?.targetReps, initialSuggestion.targetReps)
         XCTAssertEqual(
             context.viewModel.suggestedWeight(for: context.pendingSet.id),
@@ -849,6 +850,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         }
 
         XCTAssertFalse(context.viewModel.isLoadingWeightSuggestions)
+        XCTAssertFalse(context.viewModel.isRefreshingWeightSuggestions)
         XCTAssertEqual(
             context.viewModel.suggestedWeight(for: context.pendingSet.id),
             context.viewModel.weightSuggestionData?.suggestion(for: context.pendingSet.id)?.suggestedWeight
@@ -907,6 +909,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
 
         context.pendingSet.reps = 9
         context.viewModel.markSetDirty(context.pendingSet, field: .reps)
+        XCTAssertTrue(context.viewModel.isRefreshingWeightSuggestions)
 
         context.viewModel.selectedExerciseIndex = 1
         let loadTask = Task {
@@ -919,6 +922,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         await loadTask.value
 
         XCTAssertFalse(context.viewModel.isLoadingWeightSuggestions)
+        XCTAssertFalse(context.viewModel.isRefreshingWeightSuggestions)
         XCTAssertEqual(loadPrescriptionService.evaluationCount, 2)
         XCTAssertEqual(context.viewModel.currentExercise?.id, context.secondExercise?.id)
         XCTAssertEqual(context.viewModel.weightSuggestionData?.suggestions.first?.targetReps, 12)
@@ -1018,6 +1022,65 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
 
         XCTAssertEqual(loadPrescriptionService.lastRecordedTargetReps, [10])
         XCTAssertEqual(context.viewModel.suggestionState(for: context.pendingSet.id)?.target?.repRange, 8...12)
+    }
+
+    func testCustomKeyboardRepRangeCommitTriggersDebouncedRefresh() async throws {
+        let loadPrescriptionService = LoadPrescriptionServiceSpy()
+        let context = makeContext(loadPrescriptionService: loadPrescriptionService)
+
+        await context.viewModel.loadWeightSuggestions()
+        XCTAssertEqual(loadPrescriptionService.evaluationCount, 1)
+
+        let committedText = CustomRepRangeCommitter.commit(min: 8, max: 12, to: context.pendingSet)
+        XCTAssertEqual(committedText, "8-12")
+        context.viewModel.markSetDirty(context.pendingSet, field: .reps)
+
+        try await waitUntil {
+            loadPrescriptionService.evaluationCount == 2
+        }
+
+        XCTAssertEqual(context.viewModel.suggestionState(for: context.pendingSet.id)?.target?.repRange, 8...12)
+        XCTAssertEqual(loadPrescriptionService.lastRecordedTargetReps, [10])
+    }
+
+    func testManualRefreshInvalidatesSuggestionCacheEvenWhenInputsAreUnchanged() async throws {
+        let loadPrescriptionService = LoadPrescriptionServiceSpy()
+        let context = makeContext(loadPrescriptionService: loadPrescriptionService)
+
+        await context.viewModel.loadWeightSuggestions()
+        XCTAssertEqual(loadPrescriptionService.evaluationCount, 1)
+
+        await context.viewModel.refreshWeightSuggestions(
+            invalidateCache: true,
+            presentation: .preserveExisting
+        )
+
+        XCTAssertEqual(loadPrescriptionService.evaluationCount, 2)
+        XCTAssertFalse(context.viewModel.isRefreshingWeightSuggestions)
+    }
+
+    func testExerciseConfigurationRefreshReloadsSuggestionsAndExerciseInfo() async throws {
+        let loadPrescriptionService = LoadPrescriptionServiceSpy()
+        let setService = SetServiceStub()
+        let context = makeContext(
+            loadPrescriptionService: loadPrescriptionService,
+            setService: setService
+        )
+
+        context.viewModel.workout = Workout(startTime: Date())
+        await context.viewModel.loadWeightSuggestions()
+        await context.viewModel.loadExerciseInfo()
+
+        XCTAssertEqual(loadPrescriptionService.evaluationCount, 1)
+        XCTAssertEqual(setService.fetchSetsForExerciseCallCount, 1)
+        XCTAssertNotNil(context.viewModel.exerciseInfoData)
+
+        context.exercise.weightIncrement = 5.0
+        await context.viewModel.refreshCurrentExerciseConfigurationData()
+
+        XCTAssertEqual(loadPrescriptionService.evaluationCount, 2)
+        XCTAssertEqual(setService.fetchSetsForExerciseCallCount, 2)
+        XCTAssertNotNil(context.viewModel.exerciseInfoData)
     }
 
     func testSetMutationFlowsStillSucceedThroughSetService() async throws {
@@ -3005,6 +3068,7 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
     var deletedSetIds: [UUID] = []
     var workoutSets: [UUID: [WorkoutSet]] = [:]
     var exerciseSets: [UUID: [WorkoutSet]] = [:]
+    var fetchSetsForExerciseCallCount = 0
 
     func save(_ set: WorkoutSet) async throws -> SetSaveResult {
         SetSaveResult(
@@ -3039,6 +3103,7 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
     }
 
     func fetchSets(for exerciseId: UUID, limit: Int?) async throws -> [WorkoutSet] {
+        fetchSetsForExerciseCallCount += 1
         let sets = exerciseSets[exerciseId] ?? workoutSets.values.flatMap { workoutSets in
             workoutSets.filter { $0.exerciseId == exerciseId }
         }
@@ -4152,6 +4217,7 @@ private func makeExerciseTrackingTypeServiceContext() throws -> ExerciseTracking
 
     let exerciseRepo = ExerciseRepository(modelContainer: container)
     let setRepo = SetRepository(modelContainer: container)
+    let workoutRepo = WorkoutRepository(modelContainer: container)
     let exerciseStatsRepo = ExerciseStatsRepository(modelContainer: container)
     let performanceRecordRepo = PerformanceRecordRepository(modelContainer: container)
     let healthProfileRepo = HealthProfileRepository(modelContainer: container)

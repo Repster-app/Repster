@@ -75,7 +75,7 @@ enum ActiveWorkoutSessionDefaultsKeys {
 @MainActor
 final class ActiveWorkoutViewModel {
 
-    private enum SuggestionLoadPresentation {
+    enum SuggestionRefreshPresentation {
         case blocking
         case preserveExisting
     }
@@ -188,6 +188,9 @@ final class ActiveWorkoutViewModel {
 
     /// Whether the module should show blocking loading UI.
     var isLoadingWeightSuggestions: Bool = false
+
+    /// Whether the module is refreshing in the background while preserving visible rows.
+    var isRefreshingWeightSuggestions: Bool = false
 
     /// Whether prescription is globally enabled (fetched from HealthProfile).
     var prescriptionEnabled: Bool = false
@@ -1454,6 +1457,8 @@ final class ActiveWorkoutViewModel {
         exerciseInfoLoadedForExerciseId = nil
         weightSuggestionData = nil
         suggestionsLoadedForKey = nil
+        isLoadingWeightSuggestions = false
+        isRefreshingWeightSuggestions = false
 
         // Update Live Activity (exercise switched — new name, set counts)
         updateLiveActivityState()
@@ -1510,6 +1515,39 @@ final class ActiveWorkoutViewModel {
         suggestionsLoadedForKey = nil
     }
 
+    /// Invalidate exercise-info cache to force a refresh on next load.
+    func invalidateExerciseInfo() {
+        exerciseInfoData = nil
+        exerciseInfoLoadedForExerciseId = nil
+    }
+
+    /// Refresh suggestions for the current exercise with explicit cache invalidation and presentation behavior.
+    func refreshWeightSuggestions(
+        invalidateCache: Bool = true,
+        presentation: SuggestionRefreshPresentation = .preserveExisting,
+        debounce: Duration? = nil
+    ) async {
+        let task = requestWeightSuggestionRefresh(
+            mode: presentation,
+            invalidateCache: invalidateCache,
+            debounce: debounce
+        )
+        await task.value
+    }
+
+    /// Refresh configuration-dependent workout data after exercise settings change.
+    func refreshCurrentExerciseConfigurationData() async {
+        guard currentExercise != nil else { return }
+
+        invalidateExerciseInfo()
+        async let exerciseInfoRefresh: Void = loadExerciseInfo()
+        async let suggestionRefresh: Void = refreshWeightSuggestions(
+            invalidateCache: true,
+            presentation: .preserveExisting
+        )
+        _ = await (exerciseInfoRefresh, suggestionRefresh)
+    }
+
     /// Load weight suggestions for unfilled working sets of the current exercise.
     ///
     /// Uses SuggestionCoordinator to gather app models, resolve targets, and
@@ -1517,13 +1555,12 @@ final class ActiveWorkoutViewModel {
     /// when the current exercise is eligible. SuggestionExplainer then builds
     /// the read-only UI model from the evaluation result.
     func loadWeightSuggestions() async {
-        let task = requestWeightSuggestionRefresh(mode: .blocking)
-        await task.value
+        await refreshWeightSuggestions(invalidateCache: false, presentation: .blocking)
     }
 
     @discardableResult
     private func requestWeightSuggestionRefresh(
-        mode: SuggestionLoadPresentation,
+        mode: SuggestionRefreshPresentation,
         invalidateCache: Bool = false,
         debounce: Duration? = nil
     ) -> Task<Void, Never> {
@@ -1538,17 +1575,30 @@ final class ActiveWorkoutViewModel {
         }
 
         isLoadingWeightSuggestions = mode == .blocking
+        isRefreshingWeightSuggestions = mode == .preserveExisting
 
         let task = Task { [weak self] in
             if let debounce {
                 do {
                     try await Task.sleep(for: debounce)
                 } catch {
+                    await self?.finishSuggestionRefreshIfCurrent(
+                        generation: generation,
+                        expectedExerciseId: expectedExerciseId,
+                        mode: mode
+                    )
                     return
                 }
             }
 
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else {
+                await self?.finishSuggestionRefreshIfCurrent(
+                    generation: generation,
+                    expectedExerciseId: expectedExerciseId,
+                    mode: mode
+                )
+                return
+            }
             await self?.performWeightSuggestionRefresh(
                 generation: generation,
                 expectedExerciseId: expectedExerciseId,
@@ -1563,15 +1613,14 @@ final class ActiveWorkoutViewModel {
     private func performWeightSuggestionRefresh(
         generation: UInt64,
         expectedExerciseId: UUID?,
-        mode: SuggestionLoadPresentation
+        mode: SuggestionRefreshPresentation
     ) async {
         defer {
-            if isCurrentSuggestionRefresh(generation, expectedExerciseId: expectedExerciseId) {
-                suggestionRefreshTask = nil
-                if mode == .blocking {
-                    isLoadingWeightSuggestions = false
-                }
-            }
+            finishSuggestionRefreshIfCurrent(
+                generation: generation,
+                expectedExerciseId: expectedExerciseId,
+                mode: mode
+            )
         }
 
         guard isCurrentSuggestionRefresh(generation, expectedExerciseId: expectedExerciseId) else { return }
@@ -1644,6 +1693,22 @@ final class ActiveWorkoutViewModel {
         expectedExerciseId: UUID?
     ) -> Bool {
         suggestionRefreshGeneration == generation && currentExercise?.id == expectedExerciseId
+    }
+
+    private func finishSuggestionRefreshIfCurrent(
+        generation: UInt64,
+        expectedExerciseId: UUID?,
+        mode: SuggestionRefreshPresentation
+    ) {
+        guard isCurrentSuggestionRefresh(generation, expectedExerciseId: expectedExerciseId) else { return }
+
+        suggestionRefreshTask = nil
+        switch mode {
+        case .blocking:
+            isLoadingWeightSuggestions = false
+        case .preserveExisting:
+            isRefreshingWeightSuggestions = false
+        }
     }
 
     // MARK: - Summary Computation (T031)

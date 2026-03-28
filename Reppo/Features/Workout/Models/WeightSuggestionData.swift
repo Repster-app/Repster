@@ -285,6 +285,9 @@ enum SuggestionCoordinator {
         }
 
         let draftRepRange = set.draftTargetRepRange
+        let hasDraftRepTarget = set.hasDraftRepTarget
+        let draftRepMin = set.draftTargetRepMin
+        let draftRepMax = set.draftTargetRepMax
         let defaultTargetReps = normalizedDefaultTargetReps(from: profile)
         let defaultTargetRIR = normalizedDefaultTargetRIR(from: profile)
 
@@ -293,6 +296,12 @@ enum SuggestionCoordinator {
             repsResolution = (reps, .explicitSet)
         } else if let draftRepRange {
             repsResolution = ((draftRepRange.lowerBound + draftRepRange.upperBound) / 2, .explicitSet)
+        } else if let min = draftRepMin, let max = draftRepMax, min > 0, max > 0, min == max {
+            repsResolution = (min, .explicitSet)
+        } else if let min = draftRepMin, min > 0 {
+            repsResolution = (min, .explicitSet)
+        } else if let max = draftRepMax, max > 0 {
+            repsResolution = (max, .explicitSet)
         } else if let min = set.targetRepMin, let max = set.targetRepMax {
             repsResolution = ((min + max) / 2, .template)
         } else if let min = set.targetRepMin {
@@ -325,6 +334,8 @@ enum SuggestionCoordinator {
             repRange = nil
         } else if let draftRepRange {
             repRange = draftRepRange
+        } else if hasDraftRepTarget {
+            repRange = nil
         } else if repsResolution.source == .template {
             repRange = templateRepRange
         } else {

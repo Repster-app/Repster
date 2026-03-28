@@ -62,6 +62,17 @@ final class WorkoutSet {
         return draftTargetRepMin...draftTargetRepMax
     }
 
+    var hasDraftRepTarget: Bool {
+        draftTargetRepMin != nil || draftTargetRepMax != nil
+    }
+
+    var preferredTargetRepBounds: (min: Int?, max: Int?) {
+        if hasDraftRepTarget {
+            return (draftTargetRepMin, draftTargetRepMax)
+        }
+        return (targetRepMin, targetRepMax)
+    }
+
     var hasData: Bool {
         ((weight ?? 0) > 0 && prReps > 0) ||
         totalReps > 0 ||

@@ -168,6 +168,9 @@ struct SetRowView: View {
     /// Called when "Add Note" / "Edit Note" is chosen from the context menu.
     let onEditNote: () -> Void
 
+    /// Called when the custom keyboard commits a rep-range target for this row.
+    var onCommitTargetRepRange: (Int?, Int?) -> Void = { _, _ in }
+
     /// Shared custom keyboard manager for sketch-matching keyboard UX.
     var keyboardManager: SetEntryKeyboardManager? = nil
 
@@ -709,14 +712,12 @@ struct SetRowView: View {
             getSuggestedWeight: { suggestedWeight },
             getWeightIncrement: { exercise.weightIncrement ?? 2.5 },
             getTargetRepRange: {
-                let min = set.draftTargetRepMin ?? set.targetRepMin
-                let max = set.draftTargetRepMax ?? set.targetRepMax
-                return (min: min, max: max)
+                if case let .range(min, max) = RepsTargetInputParser.parse(repsBinding.wrappedValue) {
+                    return (min: min, max: max)
+                }
+                return set.preferredTargetRepBounds
             },
-            setTargetRepRange: { newMin, newMax in
-                set.draftTargetRepMin = newMin
-                set.draftTargetRepMax = newMax
-            },
+            commitTargetRepRange: onCommitTargetRepRange,
             onCompleteSet: { if !set.completed { onComplete() } },
             canCompleteSet: canCompleteSet,
             canMovePrevious: { canMoveToPreviousInput },

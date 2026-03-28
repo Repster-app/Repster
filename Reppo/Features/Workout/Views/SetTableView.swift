@@ -59,6 +59,47 @@ enum RepsTargetInputParser {
     }
 }
 
+enum CustomRepRangeCommitter {
+    static func commit(min: Int?, max: Int?, to set: WorkoutSet) -> Bool {
+        let input = normalizedInput(min: min, max: max)
+        guard input != .invalid else { return false }
+
+        switch input {
+        case .empty:
+            set.draftTargetRepMin = nil
+            set.draftTargetRepMax = nil
+        case let .single(reps):
+            set.draftTargetRepMin = reps
+            set.draftTargetRepMax = nil
+        case let .range(lowerBound, upperBound):
+            set.draftTargetRepMin = lowerBound
+            set.draftTargetRepMax = upperBound
+        case .invalid:
+            return false
+        }
+
+        return true
+    }
+
+    private static func normalizedInput(min: Int?, max: Int?) -> RepsTargetInput {
+        switch (min, max) {
+        case let (.some(lowerBound), .some(upperBound))
+        where lowerBound > 0 && upperBound > 0 && lowerBound < upperBound:
+            return .range(lowerBound, upperBound)
+        case let (.some(value), .some(otherValue))
+        where value > 0 && otherValue > 0 && value == otherValue:
+            return .single(value)
+        case let (.some(value), .none) where value > 0,
+             let (.none, .some(value)) where value > 0:
+            return .single(value)
+        case (.none, .none):
+            return .empty
+        default:
+            return .invalid
+        }
+    }
+}
+
 /// The set table for the currently selected exercise.
 ///
 /// Renders a header row with column labels, set rows via `SetRowView`,
@@ -341,6 +382,7 @@ private struct SetRowWrapper: View {
     @State private var showNoteAlert: Bool = false
     @State private var noteText: String = ""
     @State private var isAutoUncompleting: Bool = false
+    @State private var suppressNextRepsTextChange: Bool = false
 
     init(
         set: WorkoutSet,
@@ -413,6 +455,7 @@ private struct SetRowWrapper: View {
                     noteText = set.notes ?? ""
                     showNoteAlert = true
                 },
+                onCommitTargetRepRange: commitTargetRepRange,
                 keyboardManager: keyboardManager,
                 suggestedWeight: suggestedWeight,
                 prStatusOverride: CachedPRStatus.effectiveStatus(for: set, among: siblingsSets)
@@ -423,24 +466,11 @@ private struct SetRowWrapper: View {
                 }
             }
             .onChange(of: repsText) { _, newValue in
-                handleFieldEdit(field: .reps) {
-                    switch RepsTargetInputParser.parse(newValue) {
-                    case .empty:
-                        set.reps = nil
-                        set.draftTargetRepMin = nil
-                        set.draftTargetRepMax = nil
-                    case let .single(reps):
-                        set.reps = reps
-                        set.draftTargetRepMin = nil
-                        set.draftTargetRepMax = nil
-                    case let .range(min, max):
-                        set.reps = nil
-                        set.draftTargetRepMin = min
-                        set.draftTargetRepMax = max
-                    case .invalid:
-                        break
-                    }
+                if suppressNextRepsTextChange {
+                    suppressNextRepsTextChange = false
+                    return
                 }
+                applyParsedRepsInput(RepsTargetInputParser.parse(newValue))
             }
             .onChange(of: leftRepsText) { _, newValue in
                 handleFieldEdit(field: .reps) {
@@ -519,6 +549,42 @@ private struct SetRowWrapper: View {
             }
         } else {
             dataSource.markSetDirty(set, field: field)
+        }
+    }
+
+    private func applyParsedRepsInput(_ input: RepsTargetInput) {
+        handleFieldEdit(field: .reps) {
+            switch input {
+            case .empty:
+                set.reps = nil
+                set.draftTargetRepMin = nil
+                set.draftTargetRepMax = nil
+            case let .single(reps):
+                set.reps = reps
+                set.draftTargetRepMin = nil
+                set.draftTargetRepMax = nil
+            case let .range(min, max):
+                set.reps = nil
+                set.draftTargetRepMin = min
+                set.draftTargetRepMax = max
+            case .invalid:
+                break
+            }
+        }
+    }
+
+    private func commitTargetRepRange(_ min: Int?, _ max: Int?) {
+        let currentInput = RepsTargetInputParser.parse(repsText)
+        handleFieldEdit(field: .reps) {
+            guard CustomRepRangeCommitter.commit(min: min, max: max, to: set) else { return }
+
+            switch currentInput {
+            case .range, .invalid:
+                suppressNextRepsTextChange = true
+                repsText = ""
+            case .empty, .single:
+                break
+            }
         }
     }
 
@@ -619,9 +685,6 @@ private struct SetRowWrapper: View {
         if let reps = set.reps {
             return "\(reps)"
         }
-        if let draftRange = set.draftTargetRepRange {
-            return "\(draftRange.lowerBound)-\(draftRange.upperBound)"
-        }
         return ""
     }
 
@@ -634,7 +697,7 @@ private struct SetRowWrapper: View {
         }
     }
 
-    /// Compute the reps placeholder from template target rep range.
+    /// Compute the reps placeholder from the active target rep guidance.
     ///
     /// - Both min & max set and different → "8-12"
     /// - Both min & max set and equal → "8"
@@ -642,8 +705,9 @@ private struct SetRowWrapper: View {
     /// - Only max set → "12"
     /// - Neither set → "0" (default)
     static func repsPlaceholder(for set: WorkoutSet) -> String {
-        let min = set.targetRepMin
-        let max = set.targetRepMax
+        let bounds = set.preferredTargetRepBounds
+        let min = bounds.min
+        let max = bounds.max
 
         switch (min, max) {
         case let (.some(lo), .some(hi)) where lo == hi:
@@ -684,7 +748,7 @@ final class SetEntryKeyboardContext {
     let getSuggestedWeight: () -> Double?
     let getWeightIncrement: () -> Double
     let getTargetRepRange: () -> (min: Int?, max: Int?)
-    let setTargetRepRange: (Int?, Int?) -> Void
+    let commitTargetRepRange: (Int?, Int?) -> Void
     let onCompleteSet: (() -> Void)?
     let canCompleteSet: () -> Bool
     let canMovePrevious: () -> Bool
@@ -712,7 +776,7 @@ final class SetEntryKeyboardContext {
         getSuggestedWeight: @escaping () -> Double?,
         getWeightIncrement: @escaping () -> Double = { 2.5 },
         getTargetRepRange: @escaping () -> (min: Int?, max: Int?) = { (nil, nil) },
-        setTargetRepRange: @escaping (Int?, Int?) -> Void = { _, _ in },
+        commitTargetRepRange: @escaping (Int?, Int?) -> Void = { _, _ in },
         onCompleteSet: (() -> Void)? = nil,
         canCompleteSet: @escaping () -> Bool = { true },
         canMovePrevious: @escaping () -> Bool,
@@ -738,7 +802,7 @@ final class SetEntryKeyboardContext {
         self.getSuggestedWeight = getSuggestedWeight
         self.getWeightIncrement = getWeightIncrement
         self.getTargetRepRange = getTargetRepRange
-        self.setTargetRepRange = setTargetRepRange
+        self.commitTargetRepRange = commitTargetRepRange
         self.onCompleteSet = onCompleteSet
         self.canCompleteSet = canCompleteSet
         self.canMovePrevious = canMovePrevious
@@ -887,6 +951,10 @@ struct SetEntryKeyboardOverlay: View {
                     repRangeEditMode = false
                     refreshTick = 0
                 }
+                .onChange(of: manager.context?.trackedField) { _, newField in
+                    guard !supportsRepRangeEditing(for: newField) else { return }
+                    repRangeEditMode = false
+                }
             }
         }
         .animation(.easeInOut(duration: 0.2), value: manager.context?.ownerSetID)
@@ -895,74 +963,130 @@ struct SetEntryKeyboardOverlay: View {
     @ViewBuilder
     private func topStrip(for context: SetEntryKeyboardContext) -> some View {
         VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Set")
+                    .foregroundColor(.accent)
+                    .font(.system(size: 14, weight: .semibold))
+                Text("· \(fieldTitle(context.trackedField))")
+                    .foregroundColor(.textSecondary)
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+
+            if showRIRChips(for: context) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        rirChip(context, label: "—", value: nil)
+                        rirChip(context, label: "0", value: 0)
+                        rirChip(context, label: "1", value: 1)
+                        rirChip(context, label: "2", value: 2)
+                        rirChip(context, label: "3", value: 3)
+                        rirChip(context, label: "4", value: 4)
+                        rirChip(context, label: "5+", value: 5)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 10)
+                }
+            } else if shouldShowWeightHelper(for: context) {
+                Text(weightHelperText(context))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.textSecondary)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 10)
+            }
+
             if repRangeEditMode {
-                HStack {
-                    Text("Rep Range Target")
-                        .foregroundColor(.accent)
-                        .font(.system(size: 14, weight: .semibold))
-                    Spacer()
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-
-                HStack(spacing: 8) {
-                    repRangeInputField(text: $repRangeMinText, placeholder: "Min", isActive: repRangeActiveField == .min)
-                        .onTapGesture { repRangeActiveField = .min }
-                    Text("—")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.textSecondary)
-                    repRangeInputField(text: $repRangeMaxText, placeholder: "Max", isActive: repRangeActiveField == .max)
-                        .onTapGesture { repRangeActiveField = .max }
-                    Button {
-                        applyRepRange(context)
-                    } label: {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 24, weight: .semibold))
-                            .foregroundColor(.accent)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 10)
-            } else {
-                HStack {
-                    Text("Set")
-                        .foregroundColor(.accent)
-                        .font(.system(size: 14, weight: .semibold))
-                    Text("· \(fieldTitle(context.trackedField))")
-                        .foregroundColor(.textSecondary)
-                        .font(.system(size: 14, weight: .semibold))
-                    Spacer()
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-
-                if showRIRChips(for: context) {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 10) {
-                            rirChip(context, label: "—", value: nil)
-                            rirChip(context, label: "0", value: 0)
-                            rirChip(context, label: "1", value: 1)
-                            rirChip(context, label: "2", value: 2)
-                            rirChip(context, label: "3", value: 3)
-                            rirChip(context, label: "4", value: 4)
-                            rirChip(context, label: "5+", value: 5)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 10)
-                    }
-                } else if shouldShowWeightHelper(for: context) {
-                    Text(weightHelperText(context))
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.textSecondary)
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 10)
-                }
+                repRangeEditor(for: context)
             }
         }
     }
 
-    private func repRangeInputField(text: Binding<String>, placeholder: String, isActive: Bool) -> some View {
+    private func repRangeEditor(for context: SetEntryKeyboardContext) -> some View {
+        let hasInvalidDraft = repRangeDraftState == .invalid
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Label("Rep Range", systemImage: "target")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.accent)
+
+                Spacer(minLength: 0)
+
+                repRangeEditorButton(title: "Cancel", prominent: false, disabled: false) {
+                    dismissRepRangeEditMode(context)
+                }
+
+                repRangeEditorButton(title: "Apply", prominent: true, disabled: hasInvalidDraft) {
+                    applyRepRange(context)
+                }
+            }
+
+            HStack(spacing: 8) {
+                repRangeInputField(
+                    text: $repRangeMinText,
+                    placeholder: "Min",
+                    isActive: repRangeActiveField == .min,
+                    showsError: hasInvalidDraft
+                )
+                .onTapGesture { repRangeActiveField = .min }
+
+                Text("—")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.textSecondary)
+
+                repRangeInputField(
+                    text: $repRangeMaxText,
+                    placeholder: "Max",
+                    isActive: repRangeActiveField == .max,
+                    showsError: hasInvalidDraft
+                )
+                .onTapGesture { repRangeActiveField = .max }
+
+                Spacer(minLength: 0)
+            }
+
+            if hasInvalidDraft {
+                Text("Use one rep value or an ascending range.")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.danger)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 2)
+        .padding(.bottom, 10)
+    }
+
+    private func repRangeEditorButton(
+        title: String,
+        prominent: Bool,
+        disabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(disabled ? .textTertiary : (prominent ? .white : .textPrimary))
+                .padding(.horizontal, 10)
+                .frame(height: 30)
+                .background(disabled ? Color.bgInput : (prominent ? Color.accent : Color.bgHover))
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule()
+                        .stroke(prominent ? Color.clear : Color.border, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+    }
+
+    private func repRangeInputField(
+        text: Binding<String>,
+        placeholder: String,
+        isActive: Bool,
+        showsError: Bool = false
+    ) -> some View {
         Text(text.wrappedValue.isEmpty ? placeholder : text.wrappedValue)
             .font(.system(size: 18, weight: .semibold))
             .foregroundColor(text.wrappedValue.isEmpty ? .textTertiary : .textPrimary)
@@ -971,7 +1095,10 @@ struct SetEntryKeyboardOverlay: View {
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .stroke(isActive ? Color.accent : Color.border, lineWidth: isActive ? 1.5 : 1)
+                    .stroke(
+                        showsError ? Color.danger : (isActive ? Color.accent : Color.border),
+                        lineWidth: showsError || isActive ? 1.5 : 1
+                    )
             )
     }
 
@@ -984,10 +1111,23 @@ struct SetEntryKeyboardOverlay: View {
         refreshTick += 1
     }
 
+    private func dismissRepRangeEditMode(_ context: SetEntryKeyboardContext) {
+        let range = context.getTargetRepRange()
+        repRangeMinText = range.min.map { "\($0)" } ?? ""
+        repRangeMaxText = range.max.map { "\($0)" } ?? ""
+        repRangeActiveField = .min
+        repRangeEditMode = false
+        refreshTick += 1
+    }
+
     private func applyRepRange(_ context: SetEntryKeyboardContext) {
+        guard repRangeDraftState != .invalid else {
+            refreshTick += 1
+            return
+        }
         let minVal = Int(repRangeMinText)
         let maxVal = Int(repRangeMaxText)
-        context.setTargetRepRange(minVal, maxVal)
+        context.commitTargetRepRange(minVal, maxVal)
         repRangeEditMode = false
         refreshTick += 1
         manager.refresh()
@@ -1010,10 +1150,11 @@ struct SetEntryKeyboardOverlay: View {
                 return nil
             }
         }()
+        let isEditing = repRangeEditMode
 
         return Button {
-            if repRangeEditMode {
-                applyRepRange(context)
+            if isEditing {
+                dismissRepRangeEditMode(context)
             } else {
                 enterRepRangeEditMode(context)
             }
@@ -1024,16 +1165,23 @@ struct SetEntryKeyboardOverlay: View {
                 if let label = rangeLabel {
                     Text(label)
                         .font(.system(size: 13, weight: .semibold))
+                } else if isEditing {
+                    Text("Editing")
+                        .font(.system(size: 13, weight: .semibold))
                 } else {
-                    Text("Range")
+                    Text("Set Range")
                         .font(.system(size: 13, weight: .semibold))
                 }
             }
-            .foregroundColor(repRangeEditMode ? .white : (hasRange ? .white : .textTertiary))
+            .foregroundColor(isEditing || hasRange ? .white : .accent)
             .frame(maxWidth: .infinity)
             .frame(height: 44)
-            .background(repRangeEditMode ? Color.accent.opacity(0.8) : (hasRange ? Color.accent : Color.bgInput))
+            .background(isEditing ? Color.accent.opacity(0.85) : (hasRange ? Color.accent : Color.accent.opacity(0.12)))
             .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(isEditing || hasRange ? Color.clear : Color.accent.opacity(0.35), lineWidth: 1)
+            )
         }
         .buttonStyle(.plain)
     }
@@ -1174,15 +1322,14 @@ struct SetEntryKeyboardOverlay: View {
 
             HStack(spacing: 8) {
                 railNavButton(title: "Prev", disabled: !canGoPrev) {
-                    if rirMode {
-                        rirMode = false
-                    } else {
-                        context.movePreviousInTrackedOrder()
-                    }
+                    repRangeEditMode = false
+                    if rirMode { rirMode = false }
+                    context.movePreviousInTrackedOrder()
                     refreshTick += 1
                     manager.show(context)
                 }
                 railNavButton(title: "Next", disabled: !canGoNext) {
+                    repRangeEditMode = false
                     if canGoNext {
                         context.moveNextInTrackedOrder()
                     }
@@ -1362,12 +1509,41 @@ struct SetEntryKeyboardOverlay: View {
         }
     }
 
+    private var repRangeDraftState: RepsTargetInput {
+        let minValue = Int(repRangeMinText)
+        let maxValue = Int(repRangeMaxText)
+
+        switch (minValue, maxValue) {
+        case let (.some(lowerBound), .some(upperBound))
+        where lowerBound > 0 && upperBound > 0 && lowerBound < upperBound:
+            return .range(lowerBound, upperBound)
+        case let (.some(value), .some(otherValue))
+        where value > 0 && otherValue > 0 && value == otherValue:
+            return .single(value)
+        case let (.some(value), .none) where value > 0,
+             let (.none, .some(value)) where value > 0:
+            return .single(value)
+        case (.none, .none):
+            return .empty
+        default:
+            return .invalid
+        }
+    }
+
     private func showRIRChips(for context: SetEntryKeyboardContext) -> Bool {
-        if repRangeEditMode { return false }
         if rirMode {
             return context.canEditActiveRIR
         }
         return context.canEditActiveRIR
+    }
+
+    private func supportsRepRangeEditing(for field: SetRowInputField?) -> Bool {
+        switch field {
+        case .reps, .leftReps, .rightReps:
+            return true
+        case .weight, .duration, .distance, .none:
+            return false
+        }
     }
 
     private func shouldShowWeightHelper(for context: SetEntryKeyboardContext) -> Bool {

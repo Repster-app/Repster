@@ -169,7 +169,12 @@ struct ActiveWorkoutView: View {
                 if let exercise = viewModel.currentExercise {
                     ExerciseSettingsSheet(
                         exercise: exercise,
-                        services: services
+                        services: services,
+                        onSave: {
+                            Task {
+                                await viewModel.refreshCurrentExerciseConfigurationData()
+                            }
+                        }
                     )
                 }
             }
@@ -197,7 +202,16 @@ struct ActiveWorkoutView: View {
                 WeightSuggestionModuleView(
                     data: viewModel.weightSuggestionData,
                     unitPreference: viewModel.unitPreference,
-                    isLoading: viewModel.isLoadingWeightSuggestions
+                    isLoading: viewModel.isLoadingWeightSuggestions,
+                    isRefreshing: viewModel.isRefreshingWeightSuggestions,
+                    onRefresh: {
+                        Task {
+                            await viewModel.refreshWeightSuggestions(
+                                invalidateCache: true,
+                                presentation: .preserveExisting
+                            )
+                        }
+                    }
                 )
                 .padding(.horizontal, 20)
                 .padding(.top, 12)

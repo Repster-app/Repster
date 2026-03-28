@@ -3,6 +3,57 @@ import XCTest
 
 final class WorkoutSetTests: XCTestCase {
 
+    func testPreferredTargetRepBoundsPreferDraftWithoutMixingTemplateBounds() {
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: UUID(),
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            targetRepMin: 8,
+            targetRepMax: 12
+        )
+        set.draftTargetRepMin = 10
+        set.draftTargetRepMax = nil
+
+        let bounds = set.preferredTargetRepBounds
+
+        XCTAssertEqual(bounds.min, 10)
+        XCTAssertNil(bounds.max)
+    }
+
+    func testCustomRepRangeCommitStoresDraftGuidanceWithoutSettingActualReps() {
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: UUID(),
+            reps: 6,
+            orderInWorkout: 1,
+            orderInExercise: 1
+        )
+
+        let didCommit = CustomRepRangeCommitter.commit(min: 8, max: 12, to: set)
+
+        XCTAssertTrue(didCommit)
+        XCTAssertEqual(set.reps, 6)
+        XCTAssertEqual(set.draftTargetRepMin, 8)
+        XCTAssertEqual(set.draftTargetRepMax, 12)
+    }
+
+    func testCustomRepRangeCommitStoresSingleValueAsDraftGuidance() {
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: UUID(),
+            orderInWorkout: 1,
+            orderInExercise: 1
+        )
+
+        let didCommit = CustomRepRangeCommitter.commit(min: 8, max: nil, to: set)
+
+        XCTAssertTrue(didCommit)
+        XCTAssertNil(set.reps)
+        XCTAssertEqual(set.draftTargetRepMin, 8)
+        XCTAssertNil(set.draftTargetRepMax)
+    }
+
     func testSyncDerivedPerformanceFieldsUsesStrongerSideForPRAndTotalRepsForVolumeStats() {
         let exercise = Exercise(
             name: "Split Squat",

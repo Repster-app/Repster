@@ -18,6 +18,7 @@ struct ExerciseSettingsSheet: View {
 
     let exercise: Exercise
     let services: ServiceContainer
+    let onSave: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
 
@@ -35,9 +36,14 @@ struct ExerciseSettingsSheet: View {
 
     // MARK: - Init
 
-    init(exercise: Exercise, services: ServiceContainer) {
+    init(
+        exercise: Exercise,
+        services: ServiceContainer,
+        onSave: (() -> Void)? = nil
+    ) {
         self.exercise = exercise
         self.services = services
+        self.onSave = onSave
         _restTimeSeconds = State(initialValue: exercise.defaultRestTime)
         _weightIncrement = State(initialValue: exercise.weightIncrement)
     }
@@ -115,7 +121,8 @@ struct ExerciseSettingsSheet: View {
         .sheet(isPresented: $showFullSettings) {
             CreateEditExerciseSheet(
                 exercise: exercise,
-                services: services
+                services: services,
+                onSave: handleNestedExerciseSave
             )
         }
     }
@@ -137,7 +144,14 @@ struct ExerciseSettingsSheet: View {
             print("[ExerciseSettingsSheet] Failed to save: \(error)")
         }
 
+        onSave?()
         dismiss()
+    }
+
+    private func handleNestedExerciseSave() {
+        restTimeSeconds = exercise.defaultRestTime
+        weightIncrement = exercise.weightIncrement
+        onSave?()
     }
 
     private func loadDefaults() async {
