@@ -10,7 +10,7 @@ struct EditWorkoutView: View {
     // MARK: - State
 
     @State private var viewModel: EditWorkoutViewModel
-    @State private var showWorkoutExclusionSheet = false
+    @State private var showWorkoutProgressionSheet = false
 
     // MARK: - Dependencies
 
@@ -70,13 +70,14 @@ struct EditWorkoutView: View {
         .sheet(isPresented: $viewModel.showAddExerciseSheet) {
             exercisePickerSheet
         }
-        .sheet(isPresented: $showWorkoutExclusionSheet) {
+        .sheet(isPresented: $showWorkoutProgressionSheet) {
             if let workout = viewModel.workout {
-                WorkoutExclusionSheet(
+                WorkoutProgressionSheet(
                     workout: workout,
-                    exercises: viewModel.exercises
+                    exercises: viewModel.exercises,
+                    showsExerciseOverrides: false
                 ) { excludeWorkout, excludedExerciseIds in
-                    try await viewModel.updateProgressionExclusions(
+                    try await viewModel.updateProgressionHistoryExclusions(
                         excludeWorkout: excludeWorkout,
                         excludedExerciseIds: excludedExerciseIds
                     )
@@ -112,9 +113,9 @@ struct EditWorkoutView: View {
             Spacer()
 
             Button {
-                showWorkoutExclusionSheet = true
+                showWorkoutProgressionSheet = true
             } label: {
-                Image(systemName: "slider.horizontal.3")
+                Image(systemName: "ellipsis.circle")
                     .font(.system(size: 17, weight: .medium))
                     .foregroundColor(.textPrimary)
                     .frame(width: 44, height: 44)

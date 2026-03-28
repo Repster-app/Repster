@@ -285,7 +285,7 @@ protocol TemplateServiceProtocol: Sendable {
     /// Creates WorkoutSets with targets (targetRepMin, targetRepMax, targetRIR) from the template.
     /// Updates the template's lastUsedAt timestamp.
     /// Returns the created Workout.
-    func startWorkoutFromTemplate(_ templateId: UUID) async throws -> Workout
+    func startWorkoutFromTemplate(_ templateId: UUID, options: WorkoutStartOptions) async throws -> Workout
 
     // MARK: - Save as Template from Workout
 
@@ -315,4 +315,10 @@ protocol TemplateServiceProtocol: Sendable {
     /// Import a single template archive and return the created template ID.
     /// This convenience path only succeeds when every exercise resolves automatically.
     func importTemplate(data: Data) async throws -> UUID
+}
+
+extension TemplateServiceProtocol {
+    func startWorkoutFromTemplate(_ templateId: UUID) async throws -> Workout {
+        try await startWorkoutFromTemplate(templateId, options: .default)
+    }
 }

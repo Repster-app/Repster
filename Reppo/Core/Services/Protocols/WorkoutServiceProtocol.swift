@@ -10,6 +10,16 @@ enum WorkoutServiceError: Error {
     case workoutAlreadyCompleted(UUID)
 }
 
+struct WorkoutStartOptions: Sendable, Equatable {
+    var countTowardProgressionHistory: Bool = true
+
+    static let `default` = WorkoutStartOptions()
+
+    var excludeFromProgressionHistory: Bool {
+        !countTowardProgressionHistory
+    }
+}
+
 /// WorkoutService owns workout lifecycle: create, finish, delete, active detection.
 ///
 /// Responsibilities (per AGENT_RULES S6):
@@ -38,7 +48,7 @@ protocol WorkoutServiceProtocol: Sendable {
     /// Otherwise creates a new Workout with status = .inProgress, startTime = now, date = today.
     ///
     /// - Returns: The active Workout (existing or newly created).
-    func startWorkout() async throws -> Workout
+    func startWorkout(options: WorkoutStartOptions) async throws -> Workout
 
     /// Finish an active workout.
     ///
@@ -94,13 +104,13 @@ protocol WorkoutServiceProtocol: Sendable {
     ///   - perceivedEffort: Updated RPE value (nil to clear).
     func updateWorkoutMetadata(_ workoutId: UUID, notes: String?, perceivedEffort: Double?) async throws
 
-    /// Update workout-scoped PR / Smart Suggest exclusions.
+    /// Update workout-scoped progression-history exclusions.
     ///
     /// - Parameters:
     ///   - workoutId: Workout to update.
-    ///   - excludeWorkout: When true, the entire workout is ignored for PRs and Smart Suggestions.
+    ///   - excludeWorkout: When true, the entire workout is ignored for PRs and future Smart Suggestion history.
     ///   - excludedExerciseIds: Exercise IDs to ignore within this workout only.
-    func updateProgressionExclusions(
+    func updateProgressionHistoryExclusions(
         _ workoutId: UUID,
         excludeWorkout: Bool,
         excludedExerciseIds: Set<UUID>
@@ -117,4 +127,10 @@ protocol WorkoutServiceProtocol: Sendable {
     ///
     /// - Parameter workoutId: The workout to delete.
     func deleteWorkout(_ workoutId: UUID) async throws
+}
+
+extension WorkoutServiceProtocol {
+    func startWorkout() async throws -> Workout {
+        try await startWorkout(options: .default)
+    }
 }

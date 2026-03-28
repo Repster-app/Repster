@@ -71,6 +71,9 @@ struct ContentView: View {
     /// Pending workout ID for copy when discard confirmation is needed.
     @State private var pendingCopyWorkoutId: UUID? = nil
 
+    /// Start options selected from the Start Workout sheet for downstream flows.
+    @State private var pendingWorkoutStartOptions: WorkoutStartOptions? = nil
+
     /// Whether the templates flow should open after StartWorkoutSheet dismisses.
     @State private var pendingTemplateFlow = false
 
@@ -253,18 +256,20 @@ struct ContentView: View {
         }) {
             StartWorkoutSheet(
                 accessMessage: workoutAccessMessage,
-                onStartEmpty: {
-                    Task { await startEmptyWorkout() }
+                onStartEmpty: { options in
+                    Task { await startEmptyWorkout(options: options) }
                 },
-                onCopyPrevious: {
-                    Task { await beginCopyPreviousFlow() }
+                onCopyPrevious: { options in
+                    Task { await beginCopyPreviousFlow(options: options) }
                 },
-                onTemplates: {
-                    Task { await beginTemplateFlow() }
+                onTemplates: { options in
+                    Task { await beginTemplateFlow(options: options) }
                 }
             )
         }
-        .sheet(isPresented: $showCopyPreviousSheet) {
+        .sheet(isPresented: $showCopyPreviousSheet, onDismiss: {
+            pendingWorkoutStartOptions = nil
+        }) {
             CopyPreviousSheet(
                 workouts: copyPreviousWorkouts,
                 showDiscardConfirmation: $showDiscardConfirmation,
@@ -281,6 +286,7 @@ struct ContentView: View {
             )
         }
         .fullScreenCover(isPresented: $showTemplateFlow, onDismiss: {
+            pendingWorkoutStartOptions = nil
             if shouldResumeActiveWorkoutAfterTemplateFlow {
                 shouldResumeActiveWorkoutAfterTemplateFlow = false
                 hasActiveWorkout = true
@@ -298,7 +304,8 @@ struct ContentView: View {
                 onStartWorkout: {
                     shouldResumeActiveWorkoutAfterTemplateFlow = true
                     showTemplateFlow = false
-                }
+                },
+                workoutStartOptions: pendingWorkoutStartOptions ?? .default
             )
         }
     }
@@ -370,11 +377,11 @@ struct ContentView: View {
     }
 
     @MainActor
-    private func startEmptyWorkout() async {
+    private func startEmptyWorkout(options: WorkoutStartOptions) async {
         guard await ensureWorkoutCreationAccess() else { return }
 
         do {
-            _ = try await services.workoutService.startWorkout()
+            _ = try await services.workoutService.startWorkout(options: options)
             hasActiveWorkout = true
             showActiveWorkout = true
         } catch {
@@ -383,15 +390,17 @@ struct ContentView: View {
     }
 
     @MainActor
-    private func beginCopyPreviousFlow() async {
+    private func beginCopyPreviousFlow(options: WorkoutStartOptions) async {
         guard await ensureWorkoutCreationAccess() else { return }
+        pendingWorkoutStartOptions = options
         await loadCopyPreviousWorkouts()
         showCopyPreviousSheet = true
     }
 
     @MainActor
-    private func beginTemplateFlow() async {
+    private func beginTemplateFlow(options: WorkoutStartOptions) async {
         guard await ensureWorkoutCreationAccess() else { return }
+        pendingWorkoutStartOptions = options
         pendingTemplateFlow = true
     }
 
@@ -526,7 +535,8 @@ struct ContentView: View {
             .filter { $0.setType == .working }
             .sorted { ($0.orderInWorkout, $0.orderInExercise) < ($1.orderInWorkout, $1.orderInExercise) }
 
-        let newWorkout = try await services.workoutService.startWorkout()
+        let startOptions = pendingWorkoutStartOptions ?? .default
+        let newWorkout = try await services.workoutService.startWorkout(options: startOptions)
 
         for sourceSet in workingSets {
             let newSet = WorkoutSet(
@@ -545,6 +555,7 @@ struct ContentView: View {
         hasActiveWorkout = true
         showCopyPreviousSheet = false
         showActiveWorkout = true
+        pendingWorkoutStartOptions = nil
     }
 
     // MARK: - Tab Bar Appearance

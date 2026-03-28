@@ -53,9 +53,6 @@ struct ActiveWorkoutView: View {
     /// Controls the exercise settings sheet presentation.
     @State private var showExerciseSettingsSheet: Bool = false
 
-    /// Controls the workout exclusion sheet presentation.
-    @State private var showWorkoutExclusionSheet: Bool = false
-
     /// Shared custom keyboard state for set input.
     @StateObject private var setKeyboardManager = SetEntryKeyboardManager()
 
@@ -137,19 +134,6 @@ struct ActiveWorkoutView: View {
         // Exercise picker sheet — replaced with ExerciseListView (T029)
         .sheet(isPresented: $viewModel.showAddExerciseSheet) {
             exercisePickerSheet
-        }
-        .sheet(isPresented: $showWorkoutExclusionSheet) {
-            if let workout = viewModel.workout {
-                WorkoutExclusionSheet(
-                    workout: workout,
-                    exercises: viewModel.exercises
-                ) { excludeWorkout, excludedExerciseIds in
-                    try await viewModel.updateProgressionExclusions(
-                        excludeWorkout: excludeWorkout,
-                        excludedExerciseIds: excludedExerciseIds
-                    )
-                }
-            }
         }
         // Finish workout summary sheet (WP07 T032)
         .sheet(isPresented: $viewModel.showFinishSheet) {
@@ -353,15 +337,6 @@ struct ActiveWorkoutView: View {
             )
 
             Spacer()
-
-            Button {
-                showWorkoutExclusionSheet = true
-            } label: {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundColor(.textPrimary)
-                    .frame(width: 44, height: 44)
-            }
 
             // +Exercise button
             Button {

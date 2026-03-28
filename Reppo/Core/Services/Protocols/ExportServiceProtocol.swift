@@ -69,10 +69,104 @@ struct WorkoutHistoryArchiveWorkout: Codable, Sendable {
     let notes: String?
     let programId: UUID?
     let status: WorkoutStatus
-    let excludeFromPRsAndSuggestions: Bool?
-    let excludedExerciseIdsFromPRsAndSuggestions: [UUID]?
+    let excludeFromProgressionHistory: Bool?
+    let excludedExerciseIdsFromProgressionHistory: [UUID]?
     let createdAt: Date
     let updatedAt: Date
+
+    init(
+        id: UUID,
+        date: Date,
+        title: String?,
+        startTime: Date?,
+        endTime: Date?,
+        duration: Int?,
+        perceivedEffort: Double?,
+        notes: String?,
+        programId: UUID?,
+        status: WorkoutStatus,
+        excludeFromProgressionHistory: Bool?,
+        excludedExerciseIdsFromProgressionHistory: [UUID]?,
+        createdAt: Date,
+        updatedAt: Date
+    ) {
+        self.id = id
+        self.date = date
+        self.title = title
+        self.startTime = startTime
+        self.endTime = endTime
+        self.duration = duration
+        self.perceivedEffort = perceivedEffort
+        self.notes = notes
+        self.programId = programId
+        self.status = status
+        self.excludeFromProgressionHistory = excludeFromProgressionHistory
+        self.excludedExerciseIdsFromProgressionHistory = excludedExerciseIdsFromProgressionHistory
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case date
+        case title
+        case startTime
+        case endTime
+        case duration
+        case perceivedEffort
+        case notes
+        case programId
+        case status
+        case excludeFromProgressionHistory
+        case excludedExerciseIdsFromProgressionHistory
+        case excludeFromPRsAndSuggestions
+        case excludedExerciseIdsFromPRsAndSuggestions
+        case createdAt
+        case updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        date = try container.decode(Date.self, forKey: .date)
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        startTime = try container.decodeIfPresent(Date.self, forKey: .startTime)
+        endTime = try container.decodeIfPresent(Date.self, forKey: .endTime)
+        duration = try container.decodeIfPresent(Int.self, forKey: .duration)
+        perceivedEffort = try container.decodeIfPresent(Double.self, forKey: .perceivedEffort)
+        notes = try container.decodeIfPresent(String.self, forKey: .notes)
+        programId = try container.decodeIfPresent(UUID.self, forKey: .programId)
+        status = try container.decode(WorkoutStatus.self, forKey: .status)
+        excludeFromProgressionHistory =
+            try container.decodeIfPresent(Bool.self, forKey: .excludeFromProgressionHistory)
+            ?? (try container.decodeIfPresent(Bool.self, forKey: .excludeFromPRsAndSuggestions))
+        excludedExerciseIdsFromProgressionHistory =
+            try container.decodeIfPresent([UUID].self, forKey: .excludedExerciseIdsFromProgressionHistory)
+            ?? (try container.decodeIfPresent([UUID].self, forKey: .excludedExerciseIdsFromPRsAndSuggestions))
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(date, forKey: .date)
+        try container.encodeIfPresent(title, forKey: .title)
+        try container.encodeIfPresent(startTime, forKey: .startTime)
+        try container.encodeIfPresent(endTime, forKey: .endTime)
+        try container.encodeIfPresent(duration, forKey: .duration)
+        try container.encodeIfPresent(perceivedEffort, forKey: .perceivedEffort)
+        try container.encodeIfPresent(notes, forKey: .notes)
+        try container.encodeIfPresent(programId, forKey: .programId)
+        try container.encode(status, forKey: .status)
+        try container.encodeIfPresent(excludeFromProgressionHistory, forKey: .excludeFromProgressionHistory)
+        try container.encodeIfPresent(
+            excludedExerciseIdsFromProgressionHistory,
+            forKey: .excludedExerciseIdsFromProgressionHistory
+        )
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
+    }
 }
 
 struct WorkoutHistoryArchiveExercise: Codable, Sendable {

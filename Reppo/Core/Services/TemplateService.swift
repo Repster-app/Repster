@@ -265,7 +265,7 @@ actor TemplateService: TemplateServiceProtocol {
 
     // MARK: - Start Workout from Template
 
-    func startWorkoutFromTemplate(_ templateId: UUID) async throws -> Workout {
+    func startWorkoutFromTemplate(_ templateId: UUID, options: WorkoutStartOptions) async throws -> Workout {
         guard let detail = try await fetchTemplateDetail(templateId) else {
             throw TemplateServiceError.templateNotFound(templateId)
         }
@@ -273,7 +273,8 @@ actor TemplateService: TemplateServiceProtocol {
         let workout = Workout(
             date: Date(),
             startTime: Date(),
-            status: .inProgress
+            status: .inProgress,
+            excludeFromProgressionHistory: options.excludeFromProgressionHistory
         )
         try await workoutRepo.save(workout)
 

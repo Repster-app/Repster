@@ -206,7 +206,7 @@ final class SetServiceTests: XCTestCase {
             endTime: workoutDate.addingTimeInterval(1_800),
             duration: 1_800,
             status: .completed,
-            excludeFromPRsAndSuggestions: true
+            excludeFromProgressionHistory: true
         )
         let set = WorkoutSet(
             workoutId: workout.id,
@@ -259,7 +259,7 @@ final class SetServiceTests: XCTestCase {
             endTime: workoutDate.addingTimeInterval(1_800),
             duration: 1_800,
             status: .completed,
-            excludedExerciseIdsFromPRsAndSuggestions: [excludedExercise.id]
+            excludedExerciseIdsFromProgressionHistory: [excludedExercise.id]
         )
         let excludedSet = WorkoutSet(
             workoutId: workout.id,

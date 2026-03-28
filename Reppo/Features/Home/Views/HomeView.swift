@@ -72,7 +72,10 @@ struct HomeView: View {
                     workoutService: services.workoutService,
                     setService: services.setService,
                     exerciseService: services.exerciseService,
-                    statsService: services.statsService
+                    statsService: services.statsService,
+                    onWorkoutDeleted: {
+                        refreshAfterWorkoutDeletion()
+                    }
                 )
             }
         }
@@ -90,6 +93,11 @@ struct HomeView: View {
             viewModel.lastLoadTime = nil
             Task { await viewModel.loadData() }
         }
+    }
+
+    private func refreshAfterWorkoutDeletion() {
+        viewModel.lastLoadTime = nil
+        Task { await viewModel.loadData() }
     }
 
     // MARK: - Customizable Section Router

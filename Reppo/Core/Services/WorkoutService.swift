@@ -33,7 +33,7 @@ actor WorkoutService: WorkoutServiceProtocol {
 
     /// Start a new workout or return the existing active one.
     /// FR-004: Only one active workout at a time — return existing if one is in progress.
-    func startWorkout() async throws -> Workout {
+    func startWorkout(options: WorkoutStartOptions) async throws -> Workout {
         // Check for existing active workout first
         if let existing = try await workoutRepo.fetchInProgress() {
             return existing
@@ -43,7 +43,8 @@ actor WorkoutService: WorkoutServiceProtocol {
         let workout = Workout(
             date: Date(),
             startTime: Date(),
-            status: .inProgress
+            status: .inProgress,
+            excludeFromProgressionHistory: options.excludeFromProgressionHistory
         )
         try await workoutRepo.save(workout)
         return workout
@@ -119,7 +120,7 @@ actor WorkoutService: WorkoutServiceProtocol {
         try await workoutRepo.save(workout)
     }
 
-    func updateProgressionExclusions(
+    func updateProgressionHistoryExclusions(
         _ workoutId: UUID,
         excludeWorkout: Bool,
         excludedExerciseIds: Set<UUID>
@@ -131,11 +132,11 @@ actor WorkoutService: WorkoutServiceProtocol {
         let workoutExerciseIds = try await setRepo.fetchExerciseIds(for: workoutId)
         let sanitizedExcludedExerciseIds = workoutExerciseIds.intersection(excludedExerciseIds)
 
-        let previousExcludedExerciseIds = workout.excludedExerciseIdsForPRsAndSuggestions
-        let previousExcludeWorkout = workout.excludesEntireWorkoutFromPRsAndSuggestions
+        let previousExcludedExerciseIds = workout.excludedExerciseIdsForProgressionHistory
+        let previousExcludeWorkout = workout.excludesEntireWorkoutFromProgressionHistory
 
-        workout.excludeFromPRsAndSuggestions = excludeWorkout
-        workout.excludedExerciseIdsFromPRsAndSuggestions = Array(sanitizedExcludedExerciseIds).sorted {
+        workout.excludeFromProgressionHistory = excludeWorkout
+        workout.excludedExerciseIdsFromProgressionHistory = Array(sanitizedExcludedExerciseIds).sorted {
             $0.uuidString < $1.uuidString
         }
         workout.updatedAt = Date()

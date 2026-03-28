@@ -714,7 +714,7 @@ actor PRService: PRServiceProtocol {
         guard !excludeFromPRs else { return false }
 
         // Rule 2b: Workout or workout-exercise exclusion also makes the set ineligible.
-        guard try await !isWorkoutExcludedFromPRsAndSuggestions(
+        guard try await !isWorkoutExcludedFromProgressionHistory(
             workoutId: workoutId,
             exerciseId: exerciseId
         ) else { return false }
@@ -733,14 +733,14 @@ actor PRService: PRServiceProtocol {
         return true
     }
 
-    private func isWorkoutExcludedFromPRsAndSuggestions(
+    private func isWorkoutExcludedFromProgressionHistory(
         workoutId: UUID,
         exerciseId: UUID
     ) async throws -> Bool {
         guard let workout = try await workoutRepo.fetch(byId: workoutId) else {
             return false
         }
-        return workout.excludesFromPRsAndSuggestions(exerciseId: exerciseId)
+        return workout.excludesFromProgressionHistory(exerciseId: exerciseId)
     }
 
     private func excludedWorkoutIdsForSearch(
@@ -765,7 +765,7 @@ actor PRService: PRServiceProtocol {
         let workouts = try await workoutRepo.fetch(byIds: workoutIds)
         return Set(
             workouts.compactMap { workout in
-                workout.excludesFromPRsAndSuggestions(exerciseId: exerciseId) ? workout.id : nil
+                workout.excludesFromProgressionHistory(exerciseId: exerciseId) ? workout.id : nil
             }
         )
     }

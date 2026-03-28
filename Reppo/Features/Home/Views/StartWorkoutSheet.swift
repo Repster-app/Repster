@@ -7,11 +7,12 @@ import SwiftUI
 
 struct StartWorkoutSheet: View {
     let accessMessage: String?
-    let onStartEmpty: () -> Void
-    let onCopyPrevious: () -> Void
-    let onTemplates: () -> Void
+    let onStartEmpty: (WorkoutStartOptions) -> Void
+    let onCopyPrevious: (WorkoutStartOptions) -> Void
+    let onTemplates: (WorkoutStartOptions) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @State private var countTowardProgressionHistory = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -44,7 +45,7 @@ struct StartWorkoutSheet: View {
             // Primary: Empty Workout
             Button {
                 dismiss()
-                onStartEmpty()
+                onStartEmpty(startOptions)
             } label: {
                 HStack(spacing: 14) {
                     Image(systemName: "plus")
@@ -99,7 +100,7 @@ struct StartWorkoutSheet: View {
             // Copy Previous
             Button {
                 dismiss()
-                onCopyPrevious()
+                onCopyPrevious(startOptions)
             } label: {
                 optionRow(
                     icon: "doc.on.doc",
@@ -113,7 +114,7 @@ struct StartWorkoutSheet: View {
 
             // Templates
             Button {
-                onTemplates()
+                onTemplates(startOptions)
                 dismiss()
             } label: {
                 optionRow(
@@ -125,6 +126,10 @@ struct StartWorkoutSheet: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 20)
             .padding(.bottom, 16)
+
+            progressionHistoryCard
+                .padding(.horizontal, 20)
+                .padding(.bottom, 16)
 
             // Cancel button
             Button {
@@ -150,6 +155,30 @@ struct StartWorkoutSheet: View {
         .presentationDetents([.medium])
         .presentationDragIndicator(.hidden)
         .preferredColorScheme(.dark)
+    }
+
+    private var startOptions: WorkoutStartOptions {
+        WorkoutStartOptions(countTowardProgressionHistory: countTowardProgressionHistory)
+    }
+
+    private var progressionHistoryCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle("Count toward PRs & future Smart Suggestions", isOn: $countTowardProgressionHistory)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color.textPrimary)
+
+            Text("Turn this off for hotel, travel, or mismatched-equipment sessions. Live Smart Suggestions still work during the workout.")
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(Color.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .background(Color.bg)
+        .cornerRadius(14)
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.border, lineWidth: 1)
+        )
     }
 
     // MARK: - Option Row

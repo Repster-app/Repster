@@ -12,6 +12,7 @@ struct CalendarView: View {
     @State private var viewModel: CalendarViewModel
     @State private var navigationPath = NavigationPath()
     @State private var workoutToSaveAsTemplate: Workout? = nil
+    @State private var workoutToEditId: UUID?
     @State private var saveAsTemplateController = SaveWorkoutAsTemplateController()
     @State private var templateFeedback: TemplateSaveFeedback? = nil
     @Binding var initialDate: Date?
@@ -152,6 +153,24 @@ struct CalendarView: View {
                     dismissButton: .default(Text("OK"))
                 )
             }
+            .fullScreenCover(
+                isPresented: Binding(
+                    get: { workoutToEditId != nil },
+                    set: { isPresented in
+                        if !isPresented {
+                            workoutToEditId = nil
+                        }
+                    }
+                )
+            ) {
+                if let workoutToEditId {
+                    EditWorkoutView(workoutId: workoutToEditId, services: services)
+                }
+            }
+            .onChange(of: workoutToEditId) { oldValue, newValue in
+                guard oldValue != nil, newValue == nil, let selectedDate = viewModel.selectedDate else { return }
+                Task { await viewModel.selectDate(selectedDate) }
+            }
         }
     }
 
@@ -223,6 +242,9 @@ struct CalendarView: View {
                     onSaveAsTemplate: { workout in
                         workoutToSaveAsTemplate = workout
                         saveAsTemplateController.begin(defaultName: workout.displayTitle)
+                    },
+                    onEditWorkout: { workout in
+                        workoutToEditId = workout.id
                     },
                     onExerciseTapped: { exerciseId in
                         navigationPath.append(exerciseId)

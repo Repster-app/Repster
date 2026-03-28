@@ -25,17 +25,18 @@ struct ElapsedTimerView: View {
     var body: some View {
         if let elapsedTime {
             Button(action: onTap) {
-                HStack(spacing: 4) {
+                HStack(spacing: 6) {
                     Text(formatElapsed(elapsedTime))
 
-                    if isPaused {
-                        Image(systemName: "pause.fill")
-                            .font(.system(size: 7, weight: .bold))
-                    }
+                    Image(systemName: isPaused ? "play.fill" : "pause.fill")
+                        .font(.system(size: 11, weight: .semibold))
                 }
                 .font(.system(size: 14, weight: .semibold, design: .monospaced))
                 .foregroundColor(.textPrimary)
-                .frame(minWidth: 60, minHeight: 36)
+                .padding(.horizontal, 10)
+                .frame(minWidth: 76, minHeight: 32)
+                .background(isPaused ? Color.accentSoft : Color.bgSubtle)
+                .clipShape(Capsule())
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -66,7 +67,7 @@ struct ElapsedTimerView: View {
     ZStack {
         Color.bg.ignoresSafeArea()
         ElapsedTimerView(
-            elapsedTime: 3661,
+            elapsedTime: 125,
             isPaused: false,
             onTap: {}
         )
@@ -74,12 +75,24 @@ struct ElapsedTimerView: View {
     }
 }
 
-#Preview("Short Timer") {
+#Preview("Paused Timer") {
     ZStack {
         Color.bg.ignoresSafeArea()
         ElapsedTimerView(
             elapsedTime: 125,
             isPaused: true,
+            onTap: {}
+        )
+            .padding()
+    }
+}
+
+#Preview("Running Over One Hour") {
+    ZStack {
+        Color.bg.ignoresSafeArea()
+        ElapsedTimerView(
+            elapsedTime: 3661,
+            isPaused: false,
             onTap: {}
         )
             .padding()

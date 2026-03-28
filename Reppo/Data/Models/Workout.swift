@@ -13,12 +13,14 @@ final class Workout {
     var notes: String?
     var programId: UUID?
     var status: WorkoutStatus
-    /// Session-scoped override to ignore this workout for PRs and Smart Suggestions.
+    /// Session-scoped override to ignore this workout for PRs and future Smart Suggestion history.
     /// Optional for lightweight migration compatibility; nil behaves as false.
-    var excludeFromPRsAndSuggestions: Bool?
-    /// Exercise IDs to ignore for PRs and Smart Suggestions within this workout only.
+    @Attribute(originalName: "excludeFromPRsAndSuggestions")
+    var excludeFromProgressionHistory: Bool?
+    /// Exercise IDs to ignore for PRs and future Smart Suggestion history within this workout only.
     /// Optional for lightweight migration compatibility; nil behaves as [].
-    var excludedExerciseIdsFromPRsAndSuggestions: [UUID]?
+    @Attribute(originalName: "excludedExerciseIdsFromPRsAndSuggestions")
+    var excludedExerciseIdsFromProgressionHistory: [UUID]?
     var createdAt: Date
     var updatedAt: Date
 
@@ -35,16 +37,16 @@ final class Workout {
         }
     }
 
-    var excludesEntireWorkoutFromPRsAndSuggestions: Bool {
-        excludeFromPRsAndSuggestions ?? false
+    var excludesEntireWorkoutFromProgressionHistory: Bool {
+        excludeFromProgressionHistory ?? false
     }
 
-    var excludedExerciseIdsForPRsAndSuggestions: Set<UUID> {
-        Set(excludedExerciseIdsFromPRsAndSuggestions ?? [])
+    var excludedExerciseIdsForProgressionHistory: Set<UUID> {
+        Set(excludedExerciseIdsFromProgressionHistory ?? [])
     }
 
-    func excludesFromPRsAndSuggestions(exerciseId: UUID) -> Bool {
-        excludesEntireWorkoutFromPRsAndSuggestions || excludedExerciseIdsForPRsAndSuggestions.contains(exerciseId)
+    func excludesFromProgressionHistory(exerciseId: UUID) -> Bool {
+        excludesEntireWorkoutFromProgressionHistory || excludedExerciseIdsForProgressionHistory.contains(exerciseId)
     }
 
     init(
@@ -58,8 +60,8 @@ final class Workout {
         notes: String? = nil,
         programId: UUID? = nil,
         status: WorkoutStatus = .inProgress,
-        excludeFromPRsAndSuggestions: Bool? = nil,
-        excludedExerciseIdsFromPRsAndSuggestions: [UUID]? = nil,
+        excludeFromProgressionHistory: Bool? = nil,
+        excludedExerciseIdsFromProgressionHistory: [UUID]? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -73,8 +75,8 @@ final class Workout {
         self.notes = notes
         self.programId = programId
         self.status = status
-        self.excludeFromPRsAndSuggestions = excludeFromPRsAndSuggestions
-        self.excludedExerciseIdsFromPRsAndSuggestions = excludedExerciseIdsFromPRsAndSuggestions
+        self.excludeFromProgressionHistory = excludeFromProgressionHistory
+        self.excludedExerciseIdsFromProgressionHistory = excludedExerciseIdsFromProgressionHistory
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

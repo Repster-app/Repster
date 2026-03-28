@@ -360,8 +360,8 @@ private extension WorkoutHistoryArchiveWorkout {
             notes: workout.notes,
             programId: workout.programId,
             status: workout.status,
-            excludeFromPRsAndSuggestions: workout.excludeFromPRsAndSuggestions,
-            excludedExerciseIdsFromPRsAndSuggestions: workout.excludedExerciseIdsFromPRsAndSuggestions,
+            excludeFromProgressionHistory: workout.excludeFromProgressionHistory,
+            excludedExerciseIdsFromProgressionHistory: workout.excludedExerciseIdsFromProgressionHistory,
             createdAt: workout.createdAt,
             updatedAt: workout.updatedAt
         )
@@ -379,8 +379,8 @@ private extension WorkoutHistoryArchiveWorkout {
             notes: notes,
             programId: programId,
             status: status,
-            excludeFromPRsAndSuggestions: excludeFromPRsAndSuggestions,
-            excludedExerciseIdsFromPRsAndSuggestions: excludedExerciseIdsFromPRsAndSuggestions,
+            excludeFromProgressionHistory: excludeFromProgressionHistory,
+            excludedExerciseIdsFromProgressionHistory: excludedExerciseIdsFromProgressionHistory,
             createdAt: createdAt,
             updatedAt: updatedAt
         )

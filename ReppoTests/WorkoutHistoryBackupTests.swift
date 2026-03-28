@@ -315,8 +315,8 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             endTime: makeDate(2026, 3, 20, 10, 0),
             duration: 3600,
             status: .completed,
-            excludeFromPRsAndSuggestions: true,
-            excludedExerciseIdsFromPRsAndSuggestions: [exercise.id]
+            excludeFromProgressionHistory: true,
+            excludedExerciseIdsFromProgressionHistory: [exercise.id]
         )
         try await context.workoutRepo.save(workout)
 
@@ -339,9 +339,9 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
         let archive = try decodeBackupArchive(backupData)
         let archivedWorkout = try XCTUnwrap(archive.workouts.first(where: { $0.id == workout.id }))
 
-        XCTAssertEqual(archivedWorkout.excludeFromPRsAndSuggestions, true)
+        XCTAssertEqual(archivedWorkout.excludeFromProgressionHistory, true)
         XCTAssertEqual(
-            Set(archivedWorkout.excludedExerciseIdsFromPRsAndSuggestions ?? []),
+            Set(archivedWorkout.excludedExerciseIdsFromProgressionHistory ?? []),
             [exercise.id]
         )
 
@@ -350,12 +350,62 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
         let restoredWorkout = try await restoredContext.workoutRepo.fetch(byId: workout.id)
 
         XCTAssertEqual(restoreResult.workoutsRestored, 1)
-        XCTAssertEqual(restoredWorkout?.excludeFromPRsAndSuggestions, true)
+        XCTAssertEqual(restoredWorkout?.excludeFromProgressionHistory, true)
         XCTAssertEqual(
-            Set(restoredWorkout?.excludedExerciseIdsFromPRsAndSuggestions ?? []),
+            Set(restoredWorkout?.excludedExerciseIdsFromProgressionHistory ?? []),
             [exercise.id]
         )
-        XCTAssertTrue(restoredWorkout?.excludesFromPRsAndSuggestions(exerciseId: exercise.id) == true)
+        XCTAssertTrue(restoredWorkout?.excludesFromProgressionHistory(exerciseId: exercise.id) == true)
+    }
+
+    func testStartWorkoutOptionsPersistProgressionHistoryChoice() async throws {
+        let context = try makeBackupServiceContext()
+
+        let workout = try await context.workoutService.startWorkout(
+            options: WorkoutStartOptions(countTowardProgressionHistory: false)
+        )
+
+        XCTAssertEqual(workout.excludeFromProgressionHistory, true)
+        XCTAssertTrue(workout.excludesEntireWorkoutFromProgressionHistory)
+    }
+
+    func testTemplateStartWorkoutOptionsPersistProgressionHistoryChoice() async throws {
+        let context = try makeBackupServiceContext()
+        let exercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest"
+        )
+        try await context.exerciseRepo.save(exercise)
+
+        let template = WorkoutTemplate(name: "Push Day")
+        try await context.templateRepo.saveTemplate(template)
+
+        let templateExercise = TemplateExercise(
+            templateId: template.id,
+            exerciseId: exercise.id,
+            orderInTemplate: 1
+        )
+        try await context.templateRepo.saveTemplateExercise(templateExercise)
+
+        let templateSet = TemplateSet(
+            templateExerciseId: templateExercise.id,
+            setType: .working,
+            targetRepMin: 5,
+            targetRepMax: 8,
+            targetRIR: 2,
+            orderInExercise: 1
+        )
+        try await context.templateRepo.saveTemplateSet(templateSet)
+
+        let workout = try await context.templateService.startWorkoutFromTemplate(
+            template.id,
+            options: WorkoutStartOptions(countTowardProgressionHistory: false)
+        )
+
+        XCTAssertEqual(workout.excludeFromProgressionHistory, true)
+        XCTAssertTrue(workout.excludesEntireWorkoutFromProgressionHistory)
     }
 
     func testBackupRoundTripPreservesFatigueLearningAuditsAndGlobalProfileLearning() async throws {
@@ -849,6 +899,100 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
         XCTAssertTrue(remainingSets.isEmpty)
     }
 
+    func testHomeViewModelReloadRemovesDeletedWorkoutFromRecentWorkouts() async throws {
+        let context = try makeBackupServiceContext()
+        let homeSectionConfigKey = "homeSectionConfig"
+        let originalHomeSectionConfig = UserDefaults.standard.data(forKey: homeSectionConfigKey)
+        UserDefaults.standard.removeObject(forKey: homeSectionConfigKey)
+        defer {
+            if let originalHomeSectionConfig {
+                UserDefaults.standard.set(originalHomeSectionConfig, forKey: homeSectionConfigKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: homeSectionConfigKey)
+            }
+        }
+
+        let exercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest"
+        )
+        try await context.exerciseRepo.save(exercise)
+
+        let calendar = Calendar.current
+        let newerDate = try XCTUnwrap(calendar.date(byAdding: .day, value: -1, to: Date()))
+        let olderDate = try XCTUnwrap(calendar.date(byAdding: .day, value: -3, to: Date()))
+
+        let newerWorkout = Workout(
+            date: newerDate,
+            title: "Newest Session",
+            startTime: newerDate,
+            endTime: try XCTUnwrap(calendar.date(byAdding: .minute, value: 55, to: newerDate)),
+            duration: 3300,
+            status: .completed
+        )
+        let olderWorkout = Workout(
+            date: olderDate,
+            title: "Older Session",
+            startTime: olderDate,
+            endTime: try XCTUnwrap(calendar.date(byAdding: .minute, value: 45, to: olderDate)),
+            duration: 2700,
+            status: .completed
+        )
+        try await context.workoutRepo.save(newerWorkout)
+        try await context.workoutRepo.save(olderWorkout)
+
+        try await context.setRepo.save(
+            WorkoutSet(
+                workoutId: newerWorkout.id,
+                exerciseId: exercise.id,
+                date: newerDate,
+                weight: 100,
+                effectiveWeight: 100,
+                reps: 5,
+                setType: .working,
+                orderInWorkout: 1,
+                orderInExercise: 1,
+                completed: true
+            )
+        )
+        try await context.setRepo.save(
+            WorkoutSet(
+                workoutId: olderWorkout.id,
+                exerciseId: exercise.id,
+                date: olderDate,
+                weight: 90,
+                effectiveWeight: 90,
+                reps: 8,
+                setType: .working,
+                orderInWorkout: 1,
+                orderInExercise: 1,
+                completed: true
+            )
+        )
+
+        let viewModel = HomeViewModel(
+            workoutService: context.workoutService,
+            setService: context.setService,
+            exerciseService: context.exerciseService,
+            chartDataService: context.chartDataService,
+            statsService: context.statsService
+        )
+
+        await viewModel.loadData()
+
+        XCTAssertEqual(viewModel.recentWorkouts.map(\.id), [newerWorkout.id, olderWorkout.id])
+
+        try await context.workoutService.deleteWorkout(newerWorkout.id)
+
+        viewModel.lastLoadTime = nil
+        await viewModel.loadData()
+
+        XCTAssertEqual(viewModel.recentWorkouts.map(\.id), [olderWorkout.id])
+        XCTAssertEqual(viewModel.recentWorkouts.count, 1)
+    }
+
     func testExerciseServiceDeleteExerciseRemovesCapturedLearningData() async throws {
         let context = try makeBackupServiceContext()
         let exercise = Exercise(
@@ -929,6 +1073,7 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
         let performanceRecordRepo = PerformanceRecordRepository(modelContainer: container)
         let bodyweightRepo = BodyweightEntryRepository(modelContainer: container)
         let healthProfileRepo = HealthProfileRepository(modelContainer: container)
+        let templateRepo = TemplateRepository(modelContainer: container)
         let fatigueObservationRepo = FatigueObservationRepository(modelContainer: container)
         let fatigueLearningAuditRepo = FatigueLearningSetAuditRepository(modelContainer: container)
 
@@ -937,6 +1082,13 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             setRepository: setRepo,
             exerciseRepository: exerciseRepo,
             healthProfileRepository: healthProfileRepo,
+            performanceRecordRepository: performanceRecordRepo
+        )
+        let chartDataService = ChartDataService(
+            setRepository: setRepo,
+            workoutRepository: workoutRepo,
+            exerciseRepository: exerciseRepo,
+            exerciseStatsRepository: exerciseStatsRepo,
             performanceRecordRepository: performanceRecordRepo
         )
         let prService = PRService(
@@ -951,6 +1103,15 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             exerciseRepo: exerciseRepo,
             healthProfileRepo: healthProfileRepo,
             auditRepo: fatigueLearningAuditRepo
+        )
+        let setService = SetService(
+            setRepository: setRepo,
+            exerciseRepository: exerciseRepo,
+            bodyweightEntryRepository: bodyweightRepo,
+            healthProfileRepository: healthProfileRepo,
+            prService: prService,
+            statsService: statsService,
+            fatigueLearningService: fatigueLearningService
         )
         let workoutService = WorkoutService(
             workoutRepository: workoutRepo,
@@ -968,6 +1129,13 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             statsService: statsService,
             fatigueLearningService: fatigueLearningService
         )
+        let templateService = TemplateService(
+            templateRepository: templateRepo,
+            workoutRepository: workoutRepo,
+            setRepository: setRepo,
+            exerciseRepository: exerciseRepo,
+            exerciseStatsRepository: exerciseStatsRepo
+        )
         let service = WorkoutHistoryBackupService(
             workoutRepo: workoutRepo,
             exerciseRepo: exerciseRepo,
@@ -983,10 +1151,15 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             modelContainer: container,
             service: service,
             workoutService: workoutService,
+            setService: setService,
             exerciseService: exerciseService,
+            chartDataService: chartDataService,
+            statsService: statsService,
+            templateService: templateService,
             exerciseRepo: exerciseRepo,
             workoutRepo: workoutRepo,
             setRepo: setRepo,
+            templateRepo: templateRepo,
             exerciseStatsRepo: exerciseStatsRepo,
             performanceRecordRepo: performanceRecordRepo,
             bodyweightRepo: bodyweightRepo,
@@ -1446,10 +1619,15 @@ private struct WorkoutHistoryBackupArchiveTestContext {
     let modelContainer: ModelContainer
     let service: WorkoutHistoryBackupService
     let workoutService: WorkoutService
+    let setService: SetService
     let exerciseService: ExerciseService
+    let chartDataService: ChartDataService
+    let statsService: StatsService
+    let templateService: TemplateService
     let exerciseRepo: ExerciseRepository
     let workoutRepo: WorkoutRepository
     let setRepo: SetRepository
+    let templateRepo: TemplateRepository
     let exerciseStatsRepo: ExerciseStatsRepository
     let performanceRecordRepo: PerformanceRecordRepository
     let bodyweightRepo: BodyweightEntryRepository

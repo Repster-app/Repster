@@ -1,8 +1,9 @@
 import SwiftUI
 
-struct WorkoutExclusionSheet: View {
+struct WorkoutProgressionSheet: View {
     let workout: Workout
     let exercises: [Exercise]
+    let showsExerciseOverrides: Bool
     let onSave: @Sendable (Bool, Set<UUID>) async throws -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -15,47 +16,51 @@ struct WorkoutExclusionSheet: View {
     init(
         workout: Workout,
         exercises: [Exercise],
+        showsExerciseOverrides: Bool = true,
         onSave: @escaping @Sendable (Bool, Set<UUID>) async throws -> Void
     ) {
         self.workout = workout
         self.exercises = exercises
+        self.showsExerciseOverrides = showsExerciseOverrides
         self.onSave = onSave
-        _excludeWorkout = State(initialValue: workout.excludesEntireWorkoutFromPRsAndSuggestions)
-        _excludedExerciseIds = State(initialValue: workout.excludedExerciseIdsForPRsAndSuggestions)
+        _excludeWorkout = State(initialValue: workout.excludesEntireWorkoutFromProgressionHistory)
+        _excludedExerciseIds = State(initialValue: workout.excludedExerciseIdsForProgressionHistory)
     }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    Toggle("Exclude entire workout from PRs & Smart Suggestions", isOn: $excludeWorkout)
+                    Toggle("Exclude entire workout from PRs & future suggestions", isOn: $excludeWorkout)
                         .foregroundStyle(Color.textPrimary)
                 } footer: {
-                    Text("Use this when equipment or plate loading differs, such as hotel or friend's gyms.")
+                    Text(wholeWorkoutFooterCopy)
                         .foregroundStyle(Color.textTertiary)
                 }
 
-                Section {
-                    if exercises.isEmpty {
-                        Text("Add exercises to use per-exercise exclusions.")
+                if showsExerciseOverrides {
+                    Section {
+                        if exercises.isEmpty {
+                            Text("Add exercises to use per-exercise progression exclusions.")
+                                .foregroundStyle(Color.textTertiary)
+                        } else {
+                            ForEach(exercises, id: \.id) { exercise in
+                                Toggle(exercise.name, isOn: binding(for: exercise.id))
+                                    .foregroundStyle(Color.textPrimary)
+                                }
+                        }
+                    } header: {
+                        Text("Exclude Exercises from Progression")
+                    } footer: {
+                        Text("Whole-workout exclusion overrides the list below, but your selections are kept for later.")
                             .foregroundStyle(Color.textTertiary)
-                    } else {
-                        ForEach(exercises, id: \.id) { exercise in
-                            Toggle(exercise.name, isOn: binding(for: exercise.id))
-                                .foregroundStyle(Color.textPrimary)
-                            }
                     }
-                } header: {
-                    Text("Exercises in This Workout")
-                } footer: {
-                    Text("Whole-workout exclusion overrides the list below, but your selections are kept.")
-                        .foregroundStyle(Color.textTertiary)
+                    .disabled(excludeWorkout)
                 }
-                .disabled(excludeWorkout)
             }
             .scrollContentBackground(.hidden)
             .background(Color.bg)
-            .navigationTitle("Workout Exclusions")
+            .navigationTitle("Progression")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -73,7 +78,7 @@ struct WorkoutExclusionSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents(showsExerciseOverrides ? [.medium, .large] : [.medium])
         .alert("Unable to Save", isPresented: errorIsPresented) {
             Button("OK") {
                 errorMessage = nil
@@ -94,6 +99,14 @@ struct WorkoutExclusionSheet: View {
         )
     }
 
+    private var wholeWorkoutFooterCopy: String {
+        if showsExerciseOverrides {
+            return "Use this for travel, hotel, or mismatched-equipment sessions. Live Smart Suggestions still work during the workout."
+        }
+
+        return "Historic edits only let you decide whether the full workout should count toward PRs and future Smart Suggestions."
+    }
+
     private func binding(for exerciseId: UUID) -> Binding<Bool> {
         Binding(
             get: { excludedExerciseIds.contains(exerciseId) },
@@ -112,7 +125,8 @@ struct WorkoutExclusionSheet: View {
         defer { isSaving = false }
 
         do {
-            try await onSave(excludeWorkout, excludedExerciseIds)
+            let effectiveExcludedExerciseIds = showsExerciseOverrides ? excludedExerciseIds : []
+            try await onSave(excludeWorkout, effectiveExcludedExerciseIds)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

@@ -1425,7 +1425,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         XCTAssertEqual(preparation.unavailableReason, .missingTarget)
     }
 
-    func testWholeWorkoutExclusionMarksSuggestionsUnavailableAndChangesCacheKey() {
+    func testWholeWorkoutExclusionStillAllowsSuggestionsAndChangesCacheKey() {
         let exercise = Exercise(
             name: "Bench Press",
             equipmentType: .barbell,
@@ -1444,12 +1444,12 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         let includedWorkout = Workout(
             id: workoutId,
             date: Date(),
-            excludeFromPRsAndSuggestions: false
+            excludeFromProgressionHistory: false
         )
         let excludedWorkout = Workout(
             id: workoutId,
             date: Date(),
-            excludeFromPRsAndSuggestions: true
+            excludeFromProgressionHistory: true
         )
 
         let included = SuggestionCoordinator.prepare(
@@ -1466,11 +1466,12 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         )
 
         XCTAssertNil(included.unavailableReason)
-        XCTAssertEqual(excluded.unavailableReason, .excludedFromPRsAndSuggestions)
+        XCTAssertNil(excluded.unavailableReason)
+        XCTAssertEqual(excluded.pendingSets.count, 1)
         XCTAssertNotEqual(included.cacheKey, excluded.cacheKey)
     }
 
-    func testExerciseScopedExclusionOnlyBlocksMatchingExercise() {
+    func testExerciseScopedExclusionStillAllowsSuggestions() {
         let excludedExercise = Exercise(
             name: "Bench Press",
             equipmentType: .barbell,
@@ -1485,7 +1486,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         let workout = Workout(
             id: workoutId,
             date: Date(),
-            excludedExerciseIdsFromPRsAndSuggestions: [excludedExercise.id]
+            excludedExerciseIdsFromProgressionHistory: [excludedExercise.id]
         )
         let excludedSet = WorkoutSet(
             workoutId: workoutId,
@@ -1518,7 +1519,8 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
             profile: profile
         )
 
-        XCTAssertEqual(excluded.unavailableReason, .excludedFromPRsAndSuggestions)
+        XCTAssertNil(excluded.unavailableReason)
+        XCTAssertEqual(excluded.pendingSets.count, 1)
         XCTAssertNil(allowed.unavailableReason)
     }
 
@@ -3056,7 +3058,12 @@ private final class WorkoutServiceStub: @unchecked Sendable, WorkoutServiceProto
     var lastFinishDurationSecondsOverride: Int?
     var finishCallCount = 0
 
-    func startWorkout() async throws -> Workout { Workout(startTime: Date()) }
+    func startWorkout(options: WorkoutStartOptions) async throws -> Workout {
+        Workout(
+            startTime: Date(),
+            excludeFromProgressionHistory: options.excludeFromProgressionHistory
+        )
+    }
     func finishWorkout(
         _ workoutId: UUID,
         title: String?,
@@ -3090,7 +3097,7 @@ private final class WorkoutServiceStub: @unchecked Sendable, WorkoutServiceProto
         let _ = notes
         let _ = perceivedEffort
     }
-    func updateProgressionExclusions(
+    func updateProgressionHistoryExclusions(
         _ workoutId: UUID,
         excludeWorkout: Bool,
         excludedExerciseIds: Set<UUID>

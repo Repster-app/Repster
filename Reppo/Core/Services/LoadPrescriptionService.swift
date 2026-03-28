@@ -294,7 +294,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         let workouts = try await workoutRepo.fetch(byIds: workoutIds)
         return Set(
             workouts.compactMap { workout in
-                workout.excludesFromPRsAndSuggestions(exerciseId: exerciseId) ? workout.id : nil
+                workout.excludesFromProgressionHistory(exerciseId: exerciseId) ? workout.id : nil
             }
         )
     }

@@ -12,6 +12,7 @@ struct WorkoutDetailFromHomeView: View {
     let setService: any SetServiceProtocol
     let exerciseService: any ExerciseServiceProtocol
     let statsService: any StatsServiceProtocol
+    let onWorkoutDeleted: () -> Void
 
     @State private var workoutDetails: [WorkoutDetail] = []
     @State private var isLoading = true
@@ -24,6 +25,22 @@ struct WorkoutDetailFromHomeView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceContainer.self) private var services
 
+    init(
+        workoutId: UUID,
+        workoutService: any WorkoutServiceProtocol,
+        setService: any SetServiceProtocol,
+        exerciseService: any ExerciseServiceProtocol,
+        statsService: any StatsServiceProtocol,
+        onWorkoutDeleted: @escaping () -> Void = {}
+    ) {
+        self.workoutId = workoutId
+        self.workoutService = workoutService
+        self.setService = setService
+        self.exerciseService = exerciseService
+        self.statsService = statsService
+        self.onWorkoutDeleted = onWorkoutDeleted
+    }
+
     var body: some View {
         ScrollView {
             if isLoading {
@@ -35,6 +52,7 @@ struct WorkoutDetailFromHomeView: View {
                     workoutDetails: workoutDetails,
                     selectedDate: workoutDetails.first?.workout.date ?? Date(),
                     onSaveAsTemplate: nil,
+                    onEditWorkout: nil,
                     onExerciseTapped: { exerciseId in
                         selectedExerciseId = exerciseId
                     }
@@ -151,6 +169,7 @@ struct WorkoutDetailFromHomeView: View {
         do {
             try await workoutService.deleteWorkout(workoutId)
             isDeleting = false
+            onWorkoutDeleted()
             dismiss()
         } catch {
             isDeleting = false

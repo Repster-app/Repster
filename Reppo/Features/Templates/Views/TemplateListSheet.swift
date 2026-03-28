@@ -47,18 +47,21 @@ struct TemplateFlowView: View {
 
     let beforeStartWorkout: () async -> Bool
     let onStartWorkout: () -> Void
+    let workoutStartOptions: WorkoutStartOptions
 
     init(
         templateService: any TemplateServiceProtocol,
         exerciseService: any ExerciseServiceProtocol,
         beforeStartWorkout: @escaping () async -> Bool,
-        onStartWorkout: @escaping () -> Void
+        onStartWorkout: @escaping () -> Void,
+        workoutStartOptions: WorkoutStartOptions = .default
     ) {
         self.templateService = templateService
         self.exerciseService = exerciseService
         _viewModel = State(initialValue: TemplateListViewModel(templateService: templateService))
         self.beforeStartWorkout = beforeStartWorkout
         self.onStartWorkout = onStartWorkout
+        self.workoutStartOptions = workoutStartOptions
     }
 
     var body: some View {
@@ -376,7 +379,10 @@ struct TemplateFlowView: View {
         Task {
             do {
                 guard await beforeStartWorkout() else { return }
-                _ = try await viewModel.startWorkoutFromTemplate(template.id)
+                _ = try await viewModel.startWorkoutFromTemplate(
+                    template.id,
+                    options: workoutStartOptions
+                )
                 onStartWorkout()
             } catch {
                 actionAlert = TemplateActionAlert(

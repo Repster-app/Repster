@@ -359,20 +359,20 @@ final class EditWorkoutViewModel {
         }
     }
 
-    func updateProgressionExclusions(
+    func updateProgressionHistoryExclusions(
         excludeWorkout: Bool,
         excludedExerciseIds: Set<UUID>
     ) async throws {
         guard let workout else { return }
 
-        try await workoutService.updateProgressionExclusions(
+        try await workoutService.updateProgressionHistoryExclusions(
             workout.id,
             excludeWorkout: excludeWorkout,
             excludedExerciseIds: excludedExerciseIds
         )
 
-        workout.excludeFromPRsAndSuggestions = excludeWorkout
-        workout.excludedExerciseIdsFromPRsAndSuggestions = Array(excludedExerciseIds).sorted {
+        workout.excludeFromProgressionHistory = excludeWorkout
+        workout.excludedExerciseIdsFromProgressionHistory = Array(excludedExerciseIds).sorted {
             $0.uuidString < $1.uuidString
         }
 

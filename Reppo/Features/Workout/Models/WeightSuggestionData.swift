@@ -201,8 +201,6 @@ enum SuggestionCoordinator {
             unavailableReason = .missingExercise
         } else if !(profile?.prescriptionEnabled ?? true) {
             unavailableReason = .featureDisabled
-        } else if let exercise, let workout, workout.excludesFromPRsAndSuggestions(exerciseId: exercise.id) {
-            unavailableReason = .excludedFromPRsAndSuggestions
         } else if let exercise, !supportsSuggestions(for: exercise) {
             unavailableReason = .unsupportedExercise
         } else if setResolutions.isEmpty {
@@ -440,7 +438,7 @@ enum SuggestionCoordinator {
 
         return [
             exerciseSignature,
-            workoutExclusionSignature(workout: workout, exercise: exercise),
+            workoutProgressionHistorySignature(workout: workout, exercise: exercise),
             profileSignature,
             "reason:\(unavailableReason?.rawValue ?? "none")",
             completedSignature,
@@ -457,25 +455,25 @@ enum SuggestionCoordinator {
         return signatureNumber(value)
     }
 
-    private static func workoutExclusionSignature(
+    private static func workoutProgressionHistorySignature(
         workout: Workout?,
         exercise: Exercise?
     ) -> String {
         guard let workout else { return "workout:none" }
-        let excludedIds = (workout.excludedExerciseIdsFromPRsAndSuggestions ?? [])
+        let excludedIds = (workout.excludedExerciseIdsFromProgressionHistory ?? [])
             .map(\.uuidString)
             .sorted()
             .joined(separator: ",")
-        let currentExerciseExcluded: Bool
+        let currentExerciseExcludedFromHistory: Bool
         if let exercise {
-            currentExerciseExcluded = workout.excludesFromPRsAndSuggestions(exerciseId: exercise.id)
+            currentExerciseExcludedFromHistory = workout.excludesFromProgressionHistory(exerciseId: exercise.id)
         } else {
-            currentExerciseExcluded = false
+            currentExerciseExcludedFromHistory = false
         }
         return [
             workout.id.uuidString,
-            "all\(workout.excludesEntireWorkoutFromPRsAndSuggestions)",
-            "current\(currentExerciseExcluded)",
+            "all\(workout.excludesEntireWorkoutFromProgressionHistory)",
+            "current\(currentExerciseExcludedFromHistory)",
             "ids\(excludedIds)"
         ].joined(separator: ":")
     }

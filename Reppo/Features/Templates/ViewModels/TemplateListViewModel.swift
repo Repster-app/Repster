@@ -41,8 +41,8 @@ final class TemplateListViewModel {
 
     // MARK: - Actions
 
-    func startWorkoutFromTemplate(_ templateId: UUID) async throws -> Workout {
-        let workout = try await templateService.startWorkoutFromTemplate(templateId)
+    func startWorkoutFromTemplate(_ templateId: UUID, options: WorkoutStartOptions) async throws -> Workout {
+        let workout = try await templateService.startWorkoutFromTemplate(templateId, options: options)
         return workout
     }
 
