@@ -1031,8 +1031,9 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         await context.viewModel.loadWeightSuggestions()
         XCTAssertEqual(loadPrescriptionService.evaluationCount, 1)
 
-        let committedText = CustomRepRangeCommitter.commit(min: 8, max: 12, to: context.pendingSet)
-        XCTAssertEqual(committedText, "8-12")
+        context.pendingSet.reps = nil
+        let didCommit = CustomRepRangeCommitter.commit(min: 8, max: 12, to: context.pendingSet)
+        XCTAssertTrue(didCommit)
         context.viewModel.markSetDirty(context.pendingSet, field: .reps)
 
         try await waitUntil {
@@ -1402,6 +1403,63 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         XCTAssertEqual(data.rowState(for: set.id)?.target?.sourceLabel, "Smart Suggestions default")
     }
 
+    func testDiagnosticsCarryFirstSetProgressionBiasMetadata() throws {
+        let setId = UUID()
+        let target = SuggestionTarget(
+            reps: 9,
+            rir: 0.0,
+            repRange: 5...10,
+            repsSource: .template,
+            rirSource: .template
+        )
+        let pendingSet = SuggestionPendingSetInput(
+            setId: setId,
+            setIndex: 0,
+            setNumber: 1,
+            target: target,
+            setType: .working
+        )
+        let preparation = SuggestionPreparation(
+            cacheKey: "selection-bias",
+            completedSessionSets: [],
+            setResolutions: [
+                SuggestionSetResolution(
+                    setId: setId,
+                    setIndex: 0,
+                    setNumber: 1,
+                    eligibility: .eligible(target: target),
+                    setType: .working
+                )
+            ],
+            pendingSets: [pendingSet],
+            unavailableReason: nil
+        )
+        let evaluation = SuggestionEvaluation(
+            input: makeInput(pendingSets: [pendingSet]),
+            decisions: [
+                makeDecision(
+                    setId: setId,
+                    setIndex: 0,
+                    setNumber: 1,
+                    target: target,
+                    selectionPolicy: .firstSetProgressionAboveRecentPeak,
+                    selectionReferenceE1RM: 104
+                )
+            ],
+            unavailableReason: nil
+        )
+
+        let data = SuggestionExplainer.makeWeightSuggestionData(
+            preparation: preparation,
+            evaluation: evaluation
+        )
+        let suggestion = try XCTUnwrap(data.suggestion(for: setId))
+        let selectionReferenceE1RM = try XCTUnwrap(suggestion.diagnostics.selectionReferenceE1RM)
+
+        XCTAssertEqual(suggestion.diagnostics.selectionPolicy, .firstSetProgressionAboveRecentPeak)
+        XCTAssertEqual(selectionReferenceE1RM, 104, accuracy: 0.001)
+    }
+
     func testPartialTargetUsesDefaultForMissingPiece() throws {
         let exercise = Exercise(
             name: "Bench Press",
@@ -1612,7 +1670,9 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         setId: UUID,
         setIndex: Int,
         setNumber: Int,
-        target: SuggestionTarget
+        target: SuggestionTarget,
+        selectionPolicy: SuggestionSelectionPolicy = .closestMatch,
+        selectionReferenceE1RM: Double? = nil
     ) -> SuggestionDecision {
         SuggestionDecision(
             setId: setId,
@@ -1632,6 +1692,8 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
             e1RMSource: .recentPerformance,
             sessionCapabilitySourceLabel: SessionCapabilityPolicy.observed.label,
             bestReps: nil,
+            selectionPolicy: selectionPolicy,
+            selectionReferenceE1RM: selectionReferenceE1RM,
             calibrationAdjustment: .neutral,
             projectedSessionFatigue: 0.0
         )
@@ -3447,6 +3509,262 @@ private final class ImportBodyweightRepositoryStub: @unchecked Sendable, Bodywei
 // MARK: - Fatigue Model v2 Tests
 
 final class FatigueModelV2Tests: XCTestCase {
+
+    func testFirstSetRepRangeBiasesAboveRecentPeakWhenClosestMatchEqualsBaseline() {
+        let pendingSet = SuggestionPendingSetInput(
+            setId: UUID(),
+            setIndex: 0,
+            setNumber: 1,
+            target: SuggestionTarget(
+                reps: 9,
+                rir: 0.0,
+                repRange: 5...10,
+                repsSource: .template,
+                rirSource: .template
+            ),
+            setType: .working
+        )
+        let input = SuggestionEngineInput(
+            baseE1RM: 104,
+            baseSource: .recentPerformance,
+            completedSessionSets: [],
+            pendingSets: [pendingSet],
+            settings: SuggestionSettingsSnapshot(
+                formula: .epley,
+                restTimerSeconds: 120,
+                weightIncrement: 2.5,
+                fatigueEnabled: true,
+                freshnessEnabled: false,
+                freshnessPercent: 0.03,
+                baseFatigueRate: 0.03,
+                recoveryConstant: 180.0,
+                sessionCapabilityPolicy: .observed
+            ),
+            calibrationAdjustment: .neutral
+        )
+
+        let decision = try! XCTUnwrap(SuggestionEngine.evaluate(input).first)
+        let selectionReferenceE1RM = try! XCTUnwrap(decision.selectionReferenceE1RM)
+
+        XCTAssertEqual(decision.prescribedWeight, 82.5, accuracy: 0.001)
+        XCTAssertEqual(decision.bestReps, 8)
+        XCTAssertEqual(decision.selectionPolicy, .firstSetProgressionAboveRecentPeak)
+        XCTAssertEqual(selectionReferenceE1RM, 104, accuracy: 0.001)
+    }
+
+    func testFirstSetBiasDoesNotDoublePushWhenFreshnessAlreadyLiftsAboveBaseline() {
+        let pendingSet = SuggestionPendingSetInput(
+            setId: UUID(),
+            setIndex: 0,
+            setNumber: 1,
+            target: SuggestionTarget(
+                reps: 9,
+                rir: 0.0,
+                repRange: 5...10,
+                repsSource: .template,
+                rirSource: .template
+            ),
+            setType: .working
+        )
+        let input = SuggestionEngineInput(
+            baseE1RM: 104,
+            baseSource: .recentPerformance,
+            completedSessionSets: [],
+            pendingSets: [pendingSet],
+            settings: SuggestionSettingsSnapshot(
+                formula: .epley,
+                restTimerSeconds: 120,
+                weightIncrement: 2.5,
+                fatigueEnabled: true,
+                freshnessEnabled: true,
+                freshnessPercent: 0.03,
+                baseFatigueRate: 0.03,
+                recoveryConstant: 180.0,
+                sessionCapabilityPolicy: .observed
+            ),
+            calibrationAdjustment: .neutral
+        )
+
+        let decision = try! XCTUnwrap(SuggestionEngine.evaluate(input).first)
+
+        XCTAssertEqual(decision.prescribedWeight, 82.5, accuracy: 0.001)
+        XCTAssertEqual(decision.bestReps, 9)
+        XCTAssertEqual(decision.selectionPolicy, .closestMatch)
+        XCTAssertNil(decision.selectionReferenceE1RM)
+    }
+
+    func testFirstSetBiasFallsBackToClosestMatchWhenNoHigherRoundedCandidateExists() {
+        let pendingSet = SuggestionPendingSetInput(
+            setId: UUID(),
+            setIndex: 0,
+            setNumber: 1,
+            target: SuggestionTarget(
+                reps: 6,
+                rir: 0.0,
+                repRange: 5...6,
+                repsSource: .template,
+                rirSource: .template
+            ),
+            setType: .working
+        )
+        let input = SuggestionEngineInput(
+            baseE1RM: 50,
+            baseSource: .recentPerformance,
+            completedSessionSets: [],
+            pendingSets: [pendingSet],
+            settings: SuggestionSettingsSnapshot(
+                formula: .epley,
+                restTimerSeconds: 120,
+                weightIncrement: 10,
+                fatigueEnabled: true,
+                freshnessEnabled: false,
+                freshnessPercent: 0.03,
+                baseFatigueRate: 0.03,
+                recoveryConstant: 180.0,
+                sessionCapabilityPolicy: .observed
+            ),
+            calibrationAdjustment: .neutral
+        )
+
+        let decision = try! XCTUnwrap(SuggestionEngine.evaluate(input).first)
+
+        XCTAssertEqual(decision.prescribedWeight, 40, accuracy: 0.001)
+        XCTAssertEqual(decision.bestReps, 6)
+        XCTAssertEqual(decision.selectionPolicy, .closestMatch)
+        XCTAssertNil(decision.selectionReferenceE1RM)
+    }
+
+    func testFirstSetFixedRepPrescriptionsRemainClosestMatch() {
+        let pendingSet = SuggestionPendingSetInput(
+            setId: UUID(),
+            setIndex: 0,
+            setNumber: 1,
+            target: SuggestionTarget(
+                reps: 9,
+                rir: 0.0,
+                repRange: nil,
+                repsSource: .template,
+                rirSource: .template
+            ),
+            setType: .working
+        )
+        let input = SuggestionEngineInput(
+            baseE1RM: 104,
+            baseSource: .recentPerformance,
+            completedSessionSets: [],
+            pendingSets: [pendingSet],
+            settings: SuggestionSettingsSnapshot(
+                formula: .epley,
+                restTimerSeconds: 120,
+                weightIncrement: 2.5,
+                fatigueEnabled: true,
+                freshnessEnabled: false,
+                freshnessPercent: 0.03,
+                baseFatigueRate: 0.03,
+                recoveryConstant: 180.0,
+                sessionCapabilityPolicy: .observed
+            ),
+            calibrationAdjustment: .neutral
+        )
+
+        let decision = try! XCTUnwrap(SuggestionEngine.evaluate(input).first)
+
+        XCTAssertEqual(decision.prescribedWeight, 80, accuracy: 0.001)
+        XCTAssertNil(decision.bestReps)
+        XCTAssertEqual(decision.selectionPolicy, .closestMatch)
+        XCTAssertNil(decision.selectionReferenceE1RM)
+    }
+
+    func testHistoricalPRSourceDoesNotUseFirstSetBias() {
+        let pendingSet = SuggestionPendingSetInput(
+            setId: UUID(),
+            setIndex: 0,
+            setNumber: 1,
+            target: SuggestionTarget(
+                reps: 9,
+                rir: 0.0,
+                repRange: 5...10,
+                repsSource: .template,
+                rirSource: .template
+            ),
+            setType: .working
+        )
+        let input = SuggestionEngineInput(
+            baseE1RM: 104,
+            baseSource: .historicalPR,
+            completedSessionSets: [],
+            pendingSets: [pendingSet],
+            settings: SuggestionSettingsSnapshot(
+                formula: .epley,
+                restTimerSeconds: 120,
+                weightIncrement: 2.5,
+                fatigueEnabled: true,
+                freshnessEnabled: false,
+                freshnessPercent: 0.03,
+                baseFatigueRate: 0.03,
+                recoveryConstant: 180.0,
+                sessionCapabilityPolicy: .observed
+            ),
+            calibrationAdjustment: .neutral
+        )
+
+        let decision = try! XCTUnwrap(SuggestionEngine.evaluate(input).first)
+
+        XCTAssertEqual(decision.prescribedWeight, 80, accuracy: 0.001)
+        XCTAssertEqual(decision.bestReps, 9)
+        XCTAssertEqual(decision.selectionPolicy, .closestMatch)
+        XCTAssertNil(decision.selectionReferenceE1RM)
+    }
+
+    func testLaterSetsDoNotUseFirstSetBias() {
+        let pendingSet = SuggestionPendingSetInput(
+            setId: UUID(),
+            setIndex: 1,
+            setNumber: 2,
+            target: SuggestionTarget(
+                reps: 9,
+                rir: 0.0,
+                repRange: 5...10,
+                repsSource: .template,
+                rirSource: .template
+            ),
+            setType: .working
+        )
+        let completedSet = SessionSetContext(
+            weight: 80,
+            reps: 9,
+            rir: 0.0,
+            completedAt: Date(),
+            completed: true,
+            setType: .working,
+            restDurationSeconds: 120
+        )
+        let input = SuggestionEngineInput(
+            baseE1RM: 104,
+            baseSource: .recentPerformance,
+            completedSessionSets: [completedSet],
+            pendingSets: [pendingSet],
+            settings: SuggestionSettingsSnapshot(
+                formula: .epley,
+                restTimerSeconds: 120,
+                weightIncrement: 2.5,
+                fatigueEnabled: false,
+                freshnessEnabled: false,
+                freshnessPercent: 0.03,
+                baseFatigueRate: 0.03,
+                recoveryConstant: 180.0,
+                sessionCapabilityPolicy: .observed
+            ),
+            calibrationAdjustment: .neutral
+        )
+
+        let decision = try! XCTUnwrap(SuggestionEngine.evaluate(input).first)
+
+        XCTAssertEqual(decision.prescribedWeight, 80, accuracy: 0.001)
+        XCTAssertEqual(decision.bestReps, 9)
+        XCTAssertEqual(decision.selectionPolicy, .closestMatch)
+        XCTAssertNil(decision.selectionReferenceE1RM)
+    }
 
     // MARK: - Set-type multipliers
 

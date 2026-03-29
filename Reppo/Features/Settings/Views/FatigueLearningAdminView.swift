@@ -60,7 +60,7 @@ struct FatigueLearningAdminView: View {
             Text("No Learning Data Yet")
                 .font(.headline)
                 .foregroundStyle(Color.textPrimary)
-            Text("Complete workouts with Smart Suggestions enabled. The app starts a global fatigue baseline after the first workout with at least 2 tracked sets, and exercise-specific tuning begins after 5 qualifying sessions.")
+            Text("Complete workouts with Smart Suggestions enabled. The app starts a global fatigue baseline after the first workout with at least 2 tracked sets, and exercise-specific learning starts after 2 qualifying workouts, ramping to full local influence by 4.")
                 .font(.subheadline)
                 .foregroundStyle(Color.textSecondary)
                 .multilineTextAlignment(.center)
@@ -175,7 +175,7 @@ private struct ExerciseLearningRow: View {
                     .font(.caption)
                     .foregroundStyle(Color.textSecondary)
 
-                Label(localSessionCount == 0 ? "0/5 local" : "\(localSessionCount)/5 local", systemImage: "chart.bar")
+                Label(localLearningLabel, systemImage: "chart.bar")
                     .font(.caption)
                     .foregroundStyle(Color.textSecondary)
 
@@ -186,7 +186,11 @@ private struct ExerciseLearningRow: View {
                 }
             }
 
-            if abs(cumulativeError) > 0.005 {
+            if item.appliedRate.source == .blendedLocal {
+                Text("Using \(Int(item.appliedRate.localInfluence * 100))% local learning and \(Int((1.0 - item.appliedRate.localInfluence) * 100))% global baseline.")
+                    .font(.caption)
+                    .foregroundStyle(Color.textTertiary)
+            } else if abs(cumulativeError) > 0.005 {
                 HStack(spacing: 4) {
                     Image(systemName: cumulativeError < 0 ? "arrow.down.right" : "arrow.up.right")
                     Text(cumulativeError < 0 ? "tending toward less fatigue than predicted" : "tending toward more fatigue than predicted")
@@ -204,18 +208,25 @@ private struct ExerciseLearningRow: View {
 
     @ViewBuilder
     private var statusBadge: some View {
-        if localSessionCount >= FatigueLearningService.minimumSessionsForLearning {
-            Text("Local override")
+        if item.appliedRate.source == .manualOverride {
+            Text("Manual")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Color.orange)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Color.orange.opacity(0.15), in: Capsule())
+        } else if item.appliedRate.source == .localLearned {
+            Text("Local learned")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(Color.success)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
                 .background(Color.success.opacity(0.15), in: Capsule())
-        } else if localSessionCount > 0 {
-            Text("\(localSessionCount)/\(FatigueLearningService.minimumSessionsForLearning)")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(Color.accent)
-                .padding(.horizontal, 8)
+        } else if item.appliedRate.source == .blendedLocal {
+            Text("\(Int(item.appliedRate.localInfluence * 100))% local")
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(Color.accent)
+            .padding(.horizontal, 8)
                 .padding(.vertical, 3)
                 .background(Color.accent.opacity(0.15), in: Capsule())
         } else if item.hasAuditHistory {
@@ -230,7 +241,9 @@ private struct ExerciseLearningRow: View {
 
     private func sourceBadge(_ source: AppliedFatigueRateSource) -> some View {
         let color: Color = switch source {
-        case .exerciseOverride: .success
+        case .manualOverride: .orange
+        case .localLearned: .success
+        case .blendedLocal: .accent
         case .globalLearned: .accent
         case .defaultRate: .textSecondary
         }
@@ -241,6 +254,16 @@ private struct ExerciseLearningRow: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(color.opacity(0.12), in: Capsule())
+    }
+
+    private var localLearningLabel: String {
+        if item.appliedRate.source == .manualOverride {
+            return "manual override"
+        }
+        if item.appliedRate.localInfluence > 0 {
+            return "\(localSessionCount) local / \(Int(item.appliedRate.localInfluence * 100))%"
+        }
+        return "\(localSessionCount) local"
     }
 }
 
@@ -308,9 +331,7 @@ struct FatigueLearningDetailView: View {
             parameterRow(
                 label: "Local Sessions",
                 value: "\(localSessionCount)",
-                detail: localSessionCount >= FatigueLearningService.minimumSessionsForLearning
-                    ? "exercise-specific override is active"
-                    : "\(FatigueLearningService.minimumSessionsForLearning - localSessionCount) more qualifying sessions needed for local override"
+                detail: localSessionDetail
             )
 
             parameterRow(
@@ -367,7 +388,7 @@ struct FatigueLearningDetailView: View {
         } header: {
             Text("Manual Adjustment")
         } footer: {
-            Text("This creates or updates an exercise-specific override. If the exercise had been using the global baseline, the nudge starts from that applied rate.")
+            Text("This creates or updates a full manual override. If the exercise had been using a global or blended rate, the nudge starts from that applied rate.")
                 .foregroundStyle(Color.textTertiary)
         }
     }
@@ -412,7 +433,7 @@ struct FatigueLearningDetailView: View {
         } header: {
             Text("Recent Workout Diagnostics")
         } footer: {
-            Text("Every completed set appears here. A workout only counts for local exercise learning when at least 2 sets were marked \"Used for learning\" for this exercise.")
+            Text("Every completed set appears here. A workout counts for local exercise learning when at least 1 later set is marked \"Used for learning\" for this exercise.")
                 .foregroundStyle(Color.textTertiary)
         }
         .listRowBackground(Color.bgCard)
@@ -449,7 +470,7 @@ struct FatigueLearningDetailView: View {
 
     private func qualificationBadge(_ qualifies: Bool) -> some View {
         let color: Color = qualifies ? .success : .textSecondary
-        return Text(qualifies ? "Qualified" : "Not enough tracked sets")
+        return Text(qualifies ? "Qualified" : "No used sets")
             .font(.caption2.weight(.semibold))
             .foregroundStyle(color)
             .padding(.horizontal, 8)
@@ -488,6 +509,23 @@ struct FatigueLearningDetailView: View {
             return "you usually out-perform this exercise's predictions"
         } else {
             return "you usually under-perform this exercise's predictions"
+        }
+    }
+
+    private var localSessionDetail: String {
+        switch diagnostics.appliedRate.source {
+        case .manualOverride:
+            return "manual override is active and bypasses the local learning ramp"
+        case .localLearned:
+            return "full local learning is active"
+        case .blendedLocal:
+            return "using \(Int(diagnostics.appliedRate.localInfluence * 100))% local learning"
+        case .globalLearned, .defaultRate:
+            let remaining = max(0, FatigueLearningService.localBlendStartSessions - localSessionCount)
+            if remaining > 0 {
+                return "\(remaining) more qualifying workout\(remaining == 1 ? "" : "s") needed before local learning affects suggestions"
+            }
+            return "waiting for the blended local ramp to start"
         }
     }
 }

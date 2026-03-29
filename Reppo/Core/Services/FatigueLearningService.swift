@@ -35,16 +35,22 @@ struct FatigueLearningSetSnapshot: Sendable {
 }
 
 enum AppliedFatigueRateSource: String, Sendable {
-    case exerciseOverride
+    case manualOverride
+    case localLearned
+    case blendedLocal
     case globalLearned
     case defaultRate
 
     var displayTitle: String {
         switch self {
-        case .exerciseOverride:
-            return "Exercise override"
+        case .manualOverride:
+            return "Manual override"
+        case .localLearned:
+            return "Local learned"
+        case .blendedLocal:
+            return "Blended local"
         case .globalLearned:
-            return "Global learned"
+            return "Global baseline"
         case .defaultRate:
             return "Default"
         }
@@ -54,6 +60,7 @@ enum AppliedFatigueRateSource: String, Sendable {
 struct AppliedFatigueRateInfo: Sendable {
     let rate: Double
     let source: AppliedFatigueRateSource
+    let localInfluence: Double
 }
 
 struct GlobalFatigueLearningSummary: Sendable {
@@ -79,7 +86,7 @@ struct FatigueLearningWorkoutAuditSummary: Identifiable, Sendable {
     let medianError: Double?
 
     var id: UUID { workoutId }
-    var qualifiesForExerciseLearning: Bool { usedSetCount >= 2 }
+    var qualifiesForExerciseLearning: Bool { usedSetCount >= FatigueLearningService.minimumUsedSetsForExerciseLearning }
 }
 
 /// Direction for a manual fatigue rate nudge from the user.
@@ -97,8 +104,11 @@ actor FatigueLearningService {
 
     // MARK: - Constants
 
-    /// Minimum qualifying sessions before learning adjusts parameters.
-    static let minimumSessionsForLearning = 5
+    static let defaultGlobalFatigueRate: Double = 0.03
+    static let minimumUsedSetsForGlobalLearning = 2
+    static let minimumUsedSetsForExerciseLearning = 1
+    static let localBlendStartSessions = 2
+    static let fullLocalOverrideSessions = 4
 
     /// Fixed step size for fatigueRate adjustment per session.
     static let fatigueRateStep: Double = 0.002
@@ -316,7 +326,7 @@ actor FatigueLearningService {
             let profile = try await healthProfileRepo.fetchOrCreate()
             let byExercise = Dictionary(grouping: usedAudits, by: \.exerciseId)
 
-            if usedAudits.count >= 2 {
+            if usedAudits.count >= Self.minimumUsedSetsForGlobalLearning {
                 let exerciseMedians = byExercise.values.compactMap { audits -> Double? in
                     let errors = audits.compactMap(\.normalizedError)
                     guard !errors.isEmpty else { return nil }
@@ -329,7 +339,7 @@ actor FatigueLearningService {
                 }
             }
 
-            for (exerciseId, exerciseAudits) in byExercise where exerciseAudits.count >= 2 {
+            for (exerciseId, exerciseAudits) in byExercise where exerciseAudits.count >= Self.minimumUsedSetsForExerciseLearning {
                 let errors = exerciseAudits.compactMap(\.normalizedError)
                 guard !errors.isEmpty else { continue }
                 guard let exercise = try await exerciseRepo.fetch(byId: exerciseId) else { continue }
@@ -354,6 +364,7 @@ actor FatigueLearningService {
     func resetLearning(exerciseId: UUID) async throws {
         guard let exercise = try await exerciseRepo.fetch(byId: exerciseId) else { return }
         exercise.fatigueRate = nil
+        exercise.fatigueRateSourceRawValue = nil
         exercise.fatigueLearningSessionCount = nil
         exercise.fatigueLearningCumulativeError = nil
         exercise.updatedAt = Date()
@@ -368,9 +379,11 @@ actor FatigueLearningService {
         let exercises = try await exerciseRepo.fetchAll()
         for exercise in exercises {
             if exercise.fatigueRate != nil ||
+                exercise.fatigueRateSourceRawValue != nil ||
                 exercise.fatigueLearningSessionCount != nil ||
                 exercise.fatigueLearningCumulativeError != nil {
                 exercise.fatigueRate = nil
+                exercise.fatigueRateSourceRawValue = nil
                 exercise.fatigueLearningSessionCount = nil
                 exercise.fatigueLearningCumulativeError = nil
                 exercise.updatedAt = Date()
@@ -400,8 +413,9 @@ actor FatigueLearningService {
         let profile = try await healthProfileRepo.fetchOrCreate()
         return GlobalFatigueLearningSummary(
             appliedRate: AppliedFatigueRateInfo(
-                rate: profile.prescriptionLearnedFatigueRate ?? 0.04,
-                source: profile.prescriptionLearnedFatigueRate == nil ? .defaultRate : .globalLearned
+                rate: profile.prescriptionLearnedFatigueRate ?? Self.defaultGlobalFatigueRate,
+                source: profile.prescriptionLearnedFatigueRate == nil ? .defaultRate : .globalLearned,
+                localInfluence: 0.0
             ),
             sessionCount: profile.prescriptionFatigueLearningSessionCount ?? 0,
             cumulativeError: profile.prescriptionFatigueLearningCumulativeError ?? 0.0
@@ -423,7 +437,7 @@ actor FatigueLearningService {
             diagnostics.append(
                 FatigueLearningExerciseDiagnostics(
                     exercise: exercise,
-                    appliedRate: Self.appliedFatigueRate(for: exercise, profile: profile),
+                    appliedRate: Self.appliedFatigueRateInfo(for: exercise, profile: profile),
                     hasAuditHistory: hasAuditHistory,
                     lastAuditDate: latestAudit?.createdAt
                 )
@@ -468,10 +482,14 @@ actor FatigueLearningService {
 
     func appliedFatigueRate(for exerciseId: UUID) async throws -> AppliedFatigueRateInfo {
         guard let exercise = try await exerciseRepo.fetch(byId: exerciseId) else {
-            return AppliedFatigueRateInfo(rate: 0.04, source: .defaultRate)
+            return AppliedFatigueRateInfo(
+                rate: Self.defaultGlobalFatigueRate,
+                source: .defaultRate,
+                localInfluence: 0.0
+            )
         }
         let profile = try await healthProfileRepo.fetchOrCreate()
-        return Self.appliedFatigueRate(for: exercise, profile: profile)
+        return Self.appliedFatigueRateInfo(for: exercise, profile: profile)
     }
 
     /// Fetch recent observations for an exercise, grouped by workout (most recent first).
@@ -504,12 +522,13 @@ actor FatigueLearningService {
     func applyManualNudge(exerciseId: UUID, nudge: FatigueNudge) async throws {
         guard let exercise = try await exerciseRepo.fetch(byId: exerciseId) else { return }
         let profile = try await healthProfileRepo.fetchOrCreate()
-        let currentRate = Self.appliedFatigueRate(for: exercise, profile: profile).rate
+        let currentRate = Self.appliedFatigueRateInfo(for: exercise, profile: profile).rate
         let adjustment: Double = switch nudge {
         case .lessAggressive: -Self.fatigueRateStep
         case .moreAggressive: Self.fatigueRateStep
         }
         exercise.fatigueRate = Self.clamp(currentRate + adjustment, bounds: Self.fatigueRateBounds)
+        exercise.fatigueRateSourceRawValue = ExerciseFatigueRateSource.manualOverride.rawValue
         exercise.updatedAt = Date()
         try await exerciseRepo.save(exercise)
     }
@@ -556,14 +575,26 @@ actor FatigueLearningService {
         min(max(value, bounds.lowerBound), bounds.upperBound)
     }
 
-    private static func appliedFatigueRate(for exercise: Exercise, profile: HealthProfile) -> AppliedFatigueRateInfo {
-        if let rate = exercise.fatigueRate {
-            return AppliedFatigueRateInfo(rate: rate, source: .exerciseOverride)
+    static func appliedFatigueRateInfo(for exercise: Exercise, profile: HealthProfile) -> AppliedFatigueRateInfo {
+        let globalRate = profile.prescriptionLearnedFatigueRate ?? Self.defaultGlobalFatigueRate
+        let globalSource: AppliedFatigueRateSource = profile.prescriptionLearnedFatigueRate == nil ? .defaultRate : .globalLearned
+
+        if exercise.resolvedFatigueRateSource == .manualOverride, let rate = exercise.fatigueRate {
+            return AppliedFatigueRateInfo(rate: rate, source: .manualOverride, localInfluence: 1.0)
         }
-        if let rate = profile.prescriptionLearnedFatigueRate {
-            return AppliedFatigueRateInfo(rate: rate, source: .globalLearned)
+
+        if let localRate = exercise.fatigueRate, exercise.resolvedFatigueRateSource == .learned {
+            let localInfluence = Self.localInfluence(for: exercise.fatigueLearningSessionCount ?? 0)
+            if localInfluence >= 1.0 {
+                return AppliedFatigueRateInfo(rate: localRate, source: .localLearned, localInfluence: 1.0)
+            }
+            if localInfluence > 0 {
+                let blendedRate = (localRate * localInfluence) + (globalRate * (1.0 - localInfluence))
+                return AppliedFatigueRateInfo(rate: blendedRate, source: .blendedLocal, localInfluence: localInfluence)
+            }
         }
-        return AppliedFatigueRateInfo(rate: 0.04, source: .defaultRate)
+
+        return AppliedFatigueRateInfo(rate: globalRate, source: globalSource, localInfluence: 0.0)
     }
 
     private func updateGlobalLearning(profile: HealthProfile, sessionError: Double) {
@@ -575,7 +606,7 @@ actor FatigueLearningService {
         let newCumError = Self.emaAlpha * sessionError + (1.0 - Self.emaAlpha) * oldCumError
         profile.prescriptionFatigueLearningCumulativeError = newCumError
 
-        let currentRate = profile.prescriptionLearnedFatigueRate ?? 0.04
+        let currentRate = profile.prescriptionLearnedFatigueRate ?? Self.defaultGlobalFatigueRate
         let adjustment = Self.fatigueRateStep * Self.sign(newCumError)
         profile.prescriptionLearnedFatigueRate = Self.clamp(currentRate + adjustment, bounds: Self.fatigueRateBounds)
         profile.updatedAt = Date()
@@ -590,13 +621,27 @@ actor FatigueLearningService {
         let newCumError = Self.emaAlpha * sessionError + (1.0 - Self.emaAlpha) * oldCumError
         exercise.fatigueLearningCumulativeError = newCumError
 
-        if newCount >= Self.minimumSessionsForLearning {
-            let seededRate = exercise.fatigueRate ?? profile.prescriptionLearnedFatigueRate ?? 0.04
+        if exercise.resolvedFatigueRateSource != .manualOverride {
+            let seededRate = exercise.fatigueRate ?? profile.prescriptionLearnedFatigueRate ?? Self.defaultGlobalFatigueRate
             let adjustment = Self.fatigueRateStep * Self.sign(newCumError)
             exercise.fatigueRate = Self.clamp(seededRate + adjustment, bounds: Self.fatigueRateBounds)
+            exercise.fatigueRateSourceRawValue = ExerciseFatigueRateSource.learned.rawValue
         }
 
         exercise.updatedAt = Date()
         try await exerciseRepo.save(exercise)
+    }
+
+    private static func localInfluence(for sessionCount: Int) -> Double {
+        switch sessionCount {
+        case ..<Self.localBlendStartSessions:
+            return 0.0
+        case Self.localBlendStartSessions:
+            return 0.5
+        case Self.localBlendStartSessions + 1:
+            return 0.75
+        default:
+            return 1.0
+        }
     }
 }

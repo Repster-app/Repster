@@ -77,6 +77,8 @@ struct SetSuggestionDiagnostics: Sendable {
     let baselineSourceLabel: String
     let sessionCapabilitySourceLabel: String
     let calibrationLabel: String
+    let selectionPolicy: SuggestionSelectionPolicy
+    let selectionReferenceE1RM: Double?
     let alternatives: [SuggestionRepAlternative]
     // v2 fatigue diagnostics
     let projectedSessionFatigue: Double
@@ -440,6 +442,8 @@ enum SuggestionCoordinator {
                 "tracking\(exercise.trackingType.rawValue)",
                 "inc\(signatureOptionalNumber(exercise.weightIncrement))",
                 "fatigueRate\(signatureOptionalNumber(exercise.fatigueRate))",
+                "fatigueRateSource\(exercise.fatigueRateSourceRawValue ?? "nil")",
+                "localLearnSessions\(exercise.fatigueLearningSessionCount ?? 0)",
                 "recovery\(signatureOptionalNumber(exercise.recoveryConstant))",
                 "rest\(exercise.defaultRestTime ?? -1)"
             ].joined(separator: ":")
@@ -671,6 +675,8 @@ enum SuggestionExplainer {
             baselineSourceLabel: decision.e1RMSource.label,
             sessionCapabilitySourceLabel: decision.sessionCapabilitySourceLabel,
             calibrationLabel: decision.calibrationAdjustment.explanation,
+            selectionPolicy: decision.selectionPolicy,
+            selectionReferenceE1RM: decision.selectionReferenceE1RM,
             alternatives: alternatives(for: decision, formula: formula),
             projectedSessionFatigue: decision.projectedSessionFatigue,
             setTypeFatigueMultiplier: SuggestionEngine.setTypeMultiplier(setType),

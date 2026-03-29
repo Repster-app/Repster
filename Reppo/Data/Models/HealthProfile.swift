@@ -47,7 +47,7 @@ final class HealthProfile {
     /// Default recovery constant in seconds for fatigue decay. Default: 180.
     var prescriptionDefaultRecoveryConstant: Double?
 
-    /// User-wide learned fatigue rate. Nil = use fixed default (0.04) when no exercise override exists.
+    /// User-wide learned fatigue rate. Nil = use fixed default (0.03) when no exercise override exists.
     var prescriptionLearnedFatigueRate: Double? = nil
 
     /// Number of qualifying workouts contributing to the global fatigue baseline.

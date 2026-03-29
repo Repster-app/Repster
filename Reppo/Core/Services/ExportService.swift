@@ -403,6 +403,7 @@ private extension WorkoutHistoryArchiveExercise {
             weightIncrement: exercise.weightIncrement,
             defaultRestTime: exercise.defaultRestTime,
             fatigueRate: exercise.fatigueRate,
+            fatigueRateSourceRawValue: exercise.resolvedFatigueRateSource?.rawValue,
             recoveryConstant: exercise.recoveryConstant,
             fatigueLearningSessionCount: exercise.fatigueLearningSessionCount,
             fatigueLearningCumulativeError: exercise.fatigueLearningCumulativeError,
@@ -426,6 +427,7 @@ private extension WorkoutHistoryArchiveExercise {
             weightIncrement: weightIncrement,
             defaultRestTime: defaultRestTime,
             fatigueRate: fatigueRate,
+            fatigueRateSourceRawValue: fatigueRateSourceRawValue,
             recoveryConstant: recoveryConstant,
             createdAt: createdAt,
             updatedAt: updatedAt
@@ -450,6 +452,7 @@ private extension Exercise {
         weightIncrement = archive.weightIncrement
         defaultRestTime = archive.defaultRestTime
         fatigueRate = archive.fatigueRate
+        fatigueRateSourceRawValue = archive.fatigueRateSourceRawValue
         recoveryConstant = archive.recoveryConstant
         fatigueLearningSessionCount = archive.fatigueLearningSessionCount
         fatigueLearningCumulativeError = archive.fatigueLearningCumulativeError

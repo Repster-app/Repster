@@ -183,6 +183,7 @@ struct WorkoutHistoryArchiveExercise: Codable, Sendable {
     let weightIncrement: Double?
     let defaultRestTime: Int?
     let fatigueRate: Double?
+    let fatigueRateSourceRawValue: String?
     let recoveryConstant: Double?
     let fatigueLearningSessionCount: Int?
     let fatigueLearningCumulativeError: Double?

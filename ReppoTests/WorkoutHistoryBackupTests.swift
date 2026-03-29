@@ -116,6 +116,54 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
         XCTAssertEqual(preview.latestWorkoutDate, secondStart)
     }
 
+    func testBackupPreservesExerciseFatigueRateSourceMetadata() async throws {
+        let context = try makeBackupServiceContext()
+        let workoutDate = makeDate(2026, 3, 22, 9, 0)
+        let exercise = Exercise(
+            name: "Chest Press",
+            equipmentType: .machinePin,
+            trackingType: .weightReps,
+            fatigueRate: 0.041,
+            fatigueRateSourceRawValue: ExerciseFatigueRateSource.manualOverride.rawValue
+        )
+        let workout = Workout(
+            date: workoutDate,
+            title: "Push Day",
+            startTime: workoutDate,
+            endTime: makeDate(2026, 3, 22, 10, 0),
+            duration: 3600,
+            status: .completed
+        )
+        let set = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            date: workoutDate,
+            completedAt: makeDate(2026, 3, 22, 9, 20),
+            weight: 80,
+            effectiveWeight: 80,
+            reps: 8,
+            rir: 0,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(workout)
+        try await context.setRepo.save(set)
+
+        let exportedData = try await context.service.exportBackup()
+        let archive = try decodeBackupArchive(exportedData)
+        let archivedExercise = try XCTUnwrap(archive.exercises.first(where: { $0.id == exercise.id }))
+        XCTAssertEqual(archivedExercise.fatigueRateSourceRawValue, ExerciseFatigueRateSource.manualOverride.rawValue)
+
+        let restoredContext = try makeBackupServiceContext()
+        _ = try await restoredContext.service.restoreBackup(data: exportedData)
+        let restoredExercise = try await restoredContext.exerciseRepo.fetch(byId: exercise.id)
+        XCTAssertEqual(restoredExercise?.fatigueRateSourceRawValue, ExerciseFatigueRateSource.manualOverride.rawValue)
+    }
+
     func testRestoreBackupReplacesHistoryAndKeepsUnrelatedData() async throws {
         let context = try makeBackupServiceContext()
         let profile = try await context.healthProfileRepo.fetchOrCreate()

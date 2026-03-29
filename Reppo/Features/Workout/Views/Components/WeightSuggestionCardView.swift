@@ -180,6 +180,12 @@ struct WeightSuggestionCardView: View {
                 Text(
                     "raw \(formatWeight(diagnostics.rawWeight)) -> rounded \(formatWeight(diagnostics.roundedWeight)) (inc \(formatWeight(diagnostics.weightIncrement)))"
                 )
+                if diagnostics.selectionPolicy == .firstSetProgressionAboveRecentPeak,
+                   let selectionReferenceE1RM = diagnostics.selectionReferenceE1RM {
+                    Text(
+                        "\(diagnostics.selectionPolicy.label) (\(formatWeight(selectionReferenceE1RM)) reference)"
+                    )
+                }
                 if let range = diagnostics.targetRepRange {
                     Text("rep range \(range.lowerBound)-\(range.upperBound), chosen \(diagnostics.chosenReps)")
                 }

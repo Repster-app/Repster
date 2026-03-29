@@ -7,7 +7,7 @@
 // 2. Accumulate session fatigue per set: baseFatigueRate * typeMultiplier * effortScale * repScale
 // 3. Between sets: fatigue decays via exp(-restSeconds / τ), τ = 180s default (per-exercise override)
 // 4. Forward-project fatigue across pending sets (progressive decrease)
-// 5. Compute readiness e1RM from fatigue/freshness and clamp to 0.88–1.05 around capacity
+// 5. Compute readiness e1RM from fatigue/freshness with no clamp floor
 // 6. Compute intensity_factor from selected formula: reverseCalculate(1.0, targetReps + targetRIR)
 // 7. target_weight = readiness_e1RM × intensity_factor, rounded to increment
 //
@@ -95,7 +95,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         let freshnessEnabled = profile.prescriptionFreshnessBonus ?? false
         let freshnessPercent = profile.prescriptionFreshnessBonusPercent ?? 0.03
         let formula = E1RMFormula(rawValue: profile.e1RMFormula) ?? .epley
-        let baseFatigueRate = exercise.fatigueRate ?? profile.prescriptionLearnedFatigueRate ?? 0.04
+        let baseFatigueRate = FatigueLearningService.appliedFatigueRateInfo(for: exercise, profile: profile).rate
         let recoveryConstant = exercise.recoveryConstant ?? profile.prescriptionDefaultRecoveryConstant ?? 180.0
 
         let baseEstimate = try await estimateBaseE1RM(

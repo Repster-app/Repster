@@ -1,6 +1,11 @@
 import Foundation
 import SwiftData
 
+enum ExerciseFatigueRateSource: String, Codable, Sendable {
+    case manualOverride
+    case learned
+}
+
 @Model
 final class Exercise {
     var id: UUID
@@ -18,9 +23,11 @@ final class Exercise {
 
     // MARK: - Fatigue Profile (Smart Suggestions)
 
-    /// Per-exercise fatigue rate. nil = use global default (0.05).
+    /// Per-exercise fatigue rate. nil = use global/default learned rate (0.03 fallback).
     /// Controls how much each set's stress accumulates as session fatigue.
     var fatigueRate: Double?
+    /// Source of the stored per-exercise fatigue rate.
+    var fatigueRateSourceRawValue: String?
 
     /// Per-exercise recovery constant in seconds. nil = use global default (180).
     /// Controls how quickly fatigue decays during rest periods.
@@ -52,6 +59,7 @@ final class Exercise {
         weightIncrement: Double? = nil,
         defaultRestTime: Int? = nil,
         fatigueRate: Double? = nil,
+        fatigueRateSourceRawValue: String? = nil,
         recoveryConstant: Double? = nil,
         fatigueLearningSessionCount: Int? = nil,
         fatigueLearningCumulativeError: Double? = nil,
@@ -71,6 +79,7 @@ final class Exercise {
         self.weightIncrement = weightIncrement
         self.defaultRestTime = defaultRestTime
         self.fatigueRate = fatigueRate
+        self.fatigueRateSourceRawValue = fatigueRateSourceRawValue
         self.recoveryConstant = recoveryConstant
         self.fatigueLearningSessionCount = fatigueLearningSessionCount
         self.fatigueLearningCumulativeError = fatigueLearningCumulativeError
@@ -84,6 +93,18 @@ extension Exercise: @unchecked Sendable {}
 extension Exercise {
     var supportsUnilateralLogging: Bool {
         trackingType == .weightReps || trackingType == .weightRepsDuration
+    }
+
+    var resolvedFatigueRateSource: ExerciseFatigueRateSource? {
+        if let raw = fatigueRateSourceRawValue, let source = ExerciseFatigueRateSource(rawValue: raw) {
+            return source
+        }
+        guard fatigueRate != nil else { return nil }
+        return (fatigueLearningSessionCount ?? 0) > 0 ? .learned : .manualOverride
+    }
+
+    func refreshFatigueRateSourceMetadata() {
+        fatigueRateSourceRawValue = resolvedFatigueRateSource?.rawValue
     }
 
     var isBodyweightStyleExercise: Bool {

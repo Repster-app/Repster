@@ -230,7 +230,7 @@ struct SuggestionSettingsSnapshot: Sendable {
     let fatigueEnabled: Bool
     let freshnessEnabled: Bool
     let freshnessPercent: Double
-    /// Per-exercise or global base fatigue rate (default 0.04 for v2).
+    /// Per-exercise or global base fatigue rate (default 0.03 fallback).
     let baseFatigueRate: Double
     /// Per-exercise or global recovery time constant in seconds (default 180 for v2).
     let recoveryConstant: Double
@@ -267,6 +267,8 @@ struct SuggestionDecision: Sendable {
     let e1RMSource: E1RMSource
     let sessionCapabilitySourceLabel: String
     let bestReps: Int?
+    let selectionPolicy: SuggestionSelectionPolicy
+    let selectionReferenceE1RM: Double?
     let calibrationAdjustment: SuggestionCalibrationAdjustment
     /// Projected cumulative session fatigue at the point this set would be performed.
     let projectedSessionFatigue: Double
@@ -372,6 +374,20 @@ enum E1RMSource: Sendable {
     }
 }
 
+enum SuggestionSelectionPolicy: Sendable, Equatable {
+    case closestMatch
+    case firstSetProgressionAboveRecentPeak
+
+    var label: String {
+        switch self {
+        case .closestMatch:
+            return "closest match to effective e1RM"
+        case .firstSetProgressionAboveRecentPeak:
+            return "biased above recent top workout"
+        }
+    }
+}
+
 /// Pure smart-suggestion calculation engine.
 ///
 /// The engine has no repository or view-model dependencies. It operates only on
@@ -380,15 +396,25 @@ enum E1RMSource: Sendable {
 enum SuggestionEngine {
     // MARK: - v2 constants
 
-    private static let defaultBaseFatigueRate: Double = 0.04
+    private static let defaultBaseFatigueRate: Double = 0.03
     private static let defaultRecoveryConstant: Double = 180.0
     private static let maxFatigue: Double = 0.25
     private static let missingRIRDefault: Double = 1.0
+    private static let e1RMEpsilon: Double = 0.0001
 
     private struct CompletedSessionState: Sendable {
         let sessionCapabilityE1RM: Double
         let runningFatigue: Double
         let usedSessionCapabilityBlend: Bool
+    }
+
+    private struct RepRangeCandidate: Sendable {
+        let reps: Int
+        let intensityFactor: Double
+        let rawWeight: Double
+        let roundedWeight: Double
+        let impliedE1RM: Double
+        let errorToEffectiveE1RM: Double
     }
 
     private struct ReadinessState: Sendable {
@@ -522,41 +548,37 @@ enum SuggestionEngine {
             let intensityFactor: Double
             let rawWeight: Double
             let prescribedWeight: Double
+            let selectionPolicy: SuggestionSelectionPolicy
+            let selectionReferenceE1RM: Double?
 
             if let range = setSpec.repRange, range.lowerBound < range.upperBound {
-                var bestError = Double.infinity
-                var winnerReps = setSpec.targetReps
-                var winnerIntensity = 0.0
-                var winnerRaw = 0.0
-                var winnerRounded = 0.0
+                let candidates = repRangeCandidates(
+                    range: range,
+                    targetRIR: setSpec.targetRIR,
+                    effectiveE1RM: effectiveE1RM,
+                    settings: input.settings
+                )
+                let winner = chooseRepRangeCandidate(
+                    candidates: candidates,
+                    targetReps: setSpec.targetReps,
+                    recentCapacityBaselineE1RM: input.baseE1RM,
+                    applyFirstSetProgressionBias: isFirstSet && input.baseSource == .recentPerformance
+                )
 
-                for candidateReps in range {
-                    let totalReps = max(1, candidateReps + Int(setSpec.targetRIR))
-                    let candidateIntensity = max(0.3, input.settings.formula.reverseCalculate(e1RM: 1.0, reps: totalReps))
-                    let candidateRaw = effectiveE1RM * candidateIntensity
-                    let candidateRounded = roundToIncrement(candidateRaw, increment: input.settings.weightIncrement)
-                    let impliedE1RM = input.settings.formula.calculate(weight: candidateRounded, reps: totalReps)
-                    let error = abs(impliedE1RM - effectiveE1RM)
-
-                    if error < bestError {
-                        bestError = error
-                        winnerReps = candidateReps
-                        winnerIntensity = candidateIntensity
-                        winnerRaw = candidateRaw
-                        winnerRounded = candidateRounded
-                    }
-                }
-
-                bestReps = winnerReps
-                intensityFactor = winnerIntensity
-                rawWeight = winnerRaw
-                prescribedWeight = winnerRounded
+                bestReps = winner.reps
+                intensityFactor = winner.intensityFactor
+                rawWeight = winner.rawWeight
+                prescribedWeight = winner.roundedWeight
+                selectionPolicy = winner.selectionPolicy
+                selectionReferenceE1RM = winner.selectionReferenceE1RM
             } else {
                 bestReps = nil
                 let totalReps = max(1, setSpec.targetReps + Int(setSpec.targetRIR))
                 intensityFactor = max(0.3, input.settings.formula.reverseCalculate(e1RM: 1.0, reps: totalReps))
                 rawWeight = effectiveE1RM * intensityFactor
                 prescribedWeight = roundToIncrement(rawWeight, increment: input.settings.weightIncrement)
+                selectionPolicy = .closestMatch
+                selectionReferenceE1RM = nil
             }
 
             decisions.append(SuggestionDecision(
@@ -577,12 +599,136 @@ enum SuggestionEngine {
                 e1RMSource: input.baseSource,
                 sessionCapabilitySourceLabel: sessionCapabilitySourceLabel,
                 bestReps: bestReps,
+                selectionPolicy: selectionPolicy,
+                selectionReferenceE1RM: selectionReferenceE1RM,
                 calibrationAdjustment: input.calibrationAdjustment,
                 projectedSessionFatigue: projectedFatigue
             ))
         }
 
         return decisions
+    }
+
+    private static func repRangeCandidates(
+        range: ClosedRange<Int>,
+        targetRIR: Double,
+        effectiveE1RM: Double,
+        settings: SuggestionSettingsSnapshot
+    ) -> [RepRangeCandidate] {
+        range.map { candidateReps in
+            let totalReps = max(1, candidateReps + Int(targetRIR))
+            let candidateIntensity = max(
+                0.3,
+                settings.formula.reverseCalculate(e1RM: 1.0, reps: totalReps)
+            )
+            let candidateRaw = effectiveE1RM * candidateIntensity
+            let candidateRounded = roundToIncrement(candidateRaw, increment: settings.weightIncrement)
+            let impliedE1RM = settings.formula.calculate(weight: candidateRounded, reps: totalReps)
+            let error = abs(impliedE1RM - effectiveE1RM)
+
+            return RepRangeCandidate(
+                reps: candidateReps,
+                intensityFactor: candidateIntensity,
+                rawWeight: candidateRaw,
+                roundedWeight: candidateRounded,
+                impliedE1RM: impliedE1RM,
+                errorToEffectiveE1RM: error
+            )
+        }
+    }
+
+    private static func chooseRepRangeCandidate(
+        candidates: [RepRangeCandidate],
+        targetReps: Int,
+        recentCapacityBaselineE1RM: Double,
+        applyFirstSetProgressionBias: Bool
+    ) -> (
+        reps: Int,
+        intensityFactor: Double,
+        rawWeight: Double,
+        roundedWeight: Double,
+        selectionPolicy: SuggestionSelectionPolicy,
+        selectionReferenceE1RM: Double?
+    ) {
+        guard let normalWinner = bestClosestMatchCandidate(candidates) else {
+            return (
+                reps: targetReps,
+                intensityFactor: 0.0,
+                rawWeight: 0.0,
+                roundedWeight: 0.0,
+                selectionPolicy: .closestMatch,
+                selectionReferenceE1RM: nil
+            )
+        }
+
+        if applyFirstSetProgressionBias,
+           normalWinner.impliedE1RM <= recentCapacityBaselineE1RM + Self.e1RMEpsilon,
+           let progressedWinner = bestProgressedCandidate(
+               candidates,
+               targetReps: targetReps,
+               recentCapacityBaselineE1RM: recentCapacityBaselineE1RM
+           ) {
+            return (
+                reps: progressedWinner.reps,
+                intensityFactor: progressedWinner.intensityFactor,
+                rawWeight: progressedWinner.rawWeight,
+                roundedWeight: progressedWinner.roundedWeight,
+                selectionPolicy: .firstSetProgressionAboveRecentPeak,
+                selectionReferenceE1RM: recentCapacityBaselineE1RM
+            )
+        }
+
+        return (
+            reps: normalWinner.reps,
+            intensityFactor: normalWinner.intensityFactor,
+            rawWeight: normalWinner.rawWeight,
+            roundedWeight: normalWinner.roundedWeight,
+            selectionPolicy: .closestMatch,
+            selectionReferenceE1RM: nil
+        )
+    }
+
+    private static func bestClosestMatchCandidate(_ candidates: [RepRangeCandidate]) -> RepRangeCandidate? {
+        var winner: RepRangeCandidate?
+        var bestError = Double.infinity
+
+        for candidate in candidates {
+            if candidate.errorToEffectiveE1RM + Self.e1RMEpsilon < bestError {
+                bestError = candidate.errorToEffectiveE1RM
+                winner = candidate
+            }
+        }
+
+        return winner
+    }
+
+    private static func bestProgressedCandidate(
+        _ candidates: [RepRangeCandidate],
+        targetReps: Int,
+        recentCapacityBaselineE1RM: Double
+    ) -> RepRangeCandidate? {
+        candidates
+            .filter { $0.impliedE1RM > recentCapacityBaselineE1RM + Self.e1RMEpsilon }
+            .min { lhs, rhs in
+                let lhsDelta = lhs.impliedE1RM - recentCapacityBaselineE1RM
+                let rhsDelta = rhs.impliedE1RM - recentCapacityBaselineE1RM
+
+                if abs(lhsDelta - rhsDelta) > Self.e1RMEpsilon {
+                    return lhsDelta < rhsDelta
+                }
+
+                if abs(lhs.errorToEffectiveE1RM - rhs.errorToEffectiveE1RM) > Self.e1RMEpsilon {
+                    return lhs.errorToEffectiveE1RM < rhs.errorToEffectiveE1RM
+                }
+
+                let lhsRepDistance = abs(lhs.reps - targetReps)
+                let rhsRepDistance = abs(rhs.reps - targetReps)
+                if lhsRepDistance != rhsRepDistance {
+                    return lhsRepDistance < rhsRepDistance
+                }
+
+                return lhs.reps < rhs.reps
+            }
     }
 
     private static func processCompletedSessionState(_ input: SuggestionEngineInput) -> CompletedSessionState {

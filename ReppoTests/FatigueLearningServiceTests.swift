@@ -183,13 +183,15 @@ final class FatigueLearningServiceTests: XCTestCase {
 
         let profile = try await profileRepo.fetchOrCreate()
         XCTAssertEqual(profile.prescriptionFatigueLearningSessionCount, 1)
-        XCTAssertEqual(profile.prescriptionLearnedFatigueRate ?? 0, 0.038, accuracy: 0.0001)
+        XCTAssertEqual(profile.prescriptionLearnedFatigueRate ?? 0, 0.028, accuracy: 0.0001)
         XCTAssertLessThan(profile.prescriptionFatigueLearningCumulativeError ?? 0, 0)
-        XCTAssertNil(chest.fatigueLearningSessionCount)
-        XCTAssertNil(row.fatigueLearningSessionCount)
+        XCTAssertEqual(chest.fatigueLearningSessionCount, 1)
+        XCTAssertEqual(row.fatigueLearningSessionCount, 1)
+        XCTAssertEqual(chest.fatigueRate ?? 0, 0.026, accuracy: 0.0001)
+        XCTAssertEqual(row.fatigueRate ?? 0, 0.026, accuracy: 0.0001)
     }
 
-    func testProcessSessionEnd_keepsExerciseLocalLearningAtTwoObservationsThreshold() async throws {
+    func testProcessSessionEnd_qualifiesLocalLearningWithOneUsedSetWithoutUpdatingGlobalBaseline() async throws {
         let workoutId = UUID()
         let exercise = Exercise(name: "Leg Extension", equipmentType: .machinePin, trackingType: .weightReps)
         let exerciseRepo = InMemoryExerciseRepo(exercises: [exercise])
@@ -200,16 +202,20 @@ final class FatigueLearningServiceTests: XCTestCase {
 
         await service.processSessionEnd(workoutId: workoutId)
 
-        XCTAssertNil(exercise.fatigueLearningSessionCount)
+        XCTAssertEqual(exercise.fatigueLearningSessionCount, 1)
+        XCTAssertEqual(exercise.fatigueRate ?? 0, 0.028, accuracy: 0.0001)
+        XCTAssertEqual(exercise.fatigueRateSourceRawValue, ExerciseFatigueRateSource.learned.rawValue)
         let profile = try await service.globalSummary()
         XCTAssertEqual(profile.sessionCount, 0)
     }
 
-    func testProcessSessionEnd_seedsFirstExerciseOverrideFromGlobalRateAfterFiveSessions() async throws {
+    func testProcessSessionEnd_startsBlendedLocalRateAfterSecondQualifyingWorkout() async throws {
         let workoutId = UUID()
         let exercise = Exercise(name: "Leg Extension", equipmentType: .machinePin, trackingType: .weightReps)
-        exercise.fatigueLearningSessionCount = 4
+        exercise.fatigueLearningSessionCount = 1
         exercise.fatigueLearningCumulativeError = -0.04
+        exercise.fatigueRate = 0.048
+        exercise.fatigueRateSourceRawValue = ExerciseFatigueRateSource.learned.rawValue
 
         let profile = HealthProfile(
             prescriptionLearnedFatigueRate: 0.05,
@@ -232,23 +238,57 @@ final class FatigueLearningServiceTests: XCTestCase {
 
         await service.processSessionEnd(workoutId: workoutId)
 
-        XCTAssertEqual(exercise.fatigueLearningSessionCount, 5)
+        XCTAssertEqual(exercise.fatigueLearningSessionCount, 2)
         XCTAssertEqual(exercise.fatigueRate ?? 0, 0.046, accuracy: 0.0001)
         XCTAssertLessThan(exercise.fatigueLearningCumulativeError ?? 0, 0)
+
+        let appliedRate = try await service.appliedFatigueRate(for: exercise.id)
+        XCTAssertEqual(appliedRate.source, .blendedLocal)
+        XCTAssertEqual(appliedRate.localInfluence, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(appliedRate.rate, 0.048, accuracy: 0.0001)
+    }
+
+    func testProcessSessionEnd_reachesFullLocalOverrideAfterFourthQualifyingWorkout() async throws {
+        let workoutId = UUID()
+        let exercise = Exercise(name: "Leg Extension", equipmentType: .machinePin, trackingType: .weightReps)
+        exercise.fatigueLearningSessionCount = 3
+        exercise.fatigueLearningCumulativeError = -0.04
+        exercise.fatigueRate = 0.048
+        exercise.fatigueRateSourceRawValue = ExerciseFatigueRateSource.learned.rawValue
+
+        let profile = HealthProfile(prescriptionLearnedFatigueRate: 0.05)
+        let service = makeService(
+            exerciseRepo: InMemoryExerciseRepo(exercises: [exercise]),
+            healthProfileRepo: InMemoryHealthProfileRepo(profile: profile),
+            auditRepo: InMemoryFatigueLearningSetAuditRepo(
+                audits: [makeUsedAudit(exerciseId: exercise.id, workoutId: workoutId, visibleSetNumber: 2, normalizedError: -0.06)]
+            )
+        )
+
+        await service.processSessionEnd(workoutId: workoutId)
+
+        let appliedRate = try await service.appliedFatigueRate(for: exercise.id)
+        XCTAssertEqual(exercise.fatigueLearningSessionCount, 4)
+        XCTAssertEqual(exercise.fatigueRate ?? 0, 0.046, accuracy: 0.0001)
+        XCTAssertEqual(appliedRate.source, .localLearned)
+        XCTAssertEqual(appliedRate.localInfluence, 1.0, accuracy: 0.0001)
+        XCTAssertEqual(appliedRate.rate, 0.046, accuracy: 0.0001)
     }
 
     // MARK: - Applied Rate + Diagnostics
 
-    func testAppliedFatigueRate_prefersExerciseThenGlobalThenDefault() async throws {
+    func testAppliedFatigueRate_prefersManualThenGlobalThenDefault() async throws {
         let defaultExercise = Exercise(name: "Pulldown", equipmentType: .machinePin, trackingType: .weightReps)
         let globalExercise = Exercise(name: "Press", equipmentType: .machinePin, trackingType: .weightReps)
         let overrideExercise = Exercise(name: "Curl", equipmentType: .cable, trackingType: .weightReps, fatigueRate: 0.06)
+        overrideExercise.fatigueRateSourceRawValue = ExerciseFatigueRateSource.manualOverride.rawValue
         let exerciseRepo = InMemoryExerciseRepo(exercises: [defaultExercise, globalExercise, overrideExercise])
 
         let defaultService = makeService(exerciseRepo: exerciseRepo)
         let defaultRate = try await defaultService.appliedFatigueRate(for: defaultExercise.id)
-        XCTAssertEqual(defaultRate.rate, 0.04, accuracy: 0.0001)
+        XCTAssertEqual(defaultRate.rate, 0.03, accuracy: 0.0001)
         XCTAssertEqual(defaultRate.source.displayTitle, "Default")
+        XCTAssertEqual(defaultRate.localInfluence, 0.0, accuracy: 0.0001)
 
         let globalService = makeService(
             exerciseRepo: exerciseRepo,
@@ -258,11 +298,50 @@ final class FatigueLearningServiceTests: XCTestCase {
         )
         let globalRate = try await globalService.appliedFatigueRate(for: globalExercise.id)
         XCTAssertEqual(globalRate.rate, 0.05, accuracy: 0.0001)
-        XCTAssertEqual(globalRate.source.displayTitle, "Global learned")
+        XCTAssertEqual(globalRate.source.displayTitle, "Global baseline")
 
         let overrideRate = try await globalService.appliedFatigueRate(for: overrideExercise.id)
         XCTAssertEqual(overrideRate.rate, 0.06, accuracy: 0.0001)
-        XCTAssertEqual(overrideRate.source.displayTitle, "Exercise override")
+        XCTAssertEqual(overrideRate.source.displayTitle, "Manual override")
+        XCTAssertEqual(overrideRate.localInfluence, 1.0, accuracy: 0.0001)
+    }
+
+    func testAppliedFatigueRate_infersLearnedSourceAndBlendsAtThreeSessions() async throws {
+        let exercise = Exercise(
+            name: "Lat Pulldown",
+            equipmentType: .machinePin,
+            trackingType: .weightReps,
+            fatigueRate: 0.04
+        )
+        exercise.fatigueLearningSessionCount = 3
+        exercise.fatigueLearningCumulativeError = -0.02
+        let service = makeService(
+            exerciseRepo: InMemoryExerciseRepo(exercises: [exercise]),
+            healthProfileRepo: InMemoryHealthProfileRepo(
+                profile: HealthProfile(prescriptionLearnedFatigueRate: 0.05)
+            )
+        )
+
+        let appliedRate = try await service.appliedFatigueRate(for: exercise.id)
+
+        XCTAssertEqual(appliedRate.source, .blendedLocal)
+        XCTAssertEqual(appliedRate.localInfluence, 0.75, accuracy: 0.0001)
+        XCTAssertEqual(appliedRate.rate, 0.0425, accuracy: 0.0001)
+    }
+
+    func testAppliedFatigueRate_infersManualOverrideSourceWithoutSessions() async throws {
+        let exercise = Exercise(
+            name: "Lat Pulldown",
+            equipmentType: .machinePin,
+            trackingType: .weightReps,
+            fatigueRate: 0.041
+        )
+        let service = makeService(exerciseRepo: InMemoryExerciseRepo(exercises: [exercise]))
+
+        let appliedRate = try await service.appliedFatigueRate(for: exercise.id)
+
+        XCTAssertEqual(appliedRate.source, .manualOverride)
+        XCTAssertEqual(appliedRate.rate, 0.041, accuracy: 0.0001)
     }
 
     func testDiagnosticsExercises_includeAuditHistoryWithoutLocalLearning() async throws {
@@ -306,8 +385,35 @@ final class FatigueLearningServiceTests: XCTestCase {
         try await service.applyManualNudge(exerciseId: exercise.id, nudge: .lessAggressive)
 
         XCTAssertEqual(exercise.fatigueRate ?? 0, 0.048, accuracy: 0.0001)
+        XCTAssertEqual(exercise.fatigueRateSourceRawValue, ExerciseFatigueRateSource.manualOverride.rawValue)
         XCTAssertNil(exercise.fatigueLearningSessionCount)
         XCTAssertNil(exercise.fatigueLearningCumulativeError)
+    }
+
+    func testApplyManualNudge_bypassesLocalBlendWhenExerciseHadLearnedRate() async throws {
+        let exercise = Exercise(
+            name: "Leg Extension",
+            equipmentType: .machinePin,
+            trackingType: .weightReps,
+            fatigueRate: 0.045
+        )
+        exercise.fatigueLearningSessionCount = 3
+        exercise.fatigueLearningCumulativeError = -0.02
+        exercise.fatigueRateSourceRawValue = ExerciseFatigueRateSource.learned.rawValue
+
+        let service = makeService(
+            exerciseRepo: InMemoryExerciseRepo(exercises: [exercise]),
+            healthProfileRepo: InMemoryHealthProfileRepo(
+                profile: HealthProfile(prescriptionLearnedFatigueRate: 0.05)
+            )
+        )
+
+        try await service.applyManualNudge(exerciseId: exercise.id, nudge: .lessAggressive)
+
+        let appliedRate = try await service.appliedFatigueRate(for: exercise.id)
+        XCTAssertEqual(exercise.fatigueRateSourceRawValue, ExerciseFatigueRateSource.manualOverride.rawValue)
+        XCTAssertEqual(appliedRate.source, .manualOverride)
+        XCTAssertEqual(appliedRate.localInfluence, 1.0, accuracy: 0.0001)
     }
 
     func testResetLearning_clearsExerciseDataAndPreservesGlobalBaseline() async throws {
@@ -342,6 +448,7 @@ final class FatigueLearningServiceTests: XCTestCase {
         try await service.resetLearning(exerciseId: exercise.id)
 
         XCTAssertNil(exercise.fatigueRate)
+        XCTAssertNil(exercise.fatigueRateSourceRawValue)
         XCTAssertNil(exercise.fatigueLearningSessionCount)
         XCTAssertNil(exercise.fatigueLearningCumulativeError)
         XCTAssertTrue(observationRepo.observations.isEmpty)
@@ -360,6 +467,7 @@ final class FatigueLearningServiceTests: XCTestCase {
             trackingType: .weightReps,
             fatigueRate: 0.05
         )
+        learningExercise.fatigueRateSourceRawValue = ExerciseFatigueRateSource.learned.rawValue
         learningExercise.fatigueLearningSessionCount = 3
         learningExercise.fatigueLearningCumulativeError = -0.02
 
@@ -392,6 +500,7 @@ final class FatigueLearningServiceTests: XCTestCase {
         try await service.resetAllLearning()
 
         XCTAssertNil(learningExercise.fatigueRate)
+        XCTAssertNil(learningExercise.fatigueRateSourceRawValue)
         XCTAssertNil(learningExercise.fatigueLearningSessionCount)
         XCTAssertNil(learningExercise.fatigueLearningCumulativeError)
         XCTAssertTrue(observationRepo.observations.isEmpty)
