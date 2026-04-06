@@ -1012,8 +1012,8 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         XCTAssertEqual(loadPrescriptionService.evaluationCount, 1)
 
         context.pendingSet.reps = nil
-        context.pendingSet.draftTargetRepMin = 8
-        context.pendingSet.draftTargetRepMax = 12
+        context.pendingSet.overrideTargetRepMin = 8
+        context.pendingSet.overrideTargetRepMax = 12
         context.viewModel.markSetDirty(context.pendingSet, field: .reps)
 
         try await waitUntil {
@@ -1042,6 +1042,64 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
 
         XCTAssertEqual(context.viewModel.suggestionState(for: context.pendingSet.id)?.target?.repRange, 8...12)
         XCTAssertEqual(loadPrescriptionService.lastRecordedTargetReps, [10])
+    }
+
+    func testLoadActiveWorkoutRestoresOverrideTargetsAndSuggestionsUseExplicitRepSource() async throws {
+        let workout = Workout(
+            id: UUID(),
+            date: Date(),
+            startTime: Date().addingTimeInterval(-900),
+            status: .inProgress
+        )
+        let exercise = makeExercise(name: "Bench Press")
+        let set = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: false
+        )
+        set.targetRepMin = 8
+        set.targetRepMax = 12
+        set.overrideTargetRepMin = 6
+        set.overrideTargetRepMax = 8
+        set.targetRIR = 2
+
+        let workoutService = WorkoutServiceStub()
+        workoutService.activeWorkout = workout
+        let setService = SetServiceStub()
+        setService.workoutSets[workout.id] = [set]
+        let exerciseService = ExerciseServiceStub()
+        exerciseService.fetchedExercises[exercise.id] = exercise
+        let profile = HealthProfile()
+        let loadPrescriptionService = LoadPrescriptionServiceSpy()
+        loadPrescriptionService.exerciseNames[exercise.id] = exercise.name
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: workoutService,
+            setService: setService,
+            exerciseService: exerciseService,
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: loadPrescriptionService,
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+
+        await viewModel.loadActiveWorkout()
+
+        let restoredSet = try XCTUnwrap(viewModel.currentSets.first)
+        XCTAssertEqual(restoredSet.preferredTargetRepBounds.min, 6)
+        XCTAssertEqual(restoredSet.preferredTargetRepBounds.max, 8)
+        XCTAssertEqual(restoredSet.targetRepMin, 8)
+        XCTAssertEqual(restoredSet.targetRepMax, 12)
+
+        await viewModel.loadWeightSuggestions()
+
+        let target = try XCTUnwrap(viewModel.suggestionState(for: restoredSet.id)?.target)
+        XCTAssertEqual(target.repRange, 6...8)
+        XCTAssertEqual(target.repsSource, .explicitSet)
+        XCTAssertEqual(target.rirSource, .template)
     }
 
     func testManualRefreshInvalidatesSuggestionCacheEvenWhenInputsAreUnchanged() async throws {
@@ -1082,6 +1140,47 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         XCTAssertEqual(loadPrescriptionService.evaluationCount, 2)
         XCTAssertEqual(setService.fetchSetsForExerciseCallCount, 2)
         XCTAssertNotNil(context.viewModel.exerciseInfoData)
+    }
+
+    func testLoadWeightSuggestionsPropagatesAdminModeFromProfile() async throws {
+        let profile = HealthProfile(prescriptionAdminModeEnabled: true)
+        let loadPrescriptionService = LoadPrescriptionServiceSpy()
+        let context = makeContext(
+            loadPrescriptionService: loadPrescriptionService,
+            profile: profile
+        )
+
+        XCTAssertFalse(context.viewModel.suggestionAdminModeEnabled)
+
+        await context.viewModel.loadWeightSuggestions()
+
+        XCTAssertTrue(context.viewModel.suggestionAdminModeEnabled)
+    }
+
+    func testAdminModeDoesNotChangeSuggestionOutputs() async throws {
+        let userContext = makeContext(
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            profile: HealthProfile(prescriptionAdminModeEnabled: false)
+        )
+        let adminContext = makeContext(
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            profile: HealthProfile(prescriptionAdminModeEnabled: true)
+        )
+
+        await userContext.viewModel.loadWeightSuggestions()
+        await adminContext.viewModel.loadWeightSuggestions()
+
+        let userSuggestion = try XCTUnwrap(userContext.viewModel.weightSuggestionData?.suggestions.first)
+        let adminSuggestion = try XCTUnwrap(adminContext.viewModel.weightSuggestionData?.suggestions.first)
+
+        XCTAssertEqual(userSuggestion.suggestedWeight, adminSuggestion.suggestedWeight)
+        XCTAssertEqual(userSuggestion.targetReps, adminSuggestion.targetReps)
+        XCTAssertEqual(
+            userContext.viewModel.weightSuggestionData?.unavailableReason,
+            adminContext.viewModel.weightSuggestionData?.unavailableReason
+        )
+        XCTAssertFalse(userContext.viewModel.suggestionAdminModeEnabled)
+        XCTAssertTrue(adminContext.viewModel.suggestionAdminModeEnabled)
     }
 
     func testSetMutationFlowsStillSucceedThroughSetService() async throws {
@@ -1154,11 +1253,11 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
     private func makeContext(
         loadPrescriptionService: LoadPrescriptionServiceSpy,
         setService: SetServiceStub = SetServiceStub(),
+        profile: HealthProfile = HealthProfile(),
         exerciseCount: Int = 1,
         initialReps: Int = 8,
         secondExerciseReps: Int = 12
     ) -> TestContext {
-        let profile = HealthProfile()
         let exercise = makeExercise(name: "Exercise 1")
         let pendingSet = makeSet(exerciseId: exercise.id, order: 1, reps: initialReps)
 
@@ -1197,11 +1296,17 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         )
     }
 
-    private func makeExercise(name: String) -> Exercise {
+    private func makeExercise(
+        name: String,
+        unilateral: Bool = false,
+        unilateralRepTargetMode: UnilateralRepTargetMode? = nil
+    ) -> Exercise {
         Exercise(
             name: name,
             equipmentType: .barbell,
             trackingType: .weightReps,
+            unilateral: unilateral,
+            unilateralRepTargetMode: unilateralRepTargetMode,
             weightIncrement: 2.5,
             defaultRestTime: 120
         )
@@ -1400,7 +1505,78 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         )
 
         XCTAssertEqual(data.suggestion(for: set.id)?.explanation.defaultUsageLabel, "using default target")
+        XCTAssertEqual(
+            data.suggestion(for: set.id)?.explanation.userSummary,
+            "Based on your recent performance and this set's target. Missing targets used your Smart Suggestions defaults."
+        )
+        XCTAssertTrue(
+            data.suggestion(for: set.id)?.explanation.adminSummary.contains("target from Smart Suggestions default") == true
+        )
         XCTAssertEqual(data.rowState(for: set.id)?.target?.sourceLabel, "Smart Suggestions default")
+    }
+
+    func testSuggestionExplanationSeparatesUserAndAdminSummaryCopy() throws {
+        let setId = UUID()
+        let target = SuggestionTarget(
+            reps: 8,
+            rir: 2.0,
+            repRange: nil,
+            repsSource: .template,
+            rirSource: .template
+        )
+        let pendingSet = SuggestionPendingSetInput(
+            setId: setId,
+            setIndex: 0,
+            setNumber: 1,
+            target: target,
+            setType: .working
+        )
+        let preparation = SuggestionPreparation(
+            cacheKey: "summary-copy",
+            completedSessionSets: [],
+            setResolutions: [
+                SuggestionSetResolution(
+                    setId: setId,
+                    setIndex: 0,
+                    setNumber: 1,
+                    eligibility: .eligible(target: target),
+                    setType: .working
+                )
+            ],
+            pendingSets: [pendingSet],
+            unavailableReason: nil
+        )
+        let evaluation = SuggestionEvaluation(
+            input: makeInput(pendingSets: [pendingSet]),
+            decisions: [
+                makeDecision(
+                    setId: setId,
+                    setIndex: 0,
+                    setNumber: 1,
+                    target: target,
+                    historicalBaseE1RM: 100,
+                    sessionCapabilityE1RM: 104,
+                    effectiveE1RM: 101,
+                    fatigueDiscount: 0.96,
+                    projectedSessionFatigue: 0.12
+                )
+            ],
+            unavailableReason: nil
+        )
+
+        let data = SuggestionExplainer.makeWeightSuggestionData(
+            preparation: preparation,
+            evaluation: evaluation
+        )
+        let suggestion = try XCTUnwrap(data.suggestion(for: setId))
+
+        XCTAssertEqual(
+            suggestion.explanation.userSummary,
+            "Based on your recent performance and adjusted for this workout."
+        )
+        XCTAssertTrue(suggestion.explanation.adminSummary.contains("capacity from"))
+        XCTAssertTrue(suggestion.explanation.adminSummary.contains("readiness"))
+        XCTAssertNotEqual(suggestion.explanation.userSummary, suggestion.explanation.adminSummary)
     }
 
     func testDiagnosticsCarryFirstSetProgressionBiasMetadata() throws {
@@ -1502,8 +1678,8 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
             orderInExercise: 1,
             completed: false
         )
-        set.draftTargetRepMin = 8
-        set.draftTargetRepMax = 12
+        set.overrideTargetRepMin = 8
+        set.overrideTargetRepMax = 12
         let profile = HealthProfile()
 
         let preparation = SuggestionCoordinator.prepare(
@@ -1517,6 +1693,154 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         XCTAssertEqual(target.reps, 10)
         XCTAssertEqual(target.repsSource, .explicitSet)
         XCTAssertEqual(target.rirSource, .smartDefault)
+    }
+
+    func testTotalAcrossSidesTargetNormalizesPendingSuggestionReps() throws {
+        let exercise = Exercise(
+            name: "Dumbbell Lunge",
+            equipmentType: .dumbbell,
+            trackingType: .weightReps,
+            unilateral: true,
+            unilateralRepTargetMode: .totalAcrossSides
+        )
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: exercise.id,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: false
+        )
+        set.targetRepMin = 20
+        set.targetRepMax = 20
+        let profile = HealthProfile()
+
+        let preparation = SuggestionCoordinator.prepare(
+            exercise: exercise,
+            sets: [set],
+            profile: profile
+        )
+
+        let target = try XCTUnwrap(preparation.pendingSets.first?.target)
+        XCTAssertEqual(target.reps, 10)
+        XCTAssertEqual(target.displayReps, 20)
+        XCTAssertEqual(target.displayTargetLabel, "20 total reps")
+        XCTAssertEqual(target.normalizedTargetLabel, "normalized to 10 reps each side")
+    }
+
+    func testTotalAcrossSidesRepRangeNormalizesBoundByBound() throws {
+        let exercise = Exercise(
+            name: "Dumbbell Lunge",
+            equipmentType: .dumbbell,
+            trackingType: .weightReps,
+            unilateral: true,
+            unilateralRepTargetMode: .totalAcrossSides
+        )
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: exercise.id,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: false
+        )
+        set.overrideTargetRepMin = 20
+        set.overrideTargetRepMax = 24
+        let profile = HealthProfile()
+
+        let preparation = SuggestionCoordinator.prepare(
+            exercise: exercise,
+            sets: [set],
+            profile: profile
+        )
+
+        let target = try XCTUnwrap(preparation.pendingSets.first?.target)
+        XCTAssertEqual(target.reps, 11)
+        XCTAssertEqual(target.repRange, 10...12)
+        XCTAssertEqual(target.displayRepRange, 20...24)
+    }
+
+    func testTotalAcrossSidesSuggestionCarriesDisplayAndNormalizedTargetLabels() throws {
+        let setId = UUID()
+        let target = SuggestionTarget(
+            reps: 10,
+            rir: 2.0,
+            repRange: nil,
+            repsSource: .template,
+            rirSource: .template,
+            displayReps: 20,
+            displayRepRange: nil,
+            repTargetMode: .totalAcrossSides
+        )
+        let pendingSet = SuggestionPendingSetInput(
+            setId: setId,
+            setIndex: 0,
+            setNumber: 1,
+            target: target,
+            setType: .working
+        )
+        let preparation = SuggestionPreparation(
+            cacheKey: "total-across-sides",
+            completedSessionSets: [],
+            setResolutions: [
+                SuggestionSetResolution(
+                    setId: setId,
+                    setIndex: 0,
+                    setNumber: 1,
+                    eligibility: .eligible(target: target),
+                    setType: .working
+                )
+            ],
+            pendingSets: [pendingSet],
+            unavailableReason: nil
+        )
+        let evaluation = SuggestionEvaluation(
+            input: makeInput(pendingSets: [pendingSet]),
+            decisions: [
+                makeDecision(
+                    setId: setId,
+                    setIndex: 0,
+                    setNumber: 1,
+                    target: target
+                )
+            ],
+            unavailableReason: nil
+        )
+
+        let data = SuggestionExplainer.makeWeightSuggestionData(
+            preparation: preparation,
+            evaluation: evaluation
+        )
+        let suggestion = try XCTUnwrap(data.suggestion(for: setId))
+
+        XCTAssertEqual(suggestion.targetReps, 20)
+        XCTAssertEqual(suggestion.targetDisplayLabel, "20 total reps")
+        XCTAssertEqual(suggestion.normalizedTargetLabel, "normalized to 10 reps each side")
+        XCTAssertEqual(suggestion.diagnostics.normalizedTargetReps, 10)
+        XCTAssertEqual(suggestion.diagnostics.targetDisplayLabel, "20 total reps")
+        XCTAssertTrue(suggestion.explanation.adminSummary.contains("normalized to 10 reps each side"))
+    }
+
+    func testTotalAcrossSidesUnilateralRowUsesSharedHintInsteadOfDuplicatedPlaceholders() {
+        let exercise = Exercise(
+            name: "Dumbbell Lunge",
+            equipmentType: .dumbbell,
+            trackingType: .weightReps,
+            unilateral: true,
+            unilateralRepTargetMode: .totalAcrossSides
+        )
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: exercise.id,
+            orderInWorkout: 1,
+            orderInExercise: 1
+        )
+        set.targetRepMin = 20
+        set.targetRepMax = 20
+
+        let presentation = SetTableView.unilateralTargetPresentation(for: set, exercise: exercise)
+
+        XCTAssertEqual(presentation.leftPlaceholder, "0")
+        XCTAssertEqual(presentation.rightPlaceholder, "0")
+        XCTAssertEqual(presentation.sharedHint, "20 total")
     }
 
     func testInvalidDefaultsStillYieldMissingTarget() {
@@ -1671,8 +1995,14 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         setIndex: Int,
         setNumber: Int,
         target: SuggestionTarget,
+        historicalBaseE1RM: Double = 100,
+        sessionCapabilityE1RM: Double = 100,
+        effectiveE1RM: Double = 100,
+        fatigueDiscount: Double = 1.0,
+        freshnessApplied: Bool = false,
         selectionPolicy: SuggestionSelectionPolicy = .closestMatch,
-        selectionReferenceE1RM: Double? = nil
+        selectionReferenceE1RM: Double? = nil,
+        projectedSessionFatigue: Double = 0.0
     ) -> SuggestionDecision {
         SuggestionDecision(
             setId: setId,
@@ -1683,19 +2013,19 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
             rawWeight: 79.4,
             weightIncrement: 2.5,
             baseE1RM: 100,
-            historicalBaseE1RM: 100,
-            sessionCapabilityE1RM: 100,
-            effectiveE1RM: 100,
+            historicalBaseE1RM: historicalBaseE1RM,
+            sessionCapabilityE1RM: sessionCapabilityE1RM,
+            effectiveE1RM: effectiveE1RM,
             intensityFactor: 0.8,
-            fatigueDiscount: 1.0,
-            freshnessApplied: false,
+            fatigueDiscount: fatigueDiscount,
+            freshnessApplied: freshnessApplied,
             e1RMSource: .recentPerformance,
             sessionCapabilitySourceLabel: SessionCapabilityPolicy.observed.label,
             bestReps: nil,
             selectionPolicy: selectionPolicy,
             selectionReferenceE1RM: selectionReferenceE1RM,
             calibrationAdjustment: .neutral,
-            projectedSessionFatigue: 0.0
+            projectedSessionFatigue: projectedSessionFatigue
         )
     }
 }
@@ -1753,13 +2083,58 @@ final class SmartSuggestionSettingsTests: XCTestCase {
         XCTAssertEqual(profile.prescriptionDefaultTargetRIR, 0)
     }
 
-    func testHealthProfileRepositoryBackfillsDefaultTargets() async throws {
+    func testSettingsServicePersistsAdminModeAndUpdatesTimestamp() async throws {
+        let initialUpdatedAt = Date(timeIntervalSince1970: 1_000)
+        let profile = HealthProfile(
+            prescriptionAdminModeEnabled: false,
+            updatedAt: initialUpdatedAt
+        )
+        let repo = HealthProfileRepositoryStub(profile: profile)
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(
+            for: Exercise.self,
+            Workout.self,
+            WorkoutSet.self,
+            ExerciseStats.self,
+            PerformanceRecord.self,
+            BodyweightEntry.self,
+            HealthProfile.self,
+            Program.self,
+            ProgramExercise.self,
+            PlannedWorkout.self,
+            PlannedSet.self,
+            WorkoutTemplate.self,
+            TemplateExercise.self,
+            TemplateSet.self,
+            configurations: config
+        )
+        let service = SettingsService(
+            healthProfileRepository: repo,
+            prService: PRServiceStub(),
+            statsService: StatsServiceStub(),
+            modelContainer: container,
+            seedExercises: { _ in }
+        )
+
+        try await service.updatePrescriptionAdminModeEnabled(true)
+        XCTAssertEqual(profile.prescriptionAdminModeEnabled, true)
+        XCTAssertGreaterThan(profile.updatedAt, initialUpdatedAt)
+
+        let updatedAfterEnable = profile.updatedAt
+        try await service.updatePrescriptionAdminModeEnabled(false)
+
+        XCTAssertEqual(profile.prescriptionAdminModeEnabled, false)
+        XCTAssertGreaterThanOrEqual(profile.updatedAt, updatedAfterEnable)
+    }
+
+    func testHealthProfileRepositoryBackfillsDefaultTargetsAndAdminMode() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: HealthProfile.self, configurations: config)
         let context = ModelContext(container)
         let existing = HealthProfile()
         existing.prescriptionDefaultTargetReps = nil
         existing.prescriptionDefaultTargetRIR = nil
+        existing.prescriptionAdminModeEnabled = nil
         context.insert(existing)
         try context.save()
 
@@ -1768,6 +2143,7 @@ final class SmartSuggestionSettingsTests: XCTestCase {
 
         XCTAssertEqual(profile.prescriptionDefaultTargetReps, 8)
         XCTAssertEqual(profile.prescriptionDefaultTargetRIR, 2)
+        XCTAssertEqual(profile.prescriptionAdminModeEnabled, false)
     }
 }
 
@@ -2248,6 +2624,43 @@ final class TemplateImportExportTests: XCTestCase {
         XCTAssertEqual(secondImported.template.name, "Pull Day (Imported 2)")
     }
 
+    func testCreateTemplateFromWorkoutPrefersPersistedTargetOverrideBounds() async throws {
+        let context = try makeTemplateServiceContext()
+        let exercise = makeExercise(name: "Bench Press", primaryMuscle: "chest", defaultRestTime: 120)
+        let workoutDate = makeDate(2026, 3, 22, 7, 0)
+        let workout = Workout(
+            date: workoutDate,
+            startTime: workoutDate,
+            status: .inProgress
+        )
+        let set = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            date: workoutDate,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: false
+        )
+        set.targetRepMin = 8
+        set.targetRepMax = 12
+        set.overrideTargetRepMin = 6
+        set.overrideTargetRepMax = 8
+        set.targetRIR = 2
+
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(workout)
+        try await context.setRepo.save(set)
+
+        let templateId = try await context.service.createTemplateFromWorkout(workout.id, name: "Bench Override")
+        let detail = try await context.service.fetchTemplateDetail(templateId)
+        let unwrappedDetail = try XCTUnwrap(detail)
+        let savedSet = try XCTUnwrap(unwrappedDetail.exercises.first?.sets.first)
+
+        XCTAssertEqual(savedSet.targetRepMin, 6)
+        XCTAssertEqual(savedSet.targetRepMax, 8)
+        XCTAssertEqual(savedSet.targetRIR, 2)
+    }
+
     private func makeTemplateServiceContext() throws -> TemplateServiceTestContext {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
@@ -2277,7 +2690,9 @@ final class TemplateImportExportTests: XCTestCase {
         return TemplateServiceTestContext(
             service: service,
             exerciseRepo: exerciseRepo,
-            exerciseStatsRepo: exerciseStatsRepo
+            exerciseStatsRepo: exerciseStatsRepo,
+            workoutRepo: workoutRepo,
+            setRepo: setRepo
         )
     }
 
@@ -2333,6 +2748,7 @@ final class TemplateImportExportTests: XCTestCase {
                 secondaryMuscles: [],
                 movementPattern: nil,
                 unilateral: unilateral,
+                unilateralRepTargetMode: nil,
                 bilateralLoadFactor: nil,
                 bodyweightFactor: 0,
                 weightIncrement: 2.5,
@@ -2383,6 +2799,7 @@ final class TemplateImportExportTests: XCTestCase {
             secondaryMuscles: [],
             movementPattern: nil,
             unilateral: unilateral,
+            unilateralRepTargetMode: nil,
             bilateralLoadFactor: nil,
             bodyweightFactor: 0,
             weightIncrement: 2.5,
@@ -2864,6 +3281,8 @@ private struct TemplateServiceTestContext {
     let service: TemplateService
     let exerciseRepo: ExerciseRepository
     let exerciseStatsRepo: ExerciseStatsRepository
+    let workoutRepo: WorkoutRepository
+    let setRepo: SetRepository
 }
 
 private struct WorkoutHistoryBackupServiceTestContext {
@@ -3106,6 +3525,7 @@ private final class SettingsServiceStub: @unchecked Sendable, SettingsServicePro
     }
     func updatePrescriptionFatigueModelingEnabled(_ enabled: Bool) async throws { let _ = enabled }
     func updatePrescriptionDefaultRecoveryConstant(_ seconds: Double) async throws { let _ = seconds }
+    func updatePrescriptionAdminModeEnabled(_ enabled: Bool) async throws { let _ = enabled }
     func resetAllAppData() async throws {}
     func rebuildPRs() async throws {}
     func rebuildStats() async throws {}
@@ -3128,6 +3548,7 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
     var editedSetIds: [UUID] = []
     var uncompletedSetIds: [UUID] = []
     var deletedSetIds: [UUID] = []
+    var targetOverrideUpdates: [(setId: UUID, min: Int?, max: Int?)] = []
     var workoutSets: [UUID: [WorkoutSet]] = [:]
     var exerciseSets: [UUID: [WorkoutSet]] = [:]
     var fetchSetsForExerciseCallCount = 0
@@ -3154,6 +3575,28 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
 
     func delete(_ set: WorkoutSet) async throws {
         deletedSetIds.append(set.id)
+    }
+
+    func updateInProgressTargetRepOverride(
+        setId: UUID,
+        min: Int?,
+        max: Int?
+    ) async throws {
+        targetOverrideUpdates.append((setId, min, max))
+
+        for sets in workoutSets.values {
+            if let set = sets.first(where: { $0.id == setId }) {
+                set.overrideTargetRepMin = min
+                set.overrideTargetRepMax = max
+            }
+        }
+
+        for sets in exerciseSets.values {
+            if let set = sets.first(where: { $0.id == setId }) {
+                set.overrideTargetRepMin = min
+                set.overrideTargetRepMax = max
+            }
+        }
     }
 
     func fetchSets(for workoutId: UUID) async throws -> [WorkoutSet] {

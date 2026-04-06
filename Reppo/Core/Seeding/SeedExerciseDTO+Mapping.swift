@@ -5,6 +5,7 @@ extension SeedExerciseDTO {
         case invalidTrackingType(String)
         case invalidEquipmentType(String)
         case invalidMovementPattern(String)
+        case invalidUnilateralRepTargetMode(String)
     }
 
     /// Converts this DTO to an Exercise model instance.
@@ -13,6 +14,7 @@ extension SeedExerciseDTO {
         let mappedTrackingType = try Self.mapTrackingType(trackingType)
         let mappedEquipmentType = try Self.mapEquipmentType(equipmentType)
         let mappedMovementPattern = try movementPattern.map { try Self.mapMovementPattern($0) }
+        let mappedUnilateralRepTargetMode = try unilateralRepTargetMode.map { try Self.mapUnilateralRepTargetMode($0) }
 
         return Exercise(
             name: name,
@@ -22,6 +24,7 @@ extension SeedExerciseDTO {
             secondaryMuscles: secondaryMuscles,
             movementPattern: mappedMovementPattern,
             unilateral: unilateral,
+            unilateralRepTargetMode: mappedUnilateralRepTargetMode ?? .perSide,
             bodyweightFactor: bodyweightFactor,
             weightIncrement: weightIncrement,
             defaultRestTime: defaultRestTime
@@ -69,5 +72,12 @@ extension SeedExerciseDTO {
         case "other": return .other
         default: throw MappingError.invalidMovementPattern(value)
         }
+    }
+
+    private static func mapUnilateralRepTargetMode(_ value: String) throws -> UnilateralRepTargetMode {
+        guard let mode = UnilateralRepTargetMode(rawValue: value) else {
+            throw MappingError.invalidUnilateralRepTargetMode(value)
+        }
+        return mode
     }
 }

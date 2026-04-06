@@ -20,7 +20,8 @@ struct SmartSuggestionsAdvancedSettingsView: View {
             SmartSuggestionsAdvancedSections(
                 profile: profile,
                 settingsService: settingsService,
-                fatigueLearningService: fatigueLearningService
+                fatigueLearningService: fatigueLearningService,
+                isAdminModeEnabled: profile.prescriptionAdminModeEnabled ?? false
             )
         }
         .scrollContentBackground(.hidden)
@@ -43,6 +44,7 @@ struct SmartSuggestionsAdvancedSections: View {
     private let settingsService: any SettingsServiceProtocol
     private let fatigueLearningService: FatigueLearningService
     private let firstSectionTitle: String?
+    private let isAdminModeEnabled: Bool
 
     // MARK: - Options
 
@@ -53,6 +55,7 @@ struct SmartSuggestionsAdvancedSections: View {
     init(profile: HealthProfile,
          settingsService: any SettingsServiceProtocol,
          fatigueLearningService: FatigueLearningService,
+         isAdminModeEnabled: Bool = false,
          firstSectionTitle: String? = nil) {
         _fatigueEnabled = State(initialValue: profile.prescriptionFatigueModelingEnabled ?? true)
         _recencyWeeks = State(initialValue: profile.prescriptionRecencyWeeks ?? 6)
@@ -60,6 +63,7 @@ struct SmartSuggestionsAdvancedSections: View {
         _defaultTargetRIR = State(initialValue: profile.prescriptionDefaultTargetRIR ?? 2)
         self.settingsService = settingsService
         self.fatigueLearningService = fatigueLearningService
+        self.isAdminModeEnabled = isAdminModeEnabled
         self.firstSectionTitle = firstSectionTitle
     }
 
@@ -147,7 +151,7 @@ struct SmartSuggestionsAdvancedSections: View {
                     Task { try? await settingsService.updatePrescriptionFatigueModelingEnabled(newValue) }
                 }
 
-            if fatigueEnabled {
+            if fatigueEnabled && isAdminModeEnabled {
                 NavigationLink {
                     FatigueLearningAdminView(fatigueLearningService: fatigueLearningService)
                 } label: {
@@ -156,7 +160,11 @@ struct SmartSuggestionsAdvancedSections: View {
                 }
             }
         } footer: {
-            Text("When enabled, suggested weights decrease across sets to account for accumulated fatigue. Uses your rest timer duration to model recovery between sets.")
+            Text(
+                isAdminModeEnabled
+                    ? "When enabled, suggested weights decrease across sets to account for accumulated fatigue. Uses your rest timer duration to model recovery between sets."
+                    : "When enabled, suggested weights decrease across sets to account for accumulated fatigue. Turn on Admin Mode to access troubleshooting diagnostics."
+            )
                 .foregroundColor(.textTertiary)
         }
     }

@@ -25,6 +25,7 @@ final class CreateEditExerciseViewModel {
     var secondaryMuscles: [String] = []
     var movementPattern: MovementPattern? = nil
     var unilateral: Bool = false
+    var unilateralRepTargetMode: UnilateralRepTargetMode = .perSide
     var bilateralLoadFactor: Double? = nil
     var bodyweightFactor: Double = 0.0
     var weightIncrement: Double? = nil
@@ -94,6 +95,7 @@ final class CreateEditExerciseViewModel {
             secondaryMuscles = exercise.secondaryMuscles
             movementPattern = exercise.movementPattern
             unilateral = exercise.unilateral
+            unilateralRepTargetMode = exercise.unilateralRepTargetMode
             bilateralLoadFactor = exercise.bilateralLoadFactor
             bodyweightFactor = exercise.bodyweightFactor
             weightIncrement = exercise.weightIncrement
@@ -125,6 +127,9 @@ final class CreateEditExerciseViewModel {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         let muscle = ExercisePrimaryGroup.normalizedValue(primaryMuscle)
         let resolvedUnilateral = supportsUnilateral ? self.unilateral : false
+        let resolvedUnilateralRepTargetMode: UnilateralRepTargetMode = resolvedUnilateral
+            ? unilateralRepTargetMode
+            : .perSide
 
         if isEditing, let existing = existingExercise {
             let originalTrackingType = existing.trackingType
@@ -137,6 +142,7 @@ final class CreateEditExerciseViewModel {
             existing.secondaryMuscles = secondaryMuscles
             existing.movementPattern = movementPattern
             existing.unilateral = resolvedUnilateral
+            existing.unilateralRepTargetMode = resolvedUnilateralRepTargetMode
             existing.bilateralLoadFactor = bilateralLoadFactor
             existing.bodyweightFactor = bodyweightFactor
             existing.weightIncrement = weightIncrement
@@ -153,6 +159,7 @@ final class CreateEditExerciseViewModel {
                 secondaryMuscles: secondaryMuscles,
                 movementPattern: movementPattern,
                 unilateral: resolvedUnilateral,
+                unilateralRepTargetMode: resolvedUnilateralRepTargetMode,
                 bilateralLoadFactor: bilateralLoadFactor,
                 bodyweightFactor: bodyweightFactor,
                 weightIncrement: weightIncrement,

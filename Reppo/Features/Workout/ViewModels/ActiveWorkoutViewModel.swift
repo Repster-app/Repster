@@ -195,6 +195,9 @@ final class ActiveWorkoutViewModel {
     /// Whether prescription is globally enabled (fetched from HealthProfile).
     var prescriptionEnabled: Bool = false
 
+    /// Whether Smart Suggestions admin diagnostics should be shown.
+    var suggestionAdminModeEnabled: Bool = false
+
     /// Tracks exerciseId + completed set count to avoid redundant re-computation.
     private var suggestionsLoadedForKey: String?
 
@@ -348,6 +351,7 @@ final class ActiveWorkoutViewModel {
                 self.globalDefaultRestTime = profile.defaultRestTimeSeconds ?? 150
                 self.globalDefaultWarmupRestTime = profile.defaultWarmupRestTimeSeconds
                 self.restTimerAlertMode = profile.restTimerAlert ?? "both"
+                self.suggestionAdminModeEnabled = profile.prescriptionAdminModeEnabled ?? false
             }
 
             // 8. Restore persisted workout clock and rest timer state (survives view dismissal).
@@ -1487,6 +1491,7 @@ final class ActiveWorkoutViewModel {
             let profile = try await settingsService.fetchSettings()
             unitPreference = profile.unitPreference
             prescriptionEnabled = profile.prescriptionEnabled ?? true
+            suggestionAdminModeEnabled = profile.prescriptionAdminModeEnabled ?? false
 
             let data = try await ExerciseInfoProvider.compute(
                 currentSets: currentSets,
@@ -1633,6 +1638,7 @@ final class ActiveWorkoutViewModel {
         if let resolvedProfile {
             unitPreference = resolvedProfile.unitPreference
             prescriptionEnabled = resolvedProfile.prescriptionEnabled ?? true
+            suggestionAdminModeEnabled = resolvedProfile.prescriptionAdminModeEnabled ?? false
         }
 
         guard let currentExercise else {
@@ -1932,6 +1938,22 @@ extension ActiveWorkoutViewModel: SetTableDataSource {
 
     func suggestedWeight(for setId: UUID) -> Double? {
         weightSuggestionData?.suggestedWeight(for: setId)
+    }
+
+    func persistTargetRepOverride(_ set: WorkoutSet, min: Int?, max: Int?) async {
+        do {
+            try await setService.updateInProgressTargetRepOverride(
+                setId: set.id,
+                min: min,
+                max: max
+            )
+
+            if let sets = setsByExercise[set.exerciseId] {
+                setsByExercise[set.exerciseId] = sets
+            }
+        } catch {
+            print("[ActiveWorkoutViewModel] Failed to persist target rep override for set \(set.id): \(error)")
+        }
     }
 
     /// Draft edits only affect live suggestions for reps and RIR on incomplete sets.

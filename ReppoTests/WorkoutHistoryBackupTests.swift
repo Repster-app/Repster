@@ -164,6 +164,48 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
         XCTAssertEqual(restoredExercise?.fatigueRateSourceRawValue, ExerciseFatigueRateSource.manualOverride.rawValue)
     }
 
+    func testBackupPreservesUnilateralRepTargetModeMetadata() async throws {
+        let context = try makeBackupServiceContext()
+        let workoutDate = Date()
+        let exercise = Exercise(
+            name: "Dumbbell Lunge",
+            equipmentType: .dumbbell,
+            trackingType: .weightReps,
+            unilateral: true,
+            unilateralRepTargetMode: .totalAcrossSides
+        )
+        let workout = Workout(
+            date: workoutDate,
+            startTime: workoutDate,
+            status: .completed
+        )
+        let set = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            date: workoutDate,
+            weight: 20,
+            effectiveWeight: 20,
+            reps: 10,
+            rir: 0,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(workout)
+        try await context.setRepo.save(set)
+
+        let exportedData = try await context.service.exportBackup()
+        let archive = try decodeBackupArchive(exportedData)
+        let archivedExercise = try XCTUnwrap(archive.exercises.first(where: { $0.id == exercise.id }))
+        XCTAssertEqual(archivedExercise.unilateralRepTargetMode, .totalAcrossSides)
+
+        let restoredContext = try makeBackupServiceContext()
+        _ = try await restoredContext.service.restoreBackup(data: exportedData)
+        let restoredExercise = try await restoredContext.exerciseRepo.fetch(byId: exercise.id)
+        XCTAssertEqual(restoredExercise?.unilateralRepTargetMode, .totalAcrossSides)
+    }
+
     func testRestoreBackupReplacesHistoryAndKeepsUnrelatedData() async throws {
         let context = try makeBackupServiceContext()
         let profile = try await context.healthProfileRepo.fetchOrCreate()
@@ -1748,6 +1790,7 @@ private final class ResetSettingsServiceStub: @unchecked Sendable, SettingsServi
     func updatePrescriptionFreshnessBonus(enabled: Bool, percent: Double) async throws {}
     func updatePrescriptionFatigueModelingEnabled(_ enabled: Bool) async throws {}
     func updatePrescriptionDefaultRecoveryConstant(_ seconds: Double) async throws {}
+    func updatePrescriptionAdminModeEnabled(_ enabled: Bool) async throws {}
     func resetAllAppData() async throws {
         resetAllAppDataCallCount += 1
         if let resetError {
@@ -1804,6 +1847,7 @@ private struct NoOpSettingsService: SettingsServiceProtocol {
     func updatePrescriptionFreshnessBonus(enabled: Bool, percent: Double) async throws {}
     func updatePrescriptionFatigueModelingEnabled(_ enabled: Bool) async throws {}
     func updatePrescriptionDefaultRecoveryConstant(_ seconds: Double) async throws {}
+    func updatePrescriptionAdminModeEnabled(_ enabled: Bool) async throws {}
     func resetAllAppData() async throws {}
     func rebuildPRs() async throws {}
     func rebuildStats() async throws {}

@@ -7,6 +7,7 @@ import SwiftUI
 struct WeightSuggestionCardView: View {
     let data: WeightSuggestionData
     let unitPreference: UnitPreference
+    let isAdminModeEnabled: Bool
     @State private var showDetails: Bool = false
 
     var body: some View {
@@ -47,7 +48,7 @@ struct WeightSuggestionCardView: View {
 
                 Spacer()
 
-                if let baseE1RM = data.baseE1RM {
+                if isAdminModeEnabled, let baseE1RM = data.baseE1RM {
                     Text("e1RM: \(formatWeight(baseE1RM))")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Color.textTertiary)
@@ -60,24 +61,26 @@ struct WeightSuggestionCardView: View {
                     .foregroundStyle(Color.textTertiary)
             }
 
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showDetails.toggle()
+            if isAdminModeEnabled {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showDetails.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(showDetails ? "Hide details" : "Details")
+                            .font(.system(size: 11, weight: .semibold))
+                        Image(systemName: showDetails ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.textSecondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(Color.bg.opacity(0.55))
+                    .cornerRadius(8)
                 }
-            } label: {
-                HStack(spacing: 4) {
-                    Text(showDetails ? "Hide details" : "Details")
-                        .font(.system(size: 11, weight: .semibold))
-                    Image(systemName: showDetails ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 10, weight: .semibold))
-                }
-                .foregroundStyle(Color.textSecondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(Color.bg.opacity(0.55))
-                .cornerRadius(8)
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
     }
 
@@ -93,7 +96,16 @@ struct WeightSuggestionCardView: View {
         }
     }
 
+    @ViewBuilder
     private func suggestionRow(_ suggestion: SetSuggestion) -> some View {
+        if isAdminModeEnabled {
+            adminSuggestionRow(suggestion)
+        } else {
+            userSuggestionRow(suggestion)
+        }
+    }
+
+    private func adminSuggestionRow(_ suggestion: SetSuggestion) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 0) {
                 Text("Set \(suggestion.setNumber): ")
@@ -104,18 +116,41 @@ struct WeightSuggestionCardView: View {
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(Color.textPrimary)
 
-                Text(" \u{00D7} \(suggestion.targetReps)")
+                Text(" \u{00D7} \(suggestion.targetDisplayLabel)")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Color.textSecondary)
             }
 
-            Text(suggestion.explanation.summary)
+            Text(suggestion.explanation.adminSummary)
                 .font(.system(size: 11))
                 .foregroundStyle(Color.textTertiary)
 
             if showDetails {
                 suggestionDetails(suggestion.diagnostics)
             }
+        }
+    }
+
+    private func userSuggestionRow(_ suggestion: SetSuggestion) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Set \(suggestion.setNumber)")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Color.textSecondary)
+
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(formatWeight(suggestion.suggestedWeight))
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(Color.textPrimary)
+
+                Text("for \(suggestion.targetDisplayLabel)")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color.textSecondary)
+            }
+
+            Text(suggestion.explanation.userSummary)
+                .font(.system(size: 11))
+                .foregroundStyle(Color.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -135,7 +170,7 @@ struct WeightSuggestionCardView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(Color.textTertiary)
 
-            if showDetails {
+            if isAdminModeEnabled, showDetails {
                 unavailableDetails(rowState, reason: reason)
             }
         }
@@ -165,6 +200,10 @@ struct WeightSuggestionCardView: View {
                 Text(
                     "intensity \(String(format: "%.3f", diagnostics.intensityFactor)) | RIR \(formatSimpleNumber(diagnostics.targetRIR))"
                 )
+                Text("display target \(diagnostics.targetDisplayLabel)")
+                if let normalizedTargetLabel = diagnostics.normalizedTargetLabel {
+                    Text(normalizedTargetLabel)
+                }
                 Text(
                     "target source \(diagnostics.targetSourceLabel) | baseline \(diagnostics.baselineSourceLabel)"
                 )
@@ -224,6 +263,9 @@ struct WeightSuggestionCardView: View {
                     Text("target source \(target.sourceLabel)")
                     Text("reps source \(target.repsSourceLabel)")
                     Text("RIR source \(target.rirSourceLabel)")
+                    if let normalizedTargetLabel = target.normalizedTargetLabel {
+                        Text(normalizedTargetLabel)
+                    }
                     if let defaultUsageLabel = target.defaultUsageLabel {
                         Text(defaultUsageLabel)
                     }
@@ -340,10 +382,7 @@ struct WeightSuggestionCardView: View {
     }
 
     private func targetDescription(_ target: SuggestionTarget) -> String {
-        if let repRange = target.repRange {
-            return "\(repRange.lowerBound)-\(repRange.upperBound) reps (resolved \(target.reps)) @ RIR \(formatSimpleNumber(target.rir))"
-        }
-        return "\(target.reps) reps @ RIR \(formatSimpleNumber(target.rir))"
+        return "\(target.displayTargetLabel) @ RIR \(formatSimpleNumber(target.rir))"
     }
 
     private func formatCloseness(_ closeness: E1RMCloseness) -> String {

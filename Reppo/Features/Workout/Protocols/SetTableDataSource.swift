@@ -102,6 +102,9 @@ protocol SetTableDataSource: AnyObject, Observable {
     /// Update the note on a set. Called from the context menu note editor.
     func updateSetNote(_ set: WorkoutSet, note: String?) async
 
+    /// Persist rep-target override guidance without invoking the full set edit pipeline.
+    func persistTargetRepOverride(_ set: WorkoutSet, min: Int?, max: Int?) async
+
     // MARK: - Exercise Actions
 
     /// Reorder exercises by moving from source indices to destination.
@@ -126,5 +129,10 @@ extension SetTableDataSource {
     func suggestionState(for setId: UUID) -> SetSuggestionState? { nil }
     func suggestedWeight(for setId: UUID) -> Double? {
         suggestionState(for: setId)?.suggestion?.suggestedWeight
+    }
+    func persistTargetRepOverride(_ set: WorkoutSet, min: Int?, max: Int?) async {
+        let _ = set
+        let _ = min
+        let _ = max
     }
 }

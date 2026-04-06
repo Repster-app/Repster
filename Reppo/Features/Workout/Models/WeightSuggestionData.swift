@@ -44,7 +44,10 @@ struct SuggestionRepAlternative: Identifiable, Sendable {
 
 /// User-facing explanation for why a suggestion exists.
 struct SuggestionExplanation: Sendable {
-    let summary: String
+    let userSummary: String
+    let adminSummary: String
+    let targetDisplayLabel: String
+    let normalizedTargetLabel: String?
     let targetSourceLabel: String
     let repsSourceLabel: String
     let rirSourceLabel: String
@@ -67,9 +70,15 @@ struct SetSuggestionDiagnostics: Sendable {
     let intensityFactor: Double
     let rawWeight: Double
     let roundedWeight: Double
+    let displayTargetReps: Int
+    let displayTargetRepRange: ClosedRange<Int>?
     let chosenReps: Int
+    let normalizedTargetReps: Int
+    let normalizedTargetRepRange: ClosedRange<Int>?
     let targetRIR: Double
     let targetRepRange: ClosedRange<Int>?
+    let targetDisplayLabel: String
+    let normalizedTargetLabel: String?
     let targetSourceLabel: String
     let repsSourceLabel: String
     let rirSourceLabel: String
@@ -96,20 +105,22 @@ struct SetSuggestion: Identifiable, Sendable {
     let setNumber: Int
     /// Prescribed weight in kg (views handle unit conversion).
     let suggestedWeight: Double
-    /// Target reps used for this prescription.
+    /// User-facing target reps shown in the card.
     let targetReps: Int
     /// Target RIR used for this prescription.
     let targetRIR: Double
-    /// Optional minimum target reps when the set is prescribed as a range.
+    /// Optional user-facing minimum target reps when the set is prescribed as a range.
     let targetRepMin: Int?
-    /// Optional maximum target reps when the set is prescribed as a range.
+    /// Optional user-facing maximum target reps when the set is prescribed as a range.
     let targetRepMax: Int?
+    let targetDisplayLabel: String
+    let normalizedTargetLabel: String?
     /// Structured explanation shown in summary and details.
     let explanation: SuggestionExplanation
     /// Structured diagnostics shown in the expanded details panel.
     let diagnostics: SetSuggestionDiagnostics
 
-    var contextLabel: String { explanation.summary }
+    var contextLabel: String { explanation.userSummary }
 }
 
 /// Row-level Smart Suggestion state for a pending set.
@@ -195,7 +206,7 @@ enum SuggestionCoordinator {
         profile: HealthProfile?
     ) -> SuggestionPreparation {
         let completedSessionSets = completedSessionSets(from: sets)
-        let setResolutions = resolvePendingSets(from: sets, profile: profile)
+        let setResolutions = resolvePendingSets(from: sets, exercise: exercise, profile: profile)
         let pendingSets = setResolutions.compactMap(pendingSetInput(from:))
 
         let unavailableReason: SuggestionUnavailableReason?
@@ -251,6 +262,7 @@ enum SuggestionCoordinator {
 
     private static func resolvePendingSets(
         from sets: [WorkoutSet],
+        exercise: Exercise?,
         profile: HealthProfile?
     ) -> [SuggestionSetResolution] {
         var resolutions: [SuggestionSetResolution] = []
@@ -266,7 +278,7 @@ enum SuggestionCoordinator {
                     setId: set.id,
                     setIndex: index,
                     setNumber: workingSetNumber,
-                    eligibility: resolveTarget(for: set, profile: profile),
+                    eligibility: resolveTarget(for: set, exercise: exercise, profile: profile),
                     setType: set.setType
                 )
             )
@@ -277,43 +289,40 @@ enum SuggestionCoordinator {
 
     private static func resolveTarget(
         for set: WorkoutSet,
+        exercise: Exercise?,
         profile: HealthProfile?
     ) -> SuggestionEligibility {
-        let templateRepRange: ClosedRange<Int>?
-        if let min = set.targetRepMin, let max = set.targetRepMax, min < max {
-            templateRepRange = min...max
-        } else {
-            templateRepRange = nil
-        }
+        let repTargetMode = repTargetMode(for: exercise)
+        let templateRepRange = makeRepRange(min: set.targetRepMin, max: set.targetRepMax)
 
-        let draftRepRange = set.draftTargetRepRange
-        let hasDraftRepTarget = set.hasDraftRepTarget
-        let draftRepMin = set.draftTargetRepMin
-        let draftRepMax = set.draftTargetRepMax
+        let overrideRepRange = set.overrideTargetRepRange
+        let hasOverrideRepTarget = set.hasOverrideRepTarget
+        let overrideRepMin = set.overrideTargetRepMin
+        let overrideRepMax = set.overrideTargetRepMax
         let defaultTargetReps = normalizedDefaultTargetReps(from: profile)
         let defaultTargetRIR = normalizedDefaultTargetRIR(from: profile)
 
-        let repsResolution: (value: Int, source: SuggestionTargetComponentSource)?
-        if let reps = set.reps, reps > 0 {
-            repsResolution = (reps, .explicitSet)
-        } else if let draftRepRange {
-            repsResolution = ((draftRepRange.lowerBound + draftRepRange.upperBound) / 2, .explicitSet)
-        } else if let min = draftRepMin, let max = draftRepMax, min > 0, max > 0, min == max {
-            repsResolution = (min, .explicitSet)
-        } else if let min = draftRepMin, min > 0 {
-            repsResolution = (min, .explicitSet)
-        } else if let max = draftRepMax, max > 0 {
-            repsResolution = (max, .explicitSet)
+        let displayRepsResolution: (value: Int, source: SuggestionTargetComponentSource)?
+        if let overrideRepRange {
+            displayRepsResolution = ((overrideRepRange.lowerBound + overrideRepRange.upperBound) / 2, .explicitSet)
+        } else if let min = overrideRepMin, let max = overrideRepMax, min > 0, max > 0, min == max {
+            displayRepsResolution = (min, .explicitSet)
+        } else if let min = overrideRepMin, min > 0 {
+            displayRepsResolution = (min, .explicitSet)
+        } else if let max = overrideRepMax, max > 0 {
+            displayRepsResolution = (max, .explicitSet)
+        } else if let reps = set.reps, reps > 0 {
+            displayRepsResolution = (reps, .explicitSet)
         } else if let min = set.targetRepMin, let max = set.targetRepMax {
-            repsResolution = ((min + max) / 2, .template)
+            displayRepsResolution = ((min + max) / 2, .template)
         } else if let min = set.targetRepMin {
-            repsResolution = (min, .template)
+            displayRepsResolution = (min, .template)
         } else if let max = set.targetRepMax {
-            repsResolution = (max, .template)
+            displayRepsResolution = (max, .template)
         } else if let defaultTargetReps {
-            repsResolution = (defaultTargetReps, .smartDefault)
+            displayRepsResolution = (defaultTargetReps, .smartDefault)
         } else {
-            repsResolution = nil
+            displayRepsResolution = nil
         }
 
         let rirResolution: (value: Double, source: SuggestionTargetComponentSource)?
@@ -327,30 +336,40 @@ enum SuggestionCoordinator {
             rirResolution = nil
         }
 
-        guard let repsResolution, repsResolution.value > 0, let rirResolution else {
+        guard let displayRepsResolution, displayRepsResolution.value > 0, let rirResolution else {
             return .ineligible(reason: .missingTarget)
         }
 
-        let repRange: ClosedRange<Int>?
-        if set.reps != nil {
-            repRange = nil
-        } else if let draftRepRange {
-            repRange = draftRepRange
-        } else if hasDraftRepTarget {
-            repRange = nil
-        } else if repsResolution.source == .template {
-            repRange = templateRepRange
+        let displayRepRange: ClosedRange<Int>?
+        if let overrideRepRange {
+            displayRepRange = overrideRepRange
+        } else if hasOverrideRepTarget || set.reps != nil {
+            displayRepRange = nil
+        } else if displayRepsResolution.source == .template {
+            displayRepRange = templateRepRange
         } else {
-            repRange = nil
+            displayRepRange = nil
         }
+
+        let normalizedReps = normalizedTargetReps(
+            from: displayRepsResolution.value,
+            mode: repTargetMode
+        )
+        let normalizedRepRange = normalizedTargetRepRange(
+            from: displayRepRange,
+            mode: repTargetMode
+        )
 
         return .eligible(
             target: SuggestionTarget(
-                reps: repsResolution.value,
+                reps: normalizedReps,
                 rir: rirResolution.value,
-                repRange: repRange,
-                repsSource: repsResolution.source,
-                rirSource: rirResolution.source
+                repRange: normalizedRepRange,
+                repsSource: displayRepsResolution.source,
+                rirSource: rirResolution.source,
+                displayReps: displayRepsResolution.value,
+                displayRepRange: displayRepRange,
+                repTargetMode: repTargetMode
             )
         )
     }
@@ -404,10 +423,17 @@ enum SuggestionCoordinator {
                     var parts = base + [
                         "eligible",
                         "r\(target.reps)",
+                        "displayR\(target.displayReps)",
                         "rir\(signatureNumber(target.rir))"
                     ]
                     if let range = target.repRange {
                         parts.append("rng\(range.lowerBound)-\(range.upperBound)")
+                    }
+                    if let displayRange = target.displayRepRange {
+                        parts.append("displayRng\(displayRange.lowerBound)-\(displayRange.upperBound)")
+                    }
+                    if let repTargetMode = target.repTargetMode {
+                        parts.append("mode\(repTargetMode.rawValue)")
                     }
                     return parts.joined(separator: ":")
                 case let .ineligible(reason):
@@ -445,7 +471,8 @@ enum SuggestionCoordinator {
                 "fatigueRateSource\(exercise.fatigueRateSourceRawValue ?? "nil")",
                 "localLearnSessions\(exercise.fatigueLearningSessionCount ?? 0)",
                 "recovery\(signatureOptionalNumber(exercise.recoveryConstant))",
-                "rest\(exercise.defaultRestTime ?? -1)"
+                "rest\(exercise.defaultRestTime ?? -1)",
+                "repMode\(exercise.unilateralRepTargetMode.rawValue)"
             ].joined(separator: ":")
         } else {
             exerciseSignature = "exercise:missing"
@@ -501,6 +528,41 @@ enum SuggestionCoordinator {
     private static func normalizedDefaultTargetRIR(from profile: HealthProfile?) -> Int? {
         guard let rir = profile?.prescriptionDefaultTargetRIR, (0...5).contains(rir) else { return nil }
         return rir
+    }
+
+    private static func repTargetMode(for exercise: Exercise?) -> UnilateralRepTargetMode? {
+        guard let exercise,
+              exercise.supportsUnilateralLogging,
+              exercise.unilateral else {
+            return nil
+        }
+        return exercise.unilateralRepTargetMode
+    }
+
+    private static func makeRepRange(min: Int?, max: Int?) -> ClosedRange<Int>? {
+        guard let min, let max, min < max else { return nil }
+        return min...max
+    }
+
+    private static func normalizedTargetReps(
+        from displayReps: Int,
+        mode: UnilateralRepTargetMode?
+    ) -> Int {
+        guard mode == .totalAcrossSides else { return displayReps }
+        return max(1, Int(ceil(Double(displayReps) / 2.0)))
+    }
+
+    private static func normalizedTargetRepRange(
+        from displayRepRange: ClosedRange<Int>?,
+        mode: UnilateralRepTargetMode?
+    ) -> ClosedRange<Int>? {
+        guard let displayRepRange else { return nil }
+        guard mode == .totalAcrossSides else { return displayRepRange }
+
+        let normalizedLower = normalizedTargetReps(from: displayRepRange.lowerBound, mode: mode)
+        let normalizedUpper = normalizedTargetReps(from: displayRepRange.upperBound, mode: mode)
+        guard normalizedLower < normalizedUpper else { return nil }
+        return normalizedLower...normalizedUpper
     }
 }
 
@@ -595,15 +657,17 @@ enum SuggestionExplainer {
         setType: SetType,
         configuredRestSeconds: Double
     ) -> SetSuggestion {
-        let chosenReps = decision.bestReps ?? decision.targetReps
+        let chosenDisplayReps = resolvedDisplayTargetReps(for: decision)
         return SetSuggestion(
             pendingSetId: decision.setId,
             setNumber: decision.setNumber,
             suggestedWeight: decision.prescribedWeight,
-            targetReps: chosenReps,
+            targetReps: chosenDisplayReps,
             targetRIR: decision.targetRIR,
-            targetRepMin: decision.repRange?.lowerBound,
-            targetRepMax: decision.repRange?.upperBound,
+            targetRepMin: decision.displayRepRange?.lowerBound,
+            targetRepMax: decision.displayRepRange?.upperBound,
+            targetDisplayLabel: decision.targetDisplayLabel,
+            normalizedTargetLabel: decision.normalizedTargetLabel,
             explanation: explanation(for: decision),
             diagnostics: diagnostics(
                 for: decision,
@@ -619,7 +683,7 @@ enum SuggestionExplainer {
         var summaryParts = [
             "\(String(format: "%.1f", decision.historicalBaseE1RM)) kg capacity from \(decision.e1RMSource.label)",
             "readiness \(formatSignedPercent(readinessPercent))",
-            "target from \(decision.targetSourceLabel)"
+            "\(decision.targetDisplayLabel) target from \(decision.targetSourceLabel)"
         ]
         if abs(decision.sessionCapabilityE1RM - decision.historicalBaseE1RM) > 0.05 {
             summaryParts.insert(
@@ -627,13 +691,34 @@ enum SuggestionExplainer {
                 at: 1
             )
         }
+        if let normalizedTargetLabel = decision.normalizedTargetLabel {
+            summaryParts.append(normalizedTargetLabel)
+        }
         if let defaultUsageLabel = decision.targetDefaultUsageLabel {
             summaryParts.append(defaultUsageLabel)
         }
-        let summary = summaryParts.joined(separator: ", ")
+        let adminSummary = summaryParts.joined(separator: ", ")
+
+        let hasWorkoutAdjustment =
+            abs(decision.sessionCapabilityE1RM - decision.historicalBaseE1RM) > 0.05 ||
+            abs(decision.fatigueDiscount - 1.0) > 0.001 ||
+            decision.freshnessApplied ||
+            abs(decision.projectedSessionFatigue) > 0.001
+        let userSummaryPrefix = hasWorkoutAdjustment
+            ? "Based on your recent performance and adjusted for this workout."
+            : "Based on your recent performance and this set's target."
+        let userSummary: String
+        if decision.targetDefaultUsageLabel != nil {
+            userSummary = "\(userSummaryPrefix) Missing targets used your Smart Suggestions defaults."
+        } else {
+            userSummary = userSummaryPrefix
+        }
 
         return SuggestionExplanation(
-            summary: summary,
+            userSummary: userSummary,
+            adminSummary: adminSummary,
+            targetDisplayLabel: decision.targetDisplayLabel,
+            normalizedTargetLabel: decision.normalizedTargetLabel,
             targetSourceLabel: decision.targetSourceLabel,
             repsSourceLabel: decision.targetRepsSourceLabel,
             rirSourceLabel: decision.targetRIRSourceLabel,
@@ -665,9 +750,15 @@ enum SuggestionExplainer {
             intensityFactor: decision.intensityFactor,
             rawWeight: decision.rawWeight,
             roundedWeight: decision.prescribedWeight,
+            displayTargetReps: resolvedDisplayTargetReps(for: decision),
+            displayTargetRepRange: decision.displayRepRange,
             chosenReps: chosenReps,
+            normalizedTargetReps: decision.targetReps,
+            normalizedTargetRepRange: decision.repRange,
             targetRIR: decision.targetRIR,
             targetRepRange: decision.repRange,
+            targetDisplayLabel: decision.targetDisplayLabel,
+            normalizedTargetLabel: decision.normalizedTargetLabel,
             targetSourceLabel: decision.targetSourceLabel,
             repsSourceLabel: decision.targetRepsSourceLabel,
             rirSourceLabel: decision.targetRIRSourceLabel,
@@ -761,6 +852,37 @@ enum SuggestionExplainer {
     private static func roundToIncrement(_ value: Double, increment: Double) -> Double {
         guard increment > 0 else { return value }
         return (value / increment).rounded() * increment
+    }
+
+    private static func resolvedDisplayTargetReps(for decision: SuggestionDecision) -> Int {
+        guard let normalizedBestReps = decision.bestReps else {
+            return decision.displayTargetReps
+        }
+        guard decision.target.repTargetMode == .totalAcrossSides,
+              let displayRange = decision.displayRepRange else {
+            return normalizedBestReps
+        }
+
+        let matchingDisplayReps = displayRange.filter {
+            normalizedTotalAcrossSidesDisplayReps($0) == normalizedBestReps
+        }
+
+        guard !matchingDisplayReps.isEmpty else {
+            return decision.displayTargetReps
+        }
+
+        return matchingDisplayReps.min { lhs, rhs in
+            let lhsDistance = abs(lhs - decision.displayTargetReps)
+            let rhsDistance = abs(rhs - decision.displayTargetReps)
+            if lhsDistance != rhsDistance {
+                return lhsDistance < rhsDistance
+            }
+            return lhs < rhs
+        } ?? decision.displayTargetReps
+    }
+
+    private static func normalizedTotalAcrossSidesDisplayReps(_ displayReps: Int) -> Int {
+        max(1, Int(ceil(Double(displayReps) / 2.0)))
     }
 
     private static func formatSignedPercent(_ value: Double) -> String {

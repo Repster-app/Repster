@@ -3,7 +3,7 @@ import XCTest
 
 final class WorkoutSetTests: XCTestCase {
 
-    func testPreferredTargetRepBoundsPreferDraftWithoutMixingTemplateBounds() {
+    func testPreferredTargetRepBoundsPreferOverrideWithoutMixingTemplateBounds() {
         let set = WorkoutSet(
             workoutId: UUID(),
             exerciseId: UUID(),
@@ -12,8 +12,8 @@ final class WorkoutSetTests: XCTestCase {
             targetRepMin: 8,
             targetRepMax: 12
         )
-        set.draftTargetRepMin = 10
-        set.draftTargetRepMax = nil
+        set.overrideTargetRepMin = 10
+        set.overrideTargetRepMax = nil
 
         let bounds = set.preferredTargetRepBounds
 
@@ -21,7 +21,7 @@ final class WorkoutSetTests: XCTestCase {
         XCTAssertNil(bounds.max)
     }
 
-    func testCustomRepRangeCommitStoresDraftGuidanceWithoutSettingActualReps() {
+    func testCustomRepRangeCommitStoresOverrideGuidanceWithoutSettingActualReps() {
         let set = WorkoutSet(
             workoutId: UUID(),
             exerciseId: UUID(),
@@ -34,11 +34,11 @@ final class WorkoutSetTests: XCTestCase {
 
         XCTAssertTrue(didCommit)
         XCTAssertEqual(set.reps, 6)
-        XCTAssertEqual(set.draftTargetRepMin, 8)
-        XCTAssertEqual(set.draftTargetRepMax, 12)
+        XCTAssertEqual(set.overrideTargetRepMin, 8)
+        XCTAssertEqual(set.overrideTargetRepMax, 12)
     }
 
-    func testCustomRepRangeCommitStoresSingleValueAsDraftGuidance() {
+    func testCustomRepRangeCommitStoresSingleValueAsNormalizedOverrideGuidance() {
         let set = WorkoutSet(
             workoutId: UUID(),
             exerciseId: UUID(),
@@ -50,8 +50,25 @@ final class WorkoutSetTests: XCTestCase {
 
         XCTAssertTrue(didCommit)
         XCTAssertNil(set.reps)
-        XCTAssertEqual(set.draftTargetRepMin, 8)
-        XCTAssertNil(set.draftTargetRepMax)
+        XCTAssertEqual(set.overrideTargetRepMin, 8)
+        XCTAssertEqual(set.overrideTargetRepMax, 8)
+    }
+
+    func testTemplateSaveTargetRepBoundsNormalizeSingleValueOverride() {
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: UUID(),
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            targetRepMin: 8,
+            targetRepMax: 12
+        )
+        set.overrideTargetRepMin = 6
+
+        let bounds = set.templateSaveTargetRepBounds
+
+        XCTAssertEqual(bounds.min, 6)
+        XCTAssertEqual(bounds.max, 6)
     }
 
     func testSyncDerivedPerformanceFieldsUsesStrongerSideForPRAndTotalRepsForVolumeStats() {

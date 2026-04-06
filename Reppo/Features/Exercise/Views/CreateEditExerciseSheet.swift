@@ -8,10 +8,16 @@ import SwiftUI
 
 struct CreateEditExerciseSheet: View {
 
+    private enum FocusField: Hashable {
+        case name
+        case bodyweightFactor
+    }
+
     // MARK: - State
 
     @State private var viewModel: CreateEditExerciseViewModel
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var focusedField: FocusField?
     var onSave: (() -> Void)?
 
     // MARK: - Init
@@ -42,28 +48,24 @@ struct CreateEditExerciseSheet: View {
                     trackingTypeLockNotice
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .scrollContentBackground(.hidden)
             .background(Color.bg)
             .navigationTitle(viewModel.navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") { handleCancel() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        Task {
-                            do {
-                                try await viewModel.save()
-                                onSave?()
-                                dismiss()
-                            } catch {
-                                viewModel.errorMessage = error.localizedDescription
-                                viewModel.showError = true
-                            }
-                        }
-                    }
+                    Button("Save") { saveExercise() }
                     .disabled(!viewModel.isValid || viewModel.isSaving)
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        focusedField = nil
+                    }
                 }
             }
             .alert("Error", isPresented: $viewModel.showError) {
@@ -83,6 +85,11 @@ struct CreateEditExerciseSheet: View {
     private var basicInfoSection: some View {
         Section("Basic Info") {
             TextField("Exercise Name", text: $viewModel.name)
+                .focused($focusedField, equals: .name)
+                .submitLabel(.done)
+                .onSubmit {
+                    focusedField = nil
+                }
 
             Picker("Equipment", selection: $viewModel.equipmentType) {
                 ForEach(EquipmentType.allCases, id: \.self) { type in
@@ -127,6 +134,9 @@ struct CreateEditExerciseSheet: View {
                         )
                 }
             }
+            .simultaneousGesture(TapGesture().onEnded { _ in
+                focusedField = nil
+            })
 
             Picker("Movement Pattern", selection: $viewModel.movementPattern) {
                 Text("None").tag(Optional<MovementPattern>.none)
@@ -150,12 +160,25 @@ struct CreateEditExerciseSheet: View {
                     .foregroundStyle(Color.textTertiary)
             }
 
+            if viewModel.supportsUnilateral && viewModel.unilateral {
+                Picker("Rep Target Mode", selection: $viewModel.unilateralRepTargetMode) {
+                    ForEach(UnilateralRepTargetMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+
+                Text(viewModel.unilateralRepTargetMode.helpText)
+                    .font(.caption)
+                    .foregroundStyle(Color.textTertiary)
+            }
+
             HStack {
                 Text("Bodyweight Factor")
                 Spacer()
                 TextField("0.0", value: $viewModel.bodyweightFactor,
                           format: .number)
                     .keyboardType(.decimalPad)
+                    .focused($focusedField, equals: .bodyweightFactor)
                     .multilineTextAlignment(.trailing)
                     .frame(width: 60)
             }
@@ -218,5 +241,25 @@ struct CreateEditExerciseSheet: View {
             return "\(minutes)m"
         }
         return "\(seconds) sec"
+    }
+
+    private func handleCancel() {
+        focusedField = nil
+        dismiss()
+    }
+
+    private func saveExercise() {
+        focusedField = nil
+
+        Task {
+            do {
+                try await viewModel.save()
+                onSave?()
+                dismiss()
+            } catch {
+                viewModel.errorMessage = error.localizedDescription
+                viewModel.showError = true
+            }
+        }
     }
 }

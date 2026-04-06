@@ -40,6 +40,8 @@ final class WorkoutSet {
     var targetWeight: Double?
     var targetRepMin: Int?
     var targetRepMax: Int?
+    var overrideTargetRepMin: Int?
+    var overrideTargetRepMax: Int?
     var targetRPE: Double?
     var targetRIR: Int?
     var createdAt: Date
@@ -48,29 +50,47 @@ final class WorkoutSet {
     /// Nil when timer was dismissed early or no timer was used — falls back to configured rest.
     var restDurationSeconds: Int?
 
-    /// Draft-only rep-range override typed during an active workout (for example "8-12").
-    @Transient var draftTargetRepMin: Int? = nil
-
-    /// Draft-only rep-range override typed during an active workout (for example "8-12").
-    @Transient var draftTargetRepMax: Int? = nil
     @Transient var persistedFatigueSnapshot: FatigueLearningSetSnapshot? = nil
 
-    var draftTargetRepRange: ClosedRange<Int>? {
-        guard let draftTargetRepMin, let draftTargetRepMax, draftTargetRepMin < draftTargetRepMax else {
+    var overrideTargetRepRange: ClosedRange<Int>? {
+        guard let overrideTargetRepMin, let overrideTargetRepMax, overrideTargetRepMin < overrideTargetRepMax else {
             return nil
         }
-        return draftTargetRepMin...draftTargetRepMax
+        return overrideTargetRepMin...overrideTargetRepMax
     }
 
-    var hasDraftRepTarget: Bool {
-        draftTargetRepMin != nil || draftTargetRepMax != nil
+    var hasOverrideRepTarget: Bool {
+        overrideTargetRepMin != nil || overrideTargetRepMax != nil
     }
 
     var preferredTargetRepBounds: (min: Int?, max: Int?) {
-        if hasDraftRepTarget {
-            return (draftTargetRepMin, draftTargetRepMax)
+        if hasOverrideRepTarget {
+            return (overrideTargetRepMin, overrideTargetRepMax)
         }
         return (targetRepMin, targetRepMax)
+    }
+
+    var templateSaveTargetRepBounds: (min: Int?, max: Int?) {
+        if hasOverrideRepTarget {
+            switch (overrideTargetRepMin, overrideTargetRepMax) {
+            case let (.some(min), .some(max)):
+                return (min, max)
+            case let (.some(value), .none), let (.none, .some(value)):
+                return (value, value)
+            case (.none, .none):
+                return (nil, nil)
+            }
+        }
+
+        if targetRepMin != nil || targetRepMax != nil {
+            return (targetRepMin, targetRepMax)
+        }
+
+        if let reps {
+            return (reps, reps)
+        }
+
+        return (nil, nil)
     }
 
     var hasData: Bool {
@@ -179,6 +199,8 @@ final class WorkoutSet {
         targetWeight: Double? = nil,
         targetRepMin: Int? = nil,
         targetRepMax: Int? = nil,
+        overrideTargetRepMin: Int? = nil,
+        overrideTargetRepMax: Int? = nil,
         targetRPE: Double? = nil,
         targetRIR: Int? = nil,
         createdAt: Date = Date(),
@@ -217,6 +239,8 @@ final class WorkoutSet {
         self.targetWeight = targetWeight
         self.targetRepMin = targetRepMin
         self.targetRepMax = targetRepMax
+        self.overrideTargetRepMin = overrideTargetRepMin
+        self.overrideTargetRepMax = overrideTargetRepMax
         self.targetRPE = targetRPE
         self.targetRIR = targetRIR
         self.createdAt = createdAt

@@ -125,6 +125,10 @@ final class SettingsViewModel {
         profile?.prescriptionEnabled ?? true
     }
 
+    var smartSuggestionsAdminModeEnabled: Bool {
+        profile?.prescriptionAdminModeEnabled ?? false
+    }
+
     var prescriptionIncrementDisplayName: String {
         guard let increment = profile?.prescriptionDefaultIncrement else { return "2.5 kg" }
         if increment.truncatingRemainder(dividingBy: 1) == 0 {
@@ -212,6 +216,12 @@ final class SettingsViewModel {
     func updatePrescriptionDefaultIncrement(_ increment: Double) async {
         await performUpdate {
             try await settingsService.updatePrescriptionDefaultIncrement(increment)
+        }
+    }
+
+    func updatePrescriptionAdminModeEnabled(_ enabled: Bool) async {
+        await performUpdate {
+            try await settingsService.updatePrescriptionAdminModeEnabled(enabled)
         }
     }
 

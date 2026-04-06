@@ -398,6 +398,7 @@ private extension WorkoutHistoryArchiveExercise {
             secondaryMuscles: exercise.secondaryMuscles,
             movementPattern: exercise.movementPattern,
             unilateral: exercise.unilateral,
+            unilateralRepTargetMode: exercise.unilateralRepTargetMode,
             bilateralLoadFactor: exercise.bilateralLoadFactor,
             bodyweightFactor: exercise.bodyweightFactor,
             weightIncrement: exercise.weightIncrement,
@@ -422,6 +423,7 @@ private extension WorkoutHistoryArchiveExercise {
             secondaryMuscles: secondaryMuscles,
             movementPattern: movementPattern,
             unilateral: unilateral,
+            unilateralRepTargetMode: unilateralRepTargetMode,
             bilateralLoadFactor: bilateralLoadFactor,
             bodyweightFactor: bodyweightFactor,
             weightIncrement: weightIncrement,
@@ -447,6 +449,7 @@ private extension Exercise {
         secondaryMuscles = archive.secondaryMuscles
         movementPattern = archive.movementPattern
         unilateral = archive.unilateral
+        unilateralRepTargetMode = archive.unilateralRepTargetMode ?? unilateralRepTargetMode
         bilateralLoadFactor = archive.bilateralLoadFactor
         bodyweightFactor = archive.bodyweightFactor
         weightIncrement = archive.weightIncrement
@@ -496,6 +499,8 @@ private extension WorkoutHistoryArchiveSet {
             targetWeight: set.targetWeight,
             targetRepMin: set.targetRepMin,
             targetRepMax: set.targetRepMax,
+            overrideTargetRepMin: set.overrideTargetRepMin,
+            overrideTargetRepMax: set.overrideTargetRepMax,
             targetRPE: set.targetRPE,
             targetRIR: set.targetRIR,
             createdAt: set.createdAt,
@@ -538,6 +543,8 @@ private extension WorkoutHistoryArchiveSet {
             targetWeight: targetWeight,
             targetRepMin: targetRepMin,
             targetRepMax: targetRepMax,
+            overrideTargetRepMin: overrideTargetRepMin,
+            overrideTargetRepMax: overrideTargetRepMax,
             targetRPE: targetRPE,
             targetRIR: targetRIR,
             createdAt: createdAt,

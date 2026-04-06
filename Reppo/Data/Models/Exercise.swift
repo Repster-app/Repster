@@ -6,6 +6,29 @@ enum ExerciseFatigueRateSource: String, Codable, Sendable {
     case learned
 }
 
+enum UnilateralRepTargetMode: String, Codable, CaseIterable, Sendable {
+    case perSide = "per_side"
+    case totalAcrossSides = "total_across_sides"
+
+    var displayName: String {
+        switch self {
+        case .perSide:
+            return "Per Side"
+        case .totalAcrossSides:
+            return "Total Reps"
+        }
+    }
+
+    var helpText: String {
+        switch self {
+        case .perSide:
+            return "Targets and Smart Suggestions use reps for each side."
+        case .totalAcrossSides:
+            return "Targets and Smart Suggestions start from the total reps across both sides."
+        }
+    }
+}
+
 @Model
 final class Exercise {
     var id: UUID
@@ -16,6 +39,7 @@ final class Exercise {
     var secondaryMuscles: [String]
     var movementPattern: MovementPattern?
     var unilateral: Bool
+    var unilateralRepTargetModeRawValue: String?
     var bilateralLoadFactor: Double?
     var bodyweightFactor: Double
     var weightIncrement: Double?
@@ -54,6 +78,7 @@ final class Exercise {
         secondaryMuscles: [String] = [],
         movementPattern: MovementPattern? = nil,
         unilateral: Bool = false,
+        unilateralRepTargetMode: UnilateralRepTargetMode? = nil,
         bilateralLoadFactor: Double? = nil,
         bodyweightFactor: Double = 0.0,
         weightIncrement: Double? = nil,
@@ -74,6 +99,7 @@ final class Exercise {
         self.secondaryMuscles = secondaryMuscles
         self.movementPattern = movementPattern
         self.unilateral = unilateral
+        self.unilateralRepTargetModeRawValue = unilateralRepTargetMode?.rawValue
         self.bilateralLoadFactor = bilateralLoadFactor
         self.bodyweightFactor = bodyweightFactor
         self.weightIncrement = weightIncrement
@@ -91,8 +117,29 @@ final class Exercise {
 extension Exercise: @unchecked Sendable {}
 
 extension Exercise {
+    private static let totalAcrossSidesFallbackNames: Set<String> = [
+        "dumbbell lunge"
+    ]
+
     var supportsUnilateralLogging: Bool {
         trackingType == .weightReps || trackingType == .weightRepsDuration
+    }
+
+    var unilateralRepTargetMode: UnilateralRepTargetMode {
+        get {
+            if let rawValue = unilateralRepTargetModeRawValue,
+               let mode = UnilateralRepTargetMode(rawValue: rawValue) {
+                return mode
+            }
+            return defaultUnilateralRepTargetMode
+        }
+        set {
+            unilateralRepTargetModeRawValue = newValue.rawValue
+        }
+    }
+
+    var usesTotalAcrossSidesRepTargets: Bool {
+        unilateral && supportsUnilateralLogging && unilateralRepTargetMode == .totalAcrossSides
     }
 
     var resolvedFatigueRateSource: ExerciseFatigueRateSource? {
@@ -109,5 +156,14 @@ extension Exercise {
 
     var isBodyweightStyleExercise: Bool {
         equipmentType == .bodyweight || bodyweightFactor > 0
+    }
+
+    private var defaultUnilateralRepTargetMode: UnilateralRepTargetMode {
+        guard unilateral, supportsUnilateralLogging else { return .perSide }
+        let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if Self.totalAcrossSidesFallbackNames.contains(normalizedName) {
+            return .totalAcrossSides
+        }
+        return .perSide
     }
 }

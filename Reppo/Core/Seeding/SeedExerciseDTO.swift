@@ -11,6 +11,7 @@ struct SeedExerciseDTO: Codable {
     let secondaryMuscles: [String]
     let movementPattern: String?
     let unilateral: Bool
+    let unilateralRepTargetMode: String?
     let bodyweightFactor: Double
     let weightIncrement: Double?
     let defaultRestTime: Int?

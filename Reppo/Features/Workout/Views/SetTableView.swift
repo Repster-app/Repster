@@ -59,6 +59,12 @@ enum RepsTargetInputParser {
     }
 }
 
+struct UnilateralTargetPresentation: Equatable, Sendable {
+    let leftPlaceholder: String
+    let rightPlaceholder: String
+    let sharedHint: String?
+}
+
 enum CustomRepRangeCommitter {
     static func commit(min: Int?, max: Int?, to set: WorkoutSet) -> Bool {
         let input = normalizedInput(min: min, max: max)
@@ -66,14 +72,14 @@ enum CustomRepRangeCommitter {
 
         switch input {
         case .empty:
-            set.draftTargetRepMin = nil
-            set.draftTargetRepMax = nil
+            set.overrideTargetRepMin = nil
+            set.overrideTargetRepMax = nil
         case let .single(reps):
-            set.draftTargetRepMin = reps
-            set.draftTargetRepMax = nil
+            set.overrideTargetRepMin = reps
+            set.overrideTargetRepMax = reps
         case let .range(lowerBound, upperBound):
-            set.draftTargetRepMin = lowerBound
-            set.draftTargetRepMax = upperBound
+            set.overrideTargetRepMin = lowerBound
+            set.overrideTargetRepMax = upperBound
         case .invalid:
             return false
         }
@@ -358,7 +364,6 @@ struct SetTableView: View {
 /// This wrapper initializes text from the set's current values
 /// and converts back to model types when the checkbox is tapped.
 private struct SetRowWrapper: View {
-
     let set: WorkoutSet
     let exercise: Exercise?
     let setNumber: Int
@@ -415,6 +420,7 @@ private struct SetRowWrapper: View {
 
     var body: some View {
         if let exercise {
+            let unilateralTargetPresentation = SetTableView.unilateralTargetPresentation(for: set, exercise: exercise)
             SetRowView(
                 set: set,
                 exercise: exercise,
@@ -430,6 +436,9 @@ private struct SetRowWrapper: View {
                 rightRIRValue: $rightRIRValue,
                 targetRIR: set.targetRIR,
                 repsPlaceholder: Self.repsPlaceholder(for: set),
+                leftRepsPlaceholder: unilateralTargetPresentation.leftPlaceholder,
+                rightRepsPlaceholder: unilateralTargetPresentation.rightPlaceholder,
+                unilateralTargetHint: unilateralTargetPresentation.sharedHint,
                 onComplete: {
 
                     Task {
@@ -553,30 +562,45 @@ private struct SetRowWrapper: View {
     }
 
     private func applyParsedRepsInput(_ input: RepsTargetInput) {
+        guard input != .invalid else {
+            handleFieldEdit(field: .reps) {}
+            return
+        }
+
         handleFieldEdit(field: .reps) {
             switch input {
             case .empty:
                 set.reps = nil
-                set.draftTargetRepMin = nil
-                set.draftTargetRepMax = nil
+                set.overrideTargetRepMin = nil
+                set.overrideTargetRepMax = nil
             case let .single(reps):
-                set.reps = reps
-                set.draftTargetRepMin = nil
-                set.draftTargetRepMax = nil
+                set.reps = nil
+                set.overrideTargetRepMin = reps
+                set.overrideTargetRepMax = reps
             case let .range(min, max):
                 set.reps = nil
-                set.draftTargetRepMin = min
-                set.draftTargetRepMax = max
+                set.overrideTargetRepMin = min
+                set.overrideTargetRepMax = max
             case .invalid:
                 break
             }
+        }
+
+        Task {
+            await dataSource.persistTargetRepOverride(
+                set,
+                min: set.overrideTargetRepMin,
+                max: set.overrideTargetRepMax
+            )
         }
     }
 
     private func commitTargetRepRange(_ min: Int?, _ max: Int?) {
         let currentInput = RepsTargetInputParser.parse(repsText)
+        var didCommit = false
         handleFieldEdit(field: .reps) {
-            guard CustomRepRangeCommitter.commit(min: min, max: max, to: set) else { return }
+            didCommit = CustomRepRangeCommitter.commit(min: min, max: max, to: set)
+            guard didCommit else { return }
 
             switch currentInput {
             case .range, .invalid:
@@ -585,6 +609,16 @@ private struct SetRowWrapper: View {
             case .empty, .single:
                 break
             }
+        }
+
+        guard didCommit else { return }
+
+        Task {
+            await dataSource.persistTargetRepOverride(
+                set,
+                min: set.overrideTargetRepMin,
+                max: set.overrideTargetRepMax
+            )
         }
     }
 
@@ -720,6 +754,47 @@ private struct SetRowWrapper: View {
             return "\(hi)"
         case (.none, .none):
             return "0"
+        }
+    }
+}
+
+extension SetTableView {
+    static func unilateralTargetPresentation(
+        for set: WorkoutSet,
+        exercise: Exercise
+    ) -> UnilateralTargetPresentation {
+        let defaultPlaceholder = SetRowWrapper.repsPlaceholder(for: set)
+        guard exercise.usesTotalAcrossSidesRepTargets else {
+            return UnilateralTargetPresentation(
+                leftPlaceholder: defaultPlaceholder,
+                rightPlaceholder: defaultPlaceholder,
+                sharedHint: nil
+            )
+        }
+
+        return UnilateralTargetPresentation(
+            leftPlaceholder: "0",
+            rightPlaceholder: "0",
+            sharedHint: totalAcrossSidesHint(for: set)
+        )
+    }
+
+    static func totalAcrossSidesHint(for set: WorkoutSet) -> String? {
+        let bounds = set.preferredTargetRepBounds
+        let min = bounds.min
+        let max = bounds.max
+
+        switch (min, max) {
+        case let (.some(lo), .some(hi)) where lo == hi:
+            return "\(lo) total"
+        case let (.some(lo), .some(hi)):
+            return "\(lo)-\(hi) total"
+        case let (.some(lo), .none):
+            return "\(lo) total"
+        case let (.none, .some(hi)):
+            return "\(hi) total"
+        case (.none, .none):
+            return nil
         }
     }
 }

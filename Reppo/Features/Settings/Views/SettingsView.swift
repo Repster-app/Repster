@@ -712,10 +712,24 @@ private struct SmartSuggestionsSettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                     }
+
+                    Toggle(isOn: Binding(
+                        get: { viewModel.smartSuggestionsAdminModeEnabled },
+                        set: { newValue in
+                            Task { await viewModel.updatePrescriptionAdminModeEnabled(newValue) }
+                        }
+                    )) {
+                        Label("Admin Mode", systemImage: "wrench.and.screwdriver")
+                            .foregroundStyle(Color.textPrimary)
+                    }
                 }
 
             } footer: {
-                Text("Default increment controls how suggested weights are rounded before they appear in your workout.")
+                Text(
+                    viewModel.smartSuggestionsEnabled
+                        ? "Default increment controls how suggested weights are rounded before they appear in your workout. Admin Mode exposes Smart Suggestions diagnostics and troubleshooting screens."
+                        : "Enable Smart Suggestions to show recommendations during workouts."
+                )
                     .foregroundStyle(Color.textTertiary)
             }
 
@@ -723,7 +737,8 @@ private struct SmartSuggestionsSettingsView: View {
                 SmartSuggestionsAdvancedSections(
                     profile: profile,
                     settingsService: settingsService,
-                    fatigueLearningService: fatigueLearningService
+                    fatigueLearningService: fatigueLearningService,
+                    isAdminModeEnabled: viewModel.smartSuggestionsAdminModeEnabled
                 )
             }
 

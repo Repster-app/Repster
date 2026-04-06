@@ -334,10 +334,11 @@ actor TemplateService: TemplateServiceProtocol {
             let sortedSets = exerciseSets.sorted { $0.orderInExercise < $1.orderInExercise }
 
             let templateSets = sortedSets.enumerated().map { setIndex, workoutSet in
-                TemplateSaveSet(
+                let targetBounds = workoutSet.templateSaveTargetRepBounds
+                return TemplateSaveSet(
                     setType: workoutSet.setType,
-                    targetRepMin: workoutSet.targetRepMin ?? workoutSet.reps,
-                    targetRepMax: workoutSet.targetRepMax ?? workoutSet.reps,
+                    targetRepMin: targetBounds.min,
+                    targetRepMax: targetBounds.max,
                     targetRIR: workoutSet.targetRIR,
                     orderInExercise: setIndex + 1
                 )
@@ -426,6 +427,7 @@ actor TemplateService: TemplateServiceProtocol {
                     secondaryMuscles: exercise.secondaryMuscles,
                     movementPattern: exercise.movementPattern,
                     unilateral: exercise.unilateral,
+                    unilateralRepTargetMode: exercise.unilateralRepTargetMode,
                     bilateralLoadFactor: exercise.bilateralLoadFactor,
                     bodyweightFactor: exercise.bodyweightFactor,
                     weightIncrement: exercise.weightIncrement,
@@ -582,6 +584,7 @@ actor TemplateService: TemplateServiceProtocol {
             secondaryMuscles: exercise.secondaryMuscles,
             movementPattern: exercise.movementPattern,
             unilateral: exercise.unilateral,
+            unilateralRepTargetMode: exercise.unilateralRepTargetMode,
             bilateralLoadFactor: exercise.bilateralLoadFactor,
             bodyweightFactor: exercise.bodyweightFactor,
             weightIncrement: exercise.weightIncrement,
@@ -601,6 +604,7 @@ actor TemplateService: TemplateServiceProtocol {
             secondaryMuscles: metadata.secondaryMuscles,
             movementPattern: metadata.movementPattern,
             unilateral: metadata.unilateral,
+            unilateralRepTargetMode: metadata.unilateralRepTargetMode,
             bilateralLoadFactor: metadata.bilateralLoadFactor,
             bodyweightFactor: metadata.bodyweightFactor,
             weightIncrement: metadata.weightIncrement,
@@ -686,6 +690,7 @@ actor TemplateService: TemplateServiceProtocol {
                             secondaryMuscles: draftExercise.secondaryMuscles,
                             movementPattern: draftExercise.movementPattern,
                             unilateral: draftExercise.unilateral,
+                            unilateralRepTargetMode: draftExercise.unilateralRepTargetMode,
                             bilateralLoadFactor: draftExercise.bilateralLoadFactor,
                             bodyweightFactor: draftExercise.bodyweightFactor,
                             weightIncrement: draftExercise.weightIncrement,

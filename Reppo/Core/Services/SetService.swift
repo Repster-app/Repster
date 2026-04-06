@@ -302,6 +302,22 @@ actor SetService: SetServiceProtocol {
         try await fatigueLearningService.removeCapturedSetData(setId: setId)
     }
 
+    func updateInProgressTargetRepOverride(
+        setId: UUID,
+        min: Int?,
+        max: Int?
+    ) async throws {
+        guard let set = try await setRepo.fetch(byId: setId) else {
+            throw SetServiceError.setNotFound(setId)
+        }
+
+        set.overrideTargetRepMin = min
+        set.overrideTargetRepMax = max
+        set.updatedAt = Date()
+
+        try await setRepo.save(set)
+    }
+
     // MARK: - Fetch (006: Active Workout Screen)
 
     func fetchSets(for workoutId: UUID) async throws -> [WorkoutSet] {

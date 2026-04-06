@@ -178,6 +178,7 @@ struct WorkoutHistoryArchiveExercise: Codable, Sendable {
     let secondaryMuscles: [String]
     let movementPattern: MovementPattern?
     let unilateral: Bool
+    let unilateralRepTargetMode: UnilateralRepTargetMode?
     let bilateralLoadFactor: Double?
     let bodyweightFactor: Double
     let weightIncrement: Double?
@@ -268,6 +269,8 @@ struct WorkoutHistoryArchiveSet: Codable, Sendable {
     let targetWeight: Double?
     let targetRepMin: Int?
     let targetRepMax: Int?
+    let overrideTargetRepMin: Int?
+    let overrideTargetRepMax: Int?
     let targetRPE: Double?
     let targetRIR: Int?
     let createdAt: Date

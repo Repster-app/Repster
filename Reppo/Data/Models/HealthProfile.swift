@@ -47,6 +47,9 @@ final class HealthProfile {
     /// Default recovery constant in seconds for fatigue decay. Default: 180.
     var prescriptionDefaultRecoveryConstant: Double?
 
+    /// Whether Smart Suggestions admin diagnostics are enabled. Default: false.
+    var prescriptionAdminModeEnabled: Bool?
+
     /// User-wide learned fatigue rate. Nil = use fixed default (0.03) when no exercise override exists.
     var prescriptionLearnedFatigueRate: Double? = nil
 
@@ -76,6 +79,7 @@ final class HealthProfile {
         prescriptionFreshnessBonusPercent: Double = 0.03,
         prescriptionFatigueModelingEnabled: Bool = true,
         prescriptionDefaultRecoveryConstant: Double = 180,
+        prescriptionAdminModeEnabled: Bool = false,
         prescriptionLearnedFatigueRate: Double? = nil,
         prescriptionFatigueLearningSessionCount: Int? = nil,
         prescriptionFatigueLearningCumulativeError: Double? = nil,
@@ -98,6 +102,7 @@ final class HealthProfile {
         self.prescriptionFreshnessBonusPercent = prescriptionFreshnessBonusPercent
         self.prescriptionFatigueModelingEnabled = prescriptionFatigueModelingEnabled
         self.prescriptionDefaultRecoveryConstant = prescriptionDefaultRecoveryConstant
+        self.prescriptionAdminModeEnabled = prescriptionAdminModeEnabled
         self.prescriptionLearnedFatigueRate = prescriptionLearnedFatigueRate
         self.prescriptionFatigueLearningSessionCount = prescriptionFatigueLearningSessionCount
         self.prescriptionFatigueLearningCumulativeError = prescriptionFatigueLearningCumulativeError

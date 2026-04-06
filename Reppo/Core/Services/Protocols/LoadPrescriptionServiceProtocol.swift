@@ -47,11 +47,67 @@ struct SuggestionTarget: Sendable {
     let reps: Int
     let rir: Double
     let repRange: ClosedRange<Int>?
+    let displayReps: Int
+    let displayRepRange: ClosedRange<Int>?
+    let repTargetMode: UnilateralRepTargetMode?
     let repsSource: SuggestionTargetComponentSource
     let rirSource: SuggestionTargetComponentSource
 
+    init(
+        reps: Int,
+        rir: Double,
+        repRange: ClosedRange<Int>?,
+        repsSource: SuggestionTargetComponentSource,
+        rirSource: SuggestionTargetComponentSource,
+        displayReps: Int? = nil,
+        displayRepRange: ClosedRange<Int>? = nil,
+        repTargetMode: UnilateralRepTargetMode? = nil
+    ) {
+        self.reps = reps
+        self.rir = rir
+        self.repRange = repRange
+        self.displayReps = displayReps ?? reps
+        self.displayRepRange = displayRepRange ?? repRange
+        self.repTargetMode = repTargetMode
+        self.repsSource = repsSource
+        self.rirSource = rirSource
+    }
+
     var repsSourceLabel: String { repsSource.label }
     var rirSourceLabel: String { rirSource.label }
+
+    var displayTargetLabel: String {
+        if let displayRepRange {
+            switch repTargetMode {
+            case .totalAcrossSides:
+                return "\(displayRepRange.lowerBound)-\(displayRepRange.upperBound) total reps"
+            case .perSide:
+                return "\(displayRepRange.lowerBound)-\(displayRepRange.upperBound) reps each side"
+            case nil:
+                return "\(displayRepRange.lowerBound)-\(displayRepRange.upperBound) reps"
+            }
+        }
+
+        switch repTargetMode {
+        case .totalAcrossSides:
+            return "\(displayReps) total reps"
+        case .perSide:
+            return "\(displayReps) reps each side"
+        case nil:
+            return "\(displayReps) reps"
+        }
+    }
+
+    var normalizedTargetLabel: String? {
+        guard repTargetMode == .totalAcrossSides else { return nil }
+        if let repRange {
+            if repRange.lowerBound == repRange.upperBound {
+                return "normalized to \(repRange.lowerBound) reps each side"
+            }
+            return "normalized to \(repRange.lowerBound)-\(repRange.upperBound) reps each side"
+        }
+        return "normalized to \(reps) reps each side"
+    }
 
     var sourceLabel: String {
         var orderedSources: [SuggestionTargetComponentSource] = []
@@ -217,8 +273,10 @@ struct SuggestionPendingSetInput: Sendable {
     let setType: SetType
 
     var targetReps: Int { target.reps }
+    var displayTargetReps: Int { target.displayReps }
     var targetRIR: Double { target.rir }
     var repRange: ClosedRange<Int>? { target.repRange }
+    var displayRepRange: ClosedRange<Int>? { target.displayRepRange }
     var targetSourceLabel: String { target.sourceLabel }
 }
 
@@ -274,12 +332,16 @@ struct SuggestionDecision: Sendable {
     let projectedSessionFatigue: Double
 
     var targetReps: Int { target.reps }
+    var displayTargetReps: Int { target.displayReps }
     var targetRIR: Double { target.rir }
     var repRange: ClosedRange<Int>? { target.repRange }
+    var displayRepRange: ClosedRange<Int>? { target.displayRepRange }
     var targetSourceLabel: String { target.sourceLabel }
     var targetRepsSourceLabel: String { target.repsSourceLabel }
     var targetRIRSourceLabel: String { target.rirSourceLabel }
     var targetDefaultUsageLabel: String? { target.defaultUsageLabel }
+    var targetDisplayLabel: String { target.displayTargetLabel }
+    var normalizedTargetLabel: String? { target.normalizedTargetLabel }
 }
 
 /// Expected-vs-actual set outcome payload for future calibration work.

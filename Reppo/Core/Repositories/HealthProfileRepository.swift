@@ -30,6 +30,10 @@ actor HealthProfileRepository: HealthProfileRepositoryProtocol {
                 existing.prescriptionDefaultTargetRIR = 2
                 didBackfill = true
             }
+            if existing.prescriptionAdminModeEnabled == nil {
+                existing.prescriptionAdminModeEnabled = false
+                didBackfill = true
+            }
             if didBackfill {
                 existing.updatedAt = Date()
                 try modelContext.save()

@@ -33,6 +33,7 @@ protocol SettingsServiceProtocol: Sendable {
     func updatePrescriptionFreshnessBonus(enabled: Bool, percent: Double) async throws
     func updatePrescriptionFatigueModelingEnabled(_ enabled: Bool) async throws
     func updatePrescriptionDefaultRecoveryConstant(_ seconds: Double) async throws
+    func updatePrescriptionAdminModeEnabled(_ enabled: Bool) async throws
 
     // MARK: - Data Reset
 

@@ -156,6 +156,13 @@ actor SettingsService: SettingsServiceProtocol {
         try await healthProfileRepository.save(profile)
     }
 
+    func updatePrescriptionAdminModeEnabled(_ enabled: Bool) async throws {
+        let profile = try await healthProfileRepository.fetchOrCreate()
+        profile.prescriptionAdminModeEnabled = enabled
+        profile.updatedAt = Date()
+        try await healthProfileRepository.save(profile)
+    }
+
     // MARK: - Data Reset
 
     func resetAllAppData() async throws {

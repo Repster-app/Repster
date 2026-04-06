@@ -290,6 +290,7 @@
       "secondaryMuscles": ["quads", "glutes", "hamstrings"],
       "movementPattern": "squat",
       "unilateral": true,
+      "unilateralRepTargetMode": "total_across_sides",
       "bodyweightFactor": 0.0,
       "weightIncrement": 2.0,
       "defaultRestTime": 120

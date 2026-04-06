@@ -8,6 +8,7 @@ import SwiftUI
 struct WeightSuggestionModuleView: View {
     let data: WeightSuggestionData?
     let unitPreference: UnitPreference
+    let isAdminModeEnabled: Bool
     let isLoading: Bool
     let isRefreshing: Bool
     let onRefresh: () -> Void
@@ -20,7 +21,8 @@ struct WeightSuggestionModuleView: View {
 
                     WeightSuggestionCardView(
                         data: data,
-                        unitPreference: unitPreference
+                        unitPreference: unitPreference,
+                        isAdminModeEnabled: isAdminModeEnabled
                     )
                 }
             } else if let reason = data.unavailableReason, reason != .featureDisabled {

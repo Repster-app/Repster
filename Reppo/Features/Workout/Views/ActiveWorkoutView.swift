@@ -202,6 +202,7 @@ struct ActiveWorkoutView: View {
                 WeightSuggestionModuleView(
                     data: viewModel.weightSuggestionData,
                     unitPreference: viewModel.unitPreference,
+                    isAdminModeEnabled: viewModel.suggestionAdminModeEnabled,
                     isLoading: viewModel.isLoadingWeightSuggestions,
                     isRefreshing: viewModel.isRefreshingWeightSuggestions,
                     onRefresh: {

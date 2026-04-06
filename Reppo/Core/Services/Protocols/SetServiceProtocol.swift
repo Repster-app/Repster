@@ -95,6 +95,16 @@ protocol SetServiceProtocol: Sendable {
     /// - Parameter set: The WorkoutSet to delete (hard delete, no soft delete).
     func delete(_ set: WorkoutSet) async throws
 
+    // MARK: - Lightweight In-Progress Updates
+
+    /// Persist rep-target overrides for an in-progress set without invoking the
+    /// PR, stats, fatigue, or effective-weight pipelines.
+    func updateInProgressTargetRepOverride(
+        setId: UUID,
+        min: Int?,
+        max: Int?
+    ) async throws
+
     // MARK: - Fetch (006: Active Workout Screen)
 
     /// Fetch all sets belonging to a workout, ordered by orderInWorkout.

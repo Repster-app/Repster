@@ -82,6 +82,106 @@ final class SetServiceTests: XCTestCase {
         XCTAssertEqual(learningData.audits.map(\.setId), [records.set.id])
     }
 
+    func testUpdateInProgressTargetRepOverridePersistsWithoutPRsOrStats() async throws {
+        let context = try makeContext()
+        let workoutDate = makeDate(2026, 3, 22, 8, 0)
+        let exercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest"
+        )
+        let workout = Workout(
+            date: workoutDate,
+            startTime: workoutDate,
+            status: .inProgress
+        )
+        let set = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            date: workoutDate,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: false,
+            targetRepMin: 8,
+            targetRepMax: 12,
+            targetRIR: 2
+        )
+
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(workout)
+        try await context.setRepo.save(set)
+
+        try await context.setService.updateInProgressTargetRepOverride(
+            setId: set.id,
+            min: 6,
+            max: 8
+        )
+
+        let persistedSet = try await context.setRepo.fetch(byId: set.id)
+        let performanceRecords = try await context.performanceRecordRepo.fetchAll(
+            for: exercise.id,
+            recordType: .repMax
+        )
+        let stats = try await context.statsService.fetchStats(for: exercise.id)
+
+        XCTAssertEqual(persistedSet?.overrideTargetRepMin, 6)
+        XCTAssertEqual(persistedSet?.overrideTargetRepMax, 8)
+        XCTAssertEqual(persistedSet?.targetRepMin, 8)
+        XCTAssertEqual(persistedSet?.targetRepMax, 12)
+        XCTAssertTrue(performanceRecords.isEmpty)
+        XCTAssertNil(stats)
+    }
+
+    func testBackupRoundTripPreservesTargetRepOverridesOnInProgressSet() async throws {
+        let context = try makeContext()
+        let workoutDate = makeDate(2026, 3, 22, 8, 30)
+        let exercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest"
+        )
+        let workout = Workout(
+            date: workoutDate,
+            startTime: workoutDate,
+            status: .inProgress
+        )
+        let set = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            date: workoutDate,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: false,
+            targetRepMin: 8,
+            targetRepMax: 12,
+            overrideTargetRepMin: 6,
+            overrideTargetRepMax: 8,
+            targetRIR: 2
+        )
+
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(workout)
+        try await context.setRepo.save(set)
+
+        let exportedData = try await context.backupService.exportBackup()
+        let archive = try decodeBackupArchive(exportedData)
+        let archivedSet = try XCTUnwrap(archive.sets.first(where: { $0.id == set.id }))
+
+        XCTAssertEqual(archivedSet.overrideTargetRepMin, 6)
+        XCTAssertEqual(archivedSet.overrideTargetRepMax, 8)
+
+        let restoredContext = try makeContext()
+        _ = try await restoredContext.backupService.restoreBackup(data: exportedData)
+        let restoredSet = try await restoredContext.setRepo.fetch(byId: set.id)
+
+        XCTAssertEqual(restoredSet?.overrideTargetRepMin, 6)
+        XCTAssertEqual(restoredSet?.overrideTargetRepMax, 8)
+        XCTAssertEqual(restoredSet?.targetRepMin, 8)
+        XCTAssertEqual(restoredSet?.targetRepMax, 12)
+    }
+
     func testExportBackupKeepsOnlyLearningDataForUntouchedTrackedSets() async throws {
         let context = try makeContext()
         let uncompleted = try await seedTrackedCompletedSet(in: context, order: 1)
@@ -847,6 +947,7 @@ private actor StartupPRRebuildSettingsServiceStub: SettingsServiceProtocol {
     func updatePrescriptionFreshnessBonus(enabled: Bool, percent: Double) async throws {}
     func updatePrescriptionFatigueModelingEnabled(_ enabled: Bool) async throws {}
     func updatePrescriptionDefaultRecoveryConstant(_ seconds: Double) async throws {}
+    func updatePrescriptionAdminModeEnabled(_ enabled: Bool) async throws {}
     func resetAllAppData() async throws {}
 
     func rebuildPRs() async throws {
