@@ -310,8 +310,13 @@ final class ActiveWorkoutViewModel {
             // 2. Fetch all sets for this workout (ordered by orderInWorkout)
             let allSets = try await setService.fetchSets(for: active.id)
 
-            // 3. Group sets by exerciseId
-            self.setsByExercise = Dictionary(grouping: allSets, by: \.exerciseId)
+            // 3. Group sets by exerciseId, then sort each group by orderInExercise
+            //    so warmups stay on top regardless of orderInWorkout drift.
+            var grouped = Dictionary(grouping: allSets, by: \.exerciseId)
+            for (exerciseId, exerciseSets) in grouped {
+                grouped[exerciseId] = exerciseSets.sorted { $0.orderInExercise < $1.orderInExercise }
+            }
+            self.setsByExercise = grouped
 
             // 4. Discover unique exerciseIds and fetch Exercise objects
             let exerciseIds = try await setService.fetchExerciseIds(for: active.id)
@@ -322,10 +327,11 @@ final class ActiveWorkoutViewModel {
                 }
             }
 
-            // 5. Order exercises by the first set's orderInWorkout for each group
+            // 5. Order exercises by the MIN orderInWorkout across their sets
+            //    (robust to warmups having been appended at the global tail).
             loadedExercises.sort { lhs, rhs in
-                let lhsOrder = setsByExercise[lhs.id]?.first?.orderInWorkout ?? 0
-                let rhsOrder = setsByExercise[rhs.id]?.first?.orderInWorkout ?? 0
+                let lhsOrder = setsByExercise[lhs.id]?.map(\.orderInWorkout).min() ?? 0
+                let rhsOrder = setsByExercise[rhs.id]?.map(\.orderInWorkout).min() ?? 0
                 return lhsOrder < rhsOrder
             }
             self.exercises = loadedExercises
@@ -360,7 +366,9 @@ final class ActiveWorkoutViewModel {
             updateLiveActivityState()
 
         } catch {
+            #if DEBUG
             print("[ActiveWorkoutViewModel] Failed to load active workout: \(error)")
+            #endif
         }
     }
 
@@ -430,7 +438,9 @@ final class ActiveWorkoutViewModel {
                     restDurationSeconds: set.restDurationSeconds
                 )
             } catch {
+                #if DEBUG
                 print("[ActiveWorkoutViewModel] Failed to capture fatigue learning for set \(set.id): \(error)")
+                #endif
             }
 
             // 6. Start rest timer: warmup sets use warmup rest time, working sets use default.
@@ -456,7 +466,9 @@ final class ActiveWorkoutViewModel {
             }
 
         } catch {
+            #if DEBUG
             print("[ActiveWorkoutViewModel] Failed to complete set: \(error)")
+            #endif
         }
     }
 
@@ -492,7 +504,9 @@ final class ActiveWorkoutViewModel {
         } catch {
             // Revert on failure
             set.completed = oldCompleted
+            #if DEBUG
             print("[ActiveWorkoutViewModel] Failed to uncomplete set: \(error)")
+            #endif
         }
     }
 
@@ -535,7 +549,9 @@ final class ActiveWorkoutViewModel {
             }
 
         } catch {
+            #if DEBUG
             print("[ActiveWorkoutViewModel] Failed to add set: \(error)")
+            #endif
         }
     }
 
@@ -569,13 +585,19 @@ final class ActiveWorkoutViewModel {
             reindexOrderInExercise(&exerciseSets)
             setsByExercise[exerciseId] = exerciseSets
 
+            // Rewrite global orderInWorkout so the newly-inserted warmup isn't stranded
+            // at the workout tail — keeps both order fields consistent.
+            reindexOrderInWorkout()
+
             // Invalidate and refresh suggestions for the currently visible exercise
             if currentExercise?.id == exerciseId {
                 requestWeightSuggestionRefresh(mode: .preserveExisting, invalidateCache: true)
             }
 
         } catch {
+            #if DEBUG
             print("[ActiveWorkoutViewModel] Failed to add warmup set: \(error)")
+            #endif
         }
     }
 
@@ -606,7 +628,9 @@ final class ActiveWorkoutViewModel {
             }
 
         } catch {
+            #if DEBUG
             print("[ActiveWorkoutViewModel] Failed to delete set: \(error)")
+            #endif
         }
     }
 
@@ -632,7 +656,9 @@ final class ActiveWorkoutViewModel {
             }
 
         } catch {
+            #if DEBUG
             print("[ActiveWorkoutViewModel] Failed to change set type: \(error)")
+            #endif
         }
     }
 
@@ -661,7 +687,9 @@ final class ActiveWorkoutViewModel {
                 addedExerciseCount += 1
 
             } catch {
+                #if DEBUG
                 print("[ActiveWorkoutViewModel] Failed to add exercise \(exerciseId): \(error)")
+                #endif
             }
         }
 
@@ -686,7 +714,9 @@ final class ActiveWorkoutViewModel {
             do {
                 try await setService.delete(set)
             } catch {
+                #if DEBUG
                 print("[ActiveWorkoutViewModel] Failed to delete set \(set.id) during exercise removal: \(error)")
+                #endif
             }
         }
 
@@ -712,18 +742,28 @@ final class ActiveWorkoutViewModel {
     func reorderExercises(from source: IndexSet, to destination: Int) {
         exercises.move(fromOffsets: source, toOffset: destination)
 
-        // Persist new order: update orderInWorkout on all sets to reflect new exercise order
+        // Keep the moved exercise selected (mirrors EditWorkoutViewModel behavior).
+        if let sourceIndex = source.first, sourceIndex == selectedExerciseIndex {
+            selectedExerciseIndex = destination > sourceIndex ? destination - 1 : destination
+        }
+
+        // Persist new order: update orderInWorkout on all sets to reflect new exercise order.
+        // Iterate each exercise's sets in orderInExercise order so warmups keep the lowest
+        // orderInWorkout within their exercise.
         Task {
             var globalOrder = 1
             for exercise in exercises {
                 guard let sets = setsByExercise[exercise.id] else { continue }
-                for set in sets {
+                let orderedSets = sets.sorted { $0.orderInExercise < $1.orderInExercise }
+                for set in orderedSets {
                     set.orderInWorkout = globalOrder
                     set.updatedAt = Date()
                     do {
                         _ = try await setService.edit(set)
                     } catch {
+                        #if DEBUG
                         print("[ActiveWorkoutViewModel] Failed to persist reorder for set \(set.id): \(error)")
+                        #endif
                     }
                     globalOrder += 1
                 }
@@ -1428,7 +1468,9 @@ final class ActiveWorkoutViewModel {
             .sorted { $0.date > $1.date }
             historyLoadedForExerciseId = exercise.id
         } catch {
+            #if DEBUG
             print("[ActiveWorkoutViewModel] Failed to load history: \(error)")
+            #endif
             subTabHistory = []
         }
     }
@@ -1445,7 +1487,9 @@ final class ActiveWorkoutViewModel {
             subTabPRTable = try await prService.fetchPRTable(for: exercise.id)
             prsLoadedForExerciseId = exercise.id
         } catch {
+            #if DEBUG
             print("[ActiveWorkoutViewModel] Failed to load PRs: \(error)")
+            #endif
             subTabPRTable = []
         }
     }
@@ -1509,7 +1553,9 @@ final class ActiveWorkoutViewModel {
         } catch {
             exerciseInfoData = nil
             exerciseInfoLoadedForExerciseId = exercise.id
+            #if DEBUG
             print("[ActiveWorkoutViewModel] ExerciseInfo load failed: \(error)")
+            #endif
         }
     }
 
@@ -1677,7 +1723,9 @@ final class ActiveWorkoutViewModel {
             suggestionsLoadedForKey = preparation.cacheKey
         } catch {
             guard isCurrentSuggestionRefresh(generation, expectedExerciseId: expectedExerciseId) else { return }
+            #if DEBUG
             print("[WeightSuggestion] Failed to load suggestions: \(error)")
+            #endif
             weightSuggestionData = SuggestionExplainer.makeWeightSuggestionData(
                 preparation: preparation,
                 evaluation: .unavailable(.calculationFailed)
@@ -1823,7 +1871,9 @@ final class ActiveWorkoutViewModel {
             self.isWorkoutFinished = true
 
         } catch {
+            #if DEBUG
             print("[ActiveWorkoutViewModel] Failed to finish workout: \(error)")
+            #endif
         }
     }
 
@@ -1860,7 +1910,9 @@ final class ActiveWorkoutViewModel {
             self.isWorkoutFinished = true
 
         } catch {
+            #if DEBUG
             print("[ActiveWorkoutViewModel] Failed to discard workout: \(error)")
+            #endif
         }
     }
 
@@ -1921,9 +1973,38 @@ final class ActiveWorkoutViewModel {
                     do {
                         _ = try await setService.edit(set)
                     } catch {
+                        #if DEBUG
                         print("[ActiveWorkoutViewModel] Failed to persist orderInExercise for set \(set.id): \(error)")
+                        #endif
                     }
                 }
+            }
+        }
+    }
+
+    /// Walk all exercises in their current order and reassign each set's orderInWorkout
+    /// so it matches the visual (warmup-first) order inside every exercise.
+    /// Persists only sets whose value changed.
+    private func reindexOrderInWorkout() {
+        var global = 1
+        for exercise in exercises {
+            guard let sets = setsByExercise[exercise.id] else { continue }
+            let ordered = sets.sorted { $0.orderInExercise < $1.orderInExercise }
+            for set in ordered {
+                if set.orderInWorkout != global {
+                    set.orderInWorkout = global
+                    set.updatedAt = Date()
+                    Task {
+                        do {
+                            _ = try await setService.edit(set)
+                        } catch {
+                            #if DEBUG
+                            print("[ActiveWorkoutViewModel] Failed to persist orderInWorkout for set \(set.id): \(error)")
+                            #endif
+                        }
+                    }
+                }
+                global += 1
             }
         }
     }
@@ -1952,7 +2033,9 @@ extension ActiveWorkoutViewModel: SetTableDataSource {
                 setsByExercise[set.exerciseId] = sets
             }
         } catch {
+            #if DEBUG
             print("[ActiveWorkoutViewModel] Failed to persist target rep override for set \(set.id): \(error)")
+            #endif
         }
     }
 
@@ -1985,7 +2068,9 @@ extension ActiveWorkoutViewModel: SetTableDataSource {
                 setsByExercise[set.exerciseId] = sets
             }
         } catch {
+            #if DEBUG
             print("[ActiveWorkoutViewModel] Failed to update set note: \(error)")
+            #endif
         }
     }
 

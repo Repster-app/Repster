@@ -1,7 +1,5 @@
 // ImportViewModel.swift
-// ViewModel for CSV import flow with state machine.
-// Spec: FR-001 through FR-009
-// Feature: 011-csv-import-export WP03 T011
+// ViewModel for the source-aware import flow.
 
 import Foundation
 import SwiftUI
@@ -24,11 +22,15 @@ final class ImportViewModel {
 
     var state: ImportState = .idle
     var showFilePicker = false
+    var selectedSource: ImportSource = .fitNotes
+    var selectedStrongUnitSystem: ImportUnitSystem?
 
     // Preview
     var previewHeaders: [String] = []
     var previewRows: [[String]] = []
     var estimatedTotalRows: Int = 0
+    private(set) var activeSource: ImportSource = .fitNotes
+    private(set) var activeUnitSystem: ImportUnitSystem?
 
     // Progress
     var progressFraction: Double = 0
@@ -54,11 +56,39 @@ final class ImportViewModel {
         self.importService = importService
     }
 
+    // MARK: - Derived State
+
     var shouldShowSupportCTA: Bool {
-        if case .some(.invalidHeader(_, _)) = importError {
+        if case .some(.invalidHeader(_, _, _)) = importError {
             return true
         }
         return false
+    }
+
+    var canSelectFile: Bool {
+        !selectedSource.requiresUnitSystem || selectedStrongUnitSystem != nil
+    }
+
+    var selectedUnitSystem: ImportUnitSystem? {
+        selectedSource == .strong ? selectedStrongUnitSystem : nil
+    }
+
+    var activeUnitSummary: String? {
+        activeUnitSystem?.summaryLabel
+    }
+
+    var activeSourceSummary: String {
+        activeSource.displayName
+    }
+
+    // MARK: - Selection
+
+    func chooseSource(_ source: ImportSource) {
+        selectedSource = source
+    }
+
+    func chooseStrongUnitSystem(_ unitSystem: ImportUnitSystem) {
+        selectedStrongUnitSystem = unitSystem
     }
 
     // MARK: - File Selection
@@ -70,19 +100,31 @@ final class ImportViewModel {
 
         case .success(let url):
             let accessing = url.startAccessingSecurityScopedResource()
-            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+            defer {
+                if accessing {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
 
             do {
                 errorMessage = nil
                 importError = nil
-                let data = try Data(contentsOf: url)
-                self.importData = data
 
-                let preview = try importService.previewCSV(data: data)
-                self.previewHeaders = preview.headers
-                self.previewRows = preview.sampleRows
-                self.estimatedTotalRows = preview.estimatedTotalRows
-                self.state = .previewing
+                let data = try Data(contentsOf: url)
+                let unitSystem = selectedUnitSystem
+                let preview = try importService.previewImport(
+                    data: data,
+                    source: selectedSource,
+                    unitSystem: unitSystem
+                )
+
+                importData = data
+                activeSource = selectedSource
+                activeUnitSystem = unitSystem
+                previewHeaders = preview.headers
+                previewRows = preview.sampleRows
+                estimatedTotalRows = preview.estimatedTotalRows
+                state = .previewing
             } catch {
                 setFailure(error)
             }
@@ -99,7 +141,11 @@ final class ImportViewModel {
         setsInserted = 0
 
         Task {
-            let stream = importService.importCSV(data: data)
+            let stream = importService.importData(
+                data: data,
+                source: activeSource,
+                unitSystem: activeUnitSystem
+            )
 
             for await progress in stream {
                 handleProgress(progress)
@@ -155,21 +201,12 @@ final class ImportViewModel {
         result = nil
         errorMessage = nil
         importError = nil
+        activeSource = selectedSource
+        activeUnitSystem = selectedUnitSystem
     }
 
     func retry() {
-        importData = nil
-        previewHeaders = []
-        previewRows = []
-        estimatedTotalRows = 0
-        progressFraction = 0
-        progressLabel = ""
-        setsInserted = 0
-        totalSets = 0
-        result = nil
-        errorMessage = nil
-        importError = nil
-        state = .idle
+        reset()
         showFilePicker = true
     }
 

@@ -103,6 +103,7 @@ struct TemplateArchiveExerciseMetadata: Codable, Sendable {
     let secondaryMuscles: [String]
     let movementPattern: MovementPattern?
     let unilateral: Bool
+    let unilateralRepTargetMode: UnilateralRepTargetMode?
     let bilateralLoadFactor: Double?
     let bodyweightFactor: Double
     let weightIncrement: Double?
@@ -137,6 +138,7 @@ struct AITemplateContextExercise: Codable, Sendable {
     let secondaryMuscles: [String]
     let movementPattern: MovementPattern?
     let unilateral: Bool
+    let unilateralRepTargetMode: UnilateralRepTargetMode?
     let bilateralLoadFactor: Double?
     let bodyweightFactor: Double
     let weightIncrement: Double?
@@ -173,6 +175,7 @@ struct AITemplateDraftExercise: Codable, Sendable {
     let secondaryMuscles: [String]
     let movementPattern: MovementPattern?
     let unilateral: Bool
+    let unilateralRepTargetMode: UnilateralRepTargetMode?
     let bilateralLoadFactor: Double?
     let bodyweightFactor: Double
     let weightIncrement: Double?

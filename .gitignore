@@ -36,3 +36,6 @@ Pods/
 *.ipa
 *.dSYM.zip
 *.dSYM
+
+# Local agent worktrees
+.claude/worktrees/

@@ -151,6 +151,15 @@ struct SetRowView: View {
     /// Placeholder for the reps input field. Defaults to "0", but shows target rep range (e.g. "8-12") when set from a template.
     var repsPlaceholder: String = "0"
 
+    /// Placeholder for the left reps input when unilateral logging is enabled.
+    var leftRepsPlaceholder: String = "0"
+
+    /// Placeholder for the right reps input when unilateral logging is enabled.
+    var rightRepsPlaceholder: String = "0"
+
+    /// Optional hint describing how unilateral rep targets should be interpreted.
+    var unilateralTargetHint: String? = nil
+
     // MARK: - Actions
 
     /// Called when the completion checkbox is tapped.
@@ -782,13 +791,15 @@ struct SetRowView: View {
                 unilateralSideInput(
                     title: "L",
                     repsText: $leftRepsText,
-                    focusedField: .leftReps
+                    focusedField: .leftReps,
+                    placeholder: leftRepsPlaceholder
                 )
 
                 unilateralSideInput(
                     title: "R",
                     repsText: $rightRepsText,
-                    focusedField: .rightReps
+                    focusedField: .rightReps,
+                    placeholder: rightRepsPlaceholder
                 )
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -798,7 +809,8 @@ struct SetRowView: View {
     private func unilateralSideInput(
         title: String,
         repsText: Binding<String>,
-        focusedField: SetRowInputField
+        focusedField: SetRowInputField,
+        placeholder: String
     ) -> some View {
         HStack(spacing: UnilateralSetRowLayout.sideLabelSpacing) {
             Text(title)
@@ -808,7 +820,7 @@ struct SetRowView: View {
 
             SetInputField(
                 value: repsText,
-                placeholder: repsPlaceholder,
+                placeholder: placeholder,
                 keyboardType: .numberPad,
                 isCompleted: set.completed,
                 controlHeight: UnilateralSetRowLayout.controlHeight,

@@ -96,7 +96,9 @@ final class EditWorkoutViewModel {
             self.selectedExerciseIndex = 0
             self.isLoading = false
         } catch {
+            #if DEBUG
             print("[EditWorkoutViewModel] Load failed: \(error)")
+            #endif
             isLoading = false
         }
     }
@@ -141,7 +143,9 @@ final class EditWorkoutViewModel {
             dirtySetIds.remove(set.id)
 
         } catch {
+            #if DEBUG
             print("[EditWorkoutViewModel] completeSet failed: \(error)")
+            #endif
         }
     }
 
@@ -166,7 +170,9 @@ final class EditWorkoutViewModel {
         } catch {
             // Revert on failure
             set.completed = oldCompleted
+            #if DEBUG
             print("[EditWorkoutViewModel] uncompleteSet failed: \(error)")
+            #endif
         }
     }
 
@@ -192,7 +198,9 @@ final class EditWorkoutViewModel {
             newSetIds.insert(newSet.id)
             setsByExercise[exerciseId, default: []].append(newSet)
         } catch {
+            #if DEBUG
             print("[EditWorkoutViewModel] addSet failed: \(error)")
+            #endif
         }
     }
 
@@ -224,8 +232,14 @@ final class EditWorkoutViewModel {
             sets.insert(newSet, at: insertIndex)
             reindexOrderInExercise(&sets)
             setsByExercise[exerciseId] = sets
+
+            // Rewrite global orderInWorkout so the newly-inserted warmup isn't stranded
+            // at the workout tail — keeps both order fields consistent.
+            reindexOrderInWorkout()
         } catch {
+            #if DEBUG
             print("[EditWorkoutViewModel] addWarmupSet failed: \(error)")
+            #endif
         }
     }
 
@@ -249,7 +263,9 @@ final class EditWorkoutViewModel {
             newSetIds.remove(set.id)
 
         } catch {
+            #if DEBUG
             print("[EditWorkoutViewModel] deleteSet failed: \(error)")
+            #endif
         }
     }
 
@@ -264,7 +280,9 @@ final class EditWorkoutViewModel {
             set.cachedPRStatus = result.prResult.newStatus
             applyAffectedSets(result.prResult.affectedSetIds)
         } catch {
+            #if DEBUG
             print("[EditWorkoutViewModel] changeSetType failed: \(error)")
+            #endif
         }
     }
 
@@ -283,7 +301,9 @@ final class EditWorkoutViewModel {
                 // Create initial empty working set
                 await addSet(for: exerciseId)
             } catch {
+                #if DEBUG
                 print("[EditWorkoutViewModel] addExercise failed: \(error)")
+                #endif
             }
         }
 
@@ -322,7 +342,9 @@ final class EditWorkoutViewModel {
                 try await setService.delete(set)
                 newSetIds.remove(set.id)
             } catch {
+                #if DEBUG
                 print("[EditWorkoutViewModel] delete set during removeExercise failed: \(error)")
+                #endif
             }
         }
 
@@ -355,7 +377,9 @@ final class EditWorkoutViewModel {
                 perceivedEffort: workout.perceivedEffort
             )
         } catch {
+            #if DEBUG
             print("[EditWorkoutViewModel] saveNotes failed: \(error)")
+            #endif
         }
     }
 
@@ -441,7 +465,9 @@ final class EditWorkoutViewModel {
                 set.cachedPRStatus = result.prResult.newStatus
                 applyAffectedSets(result.prResult.affectedSetIds)
             } catch {
+                #if DEBUG
                 print("[EditWorkoutViewModel] saveDirtySets failed for \(set.id): \(error)")
+                #endif
             }
         }
         dirtySetIds.removeAll()
@@ -506,6 +532,23 @@ final class EditWorkoutViewModel {
             set.orderInExercise = index + 1
         }
     }
+
+    /// Walk all exercises in current order and reassign each set's orderInWorkout
+    /// so it matches the visual (warmup-first) order inside every exercise.
+    private func reindexOrderInWorkout() {
+        var global = 1
+        for exercise in exercises {
+            guard let sets = setsByExercise[exercise.id] else { continue }
+            let ordered = sets.sorted { $0.orderInExercise < $1.orderInExercise }
+            for set in ordered {
+                if set.orderInWorkout != global {
+                    set.orderInWorkout = global
+                    set.updatedAt = Date()
+                }
+                global += 1
+            }
+        }
+    }
 }
 
 // MARK: - SetTableDataSource Conformance
@@ -532,7 +575,9 @@ extension EditWorkoutViewModel: SetTableDataSource {
                 setsByExercise[set.exerciseId] = sets
             }
         } catch {
+            #if DEBUG
             print("[EditWorkoutViewModel] Failed to update set note: \(error)")
+            #endif
         }
     }
 }

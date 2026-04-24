@@ -7,6 +7,7 @@ import SwiftUI
 struct CalendarDayCell: View {
     let date: Date
     let muscleGroups: [String]
+    let hasWorkout: Bool
     let isToday: Bool
     let isSelected: Bool
     let onTapped: () -> Void
@@ -54,9 +55,15 @@ struct CalendarDayCell: View {
 
     @ViewBuilder
     private var dotsView: some View {
-        if muscleGroups.isEmpty {
+        switch Self.indicatorStyle(hasWorkout: hasWorkout, muscleGroups: muscleGroups) {
+        case .none:
             Color.clear.frame(height: 8)
-        } else {
+        case .genericWorkout:
+            Circle()
+                .fill(Color.success)
+                .frame(width: 6, height: 6)
+                .frame(height: 8)
+        case .muscleGroups:
             HStack(spacing: 2) {
                 ForEach(muscleGroups.prefix(3), id: \.self) { group in
                     MuscleGroupDot(muscleGroup: group)
@@ -68,5 +75,20 @@ struct CalendarDayCell: View {
                 }
             }
         }
+    }
+}
+
+extension CalendarDayCell {
+    enum IndicatorStyle: Equatable {
+        case none
+        case genericWorkout
+        case muscleGroups
+    }
+
+    static func indicatorStyle(hasWorkout: Bool, muscleGroups: [String]) -> IndicatorStyle {
+        if !muscleGroups.isEmpty {
+            return .muscleGroups
+        }
+        return hasWorkout ? .genericWorkout : .none
     }
 }

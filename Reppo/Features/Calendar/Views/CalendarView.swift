@@ -78,6 +78,7 @@ struct CalendarView: View {
                         CalendarMonthView(
                             month: month,
                             calendarDotData: viewModel.calendarDotData,
+                            workoutDates: Set(viewModel.workoutsByDate.keys),
                             selectedDate: viewModel.selectedDate,
                             today: Date(),
                             onDateTapped: { date in

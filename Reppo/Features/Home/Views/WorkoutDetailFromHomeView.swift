@@ -173,7 +173,9 @@ struct WorkoutDetailFromHomeView: View {
             dismiss()
         } catch {
             isDeleting = false
+            #if DEBUG
             print("[WorkoutDetailFromHomeView] Delete failed: \(error)")
+            #endif
         }
     }
 
@@ -204,8 +206,8 @@ struct WorkoutDetailFromHomeView: View {
             }
 
             exerciseGroups.sort { lhs, rhs in
-                let l = lhs.sets.first?.orderInWorkout ?? Int.max
-                let r = rhs.sets.first?.orderInWorkout ?? Int.max
+                let l = lhs.sets.map(\.orderInWorkout).min() ?? Int.max
+                let r = rhs.sets.map(\.orderInWorkout).min() ?? Int.max
                 return l < r
             }
 
@@ -224,7 +226,9 @@ struct WorkoutDetailFromHomeView: View {
             )]
             isLoading = false
         } catch {
+            #if DEBUG
             print("[WorkoutDetailFromHomeView] Failed: \(error)")
+            #endif
             isLoading = false
         }
     }

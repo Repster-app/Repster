@@ -271,6 +271,15 @@ struct SettingsView: View {
                     systemImage: "envelope"
                 )
             }
+
+            if let privacyURL = URL(string: "https://briexman.github.io/Reppo-Privacy/privacy.html") {
+                Link(destination: privacyURL) {
+                    SettingsNavigationRow(
+                        title: "Privacy Policy",
+                        systemImage: "hand.raised"
+                    )
+                }
+            }
         }
     }
 

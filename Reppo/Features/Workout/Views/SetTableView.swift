@@ -420,7 +420,31 @@ private struct SetRowWrapper: View {
 
     var body: some View {
         if let exercise {
-            let unilateralTargetPresentation = SetTableView.unilateralTargetPresentation(for: set, exercise: exercise)
+            configuredRow(for: exercise)
+        }
+    }
+
+    private func configuredRow(for exercise: Exercise) -> AnyView {
+        let unilateralTargetPresentation = SetTableView.unilateralTargetPresentation(for: set, exercise: exercise)
+        let canComplete = completionInput(for: exercise) != nil
+        let prStatusOverride = CachedPRStatus.effectiveStatus(for: set, among: siblingsSets)
+        let row = rowContent(
+            for: exercise,
+            presentation: unilateralTargetPresentation,
+            canComplete: canComplete,
+            prStatusOverride: prStatusOverride
+        )
+        let rowWithHandlers = applyingFieldChangeHandlers(to: row, exercise: exercise)
+        return setNoteAlert(for: rowWithHandlers)
+    }
+
+    private func rowContent(
+        for exercise: Exercise,
+        presentation: UnilateralTargetPresentation,
+        canComplete: Bool,
+        prStatusOverride: CachedPRStatus?
+    ) -> AnyView {
+        AnyView(
             SetRowView(
                 set: set,
                 exercise: exercise,
@@ -436,109 +460,171 @@ private struct SetRowWrapper: View {
                 rightRIRValue: $rightRIRValue,
                 targetRIR: set.targetRIR,
                 repsPlaceholder: Self.repsPlaceholder(for: set),
-                leftRepsPlaceholder: unilateralTargetPresentation.leftPlaceholder,
-                rightRepsPlaceholder: unilateralTargetPresentation.rightPlaceholder,
-                unilateralTargetHint: unilateralTargetPresentation.sharedHint,
-                onComplete: {
-
-                    Task {
-                        if set.completed {
-                            await dataSource.uncompleteSet(set)
-                        } else if let input = completionInput(for: exercise) {
-                            await dataSource.completeSet(set, input: input)
-                        }
-                    }
-                },
-                canCompleteSet: { completionInput(for: exercise) != nil },
-                onDelete: {
-                    Task {
-                        await dataSource.deleteSet(set)
-                    }
-                },
-                onChangeSetType: { newType in
-                    Task {
-                        await dataSource.changeSetType(set, to: newType)
-                    }
-                },
-                onEditNote: {
-                    noteText = set.notes ?? ""
-                    showNoteAlert = true
-                },
+                leftRepsPlaceholder: presentation.leftPlaceholder,
+                rightRepsPlaceholder: presentation.rightPlaceholder,
+                unilateralTargetHint: presentation.sharedHint,
+                onComplete: { completeOrToggleSet(for: exercise) },
+                canCompleteSet: { canComplete },
+                onDelete: deleteCurrentSet,
+                onChangeSetType: changeSetType,
+                onEditNote: beginEditingNote,
                 onCommitTargetRepRange: commitTargetRepRange,
                 keyboardManager: keyboardManager,
                 suggestedWeight: suggestedWeight,
-                prStatusOverride: CachedPRStatus.effectiveStatus(for: set, among: siblingsSets)
+                prStatusOverride: prStatusOverride
             )
-            .onChange(of: weightText) { _, newValue in
-                handleFieldEdit(field: .weight) {
-                    set.weight = UnitConversion.parseDecimal(newValue)
+        )
+    }
+
+    private func applyingFieldChangeHandlers(to content: AnyView, exercise: Exercise) -> AnyView {
+        AnyView(
+            content
+                .onChange(of: weightText) { _, newValue in
+                    handleWeightChange(newValue)
                 }
-            }
-            .onChange(of: repsText) { _, newValue in
-                if suppressNextRepsTextChange {
-                    suppressNextRepsTextChange = false
-                    return
+                .onChange(of: repsText) { _, newValue in
+                    handleRepsChange(newValue)
                 }
-                applyParsedRepsInput(RepsTargetInputParser.parse(newValue))
-            }
-            .onChange(of: leftRepsText) { _, newValue in
-                handleFieldEdit(field: .reps) {
-                    set.leftReps = Self.singleRepsValue(from: newValue)
-                    syncDerivedSetFields(for: exercise)
+                .onChange(of: leftRepsText) { _, newValue in
+                    handleLeftRepsChange(newValue, exercise: exercise)
                 }
-            }
-            .onChange(of: rightRepsText) { _, newValue in
-                handleFieldEdit(field: .reps) {
-                    set.rightReps = Self.singleRepsValue(from: newValue)
-                    syncDerivedSetFields(for: exercise)
+                .onChange(of: rightRepsText) { _, newValue in
+                    handleRightRepsChange(newValue, exercise: exercise)
                 }
-            }
-            .onChange(of: durationText) { _, newValue in
-                handleFieldEdit(field: .duration) {
-                    set.durationSeconds = Self.durationSecondsValue(from: newValue)
+                .onChange(of: durationText) { _, newValue in
+                    handleDurationChange(newValue)
                 }
-            }
-            .onChange(of: distanceText) { _, newValue in
-                handleFieldEdit(field: .distance) {
-                    set.distanceMeters = UnitConversion.parseDecimal(newValue)
+                .onChange(of: distanceText) { _, newValue in
+                    handleDistanceChange(newValue)
                 }
-            }
-            .onChange(of: rirValue) { _, newValue in
-                handleFieldEdit(field: .rir) {
-                    set.rir = newValue
+                .onChange(of: rirValue) { _, newValue in
+                    handleRIRChange(newValue)
                 }
-            }
-            .onChange(of: leftRIRValue) { _, newValue in
-                handleFieldEdit(field: .rir) {
-                    set.leftRIR = newValue
-                    syncDerivedSetFields(for: exercise)
+                .onChange(of: leftRIRValue) { _, newValue in
+                    handleLeftRIRChange(newValue, exercise: exercise)
                 }
-            }
-            .onChange(of: rightRIRValue) { _, newValue in
-                handleFieldEdit(field: .rir) {
-                    set.rightRIR = newValue
-                    syncDerivedSetFields(for: exercise)
+                .onChange(of: rightRIRValue) { _, newValue in
+                    handleRightRIRChange(newValue, exercise: exercise)
                 }
-            }
-            .alert("Set Note", isPresented: $showNoteAlert) {
+        )
+    }
+
+    private func setNoteAlert(for content: AnyView) -> AnyView {
+        AnyView(
+            content.alert("Set Note", isPresented: $showNoteAlert) {
                 TextField("Add a note…", text: $noteText)
                 Button("Save") {
-                    Task {
-                        let trimmed = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
-                        await dataSource.updateSetNote(set, note: trimmed.isEmpty ? nil : trimmed)
-                    }
+                    saveEditedNote()
                 }
                 Button("Cancel", role: .cancel) {}
                 if set.notes != nil && !(set.notes?.isEmpty ?? true) {
                     Button("Remove Note", role: .destructive) {
-                        Task {
-                            await dataSource.updateSetNote(set, note: nil)
-                        }
+                        removeExistingNote()
                     }
                 }
             } message: {
                 Text("Add a note to this set")
             }
+        )
+    }
+
+    private func completeOrToggleSet(for exercise: Exercise) {
+        Task {
+            if set.completed {
+                await dataSource.uncompleteSet(set)
+            } else if let input = completionInput(for: exercise) {
+                await dataSource.completeSet(set, input: input)
+            }
+        }
+    }
+
+    private func deleteCurrentSet() {
+        Task {
+            await dataSource.deleteSet(set)
+        }
+    }
+
+    private func changeSetType(_ newType: SetType) {
+        Task {
+            await dataSource.changeSetType(set, to: newType)
+        }
+    }
+
+    private func beginEditingNote() {
+        noteText = set.notes ?? ""
+        showNoteAlert = true
+    }
+
+    private func saveEditedNote() {
+        Task {
+            let trimmed = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
+            await dataSource.updateSetNote(set, note: trimmed.isEmpty ? nil : trimmed)
+        }
+    }
+
+    private func removeExistingNote() {
+        Task {
+            await dataSource.updateSetNote(set, note: nil)
+        }
+    }
+
+    private func handleWeightChange(_ newValue: String) {
+        handleFieldEdit(field: .weight) {
+            set.weight = UnitConversion.parseDecimal(newValue)
+        }
+    }
+
+    private func handleRepsChange(_ newValue: String) {
+        if suppressNextRepsTextChange {
+            suppressNextRepsTextChange = false
+            return
+        }
+        applyParsedRepsInput(RepsTargetInputParser.parse(newValue))
+    }
+
+    private func handleLeftRepsChange(_ newValue: String, exercise: Exercise) {
+        handleFieldEdit(field: .reps) {
+            set.leftReps = Self.singleRepsValue(from: newValue)
+            syncDerivedSetFields(for: exercise)
+        }
+    }
+
+    private func handleRightRepsChange(_ newValue: String, exercise: Exercise) {
+        handleFieldEdit(field: .reps) {
+            set.rightReps = Self.singleRepsValue(from: newValue)
+            syncDerivedSetFields(for: exercise)
+        }
+    }
+
+    private func handleDurationChange(_ newValue: String) {
+        handleFieldEdit(field: .duration) {
+            set.durationSeconds = Self.durationSecondsValue(from: newValue)
+        }
+    }
+
+    private func handleDistanceChange(_ newValue: String) {
+        handleFieldEdit(field: .distance) {
+            set.distanceMeters = UnitConversion.parseDecimal(newValue)
+        }
+    }
+
+    private func handleRIRChange(_ newValue: Double?) {
+        handleFieldEdit(field: .rir) {
+            set.rir = newValue
+        }
+    }
+
+    private func handleLeftRIRChange(_ newValue: Double?, exercise: Exercise) {
+        handleFieldEdit(field: .rir) {
+            set.leftRIR = newValue
+            syncDerivedSetFields(for: exercise)
+        }
+    }
+
+    private func handleRightRIRChange(_ newValue: Double?, exercise: Exercise) {
+        handleFieldEdit(field: .rir) {
+            set.rightRIR = newValue
+            syncDerivedSetFields(for: exercise)
         }
     }
 

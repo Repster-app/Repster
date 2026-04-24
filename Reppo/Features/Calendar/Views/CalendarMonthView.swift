@@ -7,6 +7,7 @@ import SwiftUI
 struct CalendarMonthView: View {
     let month: Date
     let calendarDotData: [Date: [String]]
+    let workoutDates: Set<Date>
     let selectedDate: Date?
     let today: Date
     let onDateTapped: (Date) -> Void
@@ -46,9 +47,11 @@ struct CalendarMonthView: View {
 
             // Day cells
             ForEach(daysInMonth, id: \.self) { date in
+                let normalizedDate = CalendarViewModel.normalizeDate(date)
                 CalendarDayCell(
                     date: date,
-                    muscleGroups: calendarDotData[CalendarViewModel.normalizeDate(date)] ?? [],
+                    muscleGroups: calendarDotData[normalizedDate] ?? [],
+                    hasWorkout: workoutDates.contains(normalizedDate),
                     isToday: calendar.isDate(date, inSameDayAs: today),
                     isSelected: selectedDate.map { calendar.isDate($0, inSameDayAs: date) } ?? false,
                     onTapped: { onDateTapped(date) }

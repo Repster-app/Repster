@@ -5,6 +5,27 @@ import SwiftData
 @MainActor
 final class ChartDataServiceTests: XCTestCase {
 
+    func testCalendarDayCellIndicatorStyleUsesMuscleGroupsWhenAvailable() {
+        XCTAssertEqual(
+            CalendarDayCell.indicatorStyle(hasWorkout: true, muscleGroups: ["chest"]),
+            .muscleGroups
+        )
+    }
+
+    func testCalendarDayCellIndicatorStyleUsesGenericWorkoutDotWhenWorkoutHasNoMuscles() {
+        XCTAssertEqual(
+            CalendarDayCell.indicatorStyle(hasWorkout: true, muscleGroups: []),
+            .genericWorkout
+        )
+    }
+
+    func testCalendarDayCellIndicatorStyleShowsNothingWhenDateHasNoWorkout() {
+        XCTAssertEqual(
+            CalendarDayCell.indicatorStyle(hasWorkout: false, muscleGroups: []),
+            .none
+        )
+    }
+
     func testBreakdownIgnoresWarmupPartialAndNoDataSets() async throws {
         let context = try makeContext()
         let exercise = makeExercise(name: "Bench Press", primaryMuscle: "chest")

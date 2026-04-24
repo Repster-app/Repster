@@ -99,7 +99,11 @@
       "Bash(/Users/nikolettkiraly/Downloads/NewWorkoutProject/.gitignore:*)",
       "Bash(find /Users/nikolettkiraly/Downloads/NewWorkoutProject -type f -name \"*.swift\" -exec grep -l \"menu\\\\|MenuBar\\\\|topBar\\\\|navBar\" {})",
       "Bash(find /Users/nikolettkiraly/Downloads/NewWorkoutProject/Reppo/Core/Services/Protocols -name *.swift)",
-      "Bash(xcrun simctl:*)"
+      "Bash(xcrun simctl:*)",
+      "Read(//Users/nikolettkiraly/.ssh/**)",
+      "Bash(ssh -T git@github.com)",
+      "Bash(rm index.html)",
+      "Bash(cp -r /Users/nikolettkiraly/Downloads/workoutproject_docs/website/. .)"
     ]
   }
 }

@@ -1,5 +1,98 @@
 import Foundation
 
+// MARK: - ImportSource
+
+enum ImportSource: String, CaseIterable, Identifiable, Sendable {
+    case fitNotes
+    case strong
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .fitNotes:
+            return "FitNotes"
+        case .strong:
+            return "Strong"
+        }
+    }
+
+    var systemImageName: String {
+        switch self {
+        case .fitNotes:
+            return "list.bullet.rectangle"
+        case .strong:
+            return "bolt.heart"
+        }
+    }
+
+    var fileSelectionTitle: String {
+        switch self {
+        case .fitNotes:
+            return "Select FitNotes CSV"
+        case .strong:
+            return "Select Strong CSV"
+        }
+    }
+
+    var idleDescription: String {
+        switch self {
+        case .fitNotes:
+            return "Imports FitNotes workout exports with date, exercise, category, weight, reps, distance, time, notes, and kind columns."
+        case .strong:
+            return "Imports Strong workout history exports with workout time, workout duration, set markers, weight, reps, distance, seconds, and optional RPE."
+        }
+    }
+
+    var requiresUnitSystem: Bool {
+        self == .strong
+    }
+}
+
+// MARK: - ImportUnitSystem
+
+enum ImportUnitSystem: String, CaseIterable, Identifiable, Sendable {
+    case metric
+    case imperial
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .metric:
+            return "Metric"
+        case .imperial:
+            return "Imperial"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .metric:
+            return "Kilograms (kg) and kilometers (km)"
+        case .imperial:
+            return "Pounds (lb) and miles (mi)"
+        }
+    }
+
+    var summaryLabel: String {
+        switch self {
+        case .metric:
+            return "Metric (kg, km)"
+        case .imperial:
+            return "Imperial (lb, mi)"
+        }
+    }
+}
+
+// MARK: - ImportPreview
+
+struct ImportPreview: Sendable {
+    let headers: [String]
+    let sampleRows: [[String]]
+    let estimatedTotalRows: Int
+}
+
 // MARK: - ImportProgress
 
 enum ImportProgress: Sendable {
@@ -24,6 +117,7 @@ struct ImportResult: Sendable {
     let exercisesCreated: Int
     let rowsSkipped: Int
     let errors: [CSVParser.ValidationError]
+    let warnings: [CSVParser.ValidationError]
     let duration: TimeInterval
 }
 
@@ -32,7 +126,8 @@ struct ImportResult: Sendable {
 enum ImportError: Error, LocalizedError, Sendable {
     case fileReadFailed(String)
     case invalidEncoding
-    case invalidHeader(expected: [String], got: [String])
+    case invalidHeader(source: ImportSource, expected: [String], got: [String])
+    case missingUnitSystem(source: ImportSource)
     case noValidRows
     case insertFailed(String)
     case cancelled
@@ -43,8 +138,10 @@ enum ImportError: Error, LocalizedError, Sendable {
             return "Failed to read file: \(msg)"
         case .invalidEncoding:
             return "Unable to read file. Please ensure it is UTF-8 encoded."
-        case .invalidHeader:
-            return "This CSV doesn't look like a FitNotes export. Reppo currently supports FitNotes CSV imports only."
+        case .invalidHeader(let source, _, _):
+            return "This CSV doesn't look like a \(source.displayName) export. Reppo currently supports FitNotes and Strong CSV imports."
+        case .missingUnitSystem(let source):
+            return "Choose whether the \(source.displayName) export uses metric or imperial units before importing."
         case .noValidRows:
             return "No valid data rows found in the CSV file."
         case .insertFailed(let msg):
@@ -62,11 +159,11 @@ protocol ImportServiceProtocol: Sendable {
     // MARK: - Preview
 
     /// Parse first N rows for preview display. Does NOT modify any data.
-    func previewCSV(data: Data) throws -> CSVParser.PreviewResult
+    func previewImport(data: Data, source: ImportSource, unitSystem: ImportUnitSystem?) throws -> ImportPreview
 
     // MARK: - Import
 
     /// Run full import. Returns an AsyncStream of progress updates.
     /// Caller MUST consume the stream to completion.
-    func importCSV(data: Data) -> AsyncStream<ImportProgress>
+    func importData(data: Data, source: ImportSource, unitSystem: ImportUnitSystem?) -> AsyncStream<ImportProgress>
 }
