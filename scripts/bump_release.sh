@@ -18,7 +18,7 @@ fi
 
 script_dir="${0:A:h}"
 project_root="${script_dir:h}"
-project_file="$project_root/Reppo.xcodeproj/project.pbxproj"
+project_file="$project_root/Repster.xcodeproj/project.pbxproj"
 changelog_file="$project_root/CHANGELOG.md"
 note_line='Versioning rule: the app marketing version uses `0.x`, and each release bumps `x` by 1.'
 
