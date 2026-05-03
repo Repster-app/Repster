@@ -14,3 +14,10 @@ Publish from:
 Expected URL:
 
 https://repster-app.github.io/Repster/
+
+## Pages
+
+- `index.html` - marketing home page
+- `docs.html` - feature documentation
+- `support.html` - support FAQ and contact
+- `privacy.html` - privacy policy
