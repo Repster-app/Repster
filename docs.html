@@ -18,6 +18,7 @@
       <a class="active" href="docs.html">Docs</a>
       <a href="support.html">Support</a>
       <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
     </nav>
   </header>
 
@@ -25,81 +26,300 @@
     <div class="page-inner">
       <p class="eyebrow">Feature guide</p>
       <h1>Docs</h1>
-      <p>A practical guide to the main Repster workflows: logging workouts, using templates, reviewing records, and understanding progress.</p>
+      <p>A practical guide to the main Repster workflows: logging workouts, using templates, reviewing records, understanding progress, and managing your data.</p>
     </div>
   </section>
 
   <main class="content">
     <div class="content-grid">
       <nav class="side-nav" aria-label="Documentation sections">
-        <a href="#home">Home</a>
-        <a href="#workouts">Workouts</a>
+        <a href="#home-dashboard">Home Dashboard</a>
+        <a href="#active-workout">Active Workout</a>
+        <a href="#smart-suggestions">Smart Suggestions</a>
+        <a href="#fatigue-learning">Fatigue Learning</a>
+        <a href="#exercises">Exercises</a>
+        <a href="#personal-records">Records</a>
         <a href="#templates">Templates</a>
-        <a href="#records">Records</a>
+        <a href="#calendar">Calendar</a>
         <a href="#charts">Charts</a>
-        <a href="#import">Import</a>
         <a href="#settings">Settings</a>
+        <a href="#bodyweight">Body Weight</a>
+        <a href="#import-export">Import and Export</a>
+        <a href="#onboarding">Onboarding</a>
         <a href="#subscription">Subscription</a>
       </nav>
 
       <article class="article">
-        <section class="doc-section" id="home">
+        <section class="doc-section" id="home-dashboard">
           <h2>Home Dashboard</h2>
-          <p>The home screen is the starting point for training. It shows weekly activity, recent workouts, recent personal records, and the fastest path into a new session.</p>
-          <h3>Start workout</h3>
-          <p>Begin with an empty workout, copy a previous session, or start from a saved template.</p>
-          <h3>Recent activity</h3>
-          <p>Recent records and workouts keep progress visible without needing to search through history.</p>
+          <p>The Home screen is the launch point for training and a quick snapshot of recent activity.</p>
+
+          <h3>Customizable Sections</h3>
+          <p>Use home screen editing to choose which sections are visible, including monthly stats, recent workouts, and recent personal records.</p>
+
+          <h3>Week Strip</h3>
+          <p>The week strip shows workout activity day by day. Days with workouts are marked so you can scan the week quickly and jump into calendar detail.</p>
+
+          <h3>Start Workout</h3>
+          <p>The start workout card gives you three ways to begin:</p>
+          <ul>
+            <li><strong>Empty workout:</strong> start fresh and add exercises as you go.</li>
+            <li><strong>Copy previous:</strong> duplicate the structure of a recent completed workout.</li>
+            <li><strong>From template:</strong> launch a saved routine with its exercises and set targets already loaded.</li>
+          </ul>
+
+          <h3>Recent Workouts</h3>
+          <p>Recent workouts show completed sessions with their title, date, exercises, sets, duration, volume, and trained categories.</p>
+
+          <h3>Monthly Stats</h3>
+          <p>Monthly stats summarize the current month so you can track training consistency and workload without opening charts.</p>
+
+          <h3>Recent PRs</h3>
+          <p>Recent personal records are surfaced on Home so new bests remain visible after the workout is saved.</p>
         </section>
 
-        <section class="doc-section" id="workouts">
+        <section class="doc-section" id="active-workout">
           <h2>Active Workout</h2>
-          <p>The active workout screen is built for fast set entry. Exercise tabs keep the current session organized while set rows handle weight, reps, RIR, completion, and unilateral tracking where needed.</p>
+          <p>The active workout screen is where sets are logged. It is designed to keep current-session entry fast while still showing useful context for each exercise.</p>
+
+          <h3>Exercise Tabs</h3>
+          <p>A horizontal exercise strip lets you move between exercises in the current workout. Each exercise includes these views:</p>
           <ul>
-            <li><strong>Sets:</strong> log the current exercise.</li>
-            <li><strong>History:</strong> review previous sessions for the exercise.</li>
-            <li><strong>PRs:</strong> see personal records while training.</li>
-            <li><strong>Charts:</strong> inspect exercise-level trends.</li>
+            <li><strong>Sets:</strong> the main data entry view for logging set details.</li>
+            <li><strong>History:</strong> previous sessions for the same exercise.</li>
+            <li><strong>PRs:</strong> personal records for the exercise.</li>
+            <li><strong>Charts:</strong> exercise-level progress graphs.</li>
           </ul>
+
+          <h3>Set Entry</h3>
+          <p>Set rows handle the fields required by the exercise tracking type, such as weight, reps, duration, distance, RIR, and completion status. For unilateral exercises, left and right work can be tracked separately.</p>
+
+          <h3>Set Types</h3>
+          <p>Sets can be marked as working, warmup, or partial where supported. These classifications help totals, PR checks, and suggestion calculations stay meaningful.</p>
+
+          <h3>Smart Weight Suggestions</h3>
+          <p>When enabled, Repster shows suggested weight for the next set based on recent performance, target reps, target RIR, and fatigue modeling.</p>
+
+          <h3>Rest Timer</h3>
+          <p>The rest timer starts after completed sets. It supports pause and resume, time adjustments, and compact behavior so the timer stays visible while logging.</p>
+
+          <h3>Session Timer</h3>
+          <p>The workout header tracks elapsed time from the start of the session until the workout is finished.</p>
+
+          <h3>Adding Exercises</h3>
+          <p>Add exercises at any point during a workout. The exercise picker supports search and filtering so the active session can change as training changes.</p>
+
+          <h3>Workout Summary</h3>
+          <p>When a workout ends, the summary shows total exercises, sets, volume, duration, editable title and notes, effort rating, fatigue feedback, and the option to save the workout as a template.</p>
+        </section>
+
+        <section class="doc-section" id="smart-suggestions">
+          <h2>Smart Suggestions</h2>
+          <p>Smart Suggestions is Repster's fatigue-aware weight recommendation system. It estimates a useful next-set load from your recent capacity, current session fatigue, and target effort.</p>
+
+          <h3>How It Works</h3>
+          <ul>
+            <li><strong>Base e1RM estimation:</strong> reviews recent peak performances in the configured recency window to estimate current exercise capacity.</li>
+            <li><strong>Fatigue accumulation:</strong> models how fatigue builds through sets based on work performed, effort, and rest.</li>
+            <li><strong>Forward projection:</strong> accounts for expected fatigue on upcoming sets, not only the current set.</li>
+            <li><strong>Freshness bonus:</strong> can add a small first-set boost when you are fresh.</li>
+            <li><strong>Readiness clamping:</strong> keeps the effective capacity estimate within a reasonable range.</li>
+            <li><strong>Weight prescription:</strong> converts the effective e1RM into a target weight using the selected formula, target reps, target RIR, and exercise increment.</li>
+          </ul>
+
+          <h3>Configuration</h3>
+          <p>Prescription settings let you tune recency window, target reps, target RIR, fatigue modeling, first-set freshness behavior, and weight rounding increments.</p>
+        </section>
+
+        <section class="doc-section" id="fatigue-learning">
+          <h2>Adaptive Fatigue Learning</h2>
+          <p>Fatigue learning helps Smart Suggestions adapt over time by comparing predicted performance with actual completed sets.</p>
+
+          <h3>How It Learns</h3>
+          <p>After qualifying working sets, Repster can record a prediction-versus-actual observation. Those observations are normalized so different rep ranges and loads can be compared.</p>
+
+          <h3>Global and Per-Exercise Tuning</h3>
+          <ul>
+            <li><strong>Global baseline:</strong> adjusts the default fatigue behavior across exercises after enough qualified data exists.</li>
+            <li><strong>Per-exercise tuning:</strong> refines the fatigue rate for specific exercises after repeated qualifying sessions.</li>
+          </ul>
+
+          <h3>Smoothing and Bounds</h3>
+          <p>Repster smooths cumulative error over time so one unusual session does not overcorrect future suggestions. Fatigue rates are bounded to keep recommendations within a reasonable range.</p>
+
+          <h3>Workout Feedback</h3>
+          <p>Post-workout fatigue feedback such as less aggressive, about right, or more aggressive helps the app understand whether recommendations matched your effort.</p>
+
+          <h3>Admin Detail</h3>
+          <p>Advanced fatigue diagnostics can show baseline state, per-exercise tuning, observation logs, set audit detail, and reset controls where available.</p>
+        </section>
+
+        <section class="doc-section" id="exercises">
+          <h2>Exercise Management</h2>
+          <p>Repster includes a seeded exercise library and supports fully custom exercises.</p>
+
+          <h3>Browsing and Searching</h3>
+          <p>The exercise library supports search, filters, and modes for browsing exercises or selecting exercises to add to an active workout.</p>
+
+          <h3>Exercise Properties</h3>
+          <p>Exercises can define name, equipment, primary and secondary muscles, movement pattern, tracking type, unilateral behavior, bodyweight factor, weight increment, and default rest time.</p>
+
+          <h3>Tracking Types</h3>
+          <p>Tracking types determine which fields appear in set entry. Supported styles include weight and reps, duration, duration and distance, weight and distance, weight with reps and duration, and custom tracking. Once sets exist for an exercise, tracking type changes may be restricted to protect historical data.</p>
+
+          <h3>Exercise Detail</h3>
+          <p>Exercise detail views show history, personal records, aggregate stats, best e1RM, volume, and trend information where available.</p>
+        </section>
+
+        <section class="doc-section" id="personal-records">
+          <h2>Personal Records</h2>
+          <p>Repster automatically evaluates completed sets and detects personal records for each exercise.</p>
+
+          <h3>How Detection Works</h3>
+          <p>Completed sets are compared against the full exercise history with precise weight handling so records are not affected by floating-point rounding issues.</p>
+
+          <h3>PR Statuses</h3>
+          <ul>
+            <li><strong>Current:</strong> the set is currently on the performance frontier.</li>
+            <li><strong>Matched:</strong> the set ties an existing current record.</li>
+            <li><strong>Previous:</strong> the set used to be a record but has since been surpassed.</li>
+            <li><strong>Dominated:</strong> a higher-rep set exists at equal or greater weight, making this less meaningful as a current record.</li>
+          </ul>
+
+          <h3>Frontier Logic</h3>
+          <p>The record system uses frontier-style comparison so a lower-rep performance is not treated as current when a stronger higher-rep performance already exists at the same or greater load.</p>
+
+          <h3>Where PRs Appear</h3>
+          <p>PRs appear on set rows, Home, exercise detail, and the PR view inside active workouts.</p>
         </section>
 
         <section class="doc-section" id="templates">
           <h2>Templates</h2>
-          <p>Templates let you save workout structures and reuse them. Tap a template to start fast, create one manually, save one from a completed workout, or import a shared template file.</p>
-          <p>Template rows show exercise count, set count, target areas, and quick actions for management.</p>
+          <p>Templates save workout structure so repeated routines can be started quickly.</p>
+
+          <h3>Creating Templates</h3>
+          <ul>
+            <li><strong>Save from workout:</strong> turn a completed workout into a reusable template.</li>
+            <li><strong>Create manually:</strong> build a template from exercises, targets, and set counts.</li>
+            <li><strong>Import:</strong> bring in a shared template file.</li>
+            <li><strong>AI helper:</strong> generate a prompt for ChatGPT and import the returned template JSON manually.</li>
+          </ul>
+
+          <h3>Using Templates</h3>
+          <p>Tap a template to start a workout with its exercise structure, targets, and ordering already prepared.</p>
+
+          <h3>Supersets</h3>
+          <p>Templates can preserve grouped exercise ordering for superset-style routines where supported.</p>
+
+          <h3>Import and Export</h3>
+          <p>Template files can be exported, shared, imported, previewed, and validated before being added to your library.</p>
         </section>
 
-        <section class="doc-section" id="records">
-          <h2>Personal Records</h2>
-          <p>Repster evaluates completed sets against your exercise history and flags meaningful records. PRs appear during workouts, on the home dashboard, and in exercise detail views.</p>
-          <p>The app distinguishes current records, matched records, previous records, and records that have been surpassed by stronger performances.</p>
+        <section class="doc-section" id="calendar">
+          <h2>Calendar</h2>
+          <p>The Calendar tab gives a visual overview of training history.</p>
+
+          <h3>Monthly Grid</h3>
+          <p>The calendar shows workout activity across months. Days with workouts are marked with category dots so training distribution is visible without opening each day.</p>
+
+          <h3>Day Detail</h3>
+          <p>Tap a day to see workouts completed on that date, including trained categories, exercises, sets, volume, title, and duration.</p>
+
+          <h3>Past Workout Detail</h3>
+          <p>Past workouts can be opened from the calendar to review exercise and set detail. Completed workouts can also be reused as templates.</p>
         </section>
 
         <section class="doc-section" id="charts">
           <h2>Charts and Analytics</h2>
-          <p>The charts tab shows training volume, workout trends, and exercise progress over different time ranges. Breakdown charts help you see how volume is distributed across muscle groups or exercises.</p>
-          <ul>
-            <li><strong>Breakdown:</strong> volume distribution by category.</li>
-            <li><strong>Workouts:</strong> session frequency and workload over time.</li>
-            <li><strong>Exercises:</strong> individual exercise performance trends.</li>
-          </ul>
-        </section>
+          <p>Charts summarize training across time ranges and categories.</p>
 
-        <section class="doc-section" id="import">
-          <h2>Import, Export, and Backup</h2>
-          <p>Repster supports importing workout history from CSV formats and creating full backups. Imports preview and validate data before it is committed, then rebuild stats and records afterward.</p>
-          <p>Backups can be exported and restored from the Settings screen.</p>
+          <h3>Breakdown</h3>
+          <p>Breakdown charts show volume distribution by muscle group or exercise so training balance is easier to inspect.</p>
+
+          <h3>Workouts</h3>
+          <p>Workout charts show frequency, workload, set totals, and trend information over time.</p>
+
+          <h3>Exercises</h3>
+          <p>Exercise charts track selected exercises across sessions, making it easier to inspect load, reps, volume, and performance direction.</p>
+
+          <h3>Time Filters</h3>
+          <p>Charts support time filters such as week, month, year, and all time depending on the chart.</p>
         </section>
 
         <section class="doc-section" id="settings">
           <h2>Settings</h2>
-          <p>Settings control units, estimated one-rep-max formula, rest timing, import/export, bodyweight entries, and prescription behavior where available.</p>
-          <p>Bodyweight entries are stored on-device and can be used for effective weight calculations on bodyweight-factor exercises.</p>
+          <p>Settings control units, formulas, data management, and workout behavior.</p>
+
+          <h3>General</h3>
+          <ul>
+            <li><strong>Units:</strong> choose metric or imperial units.</li>
+            <li><strong>e1RM formula:</strong> select the estimated one-rep-max formula used in calculations.</li>
+          </ul>
+
+          <h3>Workout</h3>
+          <ul>
+            <li><strong>Rest time:</strong> set default rest timing.</li>
+            <li><strong>Warmup inclusion:</strong> control whether warmups are included in totals and record checks.</li>
+            <li><strong>Prescription settings:</strong> configure Smart Suggestions and fatigue behavior.</li>
+          </ul>
+
+          <h3>Data</h3>
+          <ul>
+            <li><strong>Import data:</strong> bring in compatible CSV history.</li>
+            <li><strong>Export backup:</strong> create a backup file.</li>
+            <li><strong>Restore backup:</strong> restore from a previous backup.</li>
+            <li><strong>Reset app data:</strong> delete local app data after confirmation.</li>
+          </ul>
+        </section>
+
+        <section class="doc-section" id="bodyweight">
+          <h2>Body Weight Tracking</h2>
+          <p>Bodyweight entries can be logged from Settings and used in effective weight calculations for bodyweight-factor exercises.</p>
+
+          <h3>Logging Entries</h3>
+          <p>Add entries with date and weight values. Repster uses the nearest relevant value where bodyweight contributes to performance calculations.</p>
+
+          <h3>Role in Calculations</h3>
+          <p>For exercises such as pull-ups or dips, bodyweight factors help PRs, e1RM estimates, and suggestions reflect the total load more accurately.</p>
+        </section>
+
+        <section class="doc-section" id="import-export">
+          <h2>Import and Export</h2>
+          <p>Repster supports data import, backup export, restore, and reset workflows from Settings.</p>
+
+          <h3>CSV Import</h3>
+          <p>Compatible CSV imports are previewed and validated before saving. The import can create missing exercises, process rows in batches, and rebuild records and stats afterward.</p>
+
+          <h3>Full Backup</h3>
+          <p>Backup export creates a file containing app data such as workouts, exercises, sets, templates, settings, and learning data. You choose where to store that file.</p>
+
+          <h3>Restore</h3>
+          <p>Restore uses a previously exported backup file and handles conflicts according to the restore flow shown in the app.</p>
+
+          <h3>Reset</h3>
+          <p>Reset App Data deletes local app data after confirmation and restores the app to a fresh state.</p>
+        </section>
+
+        <section class="doc-section" id="onboarding">
+          <h2>Onboarding</h2>
+          <p>Initial setup helps configure Repster before the first workout.</p>
+
+          <h3>Quick Setup</h3>
+          <p>Quick setup gets you into the app quickly with the minimum required preferences.</p>
+
+          <h3>Advanced Setup</h3>
+          <p>Advanced setup can include unit preference, e1RM formula selection, bodyweight entry, and optional import. These choices can be changed later in Settings.</p>
         </section>
 
         <section class="doc-section" id="subscription">
           <h2>Subscription</h2>
           <p>Repster includes a free tier for trying the app. Full access unlocks unlimited workout logging and is managed through Apple's App Store subscriptions.</p>
+
+          <h3>Free Tier</h3>
+          <p>The free tier lets you log up to 5 workouts before subscribing.</p>
+
+          <h3>Full Access</h3>
+          <p>After the free tier, an active subscription unlocks unlimited logging. Subscription purchase, renewal, cancellation, and refund handling are managed by Apple through your Apple ID.</p>
         </section>
       </article>
     </div>
@@ -112,6 +332,7 @@
         <a href="docs.html">Docs</a>
         <a href="support.html">Support</a>
         <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
       </nav>
     </div>
   </footer>

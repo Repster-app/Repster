@@ -2,7 +2,7 @@
 
 This repository hosts the public Repster website with GitHub Pages.
 
-The iOS app source code lives in a separate private repository.
+The iOS app project is kept separately.
 
 ## GitHub Pages
 
@@ -21,3 +21,4 @@ https://repster-app.github.io/Repster/
 - `docs.html` - feature documentation
 - `support.html` - support FAQ and contact
 - `privacy.html` - privacy policy
+- `terms.html` - terms of use
