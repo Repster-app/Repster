@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Repster is an iOS workout tracking app for fast logging, personal records, smart suggestions, and progress charts.">
+  <title>Repster - Workout Tracking for Lifters</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #111317;
+      --muted: #5c6470;
+      --line: #d9dde4;
+      --paper: #f7f5ef;
+      --surface: #ffffff;
+      --accent: #168044;
+      --accent-strong: #0f6535;
+      --gold: #d9a433;
+      --navy: #182338;
+      --shadow: 0 22px 60px rgba(17, 19, 23, 0.16);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    img {
+      display: block;
+      max-width: 100%;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .topbar {
+      position: fixed;
+      z-index: 20;
+      top: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 18px clamp(18px, 5vw, 64px);
+      color: #ffffff;
+      background: linear-gradient(180deg, rgba(17, 19, 23, 0.72), rgba(17, 19, 23, 0));
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 1rem;
+    }
+
+    .brand img {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    .nav a {
+      text-decoration: none;
+      opacity: 0.86;
+    }
+
+    .nav a:hover {
+      opacity: 1;
+    }
+
+    .hero {
+      position: relative;
+      min-height: 84vh;
+      overflow: hidden;
+      color: #ffffff;
+      background: #111317;
+      isolation: isolate;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -2;
+      background:
+        linear-gradient(90deg, rgba(17, 19, 23, 0.92) 0%, rgba(17, 19, 23, 0.78) 38%, rgba(17, 19, 23, 0.18) 100%),
+        url("assets/screenshot-home.png") center right / min(620px, 74vw) auto no-repeat,
+        #111317;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -8vw -20vh auto;
+      z-index: -1;
+      width: min(780px, 70vw);
+      height: 92vh;
+      background:
+        url("assets/screenshot-workout.png") left center / min(310px, 31vw) auto no-repeat,
+        url("assets/screenshot-detail.png") right 9vh / min(300px, 29vw) auto no-repeat;
+      opacity: 0.9;
+      filter: drop-shadow(0 26px 42px rgba(0, 0, 0, 0.36));
+    }
+
+    .hero-content {
+      width: min(1120px, calc(100% - 36px));
+      min-height: 84vh;
+      margin: 0 auto;
+      padding: 132px 0 78px;
+      display: flex;
+      align-items: end;
+    }
+
+    .hero-copy {
+      width: min(660px, 100%);
+    }
+
+    .eyebrow {
+      margin: 0 0 14px;
+      color: #bce7c8;
+      font-size: 0.82rem;
+      font-weight: 900;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(3.7rem, 8vw, 8.4rem);
+      line-height: 0.86;
+      letter-spacing: 0;
+    }
+
+    .hero-copy p {
+      width: min(560px, 100%);
+      margin: 28px 0 0;
+      color: rgba(255, 255, 255, 0.84);
+      font-size: clamp(1.08rem, 2vw, 1.32rem);
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 32px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 0 18px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+      background: var(--accent);
+      font-weight: 800;
+      text-decoration: none;
+      box-shadow: 0 18px 34px rgba(0, 0, 0, 0.24);
+    }
+
+    .button.secondary {
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(14px);
+    }
+
+    main {
+      background: var(--paper);
+    }
+
+    .section {
+      padding: clamp(64px, 9vw, 112px) clamp(18px, 5vw, 64px);
+    }
+
+    .section-inner {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+    }
+
+    .section h2 {
+      max-width: 760px;
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 4.4rem);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+
+    .section-lead {
+      max-width: 680px;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 1.1rem;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px;
+      margin-top: 42px;
+      border: 1px solid var(--line);
+      background: var(--line);
+    }
+
+    .feature {
+      min-height: 190px;
+      padding: 24px;
+      background: var(--surface);
+    }
+
+    .feature strong {
+      display: block;
+      margin-bottom: 12px;
+      font-size: 1.02rem;
+    }
+
+    .feature p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .gallery {
+      background: var(--surface);
+    }
+
+    .screens {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      align-items: end;
+      gap: clamp(16px, 3vw, 34px);
+      margin-top: 44px;
+    }
+
+    .screen {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #f0ede5;
+      box-shadow: var(--shadow);
+    }
+
+    .screen img {
+      width: 100%;
+      border-radius: 12px;
+    }
+
+    .closing {
+      color: #ffffff;
+      background: var(--navy);
+    }
+
+    .closing .section-inner {
+      display: grid;
+      grid-template-columns: 1.4fr 0.8fr;
+      gap: 36px;
+      align-items: center;
+    }
+
+    .closing h2,
+    .closing p {
+      color: #ffffff;
+    }
+
+    .closing p {
+      margin: 18px 0 0;
+      opacity: 0.76;
+      font-size: 1.08rem;
+    }
+
+    .repo-link {
+      justify-self: end;
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.24);
+      background: var(--accent);
+    }
+
+    footer {
+      padding: 26px clamp(18px, 5vw, 64px);
+      color: var(--muted);
+      background: var(--surface);
+      font-size: 0.9rem;
+    }
+
+    footer div {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+    }
+
+    @media (max-width: 900px) {
+      .topbar {
+        position: absolute;
+      }
+
+      .nav {
+        display: none;
+      }
+
+      .hero {
+        min-height: auto;
+      }
+
+      .hero::before {
+        background:
+          linear-gradient(180deg, rgba(17, 19, 23, 0.52) 0%, rgba(17, 19, 23, 0.92) 64%, rgba(17, 19, 23, 0.98) 100%),
+          url("assets/screenshot-home.png") top center / min(430px, 90vw) auto no-repeat,
+          #111317;
+      }
+
+      .hero::after {
+        display: none;
+      }
+
+      .hero-content {
+        min-height: 740px;
+        padding: 430px 0 58px;
+        align-items: end;
+      }
+
+      h1 {
+        font-size: clamp(3.2rem, 18vw, 5.4rem);
+      }
+
+      .feature-grid,
+      .screens,
+      .closing .section-inner {
+        grid-template-columns: 1fr;
+      }
+
+      .repo-link {
+        justify-self: start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar" aria-label="Site navigation">
+    <a class="brand" href="#top" aria-label="Repster home">
+      <img src="assets/repster-logo.png" alt="">
+      <span>Repster</span>
+    </a>
+    <nav class="nav" aria-label="Primary navigation">
+      <a href="#features">Features</a>
+      <a href="#screens">Screens</a>
+      <a href="https://github.com/Repster-app/Repster">GitHub</a>
+    </nav>
+  </header>
+
+  <section class="hero" id="top">
+    <div class="hero-content">
+      <div class="hero-copy">
+        <p class="eyebrow">iOS workout tracking</p>
+        <h1>Repster</h1>
+        <p>Fast workout logging, useful personal records, smart weight suggestions, and progress views built around how lifting sessions actually move.</p>
+        <div class="actions" aria-label="Primary links">
+          <a class="button" href="#screens">View Screens</a>
+          <a class="button secondary" href="https://github.com/Repster-app/Repster">Open Repository</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <main>
+    <section class="section" id="features">
+      <div class="section-inner">
+        <h2>Workout data that stays useful after the set is done.</h2>
+        <p class="section-lead">Repster keeps entry quick during training, then turns the history into records, trends, calendar detail, and exercise-level context.</p>
+        <div class="feature-grid" aria-label="Repster features">
+          <article class="feature">
+            <strong>Fast workout entry</strong>
+            <p>Log sets, edit workouts, track rest, and move through exercises without slowing down the session.</p>
+          </article>
+          <article class="feature">
+            <strong>Smart suggestions</strong>
+            <p>Use recent performance and fatigue-aware context to guide the next working weight.</p>
+          </article>
+          <article class="feature">
+            <strong>Records and history</strong>
+            <p>Surface PRs, previous sets, exercise history, and calendar detail where they are most useful.</p>
+          </article>
+          <article class="feature">
+            <strong>Charts and import</strong>
+            <p>Review progress over time and bring existing workout history forward from CSV exports.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section gallery" id="screens">
+      <div class="section-inner">
+        <h2>Built for repeated use, not one-off demos.</h2>
+        <p class="section-lead">The core screens prioritize scanning, editing, and comparing workout information with minimal friction.</p>
+        <div class="screens" aria-label="App screenshots">
+          <figure class="screen">
+            <img src="assets/screenshot-home.png" alt="Repster home screen on iPhone">
+          </figure>
+          <figure class="screen">
+            <img src="assets/screenshot-workout.png" alt="Repster workout screen on iPhone">
+          </figure>
+          <figure class="screen">
+            <img src="assets/screenshot-detail.png" alt="Repster detail screen on iPhone">
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="section closing">
+      <div class="section-inner">
+        <div>
+          <h2>Repster is being built as a focused iOS training log.</h2>
+          <p>This public repository hosts the Repster website. The iOS app source code stays in a separate private repository.</p>
+        </div>
+        <a class="button repo-link" href="https://github.com/Repster-app/Repster">Open Repository</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div>Repster for iOS. GitHub Pages site served from the public website repository.</div>
+  </footer>
+</body>
+</html>
