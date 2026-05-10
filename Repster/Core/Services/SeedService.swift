@@ -19,7 +19,7 @@ enum SeedService {
         do {
             dtos = try SeedDataLoader.loadExercises()
         } catch {
-            print("[SeedService] Failed to load seed data: \(error)")
+            dbg("[SeedService] Failed to load seed data: \(error)")
             return
         }
 
@@ -32,16 +32,16 @@ enum SeedService {
                 inserted += 1
             } catch {
                 // FR-008: Skip invalid entries, log warning
-                print("[SeedService] Skipping exercise '\(dto.name)': \(error)")
+                dbg("[SeedService] Skipping exercise '\(dto.name)': \(error)")
             }
         }
 
         // Save all at once (batch insert for performance)
         do {
             try modelContext.save()
-            print("[SeedService] Seeded \(inserted) exercises")
+            dbg("[SeedService] Seeded \(inserted) exercises")
         } catch {
-            print("[SeedService] Failed to save seed data: \(error)")
+            dbg("[SeedService] Failed to save seed data: \(error)")
         }
     }
 }

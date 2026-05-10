@@ -177,6 +177,9 @@ final class ActiveWorkoutViewModel {
     /// User's unit preference for display formatting.
     var unitPreference: UnitPreference = .metric
 
+    /// Default weight increment stored in kg.
+    var defaultWeightIncrement: Double = 2.5
+
     /// Tracks which exerciseId was last loaded for exercise info to avoid redundant fetches.
     private var exerciseInfoLoadedForExerciseId: UUID?
 
@@ -354,6 +357,9 @@ final class ActiveWorkoutViewModel {
 
             // 7. Fetch global default rest time for fallback
             if let profile = try? await settingsService.fetchSettings() {
+                self.unitPreference = profile.unitPreference
+                self.defaultWeightIncrement = profile.prescriptionDefaultIncrement
+                    ?? UnitConversion.defaultStoredWeightIncrement(for: profile.unitPreference)
                 self.globalDefaultRestTime = profile.defaultRestTimeSeconds ?? 150
                 self.globalDefaultWarmupRestTime = profile.defaultWarmupRestTimeSeconds
                 self.restTimerAlertMode = profile.restTimerAlert ?? "both"
@@ -367,7 +373,7 @@ final class ActiveWorkoutViewModel {
 
         } catch {
             #if DEBUG
-            print("[ActiveWorkoutViewModel] Failed to load active workout: \(error)")
+            dbg("[ActiveWorkoutViewModel] Failed to load active workout: \(error)")
             #endif
         }
     }
@@ -439,7 +445,7 @@ final class ActiveWorkoutViewModel {
                 )
             } catch {
                 #if DEBUG
-                print("[ActiveWorkoutViewModel] Failed to capture fatigue learning for set \(set.id): \(error)")
+                dbg("[ActiveWorkoutViewModel] Failed to capture fatigue learning for set \(set.id): \(error)")
                 #endif
             }
 
@@ -467,7 +473,7 @@ final class ActiveWorkoutViewModel {
 
         } catch {
             #if DEBUG
-            print("[ActiveWorkoutViewModel] Failed to complete set: \(error)")
+            dbg("[ActiveWorkoutViewModel] Failed to complete set: \(error)")
             #endif
         }
     }
@@ -505,7 +511,7 @@ final class ActiveWorkoutViewModel {
             // Revert on failure
             set.completed = oldCompleted
             #if DEBUG
-            print("[ActiveWorkoutViewModel] Failed to uncomplete set: \(error)")
+            dbg("[ActiveWorkoutViewModel] Failed to uncomplete set: \(error)")
             #endif
         }
     }
@@ -550,7 +556,7 @@ final class ActiveWorkoutViewModel {
 
         } catch {
             #if DEBUG
-            print("[ActiveWorkoutViewModel] Failed to add set: \(error)")
+            dbg("[ActiveWorkoutViewModel] Failed to add set: \(error)")
             #endif
         }
     }
@@ -596,7 +602,7 @@ final class ActiveWorkoutViewModel {
 
         } catch {
             #if DEBUG
-            print("[ActiveWorkoutViewModel] Failed to add warmup set: \(error)")
+            dbg("[ActiveWorkoutViewModel] Failed to add warmup set: \(error)")
             #endif
         }
     }
@@ -629,7 +635,7 @@ final class ActiveWorkoutViewModel {
 
         } catch {
             #if DEBUG
-            print("[ActiveWorkoutViewModel] Failed to delete set: \(error)")
+            dbg("[ActiveWorkoutViewModel] Failed to delete set: \(error)")
             #endif
         }
     }
@@ -657,7 +663,7 @@ final class ActiveWorkoutViewModel {
 
         } catch {
             #if DEBUG
-            print("[ActiveWorkoutViewModel] Failed to change set type: \(error)")
+            dbg("[ActiveWorkoutViewModel] Failed to change set type: \(error)")
             #endif
         }
     }
@@ -688,7 +694,7 @@ final class ActiveWorkoutViewModel {
 
             } catch {
                 #if DEBUG
-                print("[ActiveWorkoutViewModel] Failed to add exercise \(exerciseId): \(error)")
+                dbg("[ActiveWorkoutViewModel] Failed to add exercise \(exerciseId): \(error)")
                 #endif
             }
         }
@@ -715,7 +721,7 @@ final class ActiveWorkoutViewModel {
                 try await setService.delete(set)
             } catch {
                 #if DEBUG
-                print("[ActiveWorkoutViewModel] Failed to delete set \(set.id) during exercise removal: \(error)")
+                dbg("[ActiveWorkoutViewModel] Failed to delete set \(set.id) during exercise removal: \(error)")
                 #endif
             }
         }
@@ -762,7 +768,7 @@ final class ActiveWorkoutViewModel {
                         _ = try await setService.edit(set)
                     } catch {
                         #if DEBUG
-                        print("[ActiveWorkoutViewModel] Failed to persist reorder for set \(set.id): \(error)")
+                        dbg("[ActiveWorkoutViewModel] Failed to persist reorder for set \(set.id): \(error)")
                         #endif
                     }
                     globalOrder += 1
@@ -1469,7 +1475,7 @@ final class ActiveWorkoutViewModel {
             historyLoadedForExerciseId = exercise.id
         } catch {
             #if DEBUG
-            print("[ActiveWorkoutViewModel] Failed to load history: \(error)")
+            dbg("[ActiveWorkoutViewModel] Failed to load history: \(error)")
             #endif
             subTabHistory = []
         }
@@ -1488,7 +1494,7 @@ final class ActiveWorkoutViewModel {
             prsLoadedForExerciseId = exercise.id
         } catch {
             #if DEBUG
-            print("[ActiveWorkoutViewModel] Failed to load PRs: \(error)")
+            dbg("[ActiveWorkoutViewModel] Failed to load PRs: \(error)")
             #endif
             subTabPRTable = []
         }
@@ -1534,6 +1540,8 @@ final class ActiveWorkoutViewModel {
             // Fetch unit preference and prescription toggle for display
             let profile = try await settingsService.fetchSettings()
             unitPreference = profile.unitPreference
+            defaultWeightIncrement = profile.prescriptionDefaultIncrement
+                ?? UnitConversion.defaultStoredWeightIncrement(for: profile.unitPreference)
             prescriptionEnabled = profile.prescriptionEnabled ?? true
             suggestionAdminModeEnabled = profile.prescriptionAdminModeEnabled ?? false
 
@@ -1546,7 +1554,8 @@ final class ActiveWorkoutViewModel {
                 weightIncrement: exercise.weightIncrement,
                 setService: setService,
                 loadPrescriptionService: loadPrescriptionService,
-                healthProfileRepo: healthProfileRepo
+                healthProfileRepo: healthProfileRepo,
+                unitPreference: unitPreference
             )
             exerciseInfoData = data
             exerciseInfoLoadedForExerciseId = exercise.id
@@ -1554,7 +1563,7 @@ final class ActiveWorkoutViewModel {
             exerciseInfoData = nil
             exerciseInfoLoadedForExerciseId = exercise.id
             #if DEBUG
-            print("[ActiveWorkoutViewModel] ExerciseInfo load failed: \(error)")
+            dbg("[ActiveWorkoutViewModel] ExerciseInfo load failed: \(error)")
             #endif
         }
     }
@@ -1570,6 +1579,17 @@ final class ActiveWorkoutViewModel {
     func invalidateExerciseInfo() {
         exerciseInfoData = nil
         exerciseInfoLoadedForExerciseId = nil
+    }
+
+    func refreshDisplaySettings() async {
+        guard let profile = try? await settingsService.fetchSettings() else { return }
+        unitPreference = profile.unitPreference
+        defaultWeightIncrement = profile.prescriptionDefaultIncrement
+            ?? UnitConversion.defaultStoredWeightIncrement(for: profile.unitPreference)
+        prescriptionEnabled = profile.prescriptionEnabled ?? true
+        suggestionAdminModeEnabled = profile.prescriptionAdminModeEnabled ?? false
+        invalidateExerciseInfo()
+        invalidateSuggestions()
     }
 
     /// Refresh suggestions for the current exercise with explicit cache invalidation and presentation behavior.
@@ -1683,6 +1703,8 @@ final class ActiveWorkoutViewModel {
 
         if let resolvedProfile {
             unitPreference = resolvedProfile.unitPreference
+            defaultWeightIncrement = resolvedProfile.prescriptionDefaultIncrement
+                ?? UnitConversion.defaultStoredWeightIncrement(for: resolvedProfile.unitPreference)
             prescriptionEnabled = resolvedProfile.prescriptionEnabled ?? true
             suggestionAdminModeEnabled = resolvedProfile.prescriptionAdminModeEnabled ?? false
         }
@@ -1718,17 +1740,19 @@ final class ActiveWorkoutViewModel {
             guard isCurrentSuggestionRefresh(generation, expectedExerciseId: expectedExerciseId) else { return }
             weightSuggestionData = SuggestionExplainer.makeWeightSuggestionData(
                 preparation: preparation,
-                evaluation: evaluation
+                evaluation: evaluation,
+                unitPreference: unitPreference
             )
             suggestionsLoadedForKey = preparation.cacheKey
         } catch {
             guard isCurrentSuggestionRefresh(generation, expectedExerciseId: expectedExerciseId) else { return }
             #if DEBUG
-            print("[WeightSuggestion] Failed to load suggestions: \(error)")
+            dbg("[WeightSuggestion] Failed to load suggestions: \(error)")
             #endif
             weightSuggestionData = SuggestionExplainer.makeWeightSuggestionData(
                 preparation: preparation,
-                evaluation: .unavailable(.calculationFailed)
+                evaluation: .unavailable(.calculationFailed),
+                unitPreference: unitPreference
             )
             suggestionsLoadedForKey = nil
         }
@@ -1872,7 +1896,7 @@ final class ActiveWorkoutViewModel {
 
         } catch {
             #if DEBUG
-            print("[ActiveWorkoutViewModel] Failed to finish workout: \(error)")
+            dbg("[ActiveWorkoutViewModel] Failed to finish workout: \(error)")
             #endif
         }
     }
@@ -1911,7 +1935,7 @@ final class ActiveWorkoutViewModel {
 
         } catch {
             #if DEBUG
-            print("[ActiveWorkoutViewModel] Failed to discard workout: \(error)")
+            dbg("[ActiveWorkoutViewModel] Failed to discard workout: \(error)")
             #endif
         }
     }
@@ -1974,7 +1998,7 @@ final class ActiveWorkoutViewModel {
                         _ = try await setService.edit(set)
                     } catch {
                         #if DEBUG
-                        print("[ActiveWorkoutViewModel] Failed to persist orderInExercise for set \(set.id): \(error)")
+                        dbg("[ActiveWorkoutViewModel] Failed to persist orderInExercise for set \(set.id): \(error)")
                         #endif
                     }
                 }
@@ -1999,7 +2023,7 @@ final class ActiveWorkoutViewModel {
                             _ = try await setService.edit(set)
                         } catch {
                             #if DEBUG
-                            print("[ActiveWorkoutViewModel] Failed to persist orderInWorkout for set \(set.id): \(error)")
+                            dbg("[ActiveWorkoutViewModel] Failed to persist orderInWorkout for set \(set.id): \(error)")
                             #endif
                         }
                     }
@@ -2034,7 +2058,7 @@ extension ActiveWorkoutViewModel: SetTableDataSource {
             }
         } catch {
             #if DEBUG
-            print("[ActiveWorkoutViewModel] Failed to persist target rep override for set \(set.id): \(error)")
+            dbg("[ActiveWorkoutViewModel] Failed to persist target rep override for set \(set.id): \(error)")
             #endif
         }
     }
@@ -2069,7 +2093,7 @@ extension ActiveWorkoutViewModel: SetTableDataSource {
             }
         } catch {
             #if DEBUG
-            print("[ActiveWorkoutViewModel] Failed to update set note: \(error)")
+            dbg("[ActiveWorkoutViewModel] Failed to update set note: \(error)")
             #endif
         }
     }

@@ -393,10 +393,10 @@ struct WeightSuggestionCardView: View {
         let value = unitPreference == .imperial ? UnitConversion.kgToLbs(kg) : kg
         let sign = value > 0 ? "+" : value < 0 ? "-" : ""
         let absValue = abs(value)
-        let unit = unitPreference == .imperial ? "lbs" : "kg"
+        let unit = UnitConversion.weightUnitLabel(for: unitPreference)
 
-        if absValue == absValue.rounded() {
-            return "\(sign)\(Int(absValue)) \(unit)"
+        if UnitConversion.isEffectivelyWhole(absValue) {
+            return "\(sign)\(Int(absValue.rounded())) \(unit)"
         }
         return "\(sign)\(String(format: "%.1f", absValue)) \(unit)"
     }
@@ -414,15 +414,6 @@ struct WeightSuggestionCardView: View {
     }
 
     private func formatWeight(_ kg: Double) -> String {
-        let value = unitPreference == .imperial ? UnitConversion.kgToLbs(kg) : kg
-        let unit = unitPreference == .imperial ? "lbs" : "kg"
-        if value == value.rounded() && value == Double(Int(value)) {
-            return "\(Int(value)) \(unit)"
-        }
-        let formatter = NumberFormatter()
-        formatter.minimumFractionDigits = 1
-        formatter.maximumFractionDigits = 2
-        let formatted = formatter.string(from: NSNumber(value: value)) ?? String(format: "%.2f", value)
-        return "\(formatted) \(unit)"
+        UnitConversion.formatWeightLabel(kg, unitPreference: unitPreference)
     }
 }

@@ -132,7 +132,7 @@ struct WorkoutSummarySheet: View {
                 templateSavedSuccessfully = true
             },
             onError: { error in
-                print("[WorkoutSummarySheet] Save as template failed: \(error)")
+                dbg("[WorkoutSummarySheet] Save as template failed: \(error)")
             }
         )
     }

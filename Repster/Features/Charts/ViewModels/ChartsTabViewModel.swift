@@ -46,4 +46,21 @@ final class ChartsTabViewModel {
         self.workoutsVM = WorkoutsTabViewModel(chartDataService: chartDataService)
         self.exercisesVM = ExercisesTabViewModel(chartDataService: chartDataService, exerciseService: exerciseService)
     }
+
+    func updateUnitPreference(_ unitPreference: UnitPreference) {
+        breakdownVM.unitPreference = unitPreference
+        workoutsVM.unitPreference = unitPreference
+        exercisesVM.unitPreference = unitPreference
+    }
+
+    func reloadVisibleData() async {
+        switch activeTab {
+        case .breakdown:
+            await breakdownVM.loadData()
+        case .workouts:
+            await workoutsVM.loadData()
+        case .exercises:
+            await exercisesVM.loadData()
+        }
+    }
 }

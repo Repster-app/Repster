@@ -15,6 +15,7 @@ final class BreakdownTabViewModel {
     var summary: BreakdownSummary?
     var isLoading = false
     var dateRangeLabel: String = ""
+    var unitPreference: UnitPreference = .metric
     private var earliestWorkoutDate: Date?
 
     // MARK: - Dependencies
@@ -35,14 +36,20 @@ final class BreakdownTabViewModel {
             let data = try await chartDataService.fetchBreakdownData(
                 metric: selectedMetric, timeRange: selectedTimeRange
             )
-            chartData = data
+            chartData = data.map { point in
+                BreakdownDataPoint(
+                    label: point.label,
+                    value: displayValue(point.value, for: selectedMetric.aggregateType),
+                    color: point.color
+                )
+            }
             summary = try await chartDataService.fetchBreakdownSummary(timeRange: selectedTimeRange)
             if earliestWorkoutDate == nil {
                 earliestWorkoutDate = try await chartDataService.fetchEarliestWorkoutDate()
             }
             updateDateRangeLabel()
         } catch {
-            print("[BreakdownTab] Error loading data: \(error)")
+            dbg("[BreakdownTab] Error loading data: \(error)")
         }
         isLoading = false
     }
@@ -82,13 +89,22 @@ final class BreakdownTabViewModel {
         let formatted = formatNumber(point.value)
         switch selectedMetric.aggregateType {
         case .volume:
-            return "\(formatted) kg"
+            return "\(formatted) \(UnitConversion.weightUnitLabel(for: unitPreference))"
         case .sets:
             return "\(formatted) sets"
         case .reps:
             return "\(formatted) reps"
         case .workouts:
             return "\(formatted)"
+        }
+    }
+
+    private func displayValue(_ value: Double, for aggregateType: BreakdownAggregateType) -> Double {
+        switch aggregateType {
+        case .volume:
+            return UnitConversion.displayedWeight(value, unitPreference: unitPreference)
+        case .sets, .reps, .workouts:
+            return value
         }
     }
 

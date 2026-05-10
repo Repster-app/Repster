@@ -354,7 +354,7 @@ actor FatigueLearningService {
                 )
             }
         } catch {
-            print("[FatigueLearning] Error processing session end: \(error)")
+            dbg("[FatigueLearning] Error processing session end: \(error)")
         }
     }
 

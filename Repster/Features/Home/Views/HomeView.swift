@@ -110,12 +110,17 @@ struct HomeView: View {
                 MonthlyStatsCardView(
                     totalWorkouts: stats.totalWorkouts,
                     primaryMetric: stats.primaryMetric,
-                    totalSets: stats.totalSets
+                    totalSets: stats.totalSets,
+                    unitPreference: services.unitPreference
                 )
             }
         case .recentPRs:
             if !viewModel.recentPRs.isEmpty {
-                RecentPRsView(prs: viewModel.recentPRs, displayMode: viewModel.sectionConfig.prDisplayMode)
+                RecentPRsView(
+                    prs: viewModel.recentPRs,
+                    unitPreference: services.unitPreference,
+                    displayMode: viewModel.sectionConfig.prDisplayMode
+                )
             }
         case .recentWorkouts:
             recentWorkoutsSection
@@ -198,7 +203,7 @@ struct HomeView: View {
             } else {
                 ForEach(viewModel.recentWorkouts) { summary in
                     NavigationLink(value: summary.id) {
-                        RecentWorkoutCardView(summary: summary)
+                        RecentWorkoutCardView(summary: summary, unitPreference: services.unitPreference)
                     }
                     .buttonStyle(.plain)
                 }

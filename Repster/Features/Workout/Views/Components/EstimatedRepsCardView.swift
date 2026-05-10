@@ -50,14 +50,7 @@ struct EstimatedRepsCardView: View {
     // MARK: - Formatting
 
     private var formattedWeight: String {
-        let value = unitPreference == .imperial
-            ? UnitConversion.kgToLbs(info.estimatedWeight)
-            : info.estimatedWeight
-        let unit = unitPreference == .imperial ? "lbs" : "kg"
-        if value == value.rounded() && value == Double(Int(value)) {
-            return "\(Int(value)) \(unit)"
-        }
-        return String(format: "%.1f", value) + " " + unit
+        UnitConversion.formatWeightLabel(info.estimatedWeight, unitPreference: unitPreference)
     }
 }
 

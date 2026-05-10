@@ -6,6 +6,7 @@ import SwiftUI
 
 struct CopyPreviousSheet: View {
     let workouts: [CopyPreviousWorkout]
+    let unitPreference: UnitPreference
     @Binding var showDiscardConfirmation: Bool
     let onWorkoutSelected: (UUID) -> Void
     let onDiscardAndCopy: () -> Void
@@ -86,7 +87,7 @@ struct CopyPreviousSheet: View {
                 Text("\(workout.setCount) sets")
                 if let primaryMetric = workout.primaryMetric {
                     Text("\u{00B7}")
-                    Text(primaryMetric.formattedValue())
+                    Text(primaryMetric.formattedValue(unitPreference: unitPreference))
                 }
             }
             .font(.system(size: 12, weight: .medium))

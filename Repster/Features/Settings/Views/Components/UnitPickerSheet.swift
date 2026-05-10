@@ -22,7 +22,7 @@ struct UnitPickerSheet: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(unit == .metric ? "Metric" : "Imperial")
                                     .foregroundStyle(Color.textPrimary)
-                                Text(unit == .metric ? "Kilograms (kg)" : "Pounds (lbs)")
+                                Text(unit == .metric ? "Kilograms (kg)" : "Pounds (lb)")
                                     .font(.caption)
                                     .foregroundStyle(Color.textSecondary)
                             }

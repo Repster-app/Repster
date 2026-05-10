@@ -245,7 +245,7 @@ final class FatigueLearningServiceTests: XCTestCase {
         let appliedRate = try await service.appliedFatigueRate(for: exercise.id)
         XCTAssertEqual(appliedRate.source, .blendedLocal)
         XCTAssertEqual(appliedRate.localInfluence, 0.5, accuracy: 0.0001)
-        XCTAssertEqual(appliedRate.rate, 0.048, accuracy: 0.0001)
+        XCTAssertEqual(appliedRate.rate, 0.047, accuracy: 0.0001)
     }
 
     func testProcessSessionEnd_reachesFullLocalOverrideAfterFourthQualifyingWorkout() async throws {

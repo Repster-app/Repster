@@ -32,7 +32,7 @@ final class BodyweightLogViewModel {
     var hasEntries: Bool { !entries.isEmpty }
 
     var unitLabel: String {
-        unitPreference == .metric ? "kg" : "lbs"
+        UnitConversion.weightUnitLabel(for: unitPreference)
     }
 
     /// Entries sorted date-ascending for chart rendering (left-to-right).

@@ -51,6 +51,7 @@ struct WorkoutDetailFromHomeView: View {
                 CalendarWorkoutDetailView(
                     workoutDetails: workoutDetails,
                     selectedDate: workoutDetails.first?.workout.date ?? Date(),
+                    unitPreference: services.unitPreference,
                     onSaveAsTemplate: nil,
                     onEditWorkout: nil,
                     onExerciseTapped: { exerciseId in
@@ -174,7 +175,7 @@ struct WorkoutDetailFromHomeView: View {
         } catch {
             isDeleting = false
             #if DEBUG
-            print("[WorkoutDetailFromHomeView] Delete failed: \(error)")
+            dbg("[WorkoutDetailFromHomeView] Delete failed: \(error)")
             #endif
         }
     }
@@ -227,7 +228,7 @@ struct WorkoutDetailFromHomeView: View {
             isLoading = false
         } catch {
             #if DEBUG
-            print("[WorkoutDetailFromHomeView] Failed: \(error)")
+            dbg("[WorkoutDetailFromHomeView] Failed: \(error)")
             #endif
             isLoading = false
         }

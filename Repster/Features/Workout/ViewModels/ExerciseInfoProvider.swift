@@ -15,7 +15,8 @@ enum ExerciseInfoProvider {
         weightIncrement: Double?,
         setService: any SetServiceProtocol,
         loadPrescriptionService: any LoadPrescriptionServiceProtocol,
-        healthProfileRepo: any HealthProfileRepositoryProtocol
+        healthProfileRepo: any HealthProfileRepositoryProtocol,
+        unitPreference: UnitPreference
     ) async throws -> ExerciseInfoData {
 
         // Step 1: Fetch and prepare data — single DB query for all computation
@@ -38,7 +39,11 @@ enum ExerciseInfoProvider {
             : (nil, nil)
 
         // Step 4: Compute Last Workout info
-        let lastWorkoutInfo = computeLastWorkout(historicalSets: historicalSets, exercise: exercise)
+        let lastWorkoutInfo = computeLastWorkout(
+            historicalSets: historicalSets,
+            exercise: exercise,
+            unitPreference: unitPreference
+        )
 
         // Step 5: Compute Estimated Reps info
         let estimatedRepsInfo: EstimatedRepsInfo?
@@ -46,8 +51,11 @@ enum ExerciseInfoProvider {
             let targetReps = currentSets
                 .last(where: { $0.setType == .working && $0.hasData })?.prReps ?? 8
 
+            let increment = weightIncrement
+                ?? profile.prescriptionDefaultIncrement
+                ?? UnitConversion.defaultStoredWeightIncrement(for: unitPreference)
             let rawEstimated = formula.reverseCalculate(e1RM: bestE1RM, reps: targetReps)
-            let snapped = snap(rawEstimated, to: weightIncrement ?? 2.5)
+            let snapped = snap(rawEstimated, to: increment)
 
             estimatedRepsInfo = EstimatedRepsInfo(
                 targetReps: targetReps,
@@ -168,7 +176,11 @@ enum ExerciseInfoProvider {
 
     // MARK: - Last Workout Computation
 
-    private static func computeLastWorkout(historicalSets: [WorkoutSet], exercise: Exercise) -> LastWorkoutInfo? {
+    private static func computeLastWorkout(
+        historicalSets: [WorkoutSet],
+        exercise: Exercise,
+        unitPreference: UnitPreference
+    ) -> LastWorkoutInfo? {
         let grouped = Dictionary(grouping: historicalSets) { $0.workoutId }
         let sortedGroups = grouped.values.sorted { group1, group2 in
             let date1 = group1.first?.date ?? .distantPast
@@ -188,7 +200,7 @@ enum ExerciseInfoProvider {
                 reps: set.prReps == 0 ? nil : set.prReps,
                 durationSeconds: set.durationSeconds,
                 distanceMeters: set.distanceMeters,
-                formattedLabel: formatTopSetLabel(set, exercise: exercise)
+                formattedLabel: formatTopSetLabel(set, exercise: exercise, unitPreference: unitPreference)
             )
         }
 
@@ -250,17 +262,15 @@ enum ExerciseInfoProvider {
         return (0, duration, 0)
     }
 
-    private static func formatTopSetLabel(_ set: WorkoutSet, exercise: Exercise) -> String {
-        WorkoutSetPerformanceFormatter.performanceLabel(for: set, exercise: exercise) ?? "--"
-    }
-
-    private static func formatDistance(_ meters: Double) -> String {
-        if meters >= 1000 {
-            return String(format: "%.2f km", meters / 1000)
-        }
-        if meters == meters.rounded() {
-            return String(format: "%.0f m", meters)
-        }
-        return String(format: "%.1f m", meters)
+    private static func formatTopSetLabel(
+        _ set: WorkoutSet,
+        exercise: Exercise,
+        unitPreference: UnitPreference
+    ) -> String {
+        WorkoutSetPerformanceFormatter.performanceLabel(
+            for: set,
+            exercise: exercise,
+            unitPreference: unitPreference
+        ) ?? "--"
     }
 }

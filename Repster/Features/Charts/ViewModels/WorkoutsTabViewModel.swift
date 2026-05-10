@@ -18,6 +18,7 @@ final class WorkoutsTabViewModel {
     var trendLine: TrendLineData?
     var selectedDataIndex: Int?
     var isLoading = false
+    var unitPreference: UnitPreference = .metric
 
     // Filter dropdown data sources
     var availableCategories: [String] = []
@@ -34,8 +35,6 @@ final class WorkoutsTabViewModel {
         if selectedCategory == "All" {
             options += availableExercises.map { .exercise($0.id, name: $0.name) }
         } else {
-            // TODO: Filter exercises by category when data is available
-            // For now show all exercises — would need exercise-to-category mapping
             options += availableExercises.map { .exercise($0.id, name: $0.name) }
         }
         return options
@@ -73,11 +72,19 @@ final class WorkoutsTabViewModel {
                 filter: effectiveFilter,
                 timeRange: selectedTimeRange
             )
-            chartData = data
+            let displayData = data.map { point in
+                WorkoutsTimeSeriesPoint(
+                    date: point.date,
+                    value: displayValue(point.value, for: selectedMetric),
+                    label: point.label,
+                    workoutId: point.workoutId
+                )
+            }
+            chartData = displayData
 
             // Compute trend line
-            if data.count >= 2 {
-                trendLine = TrendLineCalculator.compute(values: data.map { $0.value })
+            if displayData.count >= 2 {
+                trendLine = TrendLineCalculator.compute(values: displayData.map { $0.value })
             } else {
                 trendLine = nil
             }
@@ -85,7 +92,7 @@ final class WorkoutsTabViewModel {
             // Set selected data index to latest point
             selectedDataIndex = data.isEmpty ? nil : data.count - 1
         } catch {
-            print("[WorkoutsTab] Error loading data: \(error)")
+            dbg("[WorkoutsTab] Error loading data: \(error)")
         }
         isLoading = false
     }
@@ -95,7 +102,7 @@ final class WorkoutsTabViewModel {
             availableCategories = try await chartDataService.fetchAvailableCategories()
             availableExercises = try await chartDataService.fetchPerformedExercises()
         } catch {
-            print("[WorkoutsTab] Error loading filter options: \(error)")
+            dbg("[WorkoutsTab] Error loading filter options: \(error)")
         }
     }
 
@@ -162,11 +169,11 @@ final class WorkoutsTabViewModel {
 
     var yAxisLabel: String {
         switch selectedMetric {
-        case .volume: return "kg"
+        case .volume: return UnitConversion.weightUnitLabel(for: unitPreference)
         case .sets: return "sets"
         case .reps: return "reps"
         case .workouts: return "workouts"
-        case .distance: return "m"
+        case .distance: return UnitConversion.chartDistanceUnitLabel(for: unitPreference)
         case .time: return "min"
         }
     }
@@ -177,7 +184,7 @@ final class WorkoutsTabViewModel {
         let point = data[index]
         switch selectedMetric {
         case .volume:
-            return String(format: "%.0f kg", point.value)
+            return "\(UnitConversion.formatWeight(point.value)) \(UnitConversion.weightUnitLabel(for: unitPreference))"
         case .sets:
             return "\(Int(point.value)) sets"
         case .reps:
@@ -185,10 +192,7 @@ final class WorkoutsTabViewModel {
         case .workouts:
             return "\(Int(point.value)) workouts"
         case .distance:
-            if point.value >= 1000 {
-                return String(format: "%.1f km", point.value / 1000)
-            }
-            return String(format: "%.0f m", point.value)
+            return String(format: "%.2f %@", point.value, UnitConversion.chartDistanceUnitLabel(for: unitPreference) as NSString)
         case .time:
             return String(format: "%.0f min", point.value)
         }
@@ -220,5 +224,16 @@ final class WorkoutsTabViewModel {
     var hasNextDataPoint: Bool {
         guard let data = chartData, let index = selectedDataIndex else { return false }
         return index < data.count - 1
+    }
+
+    private func displayValue(_ value: Double, for metric: WorkoutsMetric) -> Double {
+        switch metric {
+        case .volume:
+            return UnitConversion.displayedWeight(value, unitPreference: unitPreference)
+        case .distance:
+            return UnitConversion.displayedChartDistance(value, unitPreference: unitPreference)
+        case .sets, .reps, .workouts, .time:
+            return value
+        }
     }
 }

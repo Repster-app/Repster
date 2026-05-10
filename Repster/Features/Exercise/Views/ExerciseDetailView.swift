@@ -182,10 +182,15 @@ struct ExerciseDetailView: View {
     private var tabContent: some View {
         switch selectedTab {
         case .history:
-            ExerciseHistoryView(historyWorkouts: viewModel.historyWorkouts, exercise: viewModel.exercise)
+            ExerciseHistoryView(
+                historyWorkouts: viewModel.historyWorkouts,
+                exercise: viewModel.exercise,
+                unitPreference: services.unitPreference
+            )
         case .prs:
             ExercisePRsView(
                 prTable: viewModel.prTable,
+                unitPreference: services.unitPreference,
                 isPerSide: viewModel.exercise?.unilateral == true && viewModel.exercise?.supportsUnilateralLogging == true
             )
         case .charts:
@@ -229,7 +234,7 @@ struct ExerciseDetailView: View {
     // MARK: - Formatting
 
     private func formatWeight(_ weight: Double) -> String {
-        "\(UnitConversion.formatWeight(weight)) kg"
+        UnitConversion.formatWeightLabel(weight, unitPreference: services.unitPreference)
     }
 
     private func formatRelativeDate(_ date: Date) -> String {

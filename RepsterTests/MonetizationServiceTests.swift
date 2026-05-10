@@ -3,6 +3,10 @@ import XCTest
 
 final class MonetizationServiceTests: XCTestCase {
 
+    func testRevenueCatEntitlementMatchesDashboardIdentifier() {
+        XCTAssertEqual(RevenueCatConfiguration.entitlementIdentifier, "Repster")
+    }
+
     func testInactiveUserUsesRemainingFreeWorkoutQuota() async {
         let subscription = StubSubscriptionService(snapshot: .inactive)
         let store = InMemoryWorkoutQuotaStore(consumed: 2)
@@ -34,8 +38,8 @@ final class MonetizationServiceTests: XCTestCase {
         XCTAssertEqual(store.consumed, 5)
     }
 
-    func testSubscribedUserBypassesQuotaAndDoesNotConsumeWorkout() async {
-        let subscription = StubSubscriptionService(snapshot: .active, accessSource: .monthly)
+    func testRenewableSubscriptionBypassesQuotaAndDoesNotConsumeWorkout() async {
+        let subscription = StubSubscriptionService(snapshot: .active, accessSource: .subscription)
         let store = InMemoryWorkoutQuotaStore(consumed: 5)
         let service = AccessControlService(
             subscriptionService: subscription,
@@ -49,6 +53,32 @@ final class MonetizationServiceTests: XCTestCase {
         XCTAssertTrue(canStart)
         XCTAssertEqual(snapshot.state, .subscribed)
         XCTAssertEqual(store.consumed, 5)
+    }
+
+    func testSubscriptionAndLifetimeRequiresCancellationReminder() {
+        let snapshot = makeSubscriptionSnapshot(accessSource: .subscriptionAndLifetime)
+
+        XCTAssertTrue(snapshot.hasRenewableSubscription)
+        XCTAssertTrue(snapshot.hasLifetimePurchase)
+        XCTAssertTrue(snapshot.requiresSubscriptionCancellationReminder)
+    }
+
+    func testLifetimeOnlyDoesNotRequireSubscriptionCancellationReminder() {
+        let snapshot = makeSubscriptionSnapshot(accessSource: .lifetime)
+
+        XCTAssertFalse(snapshot.hasRenewableSubscription)
+        XCTAssertTrue(snapshot.hasLifetimePurchase)
+        XCTAssertFalse(snapshot.requiresSubscriptionCancellationReminder)
+    }
+
+    private func makeSubscriptionSnapshot(accessSource: SubscriptionAccessSource) -> SubscriptionSnapshot {
+        SubscriptionSnapshot(
+            status: .active,
+            entitlementIdentifier: RevenueCatConfiguration.entitlementIdentifier,
+            expirationDate: nil,
+            accessSource: accessSource,
+            managementURL: nil
+        )
     }
 }
 

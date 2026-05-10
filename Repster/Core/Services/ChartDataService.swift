@@ -353,9 +353,7 @@ actor ChartDataService: ChartDataServiceProtocol {
                                 workoutId: workoutId,
                                 topWeight: bestSet?.effectiveWeight,
                                 topReps: bestSet?.prReps,
-                                detailLabel: bestSet.flatMap {
-                                    WorkoutSetPerformanceFormatter.performanceLabel(for: $0, exercise: exercise)
-                                }
+                                detailLabel: nil
                             ))
                         }
                     }

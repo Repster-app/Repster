@@ -137,13 +137,15 @@ struct BreakdownTabView: View {
     }
 
     private func formatVolume(_ volume: Double) -> String {
-        if volume >= 1_000_000 {
-            return String(format: "%.1fM kg", volume / 1_000_000)
+        let displayVolume = UnitConversion.displayedWeight(volume, unitPreference: viewModel.unitPreference)
+        let unit = UnitConversion.weightUnitLabel(for: viewModel.unitPreference)
+        if displayVolume >= 1_000_000 {
+            return String(format: "%.1fM %@", displayVolume / 1_000_000, unit as NSString)
         }
-        if volume >= 1000 {
-            return String(format: "%.0fk kg", volume / 1000)
+        if displayVolume >= 1000 {
+            return String(format: "%.0fk %@", displayVolume / 1000, unit as NSString)
         }
-        return formatWithSeparator(volume) + " kg"
+        return "\(formatWithSeparator(displayVolume)) \(unit)"
     }
 
     private func formatWithSeparator(_ value: Double) -> String {

@@ -123,7 +123,11 @@ final class WorkoutSetTests: XCTestCase {
             orderInExercise: 1
         )
 
-        let display = WorkoutSetPerformanceFormatter.display(for: set, exercise: exercise)
+        let display = WorkoutSetPerformanceFormatter.display(
+            for: set,
+            exercise: exercise,
+            unitPreference: .metric
+        )
 
         XCTAssertEqual(display.performanceLabel, "20 kg × L: 10  R: 8")
         XCTAssertEqual(display.rirLabel, "L RIR 2 • R RIR 3")
@@ -190,11 +194,72 @@ final class WorkoutSetTests: XCTestCase {
             orderInExercise: 1
         )
 
-        let distanceDisplay = WorkoutSetPerformanceFormatter.fieldDisplay(for: .distance, set: set, exercise: exercise)
-        let timeDisplay = WorkoutSetPerformanceFormatter.fieldDisplay(for: .time, set: set, exercise: exercise)
+        let distanceDisplay = WorkoutSetPerformanceFormatter.fieldDisplay(
+            for: .distance,
+            set: set,
+            exercise: exercise,
+            unitPreference: .metric
+        )
+        let timeDisplay = WorkoutSetPerformanceFormatter.fieldDisplay(
+            for: .time,
+            set: set,
+            exercise: exercise,
+            unitPreference: .metric
+        )
 
         XCTAssertEqual(distanceDisplay.text, "400 m")
         XCTAssertEqual(timeDisplay.text, "2m 30s")
+    }
+
+    func testImperialWeightDisplayRoundTripsCleanWholeAndFractionalPounds() {
+        let oneHundredPoundsStored = UnitConversion.lbsToKg(100)
+        let fractionalPoundsStored = UnitConversion.lbsToKg(102.5)
+
+        XCTAssertEqual(
+            UnitConversion.formatWeightLabel(oneHundredPoundsStored, unitPreference: .imperial),
+            "100 lb"
+        )
+        XCTAssertEqual(
+            UnitConversion.formatWeightLabel(fractionalPoundsStored, unitPreference: .imperial),
+            "102.5 lb"
+        )
+    }
+
+    func testLegacyMetricHistoryDisplaysExactImperialConversion() {
+        XCTAssertEqual(
+            UnitConversion.formatWeightLabel(100, unitPreference: .imperial),
+            "220.46 lb"
+        )
+    }
+
+    func testDefaultWeightIncrementUsesNativeDisplayUnit() {
+        XCTAssertEqual(UnitConversion.defaultStoredWeightIncrement(for: .metric), 2.5)
+        XCTAssertEqual(
+            UnitConversion.formatWeightLabel(
+                UnitConversion.defaultStoredWeightIncrement(for: .imperial),
+                unitPreference: .imperial
+            ),
+            "5 lb"
+        )
+    }
+
+    func testDistanceFormattingUsesUnitThresholds() {
+        XCTAssertEqual(
+            UnitConversion.formatDistanceLabel(999, unitPreference: .metric),
+            "999 m"
+        )
+        XCTAssertEqual(
+            UnitConversion.formatDistanceLabel(1_000, unitPreference: .metric),
+            "1.00 km"
+        )
+        XCTAssertEqual(
+            UnitConversion.formatDistanceLabel(400, unitPreference: .imperial),
+            "1312 ft"
+        )
+        XCTAssertEqual(
+            UnitConversion.formatDistanceLabel(UnitConversion.metersPerMile, unitPreference: .imperial),
+            "1.00 mi"
+        )
     }
 
     func testWorkoutAggregateSummarySelectsDistanceForRunningWorkout() {

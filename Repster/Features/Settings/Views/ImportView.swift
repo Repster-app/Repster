@@ -9,8 +9,14 @@ struct ImportView: View {
     @State private var viewModel: ImportViewModel
     @Environment(\.dismiss) private var dismiss
 
-    init(importService: any ImportServiceProtocol) {
-        _viewModel = State(initialValue: ImportViewModel(importService: importService))
+    init(
+        importService: any ImportServiceProtocol,
+        defaultUnitPreference: UnitPreference = .metric
+    ) {
+        _viewModel = State(initialValue: ImportViewModel(
+            importService: importService,
+            defaultUnitPreference: defaultUnitPreference
+        ))
     }
 
     var body: some View {
@@ -81,7 +87,24 @@ struct ImportView: View {
                 }
                 .padding(.horizontal, 20)
 
-                if viewModel.selectedSource.requiresUnitSystem {
+                if viewModel.selectedSource == .fitNotes {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("FitNotes Weight Units")
+                            .font(.headline)
+                            .foregroundStyle(Color.textPrimary)
+
+                        Text("Choose the preferred weight column. If a row is missing that value, Repster imports the populated alternate column and reports a warning.")
+                            .font(.footnote)
+                            .foregroundStyle(Color.textSecondary)
+
+                        ImportUnitSystemChooser(
+                            selectedUnitSystem: viewModel.selectedFitNotesUnitSystem
+                        ) { unitSystem in
+                            viewModel.chooseFitNotesUnitSystem(unitSystem)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                } else if viewModel.selectedSource.requiresUnitSystem {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Strong Export Units")
                             .font(.headline)
@@ -413,8 +436,10 @@ struct ImportView: View {
             case "Date": return "→ Workout date"
             case "Exercise": return "→ Exercise name"
             case "Category": return "→ Primary muscle"
-            case "Weight (kg)": return "→ Set weight"
-            case "Weight (lbs)": return "→ Ignored"
+            case "Weight (kg)":
+                return viewModel.activeUnitSystem == .metric ? "→ Preferred weight" : "→ Fallback weight"
+            case "Weight (lbs)":
+                return viewModel.activeUnitSystem == .imperial ? "→ Preferred weight" : "→ Fallback weight"
             case "Reps": return "→ Set reps"
             case "Distance": return "→ Distance"
             case "Distance Unit": return "→ Unit conversion"

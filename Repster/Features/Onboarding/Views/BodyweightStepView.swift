@@ -36,7 +36,7 @@ struct BodyweightStepView: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 150)
                     .focused($isWeightFocused)
-                Text(unitPreference == .metric ? "kg" : "lbs")
+                Text(UnitConversion.weightUnitLabel(for: unitPreference))
                     .foregroundStyle(Color.textSecondary)
             }
             .padding(.horizontal, 48)

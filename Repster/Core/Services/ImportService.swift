@@ -377,11 +377,16 @@ private struct FitNotesCSVImporter: CSVImportAdapter {
 
         var validRows: [ValidatedRow] = []
         var errors: [CSVParser.ValidationError] = []
+        var warnings: [CSVParser.ValidationError] = []
+        let preferredUnit = unitSystem ?? .metric
 
         for (index, row) in parseResult.rows.enumerated() {
-            switch validateRow(row, rowNumber: index + 2) {
-            case .success(let validated):
-                validRows.append(validated)
+            switch validateRow(row, rowNumber: index + 2, unitSystem: preferredUnit) {
+            case .success(let result):
+                validRows.append(result.row)
+                if let warning = result.warning {
+                    warnings.append(warning)
+                }
             case .failure(let error):
                 errors.append(error)
             }
@@ -392,7 +397,7 @@ private struct FitNotesCSVImporter: CSVImportAdapter {
             workouts: workouts,
             totalRows: parseResult.totalRows,
             errors: errors,
-            warnings: []
+            warnings: warnings
         )
     }
 
@@ -410,10 +415,21 @@ private struct FitNotesCSVImporter: CSVImportAdapter {
         let trackingType: TrackingType
     }
 
+    private struct ValidationSuccess {
+        let row: ValidatedRow
+        let warning: CSVParser.ValidationError?
+    }
+
+    private struct WeightResolution {
+        let weightKg: Double?
+        let warning: CSVParser.ValidationError?
+    }
+
     private func validateRow(
         _ fields: [String],
-        rowNumber: Int
-    ) -> Result<ValidatedRow, CSVParser.ValidationError> {
+        rowNumber: Int,
+        unitSystem: ImportUnitSystem
+    ) -> Result<ValidationSuccess, CSVParser.ValidationError> {
         guard fields.count == Self.headers.count else {
             return .failure(.init(
                 rowNumber: rowNumber,
@@ -445,8 +461,18 @@ private struct FitNotesCSVImporter: CSVImportAdapter {
 
         let category = fields[2].trimmingCharacters(in: .whitespaces)
 
-        let weightText = fields[3].trimmingCharacters(in: .whitespaces)
-        let weightKg = weightText.isEmpty ? nil : Double(weightText)
+        let weightResult: WeightResolution
+        switch resolveWeight(
+            kgText: fields[3],
+            lbsText: fields[4],
+            preferredUnit: unitSystem,
+            rowNumber: rowNumber
+        ) {
+        case .success(let resolved):
+            weightResult = resolved
+        case .failure(let error):
+            return .failure(error)
+        }
 
         let repsText = fields[5].trimmingCharacters(in: .whitespaces)
         let reps = repsText.isEmpty ? nil : Int(repsText)
@@ -470,7 +496,7 @@ private struct FitNotesCSVImporter: CSVImportAdapter {
         let notes = fields[9].trimmingCharacters(in: .whitespaces)
         let kind = fields[10].trimmingCharacters(in: .whitespaces)
 
-        let hasData = weightKg != nil || reps != nil || durationSeconds != nil || distanceMeters != nil
+        let hasData = weightResult.weightKg != nil || reps != nil || durationSeconds != nil || distanceMeters != nil
         guard hasData else {
             return .failure(.init(
                 rowNumber: rowNumber,
@@ -478,17 +504,84 @@ private struct FitNotesCSVImporter: CSVImportAdapter {
             ))
         }
 
-        return .success(ValidatedRow(
-            date: date,
-            exerciseName: exerciseName,
-            category: category.isEmpty ? nil : category,
-            weightKg: weightKg,
-            reps: reps,
-            distanceMeters: distanceMeters,
-            durationSeconds: durationSeconds,
-            notes: notes.isEmpty ? nil : notes,
-            trackingType: inferTrackingType(from: kind)
+        return .success(ValidationSuccess(
+            row: ValidatedRow(
+                date: date,
+                exerciseName: exerciseName,
+                category: category.isEmpty ? nil : category,
+                weightKg: weightResult.weightKg,
+                reps: reps,
+                distanceMeters: distanceMeters,
+                durationSeconds: durationSeconds,
+                notes: notes.isEmpty ? nil : notes,
+                trackingType: inferTrackingType(from: kind)
+            ),
+            warning: weightResult.warning
         ))
+    }
+
+    private func resolveWeight(
+        kgText: String,
+        lbsText: String,
+        preferredUnit: ImportUnitSystem,
+        rowNumber: Int
+    ) -> Result<WeightResolution, CSVParser.ValidationError> {
+        let trimmedKg = kgText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedLbs = lbsText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        switch preferredUnit {
+        case .metric:
+            if !trimmedKg.isEmpty {
+                return parseWeight(trimmedKg, columnName: "Weight (kg)", rowNumber: rowNumber)
+                    .map { WeightResolution(weightKg: $0, warning: nil) }
+            }
+            if !trimmedLbs.isEmpty {
+                return parseWeight(trimmedLbs, columnName: "Weight (lbs)", rowNumber: rowNumber)
+                    .map {
+                        WeightResolution(
+                            weightKg: UnitConversion.lbsToKg($0),
+                            warning: .init(
+                                rowNumber: rowNumber,
+                                reason: "Preferred Weight (kg) was empty; imported Weight (lbs) instead."
+                            )
+                        )
+                    }
+            }
+            return .success(WeightResolution(weightKg: nil, warning: nil))
+
+        case .imperial:
+            if !trimmedLbs.isEmpty {
+                return parseWeight(trimmedLbs, columnName: "Weight (lbs)", rowNumber: rowNumber)
+                    .map { WeightResolution(weightKg: UnitConversion.lbsToKg($0), warning: nil) }
+            }
+            if !trimmedKg.isEmpty {
+                return parseWeight(trimmedKg, columnName: "Weight (kg)", rowNumber: rowNumber)
+                    .map {
+                        WeightResolution(
+                            weightKg: $0,
+                            warning: .init(
+                                rowNumber: rowNumber,
+                                reason: "Preferred Weight (lbs) was empty; imported Weight (kg) instead."
+                            )
+                        )
+                    }
+            }
+            return .success(WeightResolution(weightKg: nil, warning: nil))
+        }
+    }
+
+    private func parseWeight(
+        _ value: String,
+        columnName: String,
+        rowNumber: Int
+    ) -> Result<Double, CSVParser.ValidationError> {
+        guard let weight = Double(value) else {
+            return .failure(.init(
+                rowNumber: rowNumber,
+                reason: "Invalid \(columnName) value: '\(value)'."
+            ))
+        }
+        return .success(weight)
     }
 
     private func groupRowsByDay(_ rows: [ValidatedRow]) -> [NormalizedWorkoutImport] {

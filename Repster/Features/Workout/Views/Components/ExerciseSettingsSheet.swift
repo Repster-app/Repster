@@ -32,7 +32,9 @@ struct ExerciseSettingsSheet: View {
 
     // MARK: - Available Increments
 
-    private static let weightIncrements: [Double] = [1.25, 2.5, 5.0, 10.0, 20.0]
+    private var weightIncrements: [(display: Double, storedKg: Double)] {
+        UnitConversion.displayWeightIncrementOptions(for: services.unitPreference)
+    }
 
     // MARK: - Init
 
@@ -68,8 +70,8 @@ struct ExerciseSettingsSheet: View {
                     Picker("Increment", selection: $weightIncrement) {
                         Text("App Default (\(formatIncrement(appDefaultIncrement)))")
                             .tag(Optional<Double>.none)
-                        ForEach(Self.weightIncrements, id: \.self) { increment in
-                            Text(formatIncrement(increment)).tag(Optional(increment))
+                        ForEach(weightIncrements, id: \.storedKg) { option in
+                            Text(formatIncrement(displayValue: option.display)).tag(Optional(option.storedKg))
                         }
                     }
                     .foregroundColor(.textPrimary)
@@ -141,7 +143,7 @@ struct ExerciseSettingsSheet: View {
         do {
             try await services.exerciseService.updateExercise(exercise, originalTrackingType: exercise.trackingType)
         } catch {
-            print("[ExerciseSettingsSheet] Failed to save: \(error)")
+            dbg("[ExerciseSettingsSheet] Failed to save: \(error)")
         }
 
         onSave?()
@@ -158,6 +160,7 @@ struct ExerciseSettingsSheet: View {
         guard let profile = try? await services.settingsService.fetchSettings() else { return }
         appDefaultRestTime = profile.defaultRestTimeSeconds
         appDefaultIncrement = profile.prescriptionDefaultIncrement
+            ?? UnitConversion.defaultStoredWeightIncrement(for: profile.unitPreference)
     }
 
     private var restTimeSummary: String {
@@ -181,14 +184,11 @@ struct ExerciseSettingsSheet: View {
 
     private func formatIncrement(_ value: Double?) -> String {
         guard let value else { return "Not Set" }
-        if value.truncatingRemainder(dividingBy: 1) == 0 {
-            return String(format: "%.0f kg", value)
-        }
-        let formatter = NumberFormatter()
-        formatter.minimumFractionDigits = 1
-        formatter.maximumFractionDigits = 2
-        let formatted = formatter.string(from: NSNumber(value: value)) ?? String(format: "%.2f", value)
-        return "\(formatted) kg"
+        return UnitConversion.formatWeightLabel(value, unitPreference: services.unitPreference)
+    }
+
+    private func formatIncrement(displayValue value: Double) -> String {
+        "\(UnitConversion.formatWeight(value)) \(UnitConversion.weightUnitLabel(for: services.unitPreference))"
     }
 }
 

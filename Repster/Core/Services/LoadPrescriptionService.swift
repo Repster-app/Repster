@@ -31,9 +31,6 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
 
     // MARK: - Constants (defaults when no per-exercise override)
 
-    /// Default weight increment (kg) when exercise has no override.
-    private static let defaultWeightIncrement: Double = 2.5
-
     /// Number of recent completed workouts used for peak-oriented capacity.
     private static let recentWorkoutPeakWindow: Int = 3
 
@@ -90,7 +87,9 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         }
 
         let restTimerSeconds = Double(exercise.defaultRestTime ?? profile.defaultRestTimeSeconds ?? 150)
-        let weightIncrement = exercise.weightIncrement ?? profile.prescriptionDefaultIncrement ?? Self.defaultWeightIncrement
+        let weightIncrement = exercise.weightIncrement
+            ?? profile.prescriptionDefaultIncrement
+            ?? UnitConversion.defaultStoredWeightIncrement(for: profile.unitPreference)
         let fatigueEnabled = profile.prescriptionFatigueModelingEnabled ?? true
         let freshnessEnabled = profile.prescriptionFreshnessBonus ?? false
         let freshnessPercent = profile.prescriptionFreshnessBonusPercent ?? 0.03
@@ -253,7 +252,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         // Final fallback: use the PR table
         let prE1RM = try await estimateFromPRTable(exerciseId: exerciseId, formula: formula)
         if let prE1RM, prE1RM > 0 {
-            print("[Prescription] Using PR table fallback: e1RM = \(String(format: "%.1f", prE1RM)) kg")
+            dbg("[Prescription] Using PR table fallback: e1RM = \(String(format: "%.1f", prE1RM)) kg")
             return (prE1RM, .historicalPR)
         }
 

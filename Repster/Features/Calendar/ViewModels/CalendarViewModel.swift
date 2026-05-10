@@ -111,7 +111,7 @@ final class CalendarViewModel {
             hasLoadedDots = true
         } catch {
             isLoadingDots = false
-            print("[CalendarViewModel] Failed to load dot data: \(error)")
+            dbg("[CalendarViewModel] Failed to load dot data: \(error)")
         }
     }
 
@@ -221,7 +221,7 @@ final class CalendarViewModel {
 
             workoutDetails = details
         } catch {
-            print("[CalendarViewModel] Failed to load workout detail: \(error)")
+            dbg("[CalendarViewModel] Failed to load workout detail: \(error)")
         }
     }
 

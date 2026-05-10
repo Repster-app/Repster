@@ -28,7 +28,8 @@ struct EditWorkoutView: View {
             workoutService: services.workoutService,
             setService: services.setService,
             exerciseService: services.exerciseService,
-            statsService: services.statsService
+            statsService: services.statsService,
+            settingsService: services.settingsService
         ))
         self.services = services
     }

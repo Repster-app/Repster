@@ -97,7 +97,7 @@ final class CreateEditTemplateViewModel {
             guard let detail = try await fetchTemplateDetailWithRetry(templateId) else { return }
             applyTemplateDetail(detail)
         } catch {
-            print("[CreateEditTemplateViewModel] Failed to load template: \(error)")
+            dbg("[CreateEditTemplateViewModel] Failed to load template: \(error)")
         }
     }
 
@@ -227,7 +227,7 @@ final class CreateEditTemplateViewModel {
 
                 exercises.append(editorExercise)
             } catch {
-                print("[CreateEditTemplateViewModel] Failed to add exercise: \(error)")
+                dbg("[CreateEditTemplateViewModel] Failed to add exercise: \(error)")
             }
         }
     }

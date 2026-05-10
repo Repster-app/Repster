@@ -34,7 +34,7 @@ final class TemplateListViewModel {
         do {
             templates = try await templateService.fetchAllTemplates()
         } catch {
-            print("[TemplateListViewModel] Failed to load templates: \(error)")
+            dbg("[TemplateListViewModel] Failed to load templates: \(error)")
             templates = []
         }
     }
@@ -74,7 +74,7 @@ final class TemplateListViewModel {
             try await templateService.deleteTemplate(templateId)
             templates.removeAll { $0.id == templateId }
         } catch {
-            print("[TemplateListViewModel] Failed to delete template: \(error)")
+            dbg("[TemplateListViewModel] Failed to delete template: \(error)")
         }
     }
 

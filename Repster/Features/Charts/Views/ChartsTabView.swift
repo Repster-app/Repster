@@ -7,6 +7,7 @@ import SwiftUI
 
 struct ChartsTabView: View {
 
+    @Environment(ServiceContainer.self) private var services
     @State private var viewModel: ChartsTabViewModel
 
     init(chartDataService: any ChartDataServiceProtocol,
@@ -46,6 +47,15 @@ struct ChartsTabView: View {
                 }
             }
             .background(Color.bg)
+        }
+        .onAppear {
+            viewModel.updateUnitPreference(services.unitPreference)
+        }
+        .onChange(of: services.unitPreference) { _, newValue in
+            viewModel.updateUnitPreference(newValue)
+            Task {
+                await viewModel.reloadVisibleData()
+            }
         }
     }
 

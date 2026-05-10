@@ -91,8 +91,8 @@ struct LastWorkoutCardView: View {
         LastWorkoutCardView(
             info: LastWorkoutInfo(
                 topSets: [
-                    TopSet(weight: 0, reps: nil, durationSeconds: 150, distanceMeters: 400, formattedLabel: "2m 30s • 400 m"),
-                    TopSet(weight: 0, reps: nil, durationSeconds: 120, distanceMeters: 300, formattedLabel: "2m • 300 m")
+                    TopSet(weight: 0, reps: nil, durationSeconds: 150, distanceMeters: 400, formattedLabel: "2m 30s • \(UnitConversion.formatDistanceLabel(400, unitPreference: .metric))"),
+                    TopSet(weight: 0, reps: nil, durationSeconds: 120, distanceMeters: 300, formattedLabel: "2m • \(UnitConversion.formatDistanceLabel(300, unitPreference: .metric))")
                 ],
                 daysAgo: 3,
                 relativeTimeLabel: "3 days ago"

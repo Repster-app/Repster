@@ -9,7 +9,8 @@ import UIKit
 enum BrandingConfiguration {
     static let appName = "Repster"
     static let supportEmail = "feedback@repster.app"
-    static let privacyPolicyURL = URL(string: "https://repster.app/privacy")!
+    static let privacyPolicyURL = URL(string: "https://repster-app.github.io/Repster/privacy.html")!
+    static let termsOfUseURL = URL(string: "https://repster-app.github.io/Repster/terms.html")!
 }
 
 enum SupportEmailComposer {
@@ -136,15 +137,12 @@ final class SettingsViewModel {
     }
 
     var prescriptionIncrementDisplayName: String {
-        guard let increment = profile?.prescriptionDefaultIncrement else { return "2.5 kg" }
-        if increment.truncatingRemainder(dividingBy: 1) == 0 {
-            return String(format: "%.0f kg", increment)
+        let unitPreference = profile?.unitPreference ?? .metric
+        guard let increment = profile?.prescriptionDefaultIncrement else {
+            let fallback = UnitConversion.defaultStoredWeightIncrement(for: unitPreference)
+            return UnitConversion.formatWeightLabel(fallback, unitPreference: unitPreference)
         }
-        let formatter = NumberFormatter()
-        formatter.minimumFractionDigits = 1
-        formatter.maximumFractionDigits = 2
-        let formatted = formatter.string(from: NSNumber(value: increment)) ?? String(format: "%.2f", increment)
-        return "\(formatted) kg"
+        return UnitConversion.formatWeightLabel(increment, unitPreference: unitPreference)
     }
 
     var workoutPreferencesSummary: String {
@@ -290,13 +288,12 @@ final class SettingsViewModel {
     }
 
     private var compactIncrementSummary: String {
-        guard let increment = profile?.prescriptionDefaultIncrement else { return "2.5 kg" }
-        let formatter = NumberFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.minimumFractionDigits = 0
-        formatter.maximumFractionDigits = 2
-        let formatted = formatter.string(from: NSNumber(value: increment)) ?? String(format: "%.2f", increment)
-        return "\(formatted) kg"
+        let unitPreference = profile?.unitPreference ?? .metric
+        guard let increment = profile?.prescriptionDefaultIncrement else {
+            let fallback = UnitConversion.defaultStoredWeightIncrement(for: unitPreference)
+            return UnitConversion.formatWeightLabel(fallback, unitPreference: unitPreference)
+        }
+        return UnitConversion.formatWeightLabel(increment, unitPreference: unitPreference)
     }
 
     private func performUpdate(_ update: () async throws -> Void) async {

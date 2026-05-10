@@ -26,7 +26,7 @@ struct UnitsStepView: View {
 
             VStack(spacing: 12) {
                 unitOption(.metric, title: "Metric", subtitle: "Kilograms (kg)")
-                unitOption(.imperial, title: "Imperial", subtitle: "Pounds (lbs)")
+                unitOption(.imperial, title: "Imperial", subtitle: "Pounds (lb)")
             }
             .padding(.horizontal, 32)
 

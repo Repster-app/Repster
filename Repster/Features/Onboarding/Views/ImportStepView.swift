@@ -6,17 +6,23 @@ import UniformTypeIdentifiers
 
 struct ImportStepView: View {
     @State private var viewModel: ImportViewModel
+    private let defaultUnitPreference: UnitPreference
     let isSaving: Bool
     let onFinish: () -> Void
     let onSkip: () -> Void
 
     init(
         importService: any ImportServiceProtocol,
+        defaultUnitPreference: UnitPreference = .metric,
         isSaving: Bool,
         onFinish: @escaping () -> Void,
         onSkip: @escaping () -> Void
     ) {
-        _viewModel = State(initialValue: ImportViewModel(importService: importService))
+        _viewModel = State(initialValue: ImportViewModel(
+            importService: importService,
+            defaultUnitPreference: defaultUnitPreference
+        ))
+        self.defaultUnitPreference = defaultUnitPreference
         self.isSaving = isSaving
         self.onFinish = onFinish
         self.onSkip = onSkip
@@ -42,6 +48,10 @@ struct ImportStepView: View {
             allowedContentTypes: [.commaSeparatedText]
         ) { result in
             viewModel.handleFileSelected(result)
+        }
+        .onAppear {
+            let defaultUnitSystem: ImportUnitSystem = defaultUnitPreference == .imperial ? .imperial : .metric
+            viewModel.chooseFitNotesUnitSystem(defaultUnitSystem)
         }
     }
 
@@ -69,7 +79,14 @@ struct ImportStepView: View {
                     }
                     .padding(.horizontal, 20)
 
-                    if viewModel.selectedSource.requiresUnitSystem {
+                    if viewModel.selectedSource == .fitNotes {
+                        ImportUnitSystemChooser(
+                            selectedUnitSystem: viewModel.selectedFitNotesUnitSystem
+                        ) { unitSystem in
+                            viewModel.chooseFitNotesUnitSystem(unitSystem)
+                        }
+                        .padding(.horizontal, 20)
+                    } else if viewModel.selectedSource.requiresUnitSystem {
                         ImportUnitSystemChooser(
                             selectedUnitSystem: viewModel.selectedStrongUnitSystem
                         ) { unitSystem in

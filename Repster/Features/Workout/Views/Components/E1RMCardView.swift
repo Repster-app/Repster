@@ -91,17 +91,11 @@ struct E1RMCardView: View {
     // MARK: - Formatting
 
     private func formatHeroWeight(_ kg: Double) -> String {
-        let value = unitPreference == .imperial ? UnitConversion.kgToLbs(kg) : kg
-        let unit = unitPreference == .imperial ? "lbs" : "kg"
-        return String(format: "%.1f", value) + " " + unit
+        UnitConversion.formatWeightLabel(kg, unitPreference: unitPreference)
     }
 
     private func formatWeight(_ kg: Double) -> String {
-        let value = unitPreference == .imperial ? UnitConversion.kgToLbs(kg) : kg
-        if value == value.rounded() && value == Double(Int(value)) {
-            return "\(Int(value))"
-        }
-        return String(format: "%.1f", value)
+        UnitConversion.formatDisplayedWeight(kg, unitPreference: unitPreference)
     }
 
     private func formatSetPerformance(weightKg: Double, reps: Int) -> String {
@@ -109,12 +103,12 @@ struct E1RMCardView: View {
     }
 
     private var unitLabel: String {
-        unitPreference == .imperial ? "lbs" : "kg"
+        UnitConversion.weightUnitLabel(for: unitPreference)
     }
 
     private func formatDelta(_ delta: Double, trend: Trend) -> String {
         let value = unitPreference == .imperial ? UnitConversion.kgToLbs(delta) : delta
-        let unit = unitPreference == .imperial ? "lbs" : "kg"
+        let unit = UnitConversion.weightUnitLabel(for: unitPreference)
         let sign = value > 0 ? "+" : value < 0 ? "−" : ""
         let absValue = abs(value)
         let formatted: String

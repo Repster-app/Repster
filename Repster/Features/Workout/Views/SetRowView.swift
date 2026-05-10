@@ -183,6 +183,12 @@ struct SetRowView: View {
     /// Shared custom keyboard manager for sketch-matching keyboard UX.
     var keyboardManager: SetEntryKeyboardManager? = nil
 
+    /// Current display unit preference for weight-entry helpers.
+    var unitPreference: UnitPreference = .metric
+
+    /// Global/default weight increment stored in kg.
+    var defaultWeightIncrement: Double = 2.5
+
     /// Optional suggested weight shown in custom keyboard actions.
     var suggestedWeight: Double? = nil
 
@@ -719,7 +725,13 @@ struct SetRowView: View {
             getRightRIRValue: { rightRIRBinding.wrappedValue },
             setRightRIRValue: { rightRIRBinding.wrappedValue = $0 },
             getSuggestedWeight: { suggestedWeight },
-            getWeightIncrement: { exercise.weightIncrement ?? 2.5 },
+            getWeightIncrement: {
+                UnitConversion.displayedWeightIncrement(
+                    exercise.weightIncrement ?? defaultWeightIncrement,
+                    unitPreference: unitPreference
+                )
+            },
+            unitPreference: unitPreference,
             getTargetRepRange: {
                 if case let .range(min, max) = RepsTargetInputParser.parse(repsBinding.wrappedValue) {
                     return (min: min, max: max)

@@ -45,6 +45,7 @@ struct SettingsView: View {
     // MARK: - State
 
     @State private var viewModel: SettingsViewModel
+    @Environment(ServiceContainer.self) private var services
     @Binding private var accessSnapshot: AccessSnapshot
     private let settingsService: any SettingsServiceProtocol
     private let bodyweightService: any BodyweightServiceProtocol
@@ -105,7 +106,12 @@ struct SettingsView: View {
                 UnitPickerSheet(
                     currentUnit: viewModel.profile?.unitPreference ?? .metric
                 ) { unit in
-                    Task { await viewModel.updateUnitPreference(unit) }
+                    Task {
+                        await viewModel.updateUnitPreference(unit)
+                        if viewModel.profile?.unitPreference == unit {
+                            services.updateCachedUnitPreference(unit)
+                        }
+                    }
                 }
             }
             .sheet(isPresented: $viewModel.showFormulaSheet) {
@@ -162,11 +168,11 @@ struct SettingsView: View {
             }
 
             NavigationLink {
-                SmartSuggestionsSettingsView(
-                    viewModel: viewModel,
-                    settingsService: settingsService,
-                    fatigueLearningService: fatigueLearningService
-                )
+                    SmartSuggestionsSettingsView(
+                        viewModel: viewModel,
+                        settingsService: settingsService,
+                        fatigueLearningService: fatigueLearningService
+                    )
             } label: {
                 SettingsNavigationRow(
                     title: "Smart Suggestions",
@@ -276,6 +282,13 @@ struct SettingsView: View {
                 SettingsNavigationRow(
                     title: "Privacy Policy",
                     systemImage: "hand.raised"
+                )
+            }
+
+            Link(destination: BrandingConfiguration.termsOfUseURL) {
+                SettingsNavigationRow(
+                    title: "Terms of Use",
+                    systemImage: "doc.text"
                 )
             }
         }
@@ -405,14 +418,14 @@ private struct MembershipSettingsView: View {
                 }
             }
 
-            if shouldShowMonthlyCancellationReminder {
+            if shouldShowSubscriptionCancellationReminder {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
                         Label("Lifetime access is active", systemImage: "checkmark.seal.fill")
                             .font(.headline)
                             .foregroundStyle(Color.textPrimary)
 
-                        Text("Your monthly subscription can still renew until you cancel it in Apple subscriptions.")
+                        Text("Your subscription can still renew until you cancel it in Apple subscriptions.")
                             .font(.subheadline)
                             .foregroundStyle(Color.textSecondary)
                     }
@@ -452,7 +465,7 @@ private struct MembershipSettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Lifetime access unlocks Repster permanently. Your monthly subscription will keep renewing until you cancel it in Apple subscriptions.")
+            Text("Lifetime access unlocks Repster permanently. Your subscription will keep renewing until you cancel it in Apple subscriptions.")
         }
         .sheet(isPresented: $showPaywall, onDismiss: {
             Task { await refreshMembershipStatus(forceSubscriptionRefresh: true) }
@@ -466,22 +479,22 @@ private struct MembershipSettingsView: View {
     }
 
     private var shouldShowLifetimePurchase: Bool {
-        subscriptionSnapshot.accessSource == .monthly
+        subscriptionSnapshot.accessSource == .subscription
     }
 
-    private var shouldShowMonthlyCancellationReminder: Bool {
-        subscriptionSnapshot.requiresMonthlyCancellationReminder
+    private var shouldShowSubscriptionCancellationReminder: Bool {
+        subscriptionSnapshot.requiresSubscriptionCancellationReminder
     }
 
     private var membershipSummary: String {
         switch accessSnapshot.state {
         case .subscribed:
             switch subscriptionSnapshot.accessSource {
-            case .monthly:
-                return "Monthly active"
+            case .subscription:
+                return "Subscription active"
             case .lifetime:
                 return "Lifetime active"
-            case .monthlyAndLifetime:
+            case .subscriptionAndLifetime:
                 return "Lifetime active"
             case .none:
                 return "Unlocked"
@@ -545,7 +558,7 @@ private struct MembershipSettingsView: View {
             accessSnapshot = await accessControlService.currentAccessSnapshot()
             showManageSubscriptionAction = true
             membershipAlertTitle = "Lifetime Access Active"
-            membershipAlertMessage = "Repster now has lifetime access. Your monthly subscription may still renew until you cancel it in Apple subscriptions."
+            membershipAlertMessage = "Repster now has lifetime access. Your subscription may still renew until you cancel it in Apple subscriptions."
             showMembershipAlert = true
         } catch MonetizationError.purchaseCancelled {
             await refreshMembershipStatus(forceSubscriptionRefresh: true)
@@ -686,7 +699,13 @@ private struct SmartSuggestionsSettingsView: View {
     let settingsService: any SettingsServiceProtocol
     let fatigueLearningService: FatigueLearningService
 
-    private static let incrementOptions = [0.5, 1.0, 1.25, 2.0, 2.5, 5.0]
+    private var unitPreference: UnitPreference {
+        viewModel.profile?.unitPreference ?? .metric
+    }
+
+    private var incrementOptions: [(display: Double, storedKg: Double)] {
+        UnitConversion.displayWeightIncrementOptions(for: unitPreference)
+    }
 
     var body: some View {
         Form {
@@ -707,13 +726,16 @@ private struct SmartSuggestionsSettingsView: View {
                             .foregroundStyle(Color.textPrimary)
                         Spacer()
                         Picker("", selection: Binding(
-                            get: { viewModel.profile?.prescriptionDefaultIncrement ?? 2.5 },
+                            get: {
+                                viewModel.profile?.prescriptionDefaultIncrement
+                                    ?? UnitConversion.defaultStoredWeightIncrement(for: unitPreference)
+                            },
                             set: { newValue in
                                 Task { await viewModel.updatePrescriptionDefaultIncrement(newValue) }
                             }
                         )) {
-                            ForEach(Self.incrementOptions, id: \.self) { increment in
-                                Text(incrementLabel(for: increment)).tag(increment)
+                            ForEach(incrementOptions, id: \.storedKg) { option in
+                                Text(incrementLabel(forDisplayValue: option.display)).tag(option.storedKg)
                             }
                         }
                         .labelsHidden()
@@ -767,15 +789,8 @@ private struct SmartSuggestionsSettingsView: View {
         }
     }
 
-    private func incrementLabel(for increment: Double) -> String {
-        if increment.truncatingRemainder(dividingBy: 1) == 0 {
-            return String(format: "%.0f kg", increment)
-        }
-        let formatter = NumberFormatter()
-        formatter.minimumFractionDigits = 1
-        formatter.maximumFractionDigits = 2
-        let formatted = formatter.string(from: NSNumber(value: increment)) ?? String(format: "%.2f", increment)
-        return "\(formatted) kg"
+    private func incrementLabel(forDisplayValue value: Double) -> String {
+        "\(UnitConversion.formatWeight(value)) \(UnitConversion.weightUnitLabel(for: unitPreference))"
     }
 }
 
@@ -784,12 +799,16 @@ private struct DataBackupsView: View {
     let workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol
     let settingsService: any SettingsServiceProtocol
     let onDataReset: @MainActor @Sendable () async -> Void
+    @Environment(ServiceContainer.self) private var services
 
     var body: some View {
         Form {
             Section {
                 NavigationLink {
-                    ImportView(importService: importService)
+                    ImportView(
+                        importService: importService,
+                        defaultUnitPreference: services.unitPreference
+                    )
                 } label: {
                     SettingsNavigationRow(
                         title: SettingsDataDestination.importCSV.title,

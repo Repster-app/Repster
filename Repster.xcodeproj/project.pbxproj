@@ -37,6 +37,7 @@
 		A10008 /* UnitPreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10008 /* UnitPreference.swift */; };
 		A10009 /* WorkoutStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10009 /* WorkoutStatus.swift */; };
 		A10010 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10010 /* Assets.xcassets */; };
+		A19999 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B19999 /* PrivacyInfo.xcprivacy */; };
 		A10011 /* RepsterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10011 /* RepsterApp.swift */; };
 		A10012 /* seed_exercises.json in Resources */ = {isa = PBXBuildFile; fileRef = B10012 /* seed_exercises.json */; };
 		A20001 /* WorkoutSet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20001 /* WorkoutSet.swift */; };
@@ -86,6 +87,7 @@
 		A80005 /* WorkoutService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80005 /* WorkoutService.swift */; };
 		A80006 /* ExerciseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80006 /* ExerciseService.swift */; };
 		AC0001 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0001 /* DesignTokens.swift */; };
+		AC9999 /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC9999 /* DebugLog.swift */; };
 		AC0002 /* SetInputField.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0002 /* SetInputField.swift */; };
 		AC0003 /* PRBadgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0003 /* PRBadgeView.swift */; };
 		AC0004 /* SetNumberBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0004 /* SetNumberBadge.swift */; };
@@ -293,6 +295,7 @@
 		B10011 /* RepsterApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepsterApp.swift; sourceTree = "<group>"; };
 		B10012 /* seed_exercises.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = seed_exercises.json; sourceTree = "<group>"; };
 		B10013 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B19999 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		B20001 /* WorkoutSet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSet.swift; sourceTree = "<group>"; };
 		B20002 /* Workout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workout.swift; sourceTree = "<group>"; };
 		B20003 /* Exercise.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Exercise.swift; sourceTree = "<group>"; };
@@ -341,6 +344,7 @@
 		B80006 /* ExerciseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseService.swift; sourceTree = "<group>"; };
 		B90001 /* Repster.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Repster.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC0001 /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
+		BC9999 /* DebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
 		BC0002 /* SetInputField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetInputField.swift; sourceTree = "<group>"; };
 		BC0003 /* PRBadgeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PRBadgeView.swift; sourceTree = "<group>"; };
 		BC0004 /* SetNumberBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetNumberBadge.swift; sourceTree = "<group>"; };
@@ -566,6 +570,7 @@
 			children = (
 				D10002 /* App */,
 				B10013 /* Info.plist */,
+				B19999 /* PrivacyInfo.xcprivacy */,
 				D10003 /* Features */,
 				D10004 /* Core */,
 				D10005 /* Data */,
@@ -1021,6 +1026,7 @@
 			children = (
 				B30003 /* UnitConversion.swift */,
 				BC0001 /* DesignTokens.swift */,
+				BC9999 /* DebugLog.swift */,
 				BH0003 /* MuscleGroupColors.swift */,
 			);
 			path = Extensions;
@@ -1268,6 +1274,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = F20001 /* Build configuration list for PBXNativeTarget "Repster" */;
 			buildPhases = (
+				RC3001 /* Validate RevenueCat API Key */,
 				E20001 /* Sources */,
 				C10001 /* Frameworks */,
 				E30001 /* Resources */,
@@ -1366,6 +1373,7 @@
 			files = (
 				A10010 /* Assets.xcassets in Resources */,
 				A10012 /* seed_exercises.json in Resources */,
+				A19999 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1377,6 +1385,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		RC3001 /* Validate RevenueCat API Key */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Validate RevenueCat API Key";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\n\nif [ \"${CONFIGURATION:-}\" != \"Release\" ]; then\n  exit 0\nfi\n\nkey=\"${REVENUECAT_API_KEY:-}\"\n\nif [ -z \"$key\" ]; then\n  echo \"error: Release REVENUECAT_API_KEY is empty. Set REVENUECAT_IOS_PUBLIC_API_KEY to the RevenueCat iOS public SDK key.\"\n  exit 1\nfi\n\nif printf '%s' \"$key\" | grep -q '[$]('; then\n  echo \"error: Release REVENUECAT_API_KEY is unresolved. Set REVENUECAT_IOS_PUBLIC_API_KEY to the RevenueCat iOS public SDK key.\"\n  exit 1\nfi\n\ncase \"$key\" in\n  test_*)\n    echo \"error: Release builds must not use a RevenueCat Test Store API key. Set REVENUECAT_IOS_PUBLIC_API_KEY to the iOS public SDK key.\"\n    exit 1\n    ;;\n  sk_*)\n    echo \"error: Do not embed RevenueCat secret API keys in the app. Use the public iOS SDK key.\"\n    exit 1\n    ;;\nesac\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		0823BF8A2F5D608400A513BE /* Sources */ = {
@@ -1449,6 +1479,7 @@
 				A80005 /* WorkoutService.swift in Sources */,
 				A80006 /* ExerciseService.swift in Sources */,
 				AC0001 /* DesignTokens.swift in Sources */,
+				AC9999 /* DebugLog.swift in Sources */,
 				AC0002 /* SetInputField.swift in Sources */,
 				AC0003 /* PRBadgeView.swift in Sources */,
 				AC0004 /* SetNumberBadge.swift in Sources */,
@@ -1644,7 +1675,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = WorkoutLiveActivity/Info.plist;
@@ -1657,7 +1688,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.Repster.WorkoutLiveActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1677,7 +1708,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = WorkoutLiveActivity/Info.plist;
@@ -1690,7 +1721,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.Repster.WorkoutLiveActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1826,7 +1857,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				ENABLE_PREVIEWS = YES;
@@ -1836,9 +1867,10 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.Repster;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REVENUECAT_API_KEY = test_psuJrnnzAOgbJPObjqCZbFITiGs;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1853,7 +1885,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				ENABLE_PREVIEWS = YES;
@@ -1863,9 +1895,11 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.Repster;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REVENUECAT_API_KEY = "$(REVENUECAT_IOS_PUBLIC_API_KEY)";
+				REVENUECAT_IOS_PUBLIC_API_KEY = appl_YFMLQYQEAVtMhMdgjHwpxFygGsr;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1879,7 +1913,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -1888,7 +1922,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.RepsterTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1906,7 +1940,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -1915,7 +1949,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.RepsterTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;

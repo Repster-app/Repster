@@ -29,6 +29,7 @@ final class ServiceContainer {
     let accessControlService: any AccessControlServiceProtocol
     let fatigueLearningService: FatigueLearningService
     let healthProfileRepo: any HealthProfileRepositoryProtocol
+    var unitPreference: UnitPreference = .metric
 
     init(repositoryContainer: RepositoryContainer) {
         let subscriptionService = SubscriptionService()
@@ -171,5 +172,16 @@ final class ServiceContainer {
         self.accessControlService = accessControlService
         self.fatigueLearningService = fatigueLearningService
         self.healthProfileRepo = repositoryContainer.healthProfileRepository
+    }
+
+    @MainActor
+    func refreshUnitPreference() async {
+        guard let profile = try? await settingsService.fetchSettings() else { return }
+        unitPreference = profile.unitPreference
+    }
+
+    @MainActor
+    func updateCachedUnitPreference(_ preference: UnitPreference) {
+        unitPreference = preference
     }
 }

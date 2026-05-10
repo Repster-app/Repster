@@ -131,6 +131,15 @@ struct ActiveWorkoutView: View {
                 setKeyboardManager.hide()
             }
         }
+        .onChange(of: services.unitPreference) { _, _ in
+            Task {
+                await viewModel.refreshDisplaySettings()
+                await viewModel.refreshWeightSuggestions(
+                    invalidateCache: true,
+                    presentation: .preserveExisting
+                )
+            }
+        }
         // Exercise picker sheet — replaced with ExerciseListView (T029)
         .sheet(isPresented: $viewModel.showAddExerciseSheet) {
             exercisePickerSheet
@@ -227,7 +236,8 @@ struct ActiveWorkoutView: View {
             // Exercise history from past workouts (T026)
             ExerciseHistoryView(
                 historyWorkouts: viewModel.subTabHistory,
-                exercise: viewModel.currentExercise
+                exercise: viewModel.currentExercise,
+                unitPreference: viewModel.unitPreference
             )
                 .task(id: viewModel.currentExercise?.id) {
                     await viewModel.loadHistoryForCurrentExercise()
@@ -237,6 +247,7 @@ struct ActiveWorkoutView: View {
             // Exercise PR table — reuses ExercisePRsView from ExerciseDetailView
             ExercisePRsView(
                 prTable: viewModel.subTabPRTable,
+                unitPreference: viewModel.unitPreference,
                 isPerSide: viewModel.currentExercise?.unilateral == true
                     && viewModel.currentExercise?.supportsUnilateralLogging == true
             )

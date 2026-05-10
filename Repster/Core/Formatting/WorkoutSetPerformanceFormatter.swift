@@ -14,7 +14,11 @@ struct WorkoutSetDisplayText: Sendable {
 }
 
 enum WorkoutSetPerformanceFormatter {
-    static func display(for set: WorkoutSet, exercise: Exercise?) -> WorkoutSetDisplayText {
+    static func display(
+        for set: WorkoutSet,
+        exercise: Exercise?,
+        unitPreference: UnitPreference
+    ) -> WorkoutSetDisplayText {
         display(
             weight: set.weight,
             reps: set.reps,
@@ -25,11 +29,16 @@ enum WorkoutSetPerformanceFormatter {
             rir: set.rir,
             leftRIR: set.leftRIR,
             rightRIR: set.rightRIR,
-            isBodyweightStyle: exercise?.isBodyweightStyleExercise == true
+            isBodyweightStyle: exercise?.isBodyweightStyleExercise == true,
+            unitPreference: unitPreference
         )
     }
 
-    static func display(for set: ChartSetData, exercise: ChartExerciseData?) -> WorkoutSetDisplayText {
+    static func display(
+        for set: ChartSetData,
+        exercise: ChartExerciseData?,
+        unitPreference: UnitPreference
+    ) -> WorkoutSetDisplayText {
         display(
             weight: set.weight,
             reps: set.reps,
@@ -40,32 +49,49 @@ enum WorkoutSetPerformanceFormatter {
             rir: nil,
             leftRIR: nil,
             rightRIR: nil,
-            isBodyweightStyle: exercise?.isBodyweightStyleExercise == true
+            isBodyweightStyle: exercise?.isBodyweightStyleExercise == true,
+            unitPreference: unitPreference
         )
     }
 
-    static func performanceLabel(for set: WorkoutSet, exercise: Exercise?) -> String? {
-        display(for: set, exercise: exercise).performanceLabel
+    static func performanceLabel(
+        for set: WorkoutSet,
+        exercise: Exercise?,
+        unitPreference: UnitPreference
+    ) -> String? {
+        display(for: set, exercise: exercise, unitPreference: unitPreference).performanceLabel
     }
 
-    static func performanceLabel(for set: ChartSetData, exercise: ChartExerciseData?) -> String? {
-        display(for: set, exercise: exercise).performanceLabel
+    static func performanceLabel(
+        for set: ChartSetData,
+        exercise: ChartExerciseData?,
+        unitPreference: UnitPreference
+    ) -> String? {
+        display(for: set, exercise: exercise, unitPreference: unitPreference).performanceLabel
     }
 
     static func repsLabel(for set: WorkoutSet) -> String? {
-        display(for: set, exercise: nil).repsLabel
+        repsLabel(reps: set.reps, leftReps: set.leftReps, rightReps: set.rightReps)
     }
 
     static func rirLabel(for set: WorkoutSet) -> String? {
-        display(for: set, exercise: nil).rirLabel
+        rirLabel(rir: set.rir, leftRIR: set.leftRIR, rightRIR: set.rightRIR)
     }
 
-    static func weightLabel(for weight: Double, exercise: Exercise?) -> String {
-        weightLabel(for: weight, isBodyweightStyle: exercise?.isBodyweightStyleExercise == true)
+    static func weightLabel(for weight: Double, exercise: Exercise?, unitPreference: UnitPreference) -> String {
+        weightLabel(
+            for: weight,
+            isBodyweightStyle: exercise?.isBodyweightStyleExercise == true,
+            unitPreference: unitPreference
+        )
     }
 
-    static func weightLabel(for weight: Double, exercise: ChartExerciseData?) -> String {
-        weightLabel(for: weight, isBodyweightStyle: exercise?.isBodyweightStyleExercise == true)
+    static func weightLabel(for weight: Double, exercise: ChartExerciseData?, unitPreference: UnitPreference) -> String {
+        weightLabel(
+            for: weight,
+            isBodyweightStyle: exercise?.isBodyweightStyleExercise == true,
+            unitPreference: unitPreference
+        )
     }
 
     static func isBodyweightStyleExercise(_ exercise: Exercise?) -> Bool {
@@ -83,16 +109,19 @@ enum WorkoutSetPerformanceFormatter {
     static func fieldDisplay(
         for field: WorkoutSetReadOnlyField,
         set: WorkoutSet,
-        exercise: Exercise?
+        exercise: Exercise?,
+        unitPreference: UnitPreference
     ) -> WorkoutSetReadOnlyCellDisplay {
-        let display = display(for: set, exercise: exercise)
+        let display = display(for: set, exercise: exercise, unitPreference: unitPreference)
 
         switch field {
         case .weight:
             let resolvedWeight = set.effectiveWeight ?? set.weight
             guard let resolvedWeight else { return .placeholder }
             if resolvedWeight > 0 || isBodyweightStyleExercise(exercise) {
-                return WorkoutSetReadOnlyCellDisplay(text: weightLabel(for: resolvedWeight, exercise: exercise))
+                return WorkoutSetReadOnlyCellDisplay(
+                    text: weightLabel(for: resolvedWeight, exercise: exercise, unitPreference: unitPreference)
+                )
             }
             return .placeholder
 
@@ -104,7 +133,7 @@ enum WorkoutSetPerformanceFormatter {
 
         case .distance:
             guard let distanceMeters = set.distanceMeters, distanceMeters > 0 else { return .placeholder }
-            return WorkoutSetReadOnlyCellDisplay(text: formatDistance(distanceMeters))
+            return WorkoutSetReadOnlyCellDisplay(text: formatDistance(distanceMeters, unitPreference: unitPreference))
 
         case .time:
             guard let durationSeconds = set.durationSeconds, durationSeconds > 0 else { return .placeholder }
@@ -120,18 +149,8 @@ enum WorkoutSetPerformanceFormatter {
         }
     }
 
-    static func summaryDistanceLabel(for meters: Double) -> String {
-        if meters >= 1000 {
-            let kilometers = meters / 1000
-            if kilometers >= 10 {
-                return String(format: "%.1f km", kilometers)
-            }
-            return String(format: "%.2f km", kilometers)
-        }
-        if meters == meters.rounded() {
-            return String(format: "%.0f m", meters)
-        }
-        return String(format: "%.1f m", meters)
+    static func summaryDistanceLabel(for meters: Double, unitPreference: UnitPreference) -> String {
+        UnitConversion.formatDistanceLabel(meters, unitPreference: unitPreference)
     }
 
     static func summaryDurationLabel(for seconds: Int, style: WorkoutPrimaryMetricDisplayStyle) -> String {
@@ -166,7 +185,8 @@ enum WorkoutSetPerformanceFormatter {
         rir: Double?,
         leftRIR: Double?,
         rightRIR: Double?,
-        isBodyweightStyle: Bool
+        isBodyweightStyle: Bool,
+        unitPreference: UnitPreference
     ) -> WorkoutSetDisplayText {
         let isPerSide = leftReps != nil || rightReps != nil || leftRIR != nil || rightRIR != nil
         let repsLabel = repsLabel(reps: reps, leftReps: leftReps, rightReps: rightReps)
@@ -176,7 +196,8 @@ enum WorkoutSetPerformanceFormatter {
             repsLabel: repsLabel,
             durationSeconds: durationSeconds,
             distanceMeters: distanceMeters,
-            isBodyweightStyle: isBodyweightStyle
+            isBodyweightStyle: isBodyweightStyle,
+            unitPreference: unitPreference
         )
 
         return WorkoutSetDisplayText(
@@ -194,10 +215,11 @@ enum WorkoutSetPerformanceFormatter {
         repsLabel: String?,
         durationSeconds: Int?,
         distanceMeters: Double?,
-        isBodyweightStyle: Bool
+        isBodyweightStyle: Bool,
+        unitPreference: UnitPreference
     ) -> String? {
         if let repsLabel, let weight {
-            return "\(weightLabel(for: weight, isBodyweightStyle: isBodyweightStyle)) × \(repsLabel)"
+            return "\(weightLabel(for: weight, isBodyweightStyle: isBodyweightStyle, unitPreference: unitPreference)) × \(repsLabel)"
         }
 
         if let repsLabel {
@@ -205,11 +227,11 @@ enum WorkoutSetPerformanceFormatter {
         }
 
         if let weight, weight > 0, let distanceMeters, distanceMeters > 0 {
-            return "\(formatWeight(weight)) • \(formatDistance(distanceMeters))"
+            return "\(formatWeight(weight, unitPreference: unitPreference)) • \(formatDistance(distanceMeters, unitPreference: unitPreference))"
         }
 
         if let durationSeconds, durationSeconds > 0, let distanceMeters, distanceMeters > 0 {
-            return "\(UnitConversion.formatDuration(durationSeconds)) • \(formatDistance(distanceMeters))"
+            return "\(UnitConversion.formatDuration(durationSeconds)) • \(formatDistance(distanceMeters, unitPreference: unitPreference))"
         }
 
         if let durationSeconds, durationSeconds > 0 {
@@ -217,7 +239,7 @@ enum WorkoutSetPerformanceFormatter {
         }
 
         if let distanceMeters, distanceMeters > 0 {
-            return formatDistance(distanceMeters)
+            return formatDistance(distanceMeters, unitPreference: unitPreference)
         }
 
         return nil
@@ -291,30 +313,28 @@ enum WorkoutSetPerformanceFormatter {
         return labels
     }
 
-    private static func weightLabel(for weight: Double, isBodyweightStyle: Bool) -> String {
+    private static func weightLabel(
+        for weight: Double,
+        isBodyweightStyle: Bool,
+        unitPreference: UnitPreference
+    ) -> String {
         if weight <= 0, isBodyweightStyle {
             return "BW"
         }
 
-        return "\(formatWeight(weight)) kg"
+        return UnitConversion.formatWeightLabel(weight, unitPreference: unitPreference)
     }
 
     private static func displayRIR(_ value: Double) -> String {
         value >= 5 ? "5+" : "\(Int(value))"
     }
 
-    private static func formatWeight(_ weight: Double) -> String {
-        UnitConversion.formatWeight(weight)
+    private static func formatWeight(_ weight: Double, unitPreference: UnitPreference) -> String {
+        UnitConversion.formatWeightLabel(weight, unitPreference: unitPreference)
     }
 
-    private static func formatDistance(_ meters: Double) -> String {
-        if meters >= 1000 {
-            return String(format: "%.2f km", meters / 1000)
-        }
-        if meters == meters.rounded() {
-            return String(format: "%.0f m", meters)
-        }
-        return String(format: "%.1f m", meters)
+    private static func formatDistance(_ meters: Double, unitPreference: UnitPreference) -> String {
+        UnitConversion.formatDistanceLabel(meters, unitPreference: unitPreference)
     }
 }
 
@@ -358,7 +378,7 @@ enum WorkoutPrimaryMetric: Sendable, Equatable {
 
     func formattedValue(
         style: WorkoutPrimaryMetricDisplayStyle = .compact,
-        unitPreference: UnitPreference = .metric
+        unitPreference: UnitPreference
     ) -> String {
         switch self {
         case .volume(let totalVolume):
@@ -373,7 +393,7 @@ enum WorkoutPrimaryMetric: Sendable, Equatable {
             return "\(Self.formatDetailedNumber(convertedVolume)) \(unitLabel)"
 
         case .distance(let meters):
-            return WorkoutSetPerformanceFormatter.summaryDistanceLabel(for: meters)
+            return WorkoutSetPerformanceFormatter.summaryDistanceLabel(for: meters, unitPreference: unitPreference)
 
         case .duration(let seconds):
             return WorkoutSetPerformanceFormatter.summaryDurationLabel(for: seconds, style: style)

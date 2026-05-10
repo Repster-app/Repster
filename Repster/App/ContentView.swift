@@ -21,7 +21,7 @@ enum StartupPRRebuildMaintenance {
             try await settingsService.rebuildPRs()
             userDefaults.set(currentVersion, forKey: userDefaultsKey)
         } catch {
-            print("[ContentView] Startup PR rebuild maintenance failed: \(error)")
+            dbg("[ContentView] Startup PR rebuild maintenance failed: \(error)")
         }
     }
 }
@@ -221,7 +221,10 @@ struct ContentView: View {
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active else { return }
-            Task { await refreshMonetizationState(forceSubscriptionRefresh: true) }
+            Task {
+                await services.refreshUnitPreference()
+                await refreshMonetizationState(forceSubscriptionRefresh: true)
+            }
         }
         .onChange(of: selectedTab) { oldTab, newTab in
             guard oldTab == .settings, newTab == .home else { return }
@@ -239,6 +242,7 @@ struct ContentView: View {
             // Check for active workout on launch (AGENT_RULES S7.3)
             guard !hasCheckedForActive else { return }
             hasCheckedForActive = true
+            await services.refreshUnitPreference()
             await refreshActiveWorkoutState()
             await refreshMonetizationState(forceSubscriptionRefresh: true)
             if hasActiveWorkout {
@@ -272,6 +276,7 @@ struct ContentView: View {
         }) {
             CopyPreviousSheet(
                 workouts: copyPreviousWorkouts,
+                unitPreference: services.unitPreference,
                 showDiscardConfirmation: $showDiscardConfirmation,
                 onWorkoutSelected: { workoutId in
                     Task { await copyWorkout(workoutId) }
@@ -385,7 +390,7 @@ struct ContentView: View {
             hasActiveWorkout = true
             showActiveWorkout = true
         } catch {
-            print("[ContentView] Start empty workout failed: \(error)")
+            dbg("[ContentView] Start empty workout failed: \(error)")
         }
     }
 
@@ -442,7 +447,7 @@ struct ContentView: View {
                 try await Task.sleep(for: .milliseconds(300))
                 showActiveWorkout = true
             } catch {
-                print("[ContentView] Failed to start workout: \(error)")
+                dbg("[ContentView] Failed to start workout: \(error)")
             }
         }
     }
@@ -494,7 +499,7 @@ struct ContentView: View {
 
             copyPreviousWorkouts = items
         } catch {
-            print("[ContentView] Failed to load copy previous workouts: \(error)")
+            dbg("[ContentView] Failed to load copy previous workouts: \(error)")
         }
     }
 
@@ -509,7 +514,7 @@ struct ContentView: View {
             }
             try await performCopy(workoutId)
         } catch {
-            print("[ContentView] Copy failed: \(error)")
+            dbg("[ContentView] Copy failed: \(error)")
         }
     }
 
@@ -524,7 +529,7 @@ struct ContentView: View {
             pendingCopyWorkoutId = nil
             try await performCopy(pendingId)
         } catch {
-            print("[ContentView] Discard+copy failed: \(error)")
+            dbg("[ContentView] Discard+copy failed: \(error)")
         }
     }
 

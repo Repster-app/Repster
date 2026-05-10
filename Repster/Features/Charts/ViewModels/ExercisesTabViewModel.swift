@@ -17,6 +17,7 @@ final class ExercisesTabViewModel {
     var selectedDataIndex: Int?
     var isLoading = false
     var showExerciseSelector = false
+    var unitPreference: UnitPreference = .metric
 
     // MARK: - Configuration
 
@@ -66,23 +67,24 @@ final class ExercisesTabViewModel {
                 exerciseIds: exerciseIds,
                 timeRange: selectedTimeRange
             )
-            chartData = data
+            let displayData = displaySeries(from: data)
+            chartData = displayData
 
             // Compute trend line for first series only
-            if let firstSeries = data.first, firstSeries.points.count >= 2 {
+            if let firstSeries = displayData.first, firstSeries.points.count >= 2 {
                 trendLine = TrendLineCalculator.compute(values: firstSeries.points.map { $0.value })
             } else {
                 trendLine = nil
             }
 
             // Set selected data index to latest point of first series
-            if let firstSeries = data.first, !firstSeries.points.isEmpty {
+            if let firstSeries = displayData.first, !firstSeries.points.isEmpty {
                 selectedDataIndex = firstSeries.points.count - 1
             } else {
                 selectedDataIndex = nil
             }
         } catch {
-            print("[ExercisesTab] Error loading data: \(error)")
+            dbg("[ExercisesTab] Error loading data: \(error)")
         }
         isLoading = false
     }
@@ -129,11 +131,11 @@ final class ExercisesTabViewModel {
     var yAxisLabel: String {
         switch selectedMetric {
         case .estimatedOneRM, .maxWeight, .maxVolume, .maxWeightForReps, .workoutVolume, .personalRecords:
-            return "kg"
+            return UnitConversion.weightUnitLabel(for: unitPreference)
         case .maxReps, .workoutReps:
             return "reps"
         case .maxDistance:
-            return "m"
+            return UnitConversion.chartDistanceUnitLabel(for: unitPreference)
         case .maxTime:
             return "sec"
         case .minPace:
@@ -148,16 +150,13 @@ final class ExercisesTabViewModel {
         let point = firstSeries.points[index]
         switch selectedMetric {
         case .estimatedOneRM, .maxWeight, .maxWeightForReps, .personalRecords:
-            return String(format: "%.1f kg", point.value)
+            return "\(UnitConversion.formatWeight(point.value)) \(UnitConversion.weightUnitLabel(for: unitPreference))"
         case .maxVolume, .workoutVolume:
-            return String(format: "%.0f kg", point.value)
+            return "\(UnitConversion.formatWeight(point.value)) \(UnitConversion.weightUnitLabel(for: unitPreference))"
         case .maxReps, .workoutReps:
             return "\(Int(point.value)) reps"
         case .maxDistance:
-            if point.value >= 1000 {
-                return String(format: "%.2f km", point.value / 1000)
-            }
-            return String(format: "%.0f m", point.value)
+            return String(format: "%.2f %@", point.value, UnitConversion.chartDistanceUnitLabel(for: unitPreference) as NSString)
         case .maxTime:
             let minutes = Int(point.value) / 60
             let seconds = Int(point.value) % 60
@@ -182,14 +181,8 @@ final class ExercisesTabViewModel {
               let index = selectedDataIndex,
               index >= 0, index < firstSeries.points.count else { return nil }
         let point = firstSeries.points[index]
-        if let detailLabel = point.detailLabel {
-            return detailLabel
-        }
         guard let weight = point.topWeight, let reps = point.topReps else { return nil }
-        if weight == weight.rounded() && weight == Double(Int(weight)) {
-            return "\(Int(weight)) kg \u{00D7} \(reps) reps"
-        }
-        return String(format: "%.1f kg \u{00D7} %d reps", weight, reps)
+        return "\(UnitConversion.formatWeightLabel(weight, unitPreference: unitPreference)) \u{00D7} \(reps) reps"
     }
 
     /// The workoutId of the currently selected data point, if available.
@@ -221,5 +214,36 @@ final class ExercisesTabViewModel {
             return names.joined(separator: ", ")
         }
         return "\(names[0]), \(names[1]) +\(names.count - 2) more"
+    }
+
+    private func displaySeries(from series: [ExerciseProgressSeries]) -> [ExerciseProgressSeries] {
+        series.map { source in
+            ExerciseProgressSeries(
+                id: source.id,
+                name: source.name,
+                color: source.color,
+                points: source.points.map { point in
+                    ExerciseProgressPoint(
+                        date: point.date,
+                        value: displayValue(point.value, for: selectedMetric),
+                        workoutId: point.workoutId,
+                        topWeight: point.topWeight,
+                        topReps: point.topReps,
+                        detailLabel: nil
+                    )
+                }
+            )
+        }
+    }
+
+    private func displayValue(_ value: Double, for metric: ExerciseMetric) -> Double {
+        switch metric {
+        case .estimatedOneRM, .maxWeight, .maxWeightForReps, .personalRecords, .maxVolume, .workoutVolume:
+            return UnitConversion.displayedWeight(value, unitPreference: unitPreference)
+        case .maxDistance:
+            return UnitConversion.displayedChartDistance(value, unitPreference: unitPreference)
+        case .maxReps, .workoutReps, .maxTime, .minPace:
+            return value
+        }
     }
 }

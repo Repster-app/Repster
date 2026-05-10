@@ -143,7 +143,7 @@ struct ExercisePickerSheet: View {
         do {
             exercises = try await exerciseService.fetchAllExercises()
         } catch {
-            print("[ExercisePickerSheet] Failed to fetch exercises: \(error)")
+            dbg("[ExercisePickerSheet] Failed to fetch exercises: \(error)")
         }
     }
 }

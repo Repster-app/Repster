@@ -50,7 +50,7 @@ final class LiveActivityManager {
     ) {
         // Guard: ActivityKit must be available
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
-            print("[LiveActivityManager] Live Activities not enabled by user")
+            dbg("[LiveActivityManager] Live Activities not enabled by user")
             return
         }
 
@@ -73,7 +73,7 @@ final class LiveActivityManager {
                     restTimerRemainingSeconds: nil,
                     isRestTimerFinished: false
                 )
-                print("[LiveActivityManager] Recovered existing activity: \(existing.id)")
+                dbg("[LiveActivityManager] Recovered existing activity: \(existing.id)")
                 return
             }
         }
@@ -127,9 +127,9 @@ final class LiveActivityManager {
                 pushType: nil // Local updates only — no push token needed
             )
             currentActivity = activity
-            print("[LiveActivityManager] Started activity: \(activity.id)")
+            dbg("[LiveActivityManager] Started activity: \(activity.id)")
         } catch {
-            print("[LiveActivityManager] Failed to start activity: \(error)")
+            dbg("[LiveActivityManager] Failed to start activity: \(error)")
         }
     }
 
@@ -217,7 +217,7 @@ final class LiveActivityManager {
             )
         }
         currentActivity = nil
-        print("[LiveActivityManager] Ended activity")
+        dbg("[LiveActivityManager] Ended activity")
     }
 
     // MARK: - Cleanup

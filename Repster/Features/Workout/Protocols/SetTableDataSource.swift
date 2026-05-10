@@ -72,6 +72,12 @@ protocol SetTableDataSource: AnyObject, Observable {
     /// Sets for the currently selected exercise, ordered by orderInExercise.
     var currentSets: [WorkoutSet] { get }
 
+    /// Current display unit preference for set entry and read-only labels.
+    var unitPreference: UnitPreference { get }
+
+    /// Global/default weight increment stored in kg.
+    var defaultWeightIncrement: Double { get }
+
     // MARK: - Set Actions
 
     /// Complete or update a set with the given values.

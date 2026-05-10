@@ -212,14 +212,13 @@ struct ExercisesTabView: View {
     private func formatValue(_ value: Double) -> String {
         switch viewModel.selectedMetric {
         case .estimatedOneRM, .maxWeight, .maxWeightForReps, .personalRecords:
-            return String(format: "%.1f kg", value)
+            return "\(UnitConversion.formatWeight(value)) \(UnitConversion.weightUnitLabel(for: viewModel.unitPreference))"
         case .maxVolume, .workoutVolume:
-            return String(format: "%.0f kg", value)
+            return "\(UnitConversion.formatWeight(value)) \(UnitConversion.weightUnitLabel(for: viewModel.unitPreference))"
         case .maxReps, .workoutReps:
             return "\(Int(value))"
         case .maxDistance:
-            if value >= 1000 { return String(format: "%.1f km", value / 1000) }
-            return String(format: "%.0f m", value)
+            return String(format: "%.2f %@", value, UnitConversion.chartDistanceUnitLabel(for: viewModel.unitPreference) as NSString)
         case .maxTime:
             return String(format: "%.0fs", value)
         case .minPace:

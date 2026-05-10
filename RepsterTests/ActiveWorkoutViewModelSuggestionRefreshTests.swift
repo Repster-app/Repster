@@ -1497,7 +1497,8 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
 
         let data = SuggestionExplainer.makeWeightSuggestionData(
             preparation: preparation,
-            evaluation: evaluation
+            evaluation: evaluation,
+            unitPreference: .metric
         )
 
         XCTAssertEqual(data.rowStates.count, 2)
@@ -1544,7 +1545,8 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
 
         let data = SuggestionExplainer.makeWeightSuggestionData(
             preparation: preparation,
-            evaluation: .unavailable(.noStrengthData)
+            evaluation: .unavailable(.noStrengthData),
+            unitPreference: .metric
         )
 
         XCTAssertNil(data.suggestion(for: setId))
@@ -1598,7 +1600,8 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
 
         let data = SuggestionExplainer.makeWeightSuggestionData(
             preparation: preparation,
-            evaluation: evaluation
+            evaluation: evaluation,
+            unitPreference: .metric
         )
 
         XCTAssertEqual(data.suggestion(for: set.id)?.explanation.defaultUsageLabel, "using default target")
@@ -1663,7 +1666,8 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
 
         let data = SuggestionExplainer.makeWeightSuggestionData(
             preparation: preparation,
-            evaluation: evaluation
+            evaluation: evaluation,
+            unitPreference: .metric
         )
         let suggestion = try XCTUnwrap(data.suggestion(for: setId))
 
@@ -1724,7 +1728,8 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
 
         let data = SuggestionExplainer.makeWeightSuggestionData(
             preparation: preparation,
-            evaluation: evaluation
+            evaluation: evaluation,
+            unitPreference: .metric
         )
         let suggestion = try XCTUnwrap(data.suggestion(for: setId))
         let selectionReferenceE1RM = try XCTUnwrap(suggestion.diagnostics.selectionReferenceE1RM)
@@ -1904,7 +1909,8 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
 
         let data = SuggestionExplainer.makeWeightSuggestionData(
             preparation: preparation,
-            evaluation: evaluation
+            evaluation: evaluation,
+            unitPreference: .metric
         )
         let suggestion = try XCTUnwrap(data.suggestion(for: setId))
 
@@ -4175,6 +4181,64 @@ final class ImportSupportTests: XCTestCase {
         XCTAssertEqual(rowingSet.distanceMeters ?? 0, 2 * 1609.34, accuracy: 0.001)
     }
 
+    func testFitNotesImportUsesPreferredKgColumnAndFallsBackToLbs() async throws {
+        let context = try makeImportContext()
+        let csv = """
+        Date,Exercise,Category,Weight (kg),Weight (lbs),Reps,Distance,Distance Unit,Time,Notes,Kind
+        2026-03-20,Squat,Legs,100,,5,,,,,wr
+        2026-03-20,Bench Press,Chest,,225,5,,,,,wr
+        2026-03-20,Deadlift,Back,140,315,3,,,,,wr
+        """
+
+        let result = try await consumeImport(
+            context.service.importData(
+                data: Data(csv.utf8),
+                source: .fitNotes,
+                unitSystem: .metric
+            )
+        )
+
+        XCTAssertEqual(result.setsImported, 3)
+        XCTAssertEqual(result.rowsSkipped, 0)
+        XCTAssertEqual(result.warnings.count, 1)
+        XCTAssertEqual(result.warnings.first?.rowNumber, 3)
+        XCTAssertTrue(result.warnings.first?.reason.contains("Weight (lbs)") == true)
+
+        let setsByExercise = try fetchImportedSetsByExerciseName(context.modelContainer)
+        XCTAssertEqual(setsByExercise["Squat"]?.weight ?? 0, 100, accuracy: 0.0001)
+        XCTAssertEqual(setsByExercise["Bench Press"]?.weight ?? 0, UnitConversion.lbsToKg(225), accuracy: 0.0001)
+        XCTAssertEqual(setsByExercise["Deadlift"]?.weight ?? 0, 140, accuracy: 0.0001)
+    }
+
+    func testFitNotesImportUsesPreferredLbsColumnAndFallsBackToKg() async throws {
+        let context = try makeImportContext()
+        let csv = """
+        Date,Exercise,Category,Weight (kg),Weight (lbs),Reps,Distance,Distance Unit,Time,Notes,Kind
+        2026-03-20,Squat,Legs,100,,5,,,,,wr
+        2026-03-20,Bench Press,Chest,,225,5,,,,,wr
+        2026-03-20,Deadlift,Back,140,315,3,,,,,wr
+        """
+
+        let result = try await consumeImport(
+            context.service.importData(
+                data: Data(csv.utf8),
+                source: .fitNotes,
+                unitSystem: .imperial
+            )
+        )
+
+        XCTAssertEqual(result.setsImported, 3)
+        XCTAssertEqual(result.rowsSkipped, 0)
+        XCTAssertEqual(result.warnings.count, 1)
+        XCTAssertEqual(result.warnings.first?.rowNumber, 2)
+        XCTAssertTrue(result.warnings.first?.reason.contains("Weight (kg)") == true)
+
+        let setsByExercise = try fetchImportedSetsByExerciseName(context.modelContainer)
+        XCTAssertEqual(setsByExercise["Squat"]?.weight ?? 0, 100, accuracy: 0.0001)
+        XCTAssertEqual(setsByExercise["Bench Press"]?.weight ?? 0, UnitConversion.lbsToKg(225), accuracy: 0.0001)
+        XCTAssertEqual(setsByExercise["Deadlift"]?.weight ?? 0, UnitConversion.lbsToKg(315), accuracy: 0.0001)
+    }
+
     func testImportSupportEmailUsesFeedbackInboxAndImportSubject() throws {
         let url = try XCTUnwrap(
             SupportEmailComposer.importSupportURL(
@@ -4216,14 +4280,14 @@ final class ImportSupportTests: XCTestCase {
     private var validFitNotesCSV: String {
         """
         Date,Exercise,Category,Weight (kg),Weight (lbs),Reps,Distance,Distance Unit,Time,Notes,Kind
-        2026-03-20,Squat,Legs,100,,5,,,,wr
+        2026-03-20,Squat,Legs,100,,5,,,,,wr
         """
     }
 
     private var unsupportedCSV: String {
         """
         Workout Date,Exercise,Category,Weight (kg),Weight (lbs),Reps,Distance,Distance Unit,Time,Notes,Kind
-        2026-03-20,Squat,Legs,100,,5,,,,wr
+        2026-03-20,Squat,Legs,100,,5,,,,,wr
         """
     }
 
@@ -4252,6 +4316,18 @@ final class ImportSupportTests: XCTestCase {
 
         XCTFail("Import stream finished without a terminal event")
         throw ImportError.cancelled
+    }
+
+    private func fetchImportedSetsByExerciseName(_ modelContainer: ModelContainer) throws -> [String: WorkoutSet] {
+        let verificationContext = ModelContext(modelContainer)
+        let exercises = try verificationContext.fetch(FetchDescriptor<Exercise>())
+        let sets = try verificationContext.fetch(FetchDescriptor<WorkoutSet>())
+        let exerciseById = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0) })
+
+        return Dictionary(uniqueKeysWithValues: sets.compactMap { set in
+            guard let exerciseName = exerciseById[set.exerciseId]?.name else { return nil }
+            return (exerciseName, set)
+        })
     }
 
     private struct ImportTestContext {

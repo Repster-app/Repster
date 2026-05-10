@@ -14,6 +14,7 @@ struct RecentPR: Identifiable {
 
 struct RecentPRsView: View {
     let prs: [RecentPR]
+    let unitPreference: UnitPreference
     var displayMode: PRDisplayMode = .standard
 
     var body: some View {
@@ -118,10 +119,7 @@ struct RecentPRsView: View {
     // MARK: - Helpers
 
     private func formattedWeight(_ weight: Double) -> String {
-        if weight == weight.rounded() {
-            return "\(Int(weight))kg"
-        }
-        return String(format: "%.1fkg", weight)
+        UnitConversion.formatWeightLabel(weight, unitPreference: unitPreference)
     }
 
     private func relativeDate(_ date: Date) -> String {

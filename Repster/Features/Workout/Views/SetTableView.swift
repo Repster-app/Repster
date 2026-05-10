@@ -382,6 +382,7 @@ private struct SetRowWrapper: View {
     @State private var rirValue: Double?
     @State private var leftRIRValue: Double?
     @State private var rightRIRValue: Double?
+    @State private var lastUnitPreference: UnitPreference
 
     // Note editor state
     @State private var showNoteAlert: Bool = false
@@ -407,7 +408,8 @@ private struct SetRowWrapper: View {
         self.suggestedWeight = suggestedWeight
 
         // Initialize text from model values
-        _weightText = State(initialValue: set.weight.map { Self.formatWeight($0) } ?? "")
+        let unitPreference = dataSource.unitPreference
+        _weightText = State(initialValue: set.weight.map { Self.formatWeight($0, unitPreference: unitPreference) } ?? "")
         _repsText = State(initialValue: Self.repsTextValue(for: set))
         _leftRepsText = State(initialValue: set.leftReps.map(String.init) ?? "")
         _rightRepsText = State(initialValue: set.rightReps.map(String.init) ?? "")
@@ -416,6 +418,7 @@ private struct SetRowWrapper: View {
         _rirValue = State(initialValue: set.rir)
         _leftRIRValue = State(initialValue: set.leftRIR)
         _rightRIRValue = State(initialValue: set.rightRIR)
+        _lastUnitPreference = State(initialValue: unitPreference)
     }
 
     var body: some View {
@@ -470,6 +473,8 @@ private struct SetRowWrapper: View {
                 onEditNote: beginEditingNote,
                 onCommitTargetRepRange: commitTargetRepRange,
                 keyboardManager: keyboardManager,
+                unitPreference: dataSource.unitPreference,
+                defaultWeightIncrement: dataSource.defaultWeightIncrement,
                 suggestedWeight: suggestedWeight,
                 prStatusOverride: prStatusOverride
             )
@@ -505,6 +510,9 @@ private struct SetRowWrapper: View {
                 }
                 .onChange(of: rightRIRValue) { _, newValue in
                     handleRightRIRChange(newValue, exercise: exercise)
+                }
+                .onChange(of: dataSource.unitPreference) { oldValue, newValue in
+                    refreshDisplayTextForUnitChange(from: oldValue, to: newValue)
                 }
         )
     }
@@ -570,7 +578,7 @@ private struct SetRowWrapper: View {
 
     private func handleWeightChange(_ newValue: String) {
         handleFieldEdit(field: .weight) {
-            set.weight = UnitConversion.parseDecimal(newValue)
+            set.weight = UnitConversion.parseDisplayedWeight(newValue, unitPreference: dataSource.unitPreference)
         }
     }
 
@@ -725,7 +733,7 @@ private struct SetRowWrapper: View {
             }
 
             return SetCompletionInput(
-                weight: UnitConversion.parseDecimal(weightText),
+                weight: UnitConversion.parseDisplayedWeight(weightText, unitPreference: dataSource.unitPreference),
                 durationSeconds: durationSeconds,
                 distanceMeters: UnitConversion.parseDecimal(distanceText),
                 leftReps: leftReps,
@@ -743,7 +751,7 @@ private struct SetRowWrapper: View {
         }
 
         return SetCompletionInput(
-            weight: UnitConversion.parseDecimal(weightText),
+            weight: UnitConversion.parseDisplayedWeight(weightText, unitPreference: dataSource.unitPreference),
             reps: parsedReps.completionReps,
             durationSeconds: durationSeconds,
             distanceMeters: UnitConversion.parseDecimal(distanceText),
@@ -759,13 +767,21 @@ private struct SetRowWrapper: View {
     // MARK: - Formatters
 
     /// Format weight for display using locale-aware decimal separator.
-    private static func formatWeight(_ value: Double) -> String {
-        UnitConversion.formatWeight(value)
+    private static func formatWeight(_ value: Double, unitPreference: UnitPreference) -> String {
+        UnitConversion.formatDisplayedWeight(value, unitPreference: unitPreference)
     }
 
     /// Format distance for display using locale-aware decimal separator.
     private static func formatDistance(_ value: Double) -> String {
         UnitConversion.formatWeight(value)
+    }
+
+    private func refreshDisplayTextForUnitChange(from oldValue: UnitPreference, to newValue: UnitPreference) {
+        defer { lastUnitPreference = newValue }
+        guard oldValue != newValue else { return }
+        let oldWeightText = set.weight.map { Self.formatWeight($0, unitPreference: oldValue) } ?? ""
+        guard weightText.isEmpty || weightText == oldWeightText else { return }
+        weightText = set.weight.map { Self.formatWeight($0, unitPreference: newValue) } ?? ""
     }
 
     private static func formatDurationForInput(_ seconds: Int) -> String {
@@ -908,6 +924,7 @@ final class SetEntryKeyboardContext {
     private let setRightRIRValue: (Double?) -> Void
     let getSuggestedWeight: () -> Double?
     let getWeightIncrement: () -> Double
+    let unitPreference: UnitPreference
     let getTargetRepRange: () -> (min: Int?, max: Int?)
     let commitTargetRepRange: (Int?, Int?) -> Void
     let onCompleteSet: (() -> Void)?
@@ -936,6 +953,7 @@ final class SetEntryKeyboardContext {
         setRightRIRValue: @escaping (Double?) -> Void = { _ in },
         getSuggestedWeight: @escaping () -> Double?,
         getWeightIncrement: @escaping () -> Double = { 2.5 },
+        unitPreference: UnitPreference = .metric,
         getTargetRepRange: @escaping () -> (min: Int?, max: Int?) = { (nil, nil) },
         commitTargetRepRange: @escaping (Int?, Int?) -> Void = { _, _ in },
         onCompleteSet: (() -> Void)? = nil,
@@ -962,6 +980,7 @@ final class SetEntryKeyboardContext {
         self.setRightRIRValue = setRightRIRValue
         self.getSuggestedWeight = getSuggestedWeight
         self.getWeightIncrement = getWeightIncrement
+        self.unitPreference = unitPreference
         self.getTargetRepRange = getTargetRepRange
         self.commitTargetRepRange = commitTargetRepRange
         self.onCompleteSet = onCompleteSet
@@ -1445,7 +1464,7 @@ struct SetEntryKeyboardOverlay: View {
                         Image(systemName: "wand.and.stars")
                             .font(.system(size: 13, weight: .semibold))
                         if let weight = suggestedWeight {
-                            Text("\(UnitConversion.formatWeight(weight)) kg")
+                            Text(UnitConversion.formatWeightLabel(weight, unitPreference: context.unitPreference))
                                 .font(.system(size: 13, weight: .semibold))
                         }
                     }
@@ -1713,7 +1732,10 @@ struct SetEntryKeyboardOverlay: View {
 
     private func applySuggestedWeight(_ context: SetEntryKeyboardContext) {
         guard let suggested = context.getSuggestedWeight() else { return }
-        context.setFieldValue(.weight, UnitConversion.formatWeight(suggested))
+        context.setFieldValue(
+            .weight,
+            UnitConversion.formatDisplayedWeight(suggested, unitPreference: context.unitPreference)
+        )
         refreshTick += 1
         manager.refresh()
     }
@@ -1746,17 +1768,18 @@ struct SetEntryKeyboardOverlay: View {
     private func weightHelperText(_ context: SetEntryKeyboardContext) -> String {
         let raw = context.getFieldValue(.weight)
         let total = Double(raw.replacingOccurrences(of: ",", with: ".")) ?? 0
-        let barWeight = 20.0
+        let barWeight = context.unitPreference == .imperial ? 45.0 : 20.0
+        let unit = UnitConversion.weightUnitLabel(for: context.unitPreference)
         if total <= barWeight {
             let extra = max(0, barWeight - total)
-            return "0 kg on both sides + 20 kg bar weight = 0 kg + extra \(display(extra)) kg"
+            return "0 \(unit) on both sides + \(display(barWeight)) \(unit) bar weight = 0 \(unit) + extra \(display(extra)) \(unit)"
         }
         let side = max(0, (total - barWeight) / 2)
-        return "\(display(side)) kg on both sides + 20 kg bar weight = \(display(total)) kg total"
+        return "\(display(side)) \(unit) on both sides + \(display(barWeight)) \(unit) bar weight = \(display(total)) \(unit) total"
     }
 
     private func display(_ value: Double) -> String {
-        value.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(value)) : String(value)
+        UnitConversion.formatWeight(value)
     }
 
     private func rirColor(for value: Double?) -> Color {

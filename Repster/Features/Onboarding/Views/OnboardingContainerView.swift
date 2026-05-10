@@ -7,6 +7,7 @@ import SwiftUI
 
 struct OnboardingContainerView: View {
     @State private var viewModel: OnboardingViewModel
+    @Environment(ServiceContainer.self) private var services
     let importService: any ImportServiceProtocol
     let onComplete: () -> Void
 
@@ -57,16 +58,19 @@ struct OnboardingContainerView: View {
 
                 ImportStepView(
                     importService: importService,
+                    defaultUnitPreference: viewModel.selectedUnit,
                     isSaving: viewModel.isSaving,
                     onFinish: {
                         Task {
                             await viewModel.finish()
+                            services.updateCachedUnitPreference(viewModel.selectedUnit)
                             onComplete()
                         }
                     },
                     onSkip: {
                         Task {
                             await viewModel.finish()
+                            services.updateCachedUnitPreference(viewModel.selectedUnit)
                             onComplete()
                         }
                     }

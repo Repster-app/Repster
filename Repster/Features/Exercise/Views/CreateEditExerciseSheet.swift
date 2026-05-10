@@ -186,9 +186,9 @@ struct CreateEditExerciseSheet: View {
             Picker("Weight Increment", selection: $viewModel.weightIncrement) {
                 Text("App Default (\(viewModel.defaultIncrementDisplay))")
                     .tag(Optional<Double>.none)
-                ForEach(weightIncrementOptions, id: \.self) { increment in
-                    Text(formatIncrement(increment))
-                        .tag(Optional(increment))
+                ForEach(weightIncrementOptions, id: \.storedKg) { option in
+                    Text(formatIncrement(displayValue: option.display))
+                        .tag(Optional(option.storedKg))
                 }
             }
 
@@ -216,19 +216,16 @@ struct CreateEditExerciseSheet: View {
         }
     }
 
-    private var weightIncrementOptions: [Double] {
-        [0.5, 1.0, 1.25, 2.0, 2.5, 5.0, 10.0]
+    private var weightIncrementOptions: [(display: Double, storedKg: Double)] {
+        UnitConversion.displayWeightIncrementOptions(for: viewModel.unitPreference)
     }
 
     private var restTimeOptions: [Int] {
         [30, 45, 60, 90, 120, 150, 180, 210, 240, 300]
     }
 
-    private func formatIncrement(_ value: Double) -> String {
-        if value.truncatingRemainder(dividingBy: 1) == 0 {
-            return String(format: "%.0f kg", value)
-        }
-        return String(format: "%.2f kg", value)
+    private func formatIncrement(displayValue value: Double) -> String {
+        "\(UnitConversion.formatWeight(value)) \(UnitConversion.weightUnitLabel(for: viewModel.unitPreference))"
     }
 
     private func formatRestTime(_ seconds: Int) -> String {

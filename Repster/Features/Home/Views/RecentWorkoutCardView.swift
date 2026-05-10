@@ -7,6 +7,7 @@ import SwiftUI
 
 struct RecentWorkoutCardView: View {
     let summary: RecentWorkoutSummary
+    let unitPreference: UnitPreference
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -31,7 +32,7 @@ struct RecentWorkoutCardView: View {
                 if let primaryMetric = summary.primaryMetric {
                     statPill(
                         icon: primaryMetric.systemImageName,
-                        value: primaryMetric.formattedValue()
+                        value: primaryMetric.formattedValue(unitPreference: unitPreference)
                     )
                 }
             }

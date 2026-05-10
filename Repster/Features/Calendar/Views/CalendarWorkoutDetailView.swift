@@ -8,6 +8,7 @@ import SwiftUI
 struct CalendarWorkoutDetailView: View {
     let workoutDetails: [WorkoutDetail]
     let selectedDate: Date
+    let unitPreference: UnitPreference
     let onSaveAsTemplate: ((Workout) -> Void)?
     let onEditWorkout: ((Workout) -> Void)?
     let onExerciseTapped: (UUID) -> Void
@@ -50,7 +51,8 @@ struct CalendarWorkoutDetailView: View {
                 primaryMetric: detail.primaryMetric,
                 exerciseCount: detail.exerciseCount,
                 setCount: detail.setCount,
-                duration: detail.workout.duration
+                duration: detail.workout.duration,
+                unitPreference: unitPreference
             )
 
             ForEach(detail.exerciseGroups, id: \.exercise.id) { group in
@@ -58,6 +60,7 @@ struct CalendarWorkoutDetailView: View {
                     exercise: group.exercise,
                     sets: group.sets,
                     stats: group.stats,
+                    unitPreference: unitPreference,
                     onTapped: { onExerciseTapped(group.exercise.id) }
                 )
             }

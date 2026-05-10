@@ -34,6 +34,7 @@ struct EmbeddedExerciseChartView: View {
     // MARK: - State
 
     @State private var viewModel: ExercisesTabViewModel?
+    @Environment(ServiceContainer.self) private var services
 
     // MARK: - Body
 
@@ -63,9 +64,15 @@ struct EmbeddedExerciseChartView: View {
                             : ExercisePrimaryGroup.displayName(for: exerciseCategory)
                     )
                 )
+                vm.unitPreference = services.unitPreference
                 viewModel = vm
                 Task { await vm.loadData() }
             }
+        }
+        .onChange(of: services.unitPreference) { _, newValue in
+            guard let viewModel else { return }
+            viewModel.unitPreference = newValue
+            Task { await viewModel.loadData() }
         }
     }
 }

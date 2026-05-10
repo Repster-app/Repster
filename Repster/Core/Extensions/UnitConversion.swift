@@ -1,14 +1,18 @@
 import Foundation
 
 enum UnitConversion {
+    static let poundsPerKilogram = 2.20462
+    static let feetPerMeter = 3.28084
+    static let metersPerMile = 1609.344
+
     // MARK: - Weight
 
     static func kgToLbs(_ kg: Double) -> Double {
-        kg * 2.20462
+        kg * poundsPerKilogram
     }
 
     static func lbsToKg(_ lbs: Double) -> Double {
-        lbs / 2.20462
+        lbs / poundsPerKilogram
     }
 
     static func toGrams(_ kg: Double) -> Int {
@@ -18,11 +22,19 @@ enum UnitConversion {
     // MARK: - Distance
 
     static func metersToFeet(_ meters: Double) -> Double {
-        meters * 3.28084
+        meters * feetPerMeter
     }
 
     static func feetToMeters(_ feet: Double) -> Double {
-        feet / 3.28084
+        feet / feetPerMeter
+    }
+
+    static func metersToMiles(_ meters: Double) -> Double {
+        meters / metersPerMile
+    }
+
+    static func milesToMeters(_ miles: Double) -> Double {
+        miles * metersPerMile
     }
 
     // MARK: - Decimal Input Parsing
@@ -37,17 +49,106 @@ enum UnitConversion {
         return Double(normalized)
     }
 
-    /// Format a weight value for display, using the user's locale decimal separator.
-    /// Drops trailing ".0" for whole numbers.
+    /// Format a display weight with stable decimal precision and whole-number cleanup.
     static func formatWeight(_ value: Double) -> String {
-        if value.truncatingRemainder(dividingBy: 1) == 0 {
+        if isEffectivelyWhole(value) {
             return String(format: "%.0f", value)
         }
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.minimumFractionDigits = 1
-        formatter.maximumFractionDigits = 2
-        return formatter.string(from: NSNumber(value: value)) ?? String(format: "%.1f", value)
+        var formatted = String(format: "%.2f", value)
+        while formatted.last == "0" {
+            formatted.removeLast()
+        }
+        if formatted.last == "." {
+            formatted.removeLast()
+        }
+        return formatted
+    }
+
+    static func displayedWeight(_ kg: Double, unitPreference: UnitPreference) -> Double {
+        unitPreference == .imperial ? kgToLbs(kg) : kg
+    }
+
+    static func storedWeight(fromDisplayed value: Double, unitPreference: UnitPreference) -> Double {
+        unitPreference == .imperial ? lbsToKg(value) : value
+    }
+
+    static func parseDisplayedWeight(_ text: String, unitPreference: UnitPreference) -> Double? {
+        parseDecimal(text).map { storedWeight(fromDisplayed: $0, unitPreference: unitPreference) }
+    }
+
+    static func formatDisplayedWeight(_ kg: Double, unitPreference: UnitPreference) -> String {
+        formatWeight(displayedWeight(kg, unitPreference: unitPreference))
+    }
+
+    static func weightUnitLabel(for unitPreference: UnitPreference) -> String {
+        unitPreference == .imperial ? "lb" : "kg"
+    }
+
+    static func formatWeightLabel(_ kg: Double, unitPreference: UnitPreference) -> String {
+        "\(formatDisplayedWeight(kg, unitPreference: unitPreference)) \(weightUnitLabel(for: unitPreference))"
+    }
+
+    static func displayedWeightIncrement(_ kgIncrement: Double, unitPreference: UnitPreference) -> Double {
+        displayedWeight(kgIncrement, unitPreference: unitPreference)
+    }
+
+    static func storedWeightIncrement(fromDisplayed increment: Double, unitPreference: UnitPreference) -> Double {
+        storedWeight(fromDisplayed: increment, unitPreference: unitPreference)
+    }
+
+    static func displayWeightIncrementOptions(for unitPreference: UnitPreference) -> [(display: Double, storedKg: Double)] {
+        switch unitPreference {
+        case .metric:
+            return [0.5, 1.0, 1.25, 2.0, 2.5, 5.0, 10.0].map { ($0, $0) }
+        case .imperial:
+            return [1.0, 2.5, 5.0, 10.0, 15.0, 20.0, 25.0].map {
+                ($0, lbsToKg($0))
+            }
+        }
+    }
+
+    static func defaultStoredWeightIncrement(for unitPreference: UnitPreference) -> Double {
+        switch unitPreference {
+        case .metric:
+            return 2.5
+        case .imperial:
+            return lbsToKg(5)
+        }
+    }
+
+    static func formatDistanceLabel(_ meters: Double, unitPreference: UnitPreference) -> String {
+        switch unitPreference {
+        case .metric:
+            if meters >= 1000 {
+                return String(format: "%.2f km", meters / 1000)
+            }
+            if isEffectivelyWhole(meters) {
+                return String(format: "%.0f m", meters)
+            }
+            return String(format: "%.1f m", meters)
+        case .imperial:
+            if meters >= metersPerMile {
+                return String(format: "%.2f mi", metersToMiles(meters))
+            }
+            return String(format: "%.0f ft", metersToFeet(meters).rounded())
+        }
+    }
+
+    static func displayedChartDistance(_ meters: Double, unitPreference: UnitPreference) -> Double {
+        switch unitPreference {
+        case .metric:
+            return meters / 1000
+        case .imperial:
+            return metersToMiles(meters)
+        }
+    }
+
+    static func chartDistanceUnitLabel(for unitPreference: UnitPreference) -> String {
+        unitPreference == .imperial ? "mi" : "km"
+    }
+
+    static func isEffectivelyWhole(_ value: Double, epsilon: Double = 0.005) -> Bool {
+        abs(value - value.rounded()) < epsilon
     }
 
     // MARK: - Duration Formatting

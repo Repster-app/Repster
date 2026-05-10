@@ -8,6 +8,7 @@ struct CalendarExerciseCard: View {
     let exercise: Exercise
     let sets: [WorkoutSet]
     let stats: ExerciseStats?
+    let unitPreference: UnitPreference
     let onTapped: () -> Void
 
     private var displaySets: [WorkoutSet] {
@@ -103,7 +104,12 @@ struct CalendarExerciseCard: View {
 
                 ForEach(readOnlyFields) { field in
                     fieldView(
-                        WorkoutSetPerformanceFormatter.fieldDisplay(for: field, set: workoutSet, exercise: exercise),
+                        WorkoutSetPerformanceFormatter.fieldDisplay(
+                            for: field,
+                            set: workoutSet,
+                            exercise: exercise,
+                            unitPreference: unitPreference
+                        ),
                         field: field,
                         set: workoutSet
                     )

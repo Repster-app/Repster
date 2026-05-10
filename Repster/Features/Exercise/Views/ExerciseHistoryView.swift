@@ -10,6 +10,7 @@ struct ExerciseHistoryView: View {
 
     let historyWorkouts: [WorkoutHistoryGroup]
     let exercise: Exercise?
+    let unitPreference: UnitPreference
 
     // MARK: - Body
 
@@ -57,7 +58,11 @@ struct ExerciseHistoryView: View {
     private func setRow(_ set: WorkoutSet, index: Int, siblings: [WorkoutSet]) -> some View {
         let hasNote = set.notes != nil && !(set.notes?.isEmpty ?? true)
         let isWarmup = set.setType == .warmup
-        let display = WorkoutSetPerformanceFormatter.display(for: set, exercise: exercise)
+        let display = WorkoutSetPerformanceFormatter.display(
+            for: set,
+            exercise: exercise,
+            unitPreference: unitPreference
+        )
 
         return HStack(spacing: 8) {
             // Set number with note indicator and set type badge

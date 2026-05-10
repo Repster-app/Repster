@@ -61,7 +61,7 @@ struct CreateEditTemplateView: View {
                             onSaved?()
                             dismiss()
                         } catch {
-                            print("[CreateEditTemplateView] Save failed: \(error)")
+                            dbg("[CreateEditTemplateView] Save failed: \(error)")
                         }
                     }
                 }

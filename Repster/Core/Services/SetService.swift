@@ -84,6 +84,13 @@ actor SetService: SetServiceProtocol {
             prResult = emptyPRResult(for: set.id)
         }
 
+        // PRService skips writing cachedPRStatus on the evaluated set itself
+        // (it's returned via prResult.newStatus) — write it here.
+        if supportsRepPRs(for: exercise), set.cachedPRStatus != prResult.newStatus {
+            set.cachedPRStatus = prResult.newStatus
+            try await setRepo.save(set)
+        }
+
         // 4. Stats update (FR-003)
         try await statsService.updateStats(
             for: set.exerciseId,
@@ -161,6 +168,13 @@ actor SetService: SetServiceProtocol {
             )
         } else {
             prResult = emptyPRResult(for: set.id)
+        }
+
+        // PRService skips writing cachedPRStatus on the evaluated set itself
+        // (it's returned via prResult.newStatus) — write it here.
+        if supportsRepPRs(for: exercise), set.cachedPRStatus != prResult.newStatus {
+            set.cachedPRStatus = prResult.newStatus
+            try await setRepo.save(set)
         }
 
         // 5. Stats update with edit delta

@@ -7,6 +7,7 @@ struct MonthlyStatsCardView: View {
     let totalWorkouts: Int
     let primaryMetric: WorkoutPrimaryMetric?
     let totalSets: Int
+    let unitPreference: UnitPreference
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -19,7 +20,7 @@ struct MonthlyStatsCardView: View {
                 statCell(value: "\(totalWorkouts)", label: "Workouts")
                 if let primaryMetric {
                     statCell(
-                        value: primaryMetric.formattedValue(),
+                        value: primaryMetric.formattedValue(unitPreference: unitPreference),
                         label: primaryMetric.label
                     )
                 }

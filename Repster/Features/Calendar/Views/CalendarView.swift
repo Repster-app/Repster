@@ -240,6 +240,7 @@ struct CalendarView: View {
                 CalendarWorkoutDetailView(
                     workoutDetails: viewModel.selectedDateWorkoutDetails,
                     selectedDate: selectedDate,
+                    unitPreference: services.unitPreference,
                     onSaveAsTemplate: { workout in
                         workoutToSaveAsTemplate = workout
                         saveAsTemplateController.begin(defaultName: workout.displayTitle)

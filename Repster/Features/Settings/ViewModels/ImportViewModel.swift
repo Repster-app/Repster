@@ -23,6 +23,7 @@ final class ImportViewModel {
     var state: ImportState = .idle
     var showFilePicker = false
     var selectedSource: ImportSource = .fitNotes
+    var selectedFitNotesUnitSystem: ImportUnitSystem
     var selectedStrongUnitSystem: ImportUnitSystem?
 
     // Preview
@@ -52,8 +53,12 @@ final class ImportViewModel {
 
     // MARK: - Init
 
-    init(importService: any ImportServiceProtocol) {
+    init(
+        importService: any ImportServiceProtocol,
+        defaultUnitPreference: UnitPreference = .metric
+    ) {
         self.importService = importService
+        self.selectedFitNotesUnitSystem = defaultUnitPreference == .imperial ? .imperial : .metric
     }
 
     // MARK: - Derived State
@@ -70,7 +75,12 @@ final class ImportViewModel {
     }
 
     var selectedUnitSystem: ImportUnitSystem? {
-        selectedSource == .strong ? selectedStrongUnitSystem : nil
+        switch selectedSource {
+        case .fitNotes:
+            return selectedFitNotesUnitSystem
+        case .strong:
+            return selectedStrongUnitSystem
+        }
     }
 
     var activeUnitSummary: String? {
@@ -85,6 +95,10 @@ final class ImportViewModel {
 
     func chooseSource(_ source: ImportSource) {
         selectedSource = source
+    }
+
+    func chooseFitNotesUnitSystem(_ unitSystem: ImportUnitSystem) {
+        selectedFitNotesUnitSystem = unitSystem
     }
 
     func chooseStrongUnitSystem(_ unitSystem: ImportUnitSystem) {

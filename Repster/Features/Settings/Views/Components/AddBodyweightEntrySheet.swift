@@ -24,7 +24,7 @@ struct AddBodyweightEntrySheet: View {
                     HStack {
                         TextField("Weight", text: $weightText)
                             .keyboardType(.decimalPad)
-                        Text(unitPreference == .metric ? "kg" : "lbs")
+                        Text(UnitConversion.weightUnitLabel(for: unitPreference))
                             .foregroundStyle(Color.textSecondary)
                     }
                 }

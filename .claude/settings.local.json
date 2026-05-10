@@ -103,7 +103,11 @@
       "Read(//Users/nikolettkiraly/.ssh/**)",
       "Bash(ssh -T git@github.com)",
       "Bash(rm index.html)",
-      "Bash(cp -r /Users/nikolettkiraly/Downloads/workoutproject_docs/website/. .)"
+      "Bash(cp -r /Users/nikolettkiraly/Downloads/workoutproject_docs/website/. .)",
+      "Bash(sips -s format jpeg REPSTERLOGO.png --out _tmp.jpg)",
+      "Bash(sips -s format png _tmp.jpg --out REPSTERLOGO.png)",
+      "Bash(sips -g hasAlpha -g pixelWidth -g pixelHeight -g profile -g format REPSTERLOGO.png)",
+      "Bash(plutil -lint /Users/nikolettkiraly/Downloads/NewWorkoutProject/Repster.xcodeproj/project.pbxproj)"
     ]
   }
 }

@@ -143,7 +143,7 @@ final class HomeViewModel {
                 activeWorkoutSetCount = 0
             }
         } catch {
-            print("[HomeViewModel] Failed to check active workout: \(error)")
+            dbg("[HomeViewModel] Failed to check active workout: \(error)")
             hasActiveWorkout = false
             activeWorkoutStartTime = nil
             activeWorkoutExerciseCount = 0
@@ -169,7 +169,7 @@ final class HomeViewModel {
                 return (weekday + 5) % 7
             })
         } catch {
-            print("[HomeViewModel] Failed to load week data: \(error)")
+            dbg("[HomeViewModel] Failed to load week data: \(error)")
         }
     }
 
@@ -250,7 +250,7 @@ final class HomeViewModel {
                 monthlyStats = nil
             }
         } catch {
-            print("[HomeViewModel] Failed to load monthly stats: \(error)")
+            dbg("[HomeViewModel] Failed to load monthly stats: \(error)")
             monthlyStats = nil
         }
     }
@@ -283,7 +283,7 @@ final class HomeViewModel {
 
             recentPRs = prs
         } catch {
-            print("[HomeViewModel] Failed to load recent PRs: \(error)")
+            dbg("[HomeViewModel] Failed to load recent PRs: \(error)")
             recentPRs = []
         }
     }
@@ -334,7 +334,7 @@ final class HomeViewModel {
 
             recentWorkouts = summaries
         } catch {
-            print("[HomeViewModel] Failed to load recent workouts: \(error)")
+            dbg("[HomeViewModel] Failed to load recent workouts: \(error)")
         }
     }
 

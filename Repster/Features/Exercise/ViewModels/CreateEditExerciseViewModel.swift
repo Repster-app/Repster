@@ -40,6 +40,7 @@ final class CreateEditExerciseViewModel {
     var errorMessage: String = ""
     var appDefaultRestTime: Int? = nil
     var appDefaultWeightIncrement: Double? = nil
+    var unitPreference: UnitPreference = .metric
 
     // MARK: - Computed
 
@@ -112,8 +113,10 @@ final class CreateEditExerciseViewModel {
 
     func loadDefaults() async {
         guard let profile = try? await settingsService.fetchSettings() else { return }
+        unitPreference = profile.unitPreference
         appDefaultRestTime = profile.defaultRestTimeSeconds
         appDefaultWeightIncrement = profile.prescriptionDefaultIncrement
+            ?? UnitConversion.defaultStoredWeightIncrement(for: profile.unitPreference)
     }
 
     // MARK: - Save
@@ -187,9 +190,6 @@ final class CreateEditExerciseViewModel {
 
     private func formatIncrement(_ value: Double?) -> String {
         guard let value else { return "Not Set" }
-        if value.truncatingRemainder(dividingBy: 1) == 0 {
-            return String(format: "%.0f kg", value)
-        }
-        return String(format: "%.2f kg", value)
+        return UnitConversion.formatWeightLabel(value, unitPreference: unitPreference)
     }
 }

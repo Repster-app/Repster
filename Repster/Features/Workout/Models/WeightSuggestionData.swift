@@ -570,7 +570,8 @@ enum SuggestionCoordinator {
 enum SuggestionExplainer {
     static func makeWeightSuggestionData(
         preparation: SuggestionPreparation,
-        evaluation: SuggestionEvaluation
+        evaluation: SuggestionEvaluation,
+        unitPreference: UnitPreference
     ) -> WeightSuggestionData {
         let formula = evaluation.input?.settings.formula ?? .epley
         let configuredRestSeconds = evaluation.input?.settings.restTimerSeconds ?? 150.0
@@ -581,7 +582,8 @@ enum SuggestionExplainer {
                 decision: decisionsBySetId[resolution.setId],
                 fallbackReason: evaluation.unavailableReason ?? preparation.unavailableReason,
                 formula: formula,
-                configuredRestSeconds: configuredRestSeconds
+                configuredRestSeconds: configuredRestSeconds,
+                unitPreference: unitPreference
             )
         }
 
@@ -610,7 +612,8 @@ enum SuggestionExplainer {
         decision: SuggestionDecision?,
         fallbackReason: SuggestionUnavailableReason?,
         formula: E1RMFormula,
-        configuredRestSeconds: Double
+        configuredRestSeconds: Double,
+        unitPreference: UnitPreference
     ) -> SetSuggestionState {
         let target: SuggestionTarget?
         if case let .eligible(resolvedTarget) = resolution.eligibility {
@@ -629,7 +632,8 @@ enum SuggestionExplainer {
                     for: decision,
                     formula: formula,
                     setType: resolution.setType,
-                    configuredRestSeconds: configuredRestSeconds
+                    configuredRestSeconds: configuredRestSeconds,
+                    unitPreference: unitPreference
                 ))
             )
         }
@@ -655,7 +659,8 @@ enum SuggestionExplainer {
         for decision: SuggestionDecision,
         formula: E1RMFormula,
         setType: SetType,
-        configuredRestSeconds: Double
+        configuredRestSeconds: Double,
+        unitPreference: UnitPreference
     ) -> SetSuggestion {
         let chosenDisplayReps = resolvedDisplayTargetReps(for: decision)
         return SetSuggestion(
@@ -668,7 +673,7 @@ enum SuggestionExplainer {
             targetRepMax: decision.displayRepRange?.upperBound,
             targetDisplayLabel: decision.targetDisplayLabel,
             normalizedTargetLabel: decision.normalizedTargetLabel,
-            explanation: explanation(for: decision),
+            explanation: explanation(for: decision, unitPreference: unitPreference),
             diagnostics: diagnostics(
                 for: decision,
                 formula: formula,
@@ -678,16 +683,19 @@ enum SuggestionExplainer {
         )
     }
 
-    private static func explanation(for decision: SuggestionDecision) -> SuggestionExplanation {
+    private static func explanation(
+        for decision: SuggestionDecision,
+        unitPreference: UnitPreference
+    ) -> SuggestionExplanation {
         let readinessPercent = ((decision.effectiveE1RM / decision.sessionCapabilityE1RM) - 1.0) * 100.0
         var summaryParts = [
-            "\(String(format: "%.1f", decision.historicalBaseE1RM)) kg capacity from \(decision.e1RMSource.label)",
+            "\(UnitConversion.formatWeightLabel(decision.historicalBaseE1RM, unitPreference: unitPreference)) capacity from \(decision.e1RMSource.label)",
             "readiness \(formatSignedPercent(readinessPercent))",
             "\(decision.targetDisplayLabel) target from \(decision.targetSourceLabel)"
         ]
         if abs(decision.sessionCapabilityE1RM - decision.historicalBaseE1RM) > 0.05 {
             summaryParts.insert(
-                "\(String(format: "%.1f", decision.sessionCapabilityE1RM)) kg \(decision.sessionCapabilitySourceLabel)",
+                "\(UnitConversion.formatWeightLabel(decision.sessionCapabilityE1RM, unitPreference: unitPreference)) \(decision.sessionCapabilitySourceLabel)",
                 at: 1
             )
         }

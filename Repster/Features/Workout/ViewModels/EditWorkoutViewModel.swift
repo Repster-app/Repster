@@ -16,6 +16,7 @@ final class EditWorkoutViewModel {
     private let setService: any SetServiceProtocol
     private let exerciseService: any ExerciseServiceProtocol
     private let statsService: any StatsServiceProtocol
+    private let settingsService: any SettingsServiceProtocol
 
     // MARK: - State
 
@@ -26,6 +27,8 @@ final class EditWorkoutViewModel {
     var notesText: String = ""
     var isLoading: Bool = true
     var showAddExerciseSheet: Bool = false
+    var unitPreference: UnitPreference = .metric
+    var defaultWeightIncrement: Double = 2.5
 
     // MARK: - Internal Tracking
 
@@ -43,13 +46,15 @@ final class EditWorkoutViewModel {
         workoutService: any WorkoutServiceProtocol,
         setService: any SetServiceProtocol,
         exerciseService: any ExerciseServiceProtocol,
-        statsService: any StatsServiceProtocol
+        statsService: any StatsServiceProtocol,
+        settingsService: any SettingsServiceProtocol
     ) {
         self.workoutId = workoutId
         self.workoutService = workoutService
         self.setService = setService
         self.exerciseService = exerciseService
         self.statsService = statsService
+        self.settingsService = settingsService
     }
 
     // MARK: - Load
@@ -58,6 +63,12 @@ final class EditWorkoutViewModel {
     func loadWorkout() async {
         isLoading = true
         do {
+            if let profile = try? await settingsService.fetchSettings() {
+                unitPreference = profile.unitPreference
+                defaultWeightIncrement = profile.prescriptionDefaultIncrement
+                    ?? UnitConversion.defaultStoredWeightIncrement(for: profile.unitPreference)
+            }
+
             // 1. Fetch workout
             guard let workout = try await workoutService.fetchWorkout(workoutId) else {
                 isLoading = false
@@ -97,7 +108,7 @@ final class EditWorkoutViewModel {
             self.isLoading = false
         } catch {
             #if DEBUG
-            print("[EditWorkoutViewModel] Load failed: \(error)")
+            dbg("[EditWorkoutViewModel] Load failed: \(error)")
             #endif
             isLoading = false
         }
@@ -144,7 +155,7 @@ final class EditWorkoutViewModel {
 
         } catch {
             #if DEBUG
-            print("[EditWorkoutViewModel] completeSet failed: \(error)")
+            dbg("[EditWorkoutViewModel] completeSet failed: \(error)")
             #endif
         }
     }
@@ -171,7 +182,7 @@ final class EditWorkoutViewModel {
             // Revert on failure
             set.completed = oldCompleted
             #if DEBUG
-            print("[EditWorkoutViewModel] uncompleteSet failed: \(error)")
+            dbg("[EditWorkoutViewModel] uncompleteSet failed: \(error)")
             #endif
         }
     }
@@ -199,7 +210,7 @@ final class EditWorkoutViewModel {
             setsByExercise[exerciseId, default: []].append(newSet)
         } catch {
             #if DEBUG
-            print("[EditWorkoutViewModel] addSet failed: \(error)")
+            dbg("[EditWorkoutViewModel] addSet failed: \(error)")
             #endif
         }
     }
@@ -238,7 +249,7 @@ final class EditWorkoutViewModel {
             reindexOrderInWorkout()
         } catch {
             #if DEBUG
-            print("[EditWorkoutViewModel] addWarmupSet failed: \(error)")
+            dbg("[EditWorkoutViewModel] addWarmupSet failed: \(error)")
             #endif
         }
     }
@@ -264,7 +275,7 @@ final class EditWorkoutViewModel {
 
         } catch {
             #if DEBUG
-            print("[EditWorkoutViewModel] deleteSet failed: \(error)")
+            dbg("[EditWorkoutViewModel] deleteSet failed: \(error)")
             #endif
         }
     }
@@ -281,7 +292,7 @@ final class EditWorkoutViewModel {
             applyAffectedSets(result.prResult.affectedSetIds)
         } catch {
             #if DEBUG
-            print("[EditWorkoutViewModel] changeSetType failed: \(error)")
+            dbg("[EditWorkoutViewModel] changeSetType failed: \(error)")
             #endif
         }
     }
@@ -302,7 +313,7 @@ final class EditWorkoutViewModel {
                 await addSet(for: exerciseId)
             } catch {
                 #if DEBUG
-                print("[EditWorkoutViewModel] addExercise failed: \(error)")
+                dbg("[EditWorkoutViewModel] addExercise failed: \(error)")
                 #endif
             }
         }
@@ -343,7 +354,7 @@ final class EditWorkoutViewModel {
                 newSetIds.remove(set.id)
             } catch {
                 #if DEBUG
-                print("[EditWorkoutViewModel] delete set during removeExercise failed: \(error)")
+                dbg("[EditWorkoutViewModel] delete set during removeExercise failed: \(error)")
                 #endif
             }
         }
@@ -378,7 +389,7 @@ final class EditWorkoutViewModel {
             )
         } catch {
             #if DEBUG
-            print("[EditWorkoutViewModel] saveNotes failed: \(error)")
+            dbg("[EditWorkoutViewModel] saveNotes failed: \(error)")
             #endif
         }
     }
@@ -466,7 +477,7 @@ final class EditWorkoutViewModel {
                 applyAffectedSets(result.prResult.affectedSetIds)
             } catch {
                 #if DEBUG
-                print("[EditWorkoutViewModel] saveDirtySets failed for \(set.id): \(error)")
+                dbg("[EditWorkoutViewModel] saveDirtySets failed for \(set.id): \(error)")
                 #endif
             }
         }
@@ -576,7 +587,7 @@ extension EditWorkoutViewModel: SetTableDataSource {
             }
         } catch {
             #if DEBUG
-            print("[EditWorkoutViewModel] Failed to update set note: \(error)")
+            dbg("[EditWorkoutViewModel] Failed to update set note: \(error)")
             #endif
         }
     }

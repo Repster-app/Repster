@@ -9,6 +9,7 @@ struct SummaryStatsStrip: View {
     let exerciseCount: Int
     let setCount: Int
     let duration: Int?
+    let unitPreference: UnitPreference
 
     var body: some View {
         HStack(spacing: 0) {
@@ -52,7 +53,7 @@ struct SummaryStatsStrip: View {
         if let primaryMetric {
             items.append((
                 label: primaryMetric.label.uppercased(),
-                value: primaryMetric.formattedValue()
+                value: primaryMetric.formattedValue(unitPreference: unitPreference)
             ))
         }
 

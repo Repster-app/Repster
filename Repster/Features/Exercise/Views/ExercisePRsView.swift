@@ -9,6 +9,7 @@ import SwiftUI
 struct ExercisePRsView: View {
 
     let prTable: [PRTableEntry]
+    let unitPreference: UnitPreference
     var isPerSide: Bool = false
 
     // MARK: - Body
@@ -117,7 +118,7 @@ struct ExercisePRsView: View {
     // MARK: - Formatting
 
     private func formatWeight(_ weight: Double) -> String {
-        "\(UnitConversion.formatWeight(weight)) kg"
+        UnitConversion.formatWeightLabel(weight, unitPreference: unitPreference)
     }
 
     private func formatDate(_ date: Date) -> String {

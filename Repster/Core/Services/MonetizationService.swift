@@ -4,8 +4,30 @@ import Security
 import UIKit
 
 enum RevenueCatConfiguration {
-    static let apiKey = "test_UptcctjrPBVzeuRSBlnHdQIqvXg"
-    static let entitlementIdentifier = "full_access"
+    static let apiKey: String = {
+        let keyName = "REVENUECAT_API_KEY"
+        guard let rawKey = Bundle.main.object(forInfoDictionaryKey: keyName) as? String else {
+            fatalError("Missing \(keyName) in Info.plist.")
+        }
+
+        let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty, !key.contains("$(") else {
+            fatalError("\(keyName) must be set to a RevenueCat public SDK key.")
+        }
+
+        guard !key.hasPrefix("sk_") else {
+            fatalError("Do not embed RevenueCat secret API keys in the app.")
+        }
+
+        #if !DEBUG
+        guard !key.hasPrefix("test_") else {
+            fatalError("Release builds must use the RevenueCat iOS public SDK key, not a Test Store key.")
+        }
+        #endif
+
+        return key
+    }()
+    static let entitlementIdentifier = "Repster"
     static let freeWorkoutLimit = 5
 }
 
@@ -17,13 +39,13 @@ enum SubscriptionStatus: Equatable {
 
 enum SubscriptionAccessSource: Equatable {
     case none
-    case monthly
+    case subscription
     case lifetime
-    case monthlyAndLifetime
+    case subscriptionAndLifetime
 
-    var hasMonthlySubscription: Bool {
+    var hasRenewableSubscription: Bool {
         switch self {
-        case .monthly, .monthlyAndLifetime:
+        case .subscription, .subscriptionAndLifetime:
             return true
         case .none, .lifetime:
             return false
@@ -32,9 +54,9 @@ enum SubscriptionAccessSource: Equatable {
 
     var hasLifetimePurchase: Bool {
         switch self {
-        case .lifetime, .monthlyAndLifetime:
+        case .lifetime, .subscriptionAndLifetime:
             return true
-        case .none, .monthly:
+        case .none, .subscription:
             return false
         }
     }
@@ -51,16 +73,16 @@ struct SubscriptionSnapshot: Equatable {
         status == .active
     }
 
-    var hasMonthlySubscription: Bool {
-        accessSource.hasMonthlySubscription
+    var hasRenewableSubscription: Bool {
+        accessSource.hasRenewableSubscription
     }
 
     var hasLifetimePurchase: Bool {
         accessSource.hasLifetimePurchase
     }
 
-    var requiresMonthlyCancellationReminder: Bool {
-        accessSource == .monthlyAndLifetime
+    var requiresSubscriptionCancellationReminder: Bool {
+        accessSource == .subscriptionAndLifetime
     }
 
     static func unknown(entitlementIdentifier: String) -> SubscriptionSnapshot {
@@ -170,7 +192,7 @@ final class KeychainWorkoutQuotaStore: WorkoutQuotaStoreProtocol, @unchecked Sen
         case errSecItemNotFound:
             return 0
         default:
-            print("[Monetization] Keychain read failed: \(status)")
+            dbg("[Monetization] Keychain read failed: \(status)")
             return 0
         }
     }
@@ -190,7 +212,7 @@ final class KeychainWorkoutQuotaStore: WorkoutQuotaStoreProtocol, @unchecked Sen
         }
 
         if updateStatus != errSecItemNotFound {
-            print("[Monetization] Keychain update failed: \(updateStatus)")
+            dbg("[Monetization] Keychain update failed: \(updateStatus)")
         }
 
         var attributes = query
@@ -199,7 +221,7 @@ final class KeychainWorkoutQuotaStore: WorkoutQuotaStoreProtocol, @unchecked Sen
 
         let addStatus = SecItemAdd(attributes as CFDictionary, nil)
         if addStatus != errSecSuccess {
-            print("[Monetization] Keychain add failed: \(addStatus)")
+            dbg("[Monetization] Keychain add failed: \(addStatus)")
         }
     }
 
@@ -234,7 +256,7 @@ actor SubscriptionService: SubscriptionServiceProtocol {
             cachedSnapshot = snapshot
             return snapshot
         } catch {
-            print("[Monetization] Failed to refresh subscription status: \(error)")
+            dbg("[Monetization] Failed to refresh subscription status: \(error)")
             return cachedSnapshot
         }
     }
@@ -322,14 +344,14 @@ actor SubscriptionService: SubscriptionServiceProtocol {
         let hasLifetimePurchase = hasFullAccess
             && entitlement?.expirationDate == nil
             && entitlement?.willRenew == false
-        let hasMonthlySubscription = hasFullAccess && !customerInfo.activeSubscriptions.isEmpty
+        let hasRenewableSubscription = hasFullAccess && !customerInfo.activeSubscriptions.isEmpty
         let accessSource: SubscriptionAccessSource
 
-        switch (hasMonthlySubscription, hasLifetimePurchase) {
+        switch (hasRenewableSubscription, hasLifetimePurchase) {
         case (true, true):
-            accessSource = .monthlyAndLifetime
+            accessSource = .subscriptionAndLifetime
         case (true, false):
-            accessSource = .monthly
+            accessSource = .subscription
         case (false, true):
             accessSource = .lifetime
         case (false, false):
