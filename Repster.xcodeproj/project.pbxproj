@@ -7,26 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		FL0001 /* FatigueObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1001 /* FatigueObservation.swift */; };
-		FL0002 /* FatigueObservationRepositoryProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1002 /* FatigueObservationRepositoryProtocol.swift */; };
-		FL0003 /* FatigueObservationRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1003 /* FatigueObservationRepository.swift */; };
-		FL0004 /* FatigueLearningService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1004 /* FatigueLearningService.swift */; };
-		FL0005 /* FatigueLearningServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1005 /* FatigueLearningServiceTests.swift */; };
-		FL0006 /* FatigueLearningAdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1006 /* FatigueLearningAdminView.swift */; };
 		0823BF912F5D608400A513BE /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0823BF902F5D608400A513BE /* WidgetKit.framework */; };
 		0823BF932F5D608400A513BE /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0823BF922F5D608400A513BE /* SwiftUI.framework */; };
 		0823BFA02F5D608500A513BE /* WorkoutLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0823BF8E2F5D608400A513BE /* WorkoutLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		0823BFAB2F5D621200A513BE /* LiveActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0823BFAA2F5D621200A513BE /* LiveActivityManager.swift */; };
 		0823BFAD2F5D62E500A513BE /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0823BFAC2F5D62E500A513BE /* WorkoutActivityAttributes.swift */; };
 		0823BFAE2F5D62E500A513BE /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0823BFAC2F5D62E500A513BE /* WorkoutActivityAttributes.swift */; };
-		TT0001 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */; };
-		TT0002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = TT2003 /* XCTest.framework */; };
-		TT0003 /* ChartDataServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2004 /* ChartDataServiceTests.swift */; };
-		TT0004 /* WorkoutHistoryBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2005 /* WorkoutHistoryBackupTests.swift */; };
-		TT0005 /* SetServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2006 /* SetServiceTests.swift */; };
-		TT0006 /* WorkoutSetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2007 /* WorkoutSetTests.swift */; };
-		TT0007 /* SeedExerciseLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2008 /* SeedExerciseLibraryTests.swift */; };
-		TT0008 /* MonetizationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2009 /* MonetizationServiceTests.swift */; };
 		A10001 /* TrackingType.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001 /* TrackingType.swift */; };
 		A10002 /* SetType.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002 /* SetType.swift */; };
 		A10003 /* EquipmentType.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10003 /* EquipmentType.swift */; };
@@ -37,9 +23,9 @@
 		A10008 /* UnitPreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10008 /* UnitPreference.swift */; };
 		A10009 /* WorkoutStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10009 /* WorkoutStatus.swift */; };
 		A10010 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10010 /* Assets.xcassets */; };
-		A19999 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B19999 /* PrivacyInfo.xcprivacy */; };
 		A10011 /* RepsterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10011 /* RepsterApp.swift */; };
 		A10012 /* seed_exercises.json in Resources */ = {isa = PBXBuildFile; fileRef = B10012 /* seed_exercises.json */; };
+		A19999 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B19999 /* PrivacyInfo.xcprivacy */; };
 		A20001 /* WorkoutSet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20001 /* WorkoutSet.swift */; };
 		A20002 /* Workout.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20002 /* Workout.swift */; };
 		A20003 /* Exercise.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20003 /* Exercise.swift */; };
@@ -87,7 +73,6 @@
 		A80005 /* WorkoutService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80005 /* WorkoutService.swift */; };
 		A80006 /* ExerciseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80006 /* ExerciseService.swift */; };
 		AC0001 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0001 /* DesignTokens.swift */; };
-		AC9999 /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC9999 /* DebugLog.swift */; };
 		AC0002 /* SetInputField.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0002 /* SetInputField.swift */; };
 		AC0003 /* PRBadgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0003 /* PRBadgeView.swift */; };
 		AC0004 /* SetNumberBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0004 /* SetNumberBadge.swift */; };
@@ -110,6 +95,7 @@
 		AC0021 /* SetTableDataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0021 /* SetTableDataSource.swift */; };
 		AC0022 /* EditWorkoutViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0022 /* EditWorkoutViewModel.swift */; };
 		AC0023 /* EditWorkoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0023 /* EditWorkoutView.swift */; };
+		AC9999 /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC9999 /* DebugLog.swift */; };
 		AD0001 /* ExerciseEnums.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD0001 /* ExerciseEnums.swift */; };
 		AD0002 /* TabPlaceholderViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD0002 /* TabPlaceholderViews.swift */; };
 		AE0001 /* ExerciseListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE0001 /* ExerciseListViewModel.swift */; };
@@ -202,10 +188,24 @@
 		AW0006 /* WeightSuggestionCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0006 /* WeightSuggestionCardView.swift */; };
 		AW0007 /* WeightSuggestionModuleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0007 /* WeightSuggestionModuleView.swift */; };
 		AW0008 /* WorkoutExclusionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0008 /* WorkoutExclusionSheet.swift */; };
-		RC0002 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = RC2002 /* RevenueCat */; };
-		RC0003 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = RC2003 /* RevenueCatUI */; };
 		AX0001 /* ExerciseMuscleGroupCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BX0001 /* ExerciseMuscleGroupCatalog.swift */; };
 		AX0002 /* WorkoutSetPerformanceFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BX0002 /* WorkoutSetPerformanceFormatter.swift */; };
+		FL0001 /* FatigueObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1001 /* FatigueObservation.swift */; };
+		FL0002 /* FatigueObservationRepositoryProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1002 /* FatigueObservationRepositoryProtocol.swift */; };
+		FL0003 /* FatigueObservationRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1003 /* FatigueObservationRepository.swift */; };
+		FL0004 /* FatigueLearningService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1004 /* FatigueLearningService.swift */; };
+		FL0005 /* FatigueLearningServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1005 /* FatigueLearningServiceTests.swift */; };
+		FL0006 /* FatigueLearningAdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1006 /* FatigueLearningAdminView.swift */; };
+		RC0002 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = RC2002 /* RevenueCat */; };
+		RC0003 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = RC2003 /* RevenueCatUI */; };
+		TT0001 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */; };
+		TT0002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = TT2003 /* XCTest.framework */; };
+		TT0003 /* ChartDataServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2004 /* ChartDataServiceTests.swift */; };
+		TT0004 /* WorkoutHistoryBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2005 /* WorkoutHistoryBackupTests.swift */; };
+		TT0005 /* SetServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2006 /* SetServiceTests.swift */; };
+		TT0006 /* WorkoutSetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2007 /* WorkoutSetTests.swift */; };
+		TT0007 /* SeedExerciseLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2008 /* SeedExerciseLibraryTests.swift */; };
+		TT0008 /* MonetizationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2009 /* MonetizationServiceTests.swift */; };
 		ZA0001 /* TrendLineCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZB0001 /* TrendLineCalculator.swift */; };
 		ZA0002 /* ChartsTabViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZB0002 /* ChartsTabViewModel.swift */; };
 		ZA0003 /* BreakdownTabViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZB0003 /* BreakdownTabViewModel.swift */; };
@@ -262,26 +262,11 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		FL1001 /* FatigueObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueObservation.swift; sourceTree = "<group>"; };
-		FL1002 /* FatigueObservationRepositoryProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueObservationRepositoryProtocol.swift; sourceTree = "<group>"; };
-		FL1003 /* FatigueObservationRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueObservationRepository.swift; sourceTree = "<group>"; };
-		FL1004 /* FatigueLearningService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningService.swift; sourceTree = "<group>"; };
-		FL1005 /* FatigueLearningServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningServiceTests.swift; sourceTree = "<group>"; };
-		FL1006 /* FatigueLearningAdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningAdminView.swift; sourceTree = "<group>"; };
 		0823BF8E2F5D608400A513BE /* WorkoutLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WorkoutLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		0823BF902F5D608400A513BE /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		0823BF922F5D608400A513BE /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		0823BFAA2F5D621200A513BE /* LiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityManager.swift; sourceTree = "<group>"; };
 		0823BFAC2F5D62E500A513BE /* WorkoutActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutActivityAttributes.swift; sourceTree = "<group>"; };
-		TT2001 /* RepsterTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RepsterTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutViewModelSuggestionRefreshTests.swift; sourceTree = "<group>"; };
-		TT2003 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
-		TT2004 /* ChartDataServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartDataServiceTests.swift; sourceTree = "<group>"; };
-		TT2005 /* WorkoutHistoryBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutHistoryBackupTests.swift; sourceTree = "<group>"; };
-		TT2006 /* SetServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetServiceTests.swift; sourceTree = "<group>"; };
-		TT2007 /* WorkoutSetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSetTests.swift; sourceTree = "<group>"; };
-		TT2008 /* SeedExerciseLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedExerciseLibraryTests.swift; sourceTree = "<group>"; };
-		TT2009 /* MonetizationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonetizationServiceTests.swift; sourceTree = "<group>"; };
 		B10001 /* TrackingType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingType.swift; sourceTree = "<group>"; };
 		B10002 /* SetType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetType.swift; sourceTree = "<group>"; };
 		B10003 /* EquipmentType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentType.swift; sourceTree = "<group>"; };
@@ -344,7 +329,6 @@
 		B80006 /* ExerciseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseService.swift; sourceTree = "<group>"; };
 		B90001 /* Repster.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Repster.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC0001 /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
-		BC9999 /* DebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
 		BC0002 /* SetInputField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetInputField.swift; sourceTree = "<group>"; };
 		BC0003 /* PRBadgeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PRBadgeView.swift; sourceTree = "<group>"; };
 		BC0004 /* SetNumberBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetNumberBadge.swift; sourceTree = "<group>"; };
@@ -367,6 +351,7 @@
 		BC0021 /* SetTableDataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetTableDataSource.swift; sourceTree = "<group>"; };
 		BC0022 /* EditWorkoutViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditWorkoutViewModel.swift; sourceTree = "<group>"; };
 		BC0023 /* EditWorkoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditWorkoutView.swift; sourceTree = "<group>"; };
+		BC9999 /* DebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
 		BD0001 /* ExerciseEnums.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseEnums.swift; sourceTree = "<group>"; };
 		BD0002 /* TabPlaceholderViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabPlaceholderViews.swift; sourceTree = "<group>"; };
 		BE0001 /* ExerciseListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseListViewModel.swift; sourceTree = "<group>"; };
@@ -461,6 +446,21 @@
 		BW0008 /* WorkoutExclusionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutExclusionSheet.swift; sourceTree = "<group>"; };
 		BX0001 /* ExerciseMuscleGroupCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMuscleGroupCatalog.swift; sourceTree = "<group>"; };
 		BX0002 /* WorkoutSetPerformanceFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSetPerformanceFormatter.swift; sourceTree = "<group>"; };
+		FL1001 /* FatigueObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueObservation.swift; sourceTree = "<group>"; };
+		FL1002 /* FatigueObservationRepositoryProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueObservationRepositoryProtocol.swift; sourceTree = "<group>"; };
+		FL1003 /* FatigueObservationRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueObservationRepository.swift; sourceTree = "<group>"; };
+		FL1004 /* FatigueLearningService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningService.swift; sourceTree = "<group>"; };
+		FL1005 /* FatigueLearningServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningServiceTests.swift; sourceTree = "<group>"; };
+		FL1006 /* FatigueLearningAdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningAdminView.swift; sourceTree = "<group>"; };
+		TT2001 /* RepsterTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RepsterTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutViewModelSuggestionRefreshTests.swift; sourceTree = "<group>"; };
+		TT2003 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
+		TT2004 /* ChartDataServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartDataServiceTests.swift; sourceTree = "<group>"; };
+		TT2005 /* WorkoutHistoryBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutHistoryBackupTests.swift; sourceTree = "<group>"; };
+		TT2006 /* SetServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetServiceTests.swift; sourceTree = "<group>"; };
+		TT2007 /* WorkoutSetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSetTests.swift; sourceTree = "<group>"; };
+		TT2008 /* SeedExerciseLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedExerciseLibraryTests.swift; sourceTree = "<group>"; };
+		TT2009 /* MonetizationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonetizationServiceTests.swift; sourceTree = "<group>"; };
 		ZB0001 /* TrendLineCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendLineCalculator.swift; sourceTree = "<group>"; };
 		ZB0002 /* ChartsTabViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartsTabViewModel.swift; sourceTree = "<group>"; };
 		ZB0003 /* BreakdownTabViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreakdownTabViewModel.swift; sourceTree = "<group>"; };
@@ -548,21 +548,6 @@
 				0823BF8F2F5D608400A513BE /* Frameworks */,
 				D90001 /* Products */,
 			);
-			sourceTree = "<group>";
-		};
-		TT4001 /* RepsterTests */ = {
-			isa = PBXGroup;
-			children = (
-				TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */,
-				TT2004 /* ChartDataServiceTests.swift */,
-				TT2005 /* WorkoutHistoryBackupTests.swift */,
-				TT2006 /* SetServiceTests.swift */,
-				TT2008 /* SeedExerciseLibraryTests.swift */,
-				TT2007 /* WorkoutSetTests.swift */,
-				TT2009 /* MonetizationServiceTests.swift */,
-				FL1005 /* FatigueLearningServiceTests.swift */,
-			);
-			path = RepsterTests;
 			sourceTree = "<group>";
 		};
 		D10001 /* Repster */ = {
@@ -1245,6 +1230,21 @@
 			path = Components;
 			sourceTree = "<group>";
 		};
+		TT4001 /* RepsterTests */ = {
+			isa = PBXGroup;
+			children = (
+				TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */,
+				TT2004 /* ChartDataServiceTests.swift */,
+				TT2005 /* WorkoutHistoryBackupTests.swift */,
+				TT2006 /* SetServiceTests.swift */,
+				TT2008 /* SeedExerciseLibraryTests.swift */,
+				TT2007 /* WorkoutSetTests.swift */,
+				TT2009 /* MonetizationServiceTests.swift */,
+				FL1005 /* FatigueLearningServiceTests.swift */,
+			);
+			path = RepsterTests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -1657,17 +1657,6 @@
 		};
 /* End PBXTargetDependency section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		RC2001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/RevenueCat/purchases-ios-spm.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 5.27.1;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
 /* Begin XCBuildConfiguration section */
 		0823BFA32F5D608500A513BE /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -1675,7 +1664,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = WorkoutLiveActivity/Info.plist;
@@ -1708,7 +1697,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = WorkoutLiveActivity/Info.plist;
@@ -1857,12 +1846,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Repster/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1885,12 +1875,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Repster/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1913,7 +1904,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -1940,7 +1931,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -1962,19 +1953,6 @@
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		RC2002 /* RevenueCat */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = RC2001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
-			productName = RevenueCat;
-		};
-		RC2003 /* RevenueCatUI */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = RC2001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
-			productName = RevenueCatUI;
-		};
-/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCConfigurationList section */
 		0823BFA22F5D608500A513BE /* Build configuration list for PBXNativeTarget "WorkoutLiveActivityExtension" */ = {
@@ -2014,6 +1992,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		RC2001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RevenueCat/purchases-ios-spm.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.27.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		RC2002 /* RevenueCat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = RC2001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
+			productName = RevenueCat;
+		};
+		RC2003 /* RevenueCatUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = RC2001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
+			productName = RevenueCatUI;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D00002 /* Project object */;
 }

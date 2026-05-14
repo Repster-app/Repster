@@ -1,6 +1,8 @@
 import Foundation
 
 enum UnitConversion {
+    typealias WeightIncrementOption = (display: Double, storedKg: Double)
+
     static let poundsPerKilogram = 2.20462
     static let feetPerMeter = 3.28084
     static let metersPerMile = 1609.344
@@ -96,7 +98,7 @@ enum UnitConversion {
         storedWeight(fromDisplayed: increment, unitPreference: unitPreference)
     }
 
-    static func displayWeightIncrementOptions(for unitPreference: UnitPreference) -> [(display: Double, storedKg: Double)] {
+    static func displayWeightIncrementOptions(for unitPreference: UnitPreference) -> [WeightIncrementOption] {
         switch unitPreference {
         case .metric:
             return [0.5, 1.0, 1.25, 2.0, 2.5, 5.0, 10.0].map { ($0, $0) }
@@ -107,6 +109,15 @@ enum UnitConversion {
         }
     }
 
+    static func exerciseWeightIncrementOptions(for unitPreference: UnitPreference) -> [WeightIncrementOption] {
+        switch unitPreference {
+        case .metric:
+            return [1.25, 2.5, 5.0, 10.0, 20.0].map { ($0, $0) }
+        case .imperial:
+            return displayWeightIncrementOptions(for: unitPreference)
+        }
+    }
+
     static func defaultStoredWeightIncrement(for unitPreference: UnitPreference) -> Double {
         switch unitPreference {
         case .metric:
@@ -114,6 +125,82 @@ enum UnitConversion {
         case .imperial:
             return lbsToKg(5)
         }
+    }
+
+    static func normalizedWeightIncrementOption(
+        storedKg: Double,
+        unitPreference: UnitPreference,
+        options: [WeightIncrementOption]
+    ) -> WeightIncrementOption {
+        let displayed = displayedWeightIncrement(storedKg, unitPreference: unitPreference)
+
+        guard storedKg.isFinite, storedKg > 0 else {
+            return (displayed, storedKg)
+        }
+
+        guard let nearest = options.min(by: { lhs, rhs in
+            let lhsDistance = abs(lhs.display - displayed)
+            let rhsDistance = abs(rhs.display - displayed)
+            if abs(lhsDistance - rhsDistance) < 0.000_001 {
+                return lhs.display < rhs.display
+            }
+            return lhsDistance < rhsDistance
+        }) else {
+            return (displayed, storedKg)
+        }
+
+        return nearest
+    }
+
+    static func formatWeightIncrementLabel(
+        storedKg: Double?,
+        unitPreference: UnitPreference,
+        options: [WeightIncrementOption]
+    ) -> String {
+        guard let storedKg else { return "Not Set" }
+        let option = normalizedWeightIncrementOption(
+            storedKg: storedKg,
+            unitPreference: unitPreference,
+            options: options
+        )
+        return formatWeightIncrementLabel(displayValue: option.display, unitPreference: unitPreference)
+    }
+
+    static func formatWeightIncrementLabel(displayValue: Double, unitPreference: UnitPreference) -> String {
+        "\(formatWeight(displayValue)) \(weightUnitLabel(for: unitPreference))"
+    }
+
+    static func resolvedWeightIncrementOption(
+        exerciseIncrement: Double?,
+        defaultIncrement: Double?,
+        unitPreference: UnitPreference
+    ) -> WeightIncrementOption {
+        if let exerciseIncrement {
+            return normalizedWeightIncrementOption(
+                storedKg: exerciseIncrement,
+                unitPreference: unitPreference,
+                options: exerciseWeightIncrementOptions(for: unitPreference)
+            )
+        }
+
+        let fallback = defaultIncrement ?? defaultStoredWeightIncrement(for: unitPreference)
+        return normalizedWeightIncrementOption(
+            storedKg: fallback,
+            unitPreference: unitPreference,
+            options: displayWeightIncrementOptions(for: unitPreference)
+        )
+    }
+
+    static func resolvedStoredWeightIncrement(
+        exerciseIncrement: Double?,
+        defaultIncrement: Double?,
+        unitPreference: UnitPreference
+    ) -> Double {
+        resolvedWeightIncrementOption(
+            exerciseIncrement: exerciseIncrement,
+            defaultIncrement: defaultIncrement,
+            unitPreference: unitPreference
+        ).storedKg
     }
 
     static func formatDistanceLabel(_ meters: Double, unitPreference: UnitPreference) -> String {

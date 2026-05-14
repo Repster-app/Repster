@@ -87,9 +87,11 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         }
 
         let restTimerSeconds = Double(exercise.defaultRestTime ?? profile.defaultRestTimeSeconds ?? 150)
-        let weightIncrement = exercise.weightIncrement
-            ?? profile.prescriptionDefaultIncrement
-            ?? UnitConversion.defaultStoredWeightIncrement(for: profile.unitPreference)
+        let weightIncrement = UnitConversion.resolvedStoredWeightIncrement(
+            exerciseIncrement: exercise.weightIncrement,
+            defaultIncrement: profile.prescriptionDefaultIncrement,
+            unitPreference: profile.unitPreference
+        )
         let fatigueEnabled = profile.prescriptionFatigueModelingEnabled ?? true
         let freshnessEnabled = profile.prescriptionFreshnessBonus ?? false
         let freshnessPercent = profile.prescriptionFreshnessBonusPercent ?? 0.03

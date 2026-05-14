@@ -110,7 +110,7 @@ actor PRService: PRServiceProtocol {
             // Demote old PR-owning set to "previous"
             var affectedSets: [UUID: CachedPRStatus?] = [:]
             if let oldSet = try await setRepo.fetch(byId: existingPR.setId) {
-                oldSet.cachedPRStatus = .previous
+                oldSet.prStatus = .previous
                 try await setRepo.save(oldSet)
                 affectedSets[existingPR.setId] = .previous
             }
@@ -179,7 +179,7 @@ actor PRService: PRServiceProtocol {
         setType: SetType,
         hasData: Bool,
         excludeFromPRs: Bool,
-        previousCachedPRStatus: CachedPRStatus?,
+        previousCachedPRStatus _: CachedPRStatus?,
         date: Date
     ) async throws -> PREvaluationResult {
         guard try await supportsRepPRs(for: exerciseId) else {
@@ -188,8 +188,10 @@ actor PRService: PRServiceProtocol {
 
         // CASE 1: Edited set was NOT the PR owner
         // Re-run evaluate() logic with new values — treat as if it's a new set.
-        // Uses isPROwner to correctly identify both .current and .dominated owners.
-        if previousCachedPRStatus?.isPROwner != true {
+        // PerformanceRecord ownership is authoritative so legacy/missing cached status
+        // cannot leave stale PRs behind.
+        let ownsCurrentPR = try await isCurrentPROwner(setId: setId, exerciseId: exerciseId, reps: reps)
+        if !ownsCurrentPR {
             return try await evaluate(
                 setId: setId,
                 exerciseId: exerciseId,
@@ -337,7 +339,7 @@ actor PRService: PRServiceProtocol {
 
         // Winner gets frontier-aware status
         let winnerStatus: CachedPRStatus = winnerOnFrontier ? .current : .dominated
-        winner.cachedPRStatus = winnerStatus
+        winner.prStatus = winnerStatus
         try await setRepo.save(winner)
         affectedSets[winner.id] = winnerStatus
 
@@ -373,15 +375,16 @@ actor PRService: PRServiceProtocol {
         setId: UUID,
         exerciseId: UUID,
         reps: Int,
-        cachedPRStatus: CachedPRStatus?
+        cachedPRStatus _: CachedPRStatus?
     ) async throws -> PREvaluationResult {
         guard try await supportsRepPRs(for: exerciseId) else {
             return emptyResult(for: setId)
         }
 
         // Non-PR-owner deleted — no PR changes needed.
-        // Uses isPROwner to correctly identify both .current and .dominated owners.
-        guard cachedPRStatus?.isPROwner == true else {
+        // PerformanceRecord ownership is authoritative so old rows without raw
+        // cached status still recompute if they own the record.
+        guard try await isCurrentPROwner(setId: setId, exerciseId: exerciseId, reps: reps) else {
             return PREvaluationResult(
                 setId: setId,
                 newStatus: nil,
@@ -463,11 +466,11 @@ actor PRService: PRServiceProtocol {
             try await performanceRecordRepo.delete(record)
         }
 
-        // Step 2: Clear cachedPRStatus on ALL sets for this exercise
+        // Step 2: Clear PR status on ALL sets for this exercise
         let allSets = try await setRepo.fetchSets(for: exerciseId, limit: nil)
         for set in allSets {
-            if set.cachedPRStatus != nil {
-                set.cachedPRStatus = nil
+            if set.prStatus != nil {
+                set.prStatus = nil
                 try await setRepo.save(set)
             }
         }
@@ -536,7 +539,7 @@ actor PRService: PRServiceProtocol {
                     guard !excludedWorkoutIds.contains(otherSet.workoutId) else { continue }
                     if excludeWarmups && otherSet.setType == .warmup { continue }
 
-                    otherSet.cachedPRStatus = .matched
+                    otherSet.prStatus = .matched
                     try await setRepo.save(otherSet)
                 }
             }
@@ -552,6 +555,22 @@ actor PRService: PRServiceProtocol {
     }
 
     // MARK: - Private Helpers
+
+    private func isCurrentPROwner(
+        setId: UUID,
+        exerciseId: UUID,
+        reps: Int
+    ) async throws -> Bool {
+        guard let record = try await performanceRecordRepo.fetch(
+            exerciseId: exerciseId,
+            recordType: .repMax,
+            reps: reps
+        ) else {
+            return false
+        }
+
+        return record.setId == setId
+    }
 
     /// Recompute suffix-max frontier badges for all PR owners of an exercise.
     ///
@@ -608,8 +627,8 @@ actor PRService: PRServiceProtocol {
             guard record.setId != skipUpdateForSetId else { continue }
 
             if let owningSet = try await setRepo.fetch(byId: record.setId) {
-                if owningSet.cachedPRStatus != desiredStatus {
-                    owningSet.cachedPRStatus = desiredStatus
+                if owningSet.prStatus != desiredStatus {
+                    owningSet.prStatus = desiredStatus
                     try await setRepo.save(owningSet)
                     affectedSets[record.setId] = desiredStatus
                 }
@@ -683,7 +702,7 @@ actor PRService: PRServiceProtocol {
         let winnerOnFrontier = frontierReps.contains(reps)
         let winnerStatus: CachedPRStatus = winnerOnFrontier ? .current : .dominated
 
-        winner.cachedPRStatus = winnerStatus
+        winner.prStatus = winnerStatus
         try await setRepo.save(winner)
 
         // Merge winner status into affected sets

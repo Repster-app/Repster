@@ -65,8 +65,11 @@ final class EditWorkoutViewModel {
         do {
             if let profile = try? await settingsService.fetchSettings() {
                 unitPreference = profile.unitPreference
-                defaultWeightIncrement = profile.prescriptionDefaultIncrement
-                    ?? UnitConversion.defaultStoredWeightIncrement(for: profile.unitPreference)
+                defaultWeightIncrement = UnitConversion.resolvedStoredWeightIncrement(
+                    exerciseIncrement: nil,
+                    defaultIncrement: profile.prescriptionDefaultIncrement,
+                    unitPreference: profile.unitPreference
+                )
             }
 
             // 1. Fetch workout
@@ -140,7 +143,7 @@ final class EditWorkoutViewModel {
 
             // Apply pipeline results to local state
             set.effectiveWeight = result.effectiveWeight
-            set.cachedPRStatus = result.prResult.newStatus
+            set.prStatus = result.prResult.newStatus
 
             // Apply affected sets (PR status changes on other sets)
             applyAffectedSets(result.prResult.affectedSetIds)
@@ -164,14 +167,20 @@ final class EditWorkoutViewModel {
     ///
     /// Uses setService.uncomplete() which models uncompleting as "removing a set's
     /// contribution" — demotes PRs and decrements stats without deleting the set.
-    func uncompleteSet(_ set: WorkoutSet) async {
+    func uncompleteSet(
+        _ set: WorkoutSet,
+        previousContribution: SetContributionSnapshot? = nil
+    ) async {
         let exerciseId = set.exerciseId
         let oldCompleted = set.completed
 
         do {
-            let result = try await setService.uncomplete(set)
+            let result = try await setService.uncomplete(
+                set,
+                previousContribution: previousContribution
+            )
             set.effectiveWeight = result.effectiveWeight
-            set.cachedPRStatus = result.prResult.newStatus
+            set.prStatus = result.prResult.newStatus
             applyAffectedSets(result.prResult.affectedSetIds)
 
             // Reassign array to trigger @Observable update
@@ -288,7 +297,7 @@ final class EditWorkoutViewModel {
         do {
             let result = try await setService.edit(set)
             set.effectiveWeight = result.effectiveWeight
-            set.cachedPRStatus = result.prResult.newStatus
+            set.prStatus = result.prResult.newStatus
             applyAffectedSets(result.prResult.affectedSetIds)
         } catch {
             #if DEBUG
@@ -417,11 +426,11 @@ final class EditWorkoutViewModel {
     private func refreshPersistedWorkoutPRState() async throws {
         guard let workout else { return }
         let persistedSets = try await setService.fetchSets(for: workout.id)
-        let statusesBySetId = Dictionary(uniqueKeysWithValues: persistedSets.map { ($0.id, $0.cachedPRStatus) })
+        let statusesBySetId = Dictionary(uniqueKeysWithValues: persistedSets.map { ($0.id, $0.prStatus) })
 
         for (exerciseId, sets) in setsByExercise {
             for set in sets {
-                set.cachedPRStatus = statusesBySetId[set.id] ?? nil
+                set.prStatus = statusesBySetId[set.id] ?? nil
             }
             setsByExercise[exerciseId] = sets
         }
@@ -473,7 +482,7 @@ final class EditWorkoutViewModel {
                     result = try await setService.edit(set)
                 }
                 set.effectiveWeight = result.effectiveWeight
-                set.cachedPRStatus = result.prResult.newStatus
+                set.prStatus = result.prResult.newStatus
                 applyAffectedSets(result.prResult.affectedSetIds)
             } catch {
                 #if DEBUG
@@ -511,10 +520,10 @@ final class EditWorkoutViewModel {
             var changed = false
             for (index, set) in updatedSets.enumerated() {
                 if let newStatus = affectedSetIds[set.id] {
-                    if set.completed, isStatusUpgrade(from: set.cachedPRStatus, to: newStatus) {
+                    if set.completed, isStatusUpgrade(from: set.prStatus, to: newStatus) {
                         continue
                     }
-                    updatedSets[index].cachedPRStatus = newStatus
+                    updatedSets[index].prStatus = newStatus
                     changed = true
                 }
             }
@@ -578,7 +587,7 @@ extension EditWorkoutViewModel: SetTableDataSource {
                 result = try await setService.edit(set)
             }
             set.effectiveWeight = result.effectiveWeight
-            set.cachedPRStatus = result.prResult.newStatus
+            set.prStatus = result.prResult.newStatus
             applyAffectedSets(result.prResult.affectedSetIds)
 
             // Reassign array to trigger @Observable update for UI

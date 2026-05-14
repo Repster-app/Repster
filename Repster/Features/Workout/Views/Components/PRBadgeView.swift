@@ -1,5 +1,5 @@
 // PRBadgeView.swift
-// Renders PR badge (gold star + "PR") or match badge (blue "=") based on cachedPRStatus.
+// Renders PR badge (gold star + "PR") or match badge (blue "=") based on PR status.
 // Spec: design-system.md Section 6.4 (Badges)
 //
 // Pure presentational component — no business logic or service dependencies.

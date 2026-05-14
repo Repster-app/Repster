@@ -287,7 +287,170 @@ final class SetServiceTests: XCTestCase {
         XCTAssertEqual(performanceRecords.count, 1)
         XCTAssertEqual(performanceRecords.first?.reps, 5)
         XCTAssertEqual(performanceRecords.first?.value ?? 0, 100, accuracy: 0.001)
-        XCTAssertEqual(persistedSet?.cachedPRStatus, .current)
+        XCTAssertEqual(persistedSet?.cachedPRStatusRaw, CachedPRStatus.current.rawValue)
+        XCTAssertEqual(persistedSet?.prStatus, .current)
+    }
+
+    func testUncompleteUsesPreviousContributionWhenCompletedSetRepsWereDraftEditedFirst() async throws {
+        let context = try makeContext()
+        let workoutDate = makeDate(2026, 3, 22, 9, 5)
+        let records = try await insertExerciseAndWorkout(
+            in: context,
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest",
+            date: workoutDate
+        )
+        let set = WorkoutSet(
+            workoutId: records.workout.id,
+            exerciseId: records.exercise.id,
+            date: workoutDate,
+            completedAt: workoutDate.addingTimeInterval(300),
+            weight: 100,
+            reps: 8,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+
+        _ = try await context.setService.save(set)
+        let previousContribution = SetContributionSnapshot(set: set)
+
+        // Mirrors SetTableView's completed-row draft edit: the live model changes
+        // before uncomplete removes the old contribution.
+        set.reps = nil
+        set.overrideTargetRepMin = 7
+        set.overrideTargetRepMax = 7
+
+        _ = try await context.setService.uncomplete(
+            set,
+            previousContribution: previousContribution
+        )
+
+        var performanceRecords = try await context.performanceRecordRepo.fetchAll(
+            for: records.exercise.id,
+            recordType: .repMax
+        )
+        var stats = try await context.statsService.fetchStats(for: records.exercise.id)
+
+        XCTAssertTrue(performanceRecords.isEmpty)
+        XCTAssertEqual(stats?.totalSets, 0)
+        XCTAssertEqual(stats?.totalReps, 0)
+        XCTAssertEqual(stats?.totalVolume ?? 0, 0, accuracy: 0.001)
+
+        set.reps = 7
+        set.overrideTargetRepMin = nil
+        set.overrideTargetRepMax = nil
+        set.completed = true
+        set.completedAt = workoutDate.addingTimeInterval(600)
+
+        _ = try await context.setService.save(set)
+
+        performanceRecords = try await context.performanceRecordRepo.fetchAll(
+            for: records.exercise.id,
+            recordType: .repMax
+        )
+        stats = try await context.statsService.fetchStats(for: records.exercise.id)
+
+        XCTAssertEqual(performanceRecords.count, 1)
+        XCTAssertEqual(performanceRecords.first?.reps, 7)
+        XCTAssertEqual(performanceRecords.first?.value ?? 0, 100, accuracy: 0.001)
+        XCTAssertEqual(stats?.totalSets, 1)
+        XCTAssertEqual(stats?.totalReps, 7)
+        XCTAssertEqual(stats?.totalVolume ?? 0, 700, accuracy: 0.001)
+    }
+
+    func testUncompleteUsesPerformanceRecordOwnershipWhenRawStatusMissing() async throws {
+        let context = try makeContext()
+        let workoutDate = makeDate(2026, 3, 22, 9, 7)
+        let records = try await insertExerciseAndWorkout(
+            in: context,
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest",
+            date: workoutDate
+        )
+        let set = WorkoutSet(
+            workoutId: records.workout.id,
+            exerciseId: records.exercise.id,
+            date: workoutDate,
+            completedAt: workoutDate.addingTimeInterval(300),
+            weight: 100,
+            reps: 8,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+
+        _ = try await context.setService.save(set)
+        set.prStatus = nil
+        try await context.setRepo.save(set)
+
+        _ = try await context.setService.uncomplete(set)
+
+        let performanceRecords = try await context.performanceRecordRepo.fetchAll(
+            for: records.exercise.id,
+            recordType: .repMax
+        )
+        let persistedSet = try await context.setRepo.fetch(byId: set.id)
+
+        XCTAssertTrue(performanceRecords.isEmpty)
+        XCTAssertEqual(persistedSet?.completed, false)
+        XCTAssertNil(persistedSet?.prStatus)
+    }
+
+    func testEditRepChangeDeletesOldPRBucketAndEvaluatesNewBucket() async throws {
+        let context = try makeContext()
+        let workoutDate = makeDate(2026, 3, 22, 9, 8)
+        let records = try await insertExerciseAndWorkout(
+            in: context,
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest",
+            date: workoutDate
+        )
+        let set = WorkoutSet(
+            workoutId: records.workout.id,
+            exerciseId: records.exercise.id,
+            date: workoutDate,
+            completedAt: workoutDate.addingTimeInterval(300),
+            weight: 100,
+            reps: 8,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+
+        _ = try await context.setService.save(set)
+        let previousContribution = SetContributionSnapshot(set: set)
+
+        set.reps = 7
+
+        _ = try await context.setService.edit(
+            set,
+            previousContribution: previousContribution
+        )
+
+        let performanceRecords = try await context.performanceRecordRepo.fetchAll(
+            for: records.exercise.id,
+            recordType: .repMax
+        )
+        let persistedSet = try await context.setRepo.fetch(byId: set.id)
+        let stats = try await context.statsService.fetchStats(for: records.exercise.id)
+
+        XCTAssertEqual(performanceRecords.count, 1)
+        XCTAssertEqual(performanceRecords.first?.reps, 7)
+        XCTAssertEqual(performanceRecords.first?.value ?? 0, 100, accuracy: 0.001)
+        XCTAssertEqual(persistedSet?.prStatus, .current)
+        XCTAssertEqual(stats?.totalSets, 1)
+        XCTAssertEqual(stats?.totalReps, 7)
+        XCTAssertEqual(stats?.totalVolume ?? 0, 700, accuracy: 0.001)
     }
 
     func testSaveWeightRepsSetInExcludedWorkoutDoesNotCreatePRRecordOrBadge() async throws {
@@ -334,7 +497,7 @@ final class SetServiceTests: XCTestCase {
         XCTAssertNil(result.prResult.newStatus)
         XCTAssertFalse(result.prResult.prRecordChanged)
         XCTAssertTrue(performanceRecords.isEmpty)
-        XCTAssertNil(persistedSet?.cachedPRStatus)
+        XCTAssertNil(persistedSet?.prStatus)
     }
 
     func testExerciseScopedWorkoutExclusionStillAllowsOtherExercisesToCreatePRs() async throws {
@@ -406,13 +569,13 @@ final class SetServiceTests: XCTestCase {
         XCTAssertNil(excludedResult.prResult.newStatus)
         XCTAssertFalse(excludedResult.prResult.prRecordChanged)
         XCTAssertTrue(excludedRecords.isEmpty)
-        XCTAssertNil(persistedExcludedSet?.cachedPRStatus)
+        XCTAssertNil(persistedExcludedSet?.prStatus)
 
         XCTAssertEqual(allowedResult.prResult.newStatus, .current)
         XCTAssertEqual(allowedRecords.count, 1)
         XCTAssertEqual(allowedRecords.first?.reps, 8)
         XCTAssertEqual(allowedRecords.first?.value ?? 0, 85, accuracy: 0.001)
-        XCTAssertEqual(persistedAllowedSet?.cachedPRStatus, .current)
+        XCTAssertEqual(persistedAllowedSet?.prStatus, .current)
     }
 
     func testSaveWeightRepsDurationSetDoesNotCreatePRRecordOrBadge() async throws {
@@ -450,7 +613,7 @@ final class SetServiceTests: XCTestCase {
         XCTAssertNil(result.prResult.newStatus)
         XCTAssertFalse(result.prResult.prRecordChanged)
         XCTAssertTrue(performanceRecords.isEmpty)
-        XCTAssertNil(persistedSet?.cachedPRStatus)
+        XCTAssertNil(persistedSet?.prStatus)
     }
 
     func testFetchPRTableReturnsEmptyForUnsupportedExerciseWithStalePRData() async throws {
@@ -533,7 +696,7 @@ final class SetServiceTests: XCTestCase {
         let persistedSet = try await context.setRepo.fetch(byId: set.id)
 
         XCTAssertTrue(performanceRecords.isEmpty)
-        XCTAssertNil(persistedSet?.cachedPRStatus)
+        XCTAssertNil(persistedSet?.prStatus)
     }
 
     func testFetchRecentPRsIgnoresUnsupportedExercises() async throws {

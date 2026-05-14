@@ -727,8 +727,13 @@ private struct SmartSuggestionsSettingsView: View {
                         Spacer()
                         Picker("", selection: Binding(
                             get: {
-                                viewModel.profile?.prescriptionDefaultIncrement
+                                let stored = viewModel.profile?.prescriptionDefaultIncrement
                                     ?? UnitConversion.defaultStoredWeightIncrement(for: unitPreference)
+                                return UnitConversion.normalizedWeightIncrementOption(
+                                    storedKg: stored,
+                                    unitPreference: unitPreference,
+                                    options: incrementOptions
+                                ).storedKg
                             },
                             set: { newValue in
                                 Task { await viewModel.updatePrescriptionDefaultIncrement(newValue) }
@@ -790,7 +795,7 @@ private struct SmartSuggestionsSettingsView: View {
     }
 
     private func incrementLabel(forDisplayValue value: Double) -> String {
-        "\(UnitConversion.formatWeight(value)) \(UnitConversion.weightUnitLabel(for: unitPreference))"
+        UnitConversion.formatWeightIncrementLabel(displayValue: value, unitPreference: unitPreference)
     }
 }
 

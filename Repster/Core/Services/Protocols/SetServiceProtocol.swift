@@ -17,6 +17,39 @@ struct SetSaveResult: Sendable {
     let prResult: PREvaluationResult
 }
 
+/// Snapshot of a set's completed contribution before UI or caller-side mutation.
+///
+/// Some UI paths mutate the live `WorkoutSet` object before asking `SetService`
+/// to remove or edit its prior contribution. This value preserves the original
+/// PR/stat bucket so recomputation does not read already-mutated fields.
+struct SetContributionSnapshot: Sendable {
+    let setId: UUID
+    let exerciseId: UUID
+    let workoutId: UUID
+    let statsReps: Int
+    let prReps: Int
+    let effectiveWeight: Double
+    let setType: SetType
+    let hasData: Bool
+    let excludeFromPRs: Bool
+    let cachedPRStatus: CachedPRStatus?
+    let date: Date
+
+    init(set: WorkoutSet) {
+        self.setId = set.id
+        self.exerciseId = set.exerciseId
+        self.workoutId = set.workoutId
+        self.statsReps = set.statsReps
+        self.prReps = set.prReps
+        self.effectiveWeight = set.effectiveWeight ?? 0
+        self.setType = set.setType
+        self.hasData = set.hasData
+        self.excludeFromPRs = set.excludeFromPRs ?? false
+        self.cachedPRStatus = set.prStatus
+        self.date = set.date
+    }
+}
+
 /// SetService orchestrates the complete set lifecycle.
 ///
 /// Responsibilities (per AGENT_RULES S6):
@@ -29,7 +62,7 @@ struct SetSaveResult: Sendable {
 /// - Access ModelContext directly (uses SetRepository)
 /// - Own PR logic (that's PRService)
 /// - Own stats logic (that's StatsService)
-/// - Modify cachedPRStatus directly (PRService returns it via PREvaluationResult)
+/// - Modify PR status directly (PRService returns it via PREvaluationResult)
 ///
 /// Pipeline order (specdoc S4.5, FR-002, FR-003):
 ///   persist -> effectiveWeight -> PRService.evaluate -> StatsService.updateStats
@@ -43,7 +76,7 @@ protocol SetServiceProtocol: Sendable {
     ///
     /// 1. Compute effectiveWeight (S5.4): weight + (closestBodyweight x bodyweightFactor)
     /// 2. Persist set with effectiveWeight stored (FR-012: immediate persistence)
-    /// 3. PRService.evaluate() -> cachedPRStatus (FR-002)
+    /// 3. PRService.evaluate() -> PR status (FR-002)
     /// 4. StatsService.updateStats() (FR-003)
     ///
     /// - Parameter set: The WorkoutSet to save. effectiveWeight will be computed and set.
@@ -65,7 +98,10 @@ protocol SetServiceProtocol: Sendable {
     ///
     /// - Parameter set: The WorkoutSet with updated values.
     /// - Returns: SetSaveResult with new effectiveWeight and PR result.
-    func edit(_ set: WorkoutSet) async throws -> SetSaveResult
+    func edit(
+        _ set: WorkoutSet,
+        previousContribution: SetContributionSnapshot?
+    ) async throws -> SetSaveResult
 
     // MARK: - Uncomplete
 
@@ -73,15 +109,18 @@ protocol SetServiceProtocol: Sendable {
     ///
     /// Conceptually "removes a set's contribution" to PRs and stats without deleting it.
     /// Modeled after delete() pipeline:
-    /// 1. Capture old values (reps, effectiveWeight, cachedPRStatus, etc.)
-    /// 2. Mutate set: completed = false, completedAt = nil, cachedPRStatus = nil
+    /// 1. Capture old values (reps, effectiveWeight, PR status, etc.)
+    /// 2. Mutate set: completed = false, completedAt = nil, PR status = nil
     /// 3. Persist set (flat save — no PR/stats pipeline)
     /// 4. PRService.handleDeletion() — demotes PR if this set owned one
     /// 5. StatsService.updateStats(.delete) — decrements totals
     ///
     /// - Parameter set: The WorkoutSet to uncomplete.
     /// - Returns: SetSaveResult with effectiveWeight and PR demotion result.
-    func uncomplete(_ set: WorkoutSet) async throws -> SetSaveResult
+    func uncomplete(
+        _ set: WorkoutSet,
+        previousContribution: SetContributionSnapshot?
+    ) async throws -> SetSaveResult
 
     // MARK: - Delete (FR-005)
 
@@ -137,4 +176,14 @@ protocol SetServiceProtocol: Sendable {
     ///   - limit: Maximum number of sets to return, or nil for all.
     /// - Returns: WorkoutSets for this exercise, ordered by date descending.
     func fetchSets(for exerciseId: UUID, limit: Int?) async throws -> [WorkoutSet]
+}
+
+extension SetServiceProtocol {
+    func edit(_ set: WorkoutSet) async throws -> SetSaveResult {
+        try await edit(set, previousContribution: nil)
+    }
+
+    func uncomplete(_ set: WorkoutSet) async throws -> SetSaveResult {
+        try await uncomplete(set, previousContribution: nil)
+    }
 }

@@ -16,7 +16,7 @@ struct ChartSetData: Sendable, Equatable {
     let distanceMeters: Double?
     let e1RM: Double?
     let setType: SetType
-    let cachedPRStatus: CachedPRStatus?
+    let prStatus: CachedPRStatus?
 
     var hasData: Bool {
         ((weight ?? 0) > 0 && prReps > 0) ||
@@ -46,7 +46,7 @@ struct ChartSetData: Sendable, Equatable {
         self.distanceMeters = set.distanceMeters
         self.e1RM = set.e1RM
         self.setType = set.setType
-        self.cachedPRStatus = set.cachedPRStatus
+        self.prStatus = set.prStatus
     }
 }
 

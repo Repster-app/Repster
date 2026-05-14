@@ -75,7 +75,7 @@ protocol SetTableDataSource: AnyObject, Observable {
     /// Current display unit preference for set entry and read-only labels.
     var unitPreference: UnitPreference { get }
 
-    /// Global/default weight increment stored in kg.
+    /// Resolved global/default weight increment stored in kg.
     var defaultWeightIncrement: Double { get }
 
     // MARK: - Set Actions
@@ -93,7 +93,10 @@ protocol SetTableDataSource: AnyObject, Observable {
     func addWarmupSet(for exerciseId: UUID) async
 
     /// Uncomplete a set, flipping it back to incomplete state.
-    func uncompleteSet(_ set: WorkoutSet) async
+    func uncompleteSet(
+        _ set: WorkoutSet,
+        previousContribution: SetContributionSnapshot?
+    ) async
 
     /// Delete a set from the workout.
     func deleteSet(_ set: WorkoutSet) async
@@ -129,6 +132,12 @@ protocol SetTableDataSource: AnyObject, Observable {
     /// Optional row-addressable suggested weight for a specific pending set.
     /// Returns nil when suggestions are unavailable or no mapping exists.
     func suggestedWeight(for setId: UUID) -> Double?
+}
+
+extension SetTableDataSource {
+    func uncompleteSet(_ set: WorkoutSet) async {
+        await uncompleteSet(set, previousContribution: nil)
+    }
 }
 
 extension SetTableDataSource {

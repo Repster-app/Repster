@@ -3740,12 +3740,20 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
         )
     }
 
-    func edit(_ set: WorkoutSet) async throws -> SetSaveResult {
+    func edit(
+        _ set: WorkoutSet,
+        previousContribution: SetContributionSnapshot? = nil
+    ) async throws -> SetSaveResult {
+        let _ = previousContribution
         editedSetIds.append(set.id)
         return try await save(set)
     }
 
-    func uncomplete(_ set: WorkoutSet) async throws -> SetSaveResult {
+    func uncomplete(
+        _ set: WorkoutSet,
+        previousContribution: SetContributionSnapshot? = nil
+    ) async throws -> SetSaveResult {
+        let _ = previousContribution
         uncompletedSetIds.append(set.id)
         set.completed = false
         set.completedAt = nil

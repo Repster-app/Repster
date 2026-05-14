@@ -36,6 +36,9 @@ final class WorkoutSet {
     var supersetGroupId: UUID?
     var completed: Bool
     var excludeFromPRs: Bool?
+    var cachedPRStatusRaw: String?
+    /// Legacy persisted enum field retained for schema compatibility only.
+    /// App logic must use `prStatus` so SwiftData never reads this optional enum.
     var cachedPRStatus: CachedPRStatus?
     var targetWeight: Double?
     var targetRepMin: Int?
@@ -51,6 +54,16 @@ final class WorkoutSet {
     var restDurationSeconds: Int?
 
     @Transient var persistedFatigueSnapshot: FatigueLearningSetSnapshot? = nil
+
+    var prStatus: CachedPRStatus? {
+        get {
+            guard let cachedPRStatusRaw else { return nil }
+            return CachedPRStatus(rawValue: cachedPRStatusRaw)
+        }
+        set {
+            cachedPRStatusRaw = newValue?.rawValue
+        }
+    }
 
     var overrideTargetRepRange: ClosedRange<Int>? {
         guard let overrideTargetRepMin, let overrideTargetRepMax, overrideTargetRepMin < overrideTargetRepMax else {
@@ -235,7 +248,8 @@ final class WorkoutSet {
         self.supersetGroupId = supersetGroupId
         self.completed = completed
         self.excludeFromPRs = excludeFromPRs
-        self.cachedPRStatus = cachedPRStatus
+        self.cachedPRStatusRaw = cachedPRStatus?.rawValue
+        self.cachedPRStatus = nil
         self.targetWeight = targetWeight
         self.targetRepMin = targetRepMin
         self.targetRepMax = targetRepMax

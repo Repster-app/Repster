@@ -135,7 +135,7 @@ Local notifications are used for rest timer alerts. Live Activities are used to 
 
 ## Pre-Submission Blockers To Clear
 
-- Replace the in-app placeholder support email `feedback@repster.app` with the final address. The public support/privacy/terms pages currently use `support@reppo.app`.
+- Confirm `contact@repster.site` is the final in-app and public support/privacy/terms contact email.
 - Align `Repster/PrivacyInfo.xcprivacy` with the final App Store privacy answers.
 - Confirm the RevenueCat production public SDK key, offering, entitlement, subscription, and lifetime package setup.
 - Make Terms of Use visible around the purchase/paywall flow, not only in Settings.

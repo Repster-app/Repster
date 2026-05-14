@@ -51,9 +51,11 @@ enum ExerciseInfoProvider {
             let targetReps = currentSets
                 .last(where: { $0.setType == .working && $0.hasData })?.prReps ?? 8
 
-            let increment = weightIncrement
-                ?? profile.prescriptionDefaultIncrement
-                ?? UnitConversion.defaultStoredWeightIncrement(for: unitPreference)
+            let increment = UnitConversion.resolvedStoredWeightIncrement(
+                exerciseIncrement: weightIncrement,
+                defaultIncrement: profile.prescriptionDefaultIncrement,
+                unitPreference: unitPreference
+            )
             let rawEstimated = formula.reverseCalculate(e1RM: bestE1RM, reps: targetReps)
             let snapped = snap(rawEstimated, to: increment)
 

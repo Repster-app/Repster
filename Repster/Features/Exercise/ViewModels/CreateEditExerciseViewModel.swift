@@ -73,7 +73,11 @@ final class CreateEditExerciseViewModel {
     }
 
     var defaultIncrementDisplay: String {
-        formatIncrement(appDefaultWeightIncrement)
+        UnitConversion.formatWeightIncrementLabel(
+            storedKg: appDefaultWeightIncrement,
+            unitPreference: unitPreference,
+            options: UnitConversion.displayWeightIncrementOptions(for: unitPreference)
+        )
     }
 
     // MARK: - Init
@@ -188,8 +192,4 @@ final class CreateEditExerciseViewModel {
         return "\(seconds) sec"
     }
 
-    private func formatIncrement(_ value: Double?) -> String {
-        guard let value else { return "Not Set" }
-        return UnitConversion.formatWeightLabel(value, unitPreference: unitPreference)
-    }
 }

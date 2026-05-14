@@ -186,13 +186,13 @@ struct SetRowView: View {
     /// Current display unit preference for weight-entry helpers.
     var unitPreference: UnitPreference = .metric
 
-    /// Global/default weight increment stored in kg.
+    /// Resolved global/default weight increment stored in kg.
     var defaultWeightIncrement: Double = 2.5
 
     /// Optional suggested weight shown in custom keyboard actions.
     var suggestedWeight: Double? = nil
 
-    /// Overrides `set.cachedPRStatus` for badge display when non-nil (suppresses dominated matches).
+    /// Overrides `set.prStatus` for badge display when non-nil (suppresses dominated matches).
     var prStatusOverride: CachedPRStatus?? = nil
 
     // MARK: - Body
@@ -217,7 +217,7 @@ struct SetRowView: View {
             Color.clear
                 .frame(width: 44, height: 1)
                 .overlay(alignment: .trailing) {
-                    PRBadgeView(status: prStatusOverride ?? set.cachedPRStatus)
+                    PRBadgeView(status: prStatusOverride ?? set.prStatus)
                 }
 
             // Completion checkbox — fixed 40pt column
@@ -726,10 +726,11 @@ struct SetRowView: View {
             setRightRIRValue: { rightRIRBinding.wrappedValue = $0 },
             getSuggestedWeight: { suggestedWeight },
             getWeightIncrement: {
-                UnitConversion.displayedWeightIncrement(
-                    exercise.weightIncrement ?? defaultWeightIncrement,
+                UnitConversion.resolvedWeightIncrementOption(
+                    exerciseIncrement: exercise.weightIncrement,
+                    defaultIncrement: defaultWeightIncrement,
                     unitPreference: unitPreference
-                )
+                ).display
             },
             unitPreference: unitPreference,
             getTargetRepRange: {

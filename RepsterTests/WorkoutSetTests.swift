@@ -235,12 +235,95 @@ final class WorkoutSetTests: XCTestCase {
     func testDefaultWeightIncrementUsesNativeDisplayUnit() {
         XCTAssertEqual(UnitConversion.defaultStoredWeightIncrement(for: .metric), 2.5)
         XCTAssertEqual(
-            UnitConversion.formatWeightLabel(
-                UnitConversion.defaultStoredWeightIncrement(for: .imperial),
-                unitPreference: .imperial
+            UnitConversion.formatWeightIncrementLabel(
+                storedKg: UnitConversion.defaultStoredWeightIncrement(for: .imperial),
+                unitPreference: .imperial,
+                options: UnitConversion.displayWeightIncrementOptions(for: .imperial)
             ),
             "5 lb"
         )
+    }
+
+    func testMetricDefaultIncrementNormalizesToNativeImperialPreset() {
+        let option = UnitConversion.normalizedWeightIncrementOption(
+            storedKg: 2.5,
+            unitPreference: .imperial,
+            options: UnitConversion.displayWeightIncrementOptions(for: .imperial)
+        )
+
+        XCTAssertEqual(option.display, 5.0)
+        XCTAssertEqual(option.storedKg, UnitConversion.lbsToKg(5), accuracy: 0.0001)
+        XCTAssertEqual(
+            UnitConversion.formatWeightIncrementLabel(
+                storedKg: 2.5,
+                unitPreference: .imperial,
+                options: UnitConversion.displayWeightIncrementOptions(for: .imperial)
+            ),
+            "5 lb"
+        )
+    }
+
+    func testImperialDefaultIncrementNormalizesToNativeMetricPreset() {
+        let storedFivePounds = UnitConversion.lbsToKg(5)
+        let option = UnitConversion.normalizedWeightIncrementOption(
+            storedKg: storedFivePounds,
+            unitPreference: .metric,
+            options: UnitConversion.displayWeightIncrementOptions(for: .metric)
+        )
+
+        XCTAssertEqual(option.display, 2.5)
+        XCTAssertEqual(option.storedKg, 2.5)
+        XCTAssertEqual(
+            UnitConversion.formatWeightIncrementLabel(
+                storedKg: storedFivePounds,
+                unitPreference: .metric,
+                options: UnitConversion.displayWeightIncrementOptions(for: .metric)
+            ),
+            "2.5 kg"
+        )
+    }
+
+    func testResolvedDefaultIncrementMatchesNudgeDisplayAfterUnitSwitches() {
+        let imperialFromMetric = UnitConversion.resolvedWeightIncrementOption(
+            exerciseIncrement: nil,
+            defaultIncrement: 2.5,
+            unitPreference: .imperial
+        )
+        let metricFromImperial = UnitConversion.resolvedWeightIncrementOption(
+            exerciseIncrement: nil,
+            defaultIncrement: UnitConversion.lbsToKg(5),
+            unitPreference: .metric
+        )
+
+        XCTAssertEqual(imperialFromMetric.display, 5.0)
+        XCTAssertEqual(imperialFromMetric.storedKg, UnitConversion.lbsToKg(5), accuracy: 0.0001)
+        XCTAssertEqual(metricFromImperial.display, 2.5)
+        XCTAssertEqual(metricFromImperial.storedKg, 2.5)
+    }
+
+    func testResolvedExerciseIncrementUsesExercisePickerPresetList() {
+        let metricFromImperial = UnitConversion.resolvedWeightIncrementOption(
+            exerciseIncrement: UnitConversion.lbsToKg(5),
+            defaultIncrement: 10,
+            unitPreference: .metric
+        )
+
+        XCTAssertEqual(metricFromImperial.display, 2.5)
+        XCTAssertEqual(metricFromImperial.storedKg, 2.5)
+    }
+
+    func testExerciseSettingsMetricWeightIncrementOptionsRestoreSheetSpecificList() {
+        let options = ExerciseSettingsSheet.weightIncrementOptions(for: .metric)
+
+        XCTAssertEqual(options.map(\.display), [1.25, 2.5, 5.0, 10.0, 20.0])
+        XCTAssertEqual(options.map(\.storedKg), [1.25, 2.5, 5.0, 10.0, 20.0])
+    }
+
+    func testExerciseSettingsImperialWeightIncrementOptionsStayNativePounds() {
+        let options = ExerciseSettingsSheet.weightIncrementOptions(for: .imperial)
+
+        XCTAssertEqual(options.map(\.display), [1.0, 2.5, 5.0, 10.0, 15.0, 20.0, 25.0])
+        XCTAssertEqual(options.map(\.storedKg), options.map { UnitConversion.lbsToKg($0.display) })
     }
 
     func testDistanceFormattingUsesUnitThresholds() {

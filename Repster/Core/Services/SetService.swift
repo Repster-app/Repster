@@ -61,7 +61,7 @@ actor SetService: SetServiceProtocol {
 
         // 2. Persist immediately (FR-012)
         if !supportsRepPRs(for: exercise) {
-            set.cachedPRStatus = nil
+            set.prStatus = nil
         }
         try await setRepo.save(set)
         set.markFatigueLearningSnapshotPersisted(effectiveWeightOverride: effectiveWeight)
@@ -84,10 +84,10 @@ actor SetService: SetServiceProtocol {
             prResult = emptyPRResult(for: set.id)
         }
 
-        // PRService skips writing cachedPRStatus on the evaluated set itself
+        // PRService skips writing PR status on the evaluated set itself
         // (it's returned via prResult.newStatus) — write it here.
-        if supportsRepPRs(for: exercise), set.cachedPRStatus != prResult.newStatus {
-            set.cachedPRStatus = prResult.newStatus
+        if supportsRepPRs(for: exercise), set.prStatus != prResult.newStatus {
+            set.prStatus = prResult.newStatus
             try await setRepo.save(set)
         }
 
@@ -111,7 +111,10 @@ actor SetService: SetServiceProtocol {
         )
     }
 
-    func edit(_ set: WorkoutSet) async throws -> SetSaveResult {
+    func edit(
+        _ set: WorkoutSet,
+        previousContribution: SetContributionSnapshot? = nil
+    ) async throws -> SetSaveResult {
         let exercise = try await exerciseRepo.fetch(byId: set.exerciseId)
         set.syncDerivedPerformanceFields(for: exercise)
 
@@ -119,12 +122,8 @@ actor SetService: SetServiceProtocol {
         guard let oldSet = try await setRepo.fetch(byId: set.id) else {
             throw SetServiceError.setNotFound(set.id)
         }
+        let oldContribution = previousContribution ?? SetContributionSnapshot(set: oldSet)
         let previousFatigueSnapshot = set.persistedFatigueSnapshot ?? oldSet.fatigueLearningSnapshot()
-        let oldReps = oldSet.statsReps
-        let oldEffectiveWeight = oldSet.effectiveWeight ?? 0
-        let oldSetType = oldSet.setType
-        let oldHasData = oldSet.hasData
-        let oldCachedPRStatus = oldSet.cachedPRStatus
 
         // 2. Recompute effectiveWeight with new values (specdoc S5.4)
         let newEffectiveWeight = try await computeEffectiveWeight(
@@ -147,33 +146,58 @@ actor SetService: SetServiceProtocol {
 
         // 3. Persist updated set
         if !supportsRepPRs(for: exercise) {
-            set.cachedPRStatus = nil
+            set.prStatus = nil
         }
         try await setRepo.save(set)
 
         // 4. PR re-evaluation (FR-004)
         let prResult: PREvaluationResult
         if supportsRepPRs(for: exercise) {
-            prResult = try await prService.evaluateAfterEdit(
-                setId: set.id,
-                exerciseId: set.exerciseId,
-                reps: set.prReps,
-                effectiveWeight: newEffectiveWeight ?? 0,
-                workoutId: set.workoutId,
-                setType: set.setType,
-                hasData: set.hasData,
-                excludeFromPRs: set.excludeFromPRs ?? false,
-                previousCachedPRStatus: oldCachedPRStatus,
-                date: set.date
-            )
+            if oldContribution.prReps != set.prReps {
+                let deletionResult = try await prService.handleDeletion(
+                    setId: oldContribution.setId,
+                    exerciseId: oldContribution.exerciseId,
+                    reps: oldContribution.prReps,
+                    cachedPRStatus: oldContribution.cachedPRStatus
+                )
+                let evaluationResult = try await prService.evaluate(
+                    setId: set.id,
+                    exerciseId: set.exerciseId,
+                    reps: set.prReps,
+                    effectiveWeight: newEffectiveWeight ?? 0,
+                    workoutId: set.workoutId,
+                    setType: set.setType,
+                    hasData: set.hasData,
+                    excludeFromPRs: set.excludeFromPRs ?? false,
+                    date: set.date
+                )
+                prResult = mergedPRResult(
+                    setId: set.id,
+                    deletionResult: deletionResult,
+                    evaluationResult: evaluationResult
+                )
+            } else {
+                prResult = try await prService.evaluateAfterEdit(
+                    setId: set.id,
+                    exerciseId: set.exerciseId,
+                    reps: set.prReps,
+                    effectiveWeight: newEffectiveWeight ?? 0,
+                    workoutId: set.workoutId,
+                    setType: set.setType,
+                    hasData: set.hasData,
+                    excludeFromPRs: set.excludeFromPRs ?? false,
+                    previousCachedPRStatus: oldContribution.cachedPRStatus,
+                    date: set.date
+                )
+            }
         } else {
             prResult = emptyPRResult(for: set.id)
         }
 
-        // PRService skips writing cachedPRStatus on the evaluated set itself
+        // PRService skips writing PR status on the evaluated set itself
         // (it's returned via prResult.newStatus) — write it here.
-        if supportsRepPRs(for: exercise), set.cachedPRStatus != prResult.newStatus {
-            set.cachedPRStatus = prResult.newStatus
+        if supportsRepPRs(for: exercise), set.prStatus != prResult.newStatus {
+            set.prStatus = prResult.newStatus
             try await setRepo.save(set)
         }
 
@@ -181,10 +205,10 @@ actor SetService: SetServiceProtocol {
         try await statsService.updateStats(
             for: set.exerciseId,
             event: .edit(
-                oldReps: oldReps,
-                oldEffectiveWeight: oldEffectiveWeight,
-                oldSetType: oldSetType,
-                oldHasData: oldHasData,
+                oldReps: oldContribution.statsReps,
+                oldEffectiveWeight: oldContribution.effectiveWeight,
+                oldSetType: oldContribution.setType,
+                oldHasData: oldContribution.hasData,
                 newReps: set.statsReps,
                 newEffectiveWeight: newEffectiveWeight ?? 0,
                 newSetType: set.setType,
@@ -213,62 +237,56 @@ actor SetService: SetServiceProtocol {
         )
     }
 
-    func uncomplete(_ set: WorkoutSet) async throws -> SetSaveResult {
+    func uncomplete(
+        _ set: WorkoutSet,
+        previousContribution: SetContributionSnapshot? = nil
+    ) async throws -> SetSaveResult {
         // 1. Capture old values BEFORE mutation (same pattern as delete)
-        let setId = set.id
-        let exerciseId = set.exerciseId
-        let reps = set.statsReps
-        let prReps = set.prReps
-        let effectiveWeight = set.effectiveWeight ?? 0
-        let setType = set.setType
-        let hasData = set.hasData
-        let cachedPRStatus = set.cachedPRStatus
-        let date = set.date
-        let workoutId = set.workoutId
+        let oldContribution = previousContribution ?? SetContributionSnapshot(set: set)
 
         // 2. Mutate the set — mark as uncompleted, clear PR status
         set.completed = false
         set.completedAt = nil
-        set.cachedPRStatus = nil
+        set.prStatus = nil
         set.updatedAt = Date()
 
         // 3. Persist (flat save — no PR/stats pipeline)
         try await setRepo.save(set)
-        set.markFatigueLearningSnapshotPersisted(effectiveWeightOverride: effectiveWeight)
+        set.markFatigueLearningSnapshotPersisted(effectiveWeightOverride: oldContribution.effectiveWeight)
 
         // 4. PR demotion — same as delete path
         // handleDeletion is a no-op if this set wasn't the PR owner
-        let exercise = try await exerciseRepo.fetch(byId: exerciseId)
+        let exercise = try await exerciseRepo.fetch(byId: oldContribution.exerciseId)
         let prResult: PREvaluationResult
         if supportsRepPRs(for: exercise) {
             prResult = try await prService.handleDeletion(
-                setId: setId,
-                exerciseId: exerciseId,
-                reps: prReps,
-                cachedPRStatus: cachedPRStatus
+                setId: oldContribution.setId,
+                exerciseId: oldContribution.exerciseId,
+                reps: oldContribution.prReps,
+                cachedPRStatus: oldContribution.cachedPRStatus
             )
         } else {
-            prResult = emptyPRResult(for: setId)
+            prResult = emptyPRResult(for: oldContribution.setId)
         }
 
         // 5. Stats decrement — same as delete path
         try await statsService.updateStats(
-            for: exerciseId,
+            for: oldContribution.exerciseId,
             event: .delete(
-                reps: reps,
-                effectiveWeight: effectiveWeight,
-                setType: setType,
-                hasData: hasData,
-                date: date,
-                workoutId: workoutId
+                reps: oldContribution.statsReps,
+                effectiveWeight: oldContribution.effectiveWeight,
+                setType: oldContribution.setType,
+                hasData: oldContribution.hasData,
+                date: oldContribution.date,
+                workoutId: oldContribution.workoutId
             )
         )
 
-        try await fatigueLearningService.removeCapturedSetData(setId: setId)
+        try await fatigueLearningService.removeCapturedSetData(setId: oldContribution.setId)
 
         return SetSaveResult(
-            setId: setId,
-            effectiveWeight: effectiveWeight,
+            setId: oldContribution.setId,
+            effectiveWeight: oldContribution.effectiveWeight,
             prResult: prResult
         )
     }
@@ -282,7 +300,7 @@ actor SetService: SetServiceProtocol {
         let effectiveWeight = set.effectiveWeight ?? 0
         let setType = set.setType
         let hasData = set.hasData
-        let cachedPRStatus = set.cachedPRStatus
+        let cachedPRStatus = set.prStatus
         let date = set.date
         let workoutId = set.workoutId
 
@@ -396,6 +414,25 @@ actor SetService: SetServiceProtocol {
             newStatus: nil,
             affectedSetIds: [:],
             prRecordChanged: false
+        )
+    }
+
+    private func mergedPRResult(
+        setId: UUID,
+        deletionResult: PREvaluationResult,
+        evaluationResult: PREvaluationResult
+    ) -> PREvaluationResult {
+        var affectedSetIds = deletionResult.affectedSetIds
+        for (affectedSetId, status) in evaluationResult.affectedSetIds {
+            affectedSetIds[affectedSetId] = status
+        }
+        affectedSetIds.removeValue(forKey: setId)
+
+        return PREvaluationResult(
+            setId: setId,
+            newStatus: evaluationResult.newStatus,
+            affectedSetIds: affectedSetIds,
+            prRecordChanged: deletionResult.prRecordChanged || evaluationResult.prRecordChanged
         )
     }
 }

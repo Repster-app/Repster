@@ -446,6 +446,7 @@ enum SuggestionCoordinator {
         if let profile {
             profileSignature = [
                 "enabled\(profile.prescriptionEnabled ?? true)",
+                "unit\(profile.unitPreference.rawValue)",
                 "weeks\(profile.prescriptionRecencyWeeks ?? 6)",
                 "inc\(signatureOptionalNumber(profile.prescriptionDefaultIncrement))",
                 "defaultReps\(profile.prescriptionDefaultTargetReps ?? 8)",

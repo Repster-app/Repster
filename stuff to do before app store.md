@@ -1,6 +1,6 @@
 # Stuff To Do Before App Store
 
-- Replace the placeholder `feedback@repster.app` in the app with the final `Repster` support email.
+- Confirm `contact@repster.site` is the final `Repster` support email.
 - Update the placeholder privacy policy URL in settings to the final `Repster` page.
 - Add a visible `Terms of Use` link around the membership/paywall flow and make sure purchase, restore, and manage-subscription paths are all review-ready.
 - Replace the RevenueCat test API key with the live production key and verify the real offering / entitlement setup before submission.

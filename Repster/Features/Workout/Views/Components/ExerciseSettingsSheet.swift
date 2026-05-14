@@ -32,8 +32,12 @@ struct ExerciseSettingsSheet: View {
 
     // MARK: - Available Increments
 
+    static func weightIncrementOptions(for unitPreference: UnitPreference) -> [(display: Double, storedKg: Double)] {
+        UnitConversion.exerciseWeightIncrementOptions(for: unitPreference)
+    }
+
     private var weightIncrements: [(display: Double, storedKg: Double)] {
-        UnitConversion.displayWeightIncrementOptions(for: services.unitPreference)
+        Self.weightIncrementOptions(for: services.unitPreference)
     }
 
     // MARK: - Init
@@ -67,8 +71,8 @@ struct ExerciseSettingsSheet: View {
                 }
 
                 Section("Weight Increment") {
-                    Picker("Increment", selection: $weightIncrement) {
-                        Text("App Default (\(formatIncrement(appDefaultIncrement)))")
+                    Picker("Increment", selection: weightIncrementSelection) {
+                        Text("App Default (\(formatAppDefaultIncrement(appDefaultIncrement)))")
                             .tag(Optional<Double>.none)
                         ForEach(weightIncrements, id: \.storedKg) { option in
                             Text(formatIncrement(displayValue: option.display)).tag(Optional(option.storedKg))
@@ -182,13 +186,31 @@ struct ExerciseSettingsSheet: View {
         return "\(minutes)m \(secs)s"
     }
 
-    private func formatIncrement(_ value: Double?) -> String {
-        guard let value else { return "Not Set" }
-        return UnitConversion.formatWeightLabel(value, unitPreference: services.unitPreference)
+    private func formatAppDefaultIncrement(_ value: Double?) -> String {
+        UnitConversion.formatWeightIncrementLabel(
+            storedKg: value,
+            unitPreference: services.unitPreference,
+            options: UnitConversion.displayWeightIncrementOptions(for: services.unitPreference)
+        )
     }
 
     private func formatIncrement(displayValue value: Double) -> String {
-        "\(UnitConversion.formatWeight(value)) \(UnitConversion.weightUnitLabel(for: services.unitPreference))"
+        UnitConversion.formatWeightIncrementLabel(displayValue: value, unitPreference: services.unitPreference)
+    }
+
+    private var weightIncrementSelection: Binding<Double?> {
+        Binding(
+            get: {
+                weightIncrement.map {
+                    UnitConversion.normalizedWeightIncrementOption(
+                        storedKg: $0,
+                        unitPreference: services.unitPreference,
+                        options: weightIncrements
+                    ).storedKg
+                }
+            },
+            set: { weightIncrement = $0 }
+        )
     }
 }
 

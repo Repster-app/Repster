@@ -10,10 +10,10 @@ import Foundation
 struct PREvaluationResult: Sendable {
     /// The set that was evaluated.
     let setId: UUID
-    /// The new cachedPRStatus to assign to this set (nil means no badge).
+    /// The new PR status to assign to this set (nil means no badge).
     let newStatus: CachedPRStatus?
-    /// Other sets whose cachedPRStatus changed as a side effect.
-    /// Key: setId, Value: new cachedPRStatus (nil means cleared).
+    /// Other sets whose PR status changed as a side effect.
+    /// Key: setId, Value: new PR status (nil means cleared).
     /// Example: old PR owner's status changes to "previous".
     let affectedSetIds: [UUID: CachedPRStatus?]
     /// Whether a PerformanceRecord was created, updated, or deleted.
@@ -34,12 +34,12 @@ struct PRTableEntry: Sendable {
 /// Responsibilities (per AGENT_RULES S6):
 /// - Evaluate PR eligibility for sets
 /// - Update PerformanceRecord table
-/// - Update cachedPRStatus on WorkoutSet
+/// - Update PR status on WorkoutSet
 /// - Suffix-max filtering for display
 /// - Bulk rebuild after import or settings changes
 ///
 /// PRService does NOT:
-/// - Modify any WorkoutSet field other than cachedPRStatus
+/// - Modify any WorkoutSet field other than PR status
 /// - Handle set creation/deletion (that's SetService)
 /// - Compute stats (that's StatsService)
 /// - Access ModelContext directly (uses repositories)
@@ -91,7 +91,7 @@ protocol PRServiceProtocol: Sendable {
     ///   - setType: The set's type after edit.
     ///   - hasData: Whether the set has data after edit.
     ///   - excludeFromPRs: PR exclusion flag after edit.
-    ///   - previousCachedPRStatus: The set's cachedPRStatus before the edit.
+    ///   - previousCachedPRStatus: The set's PR status before the edit.
     ///   - date: The set's date.
     /// - Returns: Evaluation result with new status and side effects.
     func evaluateAfterEdit(
@@ -116,7 +116,7 @@ protocol PRServiceProtocol: Sendable {
     ///   - setId: The deleted set's ID (used to exclude from candidate search).
     ///   - exerciseId: The exercise this set belonged to.
     ///   - reps: Number of reps on the deleted set.
-    ///   - cachedPRStatus: The deleted set's cachedPRStatus before deletion.
+    ///   - cachedPRStatus: The deleted set's PR status before deletion.
     /// - Returns: Evaluation result with any promoted sets.
     func handleDeletion(
         setId: UUID,

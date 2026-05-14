@@ -21,10 +21,10 @@ extension CachedPRStatus {
     /// Returns the effective display status for a set, suppressing `.matched` when
     /// another set in the same workout dominates it (same/higher weight, more reps).
     static func effectiveStatus(for set: WorkoutSet, among siblings: [WorkoutSet]) -> CachedPRStatus? {
-        guard set.cachedPRStatus == .matched,
+        guard set.prStatus == .matched,
               let weight = set.weight,
               let reps = set.reps else {
-            return set.cachedPRStatus
+            return set.prStatus
         }
         let dominated = siblings.contains { sibling in
             sibling.id != set.id &&

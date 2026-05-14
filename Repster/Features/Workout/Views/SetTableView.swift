@@ -637,21 +637,28 @@ private struct SetRowWrapper: View {
     }
 
     /// Apply an input edit and ensure completed sets are automatically uncompleted.
-    private func handleFieldEdit(field: SetDraftField, _ edit: () -> Void) {
+    @discardableResult
+    private func handleFieldEdit(field: SetDraftField, _ edit: () -> Void) -> Bool {
+        let contributionBeforeEdit = set.completed ? SetContributionSnapshot(set: set) : nil
         edit()
 
         if set.completed {
             guard !isAutoUncompleting else {
                 dataSource.markSetDirty(set, field: field)
-                return
+                return true
             }
             isAutoUncompleting = true
             Task { @MainActor in
-                await dataSource.uncompleteSet(set)
+                await dataSource.uncompleteSet(
+                    set,
+                    previousContribution: contributionBeforeEdit
+                )
                 isAutoUncompleting = false
             }
+            return true
         } else {
             dataSource.markSetDirty(set, field: field)
+            return false
         }
     }
 
@@ -661,7 +668,7 @@ private struct SetRowWrapper: View {
             return
         }
 
-        handleFieldEdit(field: .reps) {
+        let startedAutoUncomplete = handleFieldEdit(field: .reps) {
             switch input {
             case .empty:
                 set.reps = nil
@@ -680,6 +687,8 @@ private struct SetRowWrapper: View {
             }
         }
 
+        guard !startedAutoUncomplete else { return }
+
         Task {
             await dataSource.persistTargetRepOverride(
                 set,
@@ -692,7 +701,7 @@ private struct SetRowWrapper: View {
     private func commitTargetRepRange(_ min: Int?, _ max: Int?) {
         let currentInput = RepsTargetInputParser.parse(repsText)
         var didCommit = false
-        handleFieldEdit(field: .reps) {
+        let startedAutoUncomplete = handleFieldEdit(field: .reps) {
             didCommit = CustomRepRangeCommitter.commit(min: min, max: max, to: set)
             guard didCommit else { return }
 
@@ -706,6 +715,7 @@ private struct SetRowWrapper: View {
         }
 
         guard didCommit else { return }
+        guard !startedAutoUncomplete else { return }
 
         Task {
             await dataSource.persistTargetRepOverride(
@@ -1741,11 +1751,25 @@ struct SetEntryKeyboardOverlay: View {
     }
 
     private func nudgeWeight(_ context: SetEntryKeyboardContext, delta: Double) {
+        guard delta.isFinite else { return }
+        let increment = abs(delta)
+        guard increment > 0 else { return }
+
         let raw = context.getFieldValue(.weight)
-        let normalized = raw.replacingOccurrences(of: ",", with: ".")
-        let current = Double(normalized) ?? 0
-        let next = max(0, ((current + delta) * 10).rounded() / 10)
-        let formatted = next.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(next)) : String(next)
+        let current = UnitConversion.parseDecimal(raw) ?? 0
+        let quotient = current / increment
+        let roundedQuotient = quotient.rounded()
+        let isOnGrid = abs(quotient - roundedQuotient) < 1e-9
+        let nextMultiple: Double
+
+        if delta > 0 {
+            nextMultiple = isOnGrid ? roundedQuotient + 1 : ceil(quotient)
+        } else {
+            nextMultiple = isOnGrid ? roundedQuotient - 1 : floor(quotient)
+        }
+
+        let next = max(0, nextMultiple * increment)
+        let formatted = UnitConversion.formatWeight(next)
         context.setFieldValue(.weight, formatted)
         refreshTick += 1
         manager.refresh()

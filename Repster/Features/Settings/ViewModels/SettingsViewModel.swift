@@ -8,7 +8,7 @@ import UIKit
 
 enum BrandingConfiguration {
     static let appName = "Repster"
-    static let supportEmail = "feedback@repster.app"
+    static let supportEmail = "contact@repster.site"
     static let privacyPolicyURL = URL(string: "https://repster-app.github.io/Repster/privacy.html")!
     static let termsOfUseURL = URL(string: "https://repster-app.github.io/Repster/terms.html")!
 }
@@ -138,11 +138,20 @@ final class SettingsViewModel {
 
     var prescriptionIncrementDisplayName: String {
         let unitPreference = profile?.unitPreference ?? .metric
+        let options = UnitConversion.displayWeightIncrementOptions(for: unitPreference)
         guard let increment = profile?.prescriptionDefaultIncrement else {
             let fallback = UnitConversion.defaultStoredWeightIncrement(for: unitPreference)
-            return UnitConversion.formatWeightLabel(fallback, unitPreference: unitPreference)
+            return UnitConversion.formatWeightIncrementLabel(
+                storedKg: fallback,
+                unitPreference: unitPreference,
+                options: options
+            )
         }
-        return UnitConversion.formatWeightLabel(increment, unitPreference: unitPreference)
+        return UnitConversion.formatWeightIncrementLabel(
+            storedKg: increment,
+            unitPreference: unitPreference,
+            options: options
+        )
     }
 
     var workoutPreferencesSummary: String {
@@ -289,11 +298,20 @@ final class SettingsViewModel {
 
     private var compactIncrementSummary: String {
         let unitPreference = profile?.unitPreference ?? .metric
+        let options = UnitConversion.displayWeightIncrementOptions(for: unitPreference)
         guard let increment = profile?.prescriptionDefaultIncrement else {
             let fallback = UnitConversion.defaultStoredWeightIncrement(for: unitPreference)
-            return UnitConversion.formatWeightLabel(fallback, unitPreference: unitPreference)
+            return UnitConversion.formatWeightIncrementLabel(
+                storedKg: fallback,
+                unitPreference: unitPreference,
+                options: options
+            )
         }
-        return UnitConversion.formatWeightLabel(increment, unitPreference: unitPreference)
+        return UnitConversion.formatWeightIncrementLabel(
+            storedKg: increment,
+            unitPreference: unitPreference,
+            options: options
+        )
     }
 
     private func performUpdate(_ update: () async throws -> Void) async {

@@ -399,7 +399,7 @@ actor ChartDataService: ChartDataServiceProtocol {
             let total = sets.reduce(0.0) { $0 + Double($1.totalReps) }
             return total > 0 ? total : nil
         case .personalRecords:
-            return sets.filter { $0.cachedPRStatus == .current }.compactMap { $0.effectiveWeight }.max()
+            return sets.filter { $0.prStatus == .current }.compactMap { $0.effectiveWeight }.max()
         case .maxDistance:
             return sets.compactMap { $0.distanceMeters }.filter { $0 > 0 }.max()
         case .maxTime:

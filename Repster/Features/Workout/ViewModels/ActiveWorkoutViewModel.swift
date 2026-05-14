@@ -177,7 +177,7 @@ final class ActiveWorkoutViewModel {
     /// User's unit preference for display formatting.
     var unitPreference: UnitPreference = .metric
 
-    /// Default weight increment stored in kg.
+    /// Resolved default weight increment stored in kg.
     var defaultWeightIncrement: Double = 2.5
 
     /// Tracks which exerciseId was last loaded for exercise info to avoid redundant fetches.
@@ -358,8 +358,11 @@ final class ActiveWorkoutViewModel {
             // 7. Fetch global default rest time for fallback
             if let profile = try? await settingsService.fetchSettings() {
                 self.unitPreference = profile.unitPreference
-                self.defaultWeightIncrement = profile.prescriptionDefaultIncrement
-                    ?? UnitConversion.defaultStoredWeightIncrement(for: profile.unitPreference)
+                self.defaultWeightIncrement = UnitConversion.resolvedStoredWeightIncrement(
+                    exerciseIncrement: nil,
+                    defaultIncrement: profile.prescriptionDefaultIncrement,
+                    unitPreference: profile.unitPreference
+                )
                 self.globalDefaultRestTime = profile.defaultRestTimeSeconds ?? 150
                 self.globalDefaultWarmupRestTime = profile.defaultWarmupRestTimeSeconds
                 self.restTimerAlertMode = profile.restTimerAlert ?? "both"
@@ -413,7 +416,7 @@ final class ActiveWorkoutViewModel {
 
             // 3. Update local state with pipeline results
             set.effectiveWeight = result.effectiveWeight
-            set.cachedPRStatus = result.prResult.newStatus
+            set.prStatus = result.prResult.newStatus
 
             // 4. Update any affected sets (e.g., demoted PR owners)
             applyAffectedSets(result.prResult.affectedSetIds)
@@ -482,14 +485,20 @@ final class ActiveWorkoutViewModel {
     ///
     /// Uses setService.uncomplete() which models uncompleting as "removing a set's
     /// contribution" — demotes PRs and decrements stats without deleting the set.
-    func uncompleteSet(_ set: WorkoutSet) async {
+    func uncompleteSet(
+        _ set: WorkoutSet,
+        previousContribution: SetContributionSnapshot? = nil
+    ) async {
         let exerciseId = set.exerciseId
         let oldCompleted = set.completed
 
         do {
-            let result = try await setService.uncomplete(set)
+            let result = try await setService.uncomplete(
+                set,
+                previousContribution: previousContribution
+            )
             set.effectiveWeight = result.effectiveWeight
-            set.cachedPRStatus = result.prResult.newStatus
+            set.prStatus = result.prResult.newStatus
             applyAffectedSets(result.prResult.affectedSetIds)
 
             // Reassign array to trigger @Observable update
@@ -650,7 +659,7 @@ final class ActiveWorkoutViewModel {
         do {
             let result = try await setService.edit(set)
             set.effectiveWeight = result.effectiveWeight
-            set.cachedPRStatus = result.prResult.newStatus
+            set.prStatus = result.prResult.newStatus
             applyAffectedSets(result.prResult.affectedSetIds)
 
             // Invalidate PR cache and refresh suggestions as needed
@@ -1540,8 +1549,11 @@ final class ActiveWorkoutViewModel {
             // Fetch unit preference and prescription toggle for display
             let profile = try await settingsService.fetchSettings()
             unitPreference = profile.unitPreference
-            defaultWeightIncrement = profile.prescriptionDefaultIncrement
-                ?? UnitConversion.defaultStoredWeightIncrement(for: profile.unitPreference)
+            defaultWeightIncrement = UnitConversion.resolvedStoredWeightIncrement(
+                exerciseIncrement: nil,
+                defaultIncrement: profile.prescriptionDefaultIncrement,
+                unitPreference: profile.unitPreference
+            )
             prescriptionEnabled = profile.prescriptionEnabled ?? true
             suggestionAdminModeEnabled = profile.prescriptionAdminModeEnabled ?? false
 
@@ -1584,8 +1596,11 @@ final class ActiveWorkoutViewModel {
     func refreshDisplaySettings() async {
         guard let profile = try? await settingsService.fetchSettings() else { return }
         unitPreference = profile.unitPreference
-        defaultWeightIncrement = profile.prescriptionDefaultIncrement
-            ?? UnitConversion.defaultStoredWeightIncrement(for: profile.unitPreference)
+        defaultWeightIncrement = UnitConversion.resolvedStoredWeightIncrement(
+            exerciseIncrement: nil,
+            defaultIncrement: profile.prescriptionDefaultIncrement,
+            unitPreference: profile.unitPreference
+        )
         prescriptionEnabled = profile.prescriptionEnabled ?? true
         suggestionAdminModeEnabled = profile.prescriptionAdminModeEnabled ?? false
         invalidateExerciseInfo()
@@ -1703,8 +1718,11 @@ final class ActiveWorkoutViewModel {
 
         if let resolvedProfile {
             unitPreference = resolvedProfile.unitPreference
-            defaultWeightIncrement = resolvedProfile.prescriptionDefaultIncrement
-                ?? UnitConversion.defaultStoredWeightIncrement(for: resolvedProfile.unitPreference)
+            defaultWeightIncrement = UnitConversion.resolvedStoredWeightIncrement(
+                exerciseIncrement: nil,
+                defaultIncrement: resolvedProfile.prescriptionDefaultIncrement,
+                unitPreference: resolvedProfile.unitPreference
+            )
             prescriptionEnabled = resolvedProfile.prescriptionEnabled ?? true
             suggestionAdminModeEnabled = resolvedProfile.prescriptionAdminModeEnabled ?? false
         }
@@ -1819,8 +1837,8 @@ final class ActiveWorkoutViewModel {
             let bestWeight = completedSets.compactMap(\.effectiveWeight).max()
             let bestReps = completedSets.map(\.prReps).max()
 
-            // PRs hit (cachedPRStatus == .current)
-            let exercisePRs = sets.filter { $0.cachedPRStatus == .current }.count
+            // PRs hit (prStatus == .current)
+            let exercisePRs = sets.filter { $0.prStatus == .current }.count
             prsHit += exercisePRs
 
             exerciseSummaries.append(ExerciseSummary(
@@ -1945,7 +1963,7 @@ final class ActiveWorkoutViewModel {
     /// Apply affected set status changes from PR pipeline results.
     ///
     /// When a set is saved/edited/deleted, the PR pipeline may change
-    /// cachedPRStatus on other sets (e.g., demoting a previous PR owner).
+    /// PR status on other sets (e.g., demoting a previous PR owner).
     /// To avoid confusing retroactive badge "upgrades" during a workout,
     /// completed in-session sets only receive demotions, not promotions.
     private func applyAffectedSets(_ affectedSetIds: [UUID: CachedPRStatus?]) {
@@ -1958,10 +1976,10 @@ final class ActiveWorkoutViewModel {
                 if let newStatus = affectedSetIds[set.id] {
                     // For completed sets, only apply demotions (not promotions).
                     // This prevents confusing badge changes on sets the user already saw.
-                    if set.completed, isStatusUpgrade(from: set.cachedPRStatus, to: newStatus) {
+                    if set.completed, isStatusUpgrade(from: set.prStatus, to: newStatus) {
                         continue
                     }
-                    updatedSets[index].cachedPRStatus = newStatus
+                    updatedSets[index].prStatus = newStatus
                     changed = true
                 }
             }

@@ -495,7 +495,7 @@ private extension WorkoutHistoryArchiveSet {
             supersetGroupId: set.supersetGroupId,
             completed: set.completed,
             excludeFromPRs: set.excludeFromPRs,
-            cachedPRStatus: set.cachedPRStatus,
+            cachedPRStatus: set.prStatus,
             targetWeight: set.targetWeight,
             targetRepMin: set.targetRepMin,
             targetRepMax: set.targetRepMax,
