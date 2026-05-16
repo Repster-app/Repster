@@ -6,18 +6,18 @@
 import Foundation
 
 enum OnboardingStep: Int, CaseIterable {
-    case welcome      = 0
-    case units        = 1
-    case formula      = 2
-    case bodyweight   = 3
-    case importPrompt = 4
+    case welcome          = 0
+    case units            = 1
+    case bodyweight       = 2
+    case smartSuggestions = 3
+    case importPrompt     = 4
 
     static var totalSteps: Int { allCases.count }
 
     var isSkippable: Bool {
         switch self {
         case .welcome: return false
-        case .units, .formula, .bodyweight, .importPrompt: return true
+        case .units, .bodyweight, .smartSuggestions, .importPrompt: return true
         }
     }
 }

@@ -60,73 +60,148 @@ struct ImportStepView: View {
     private var idleView: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(spacing: 16) {
-                    Text("Migrating from another app?")
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Color.textPrimary)
-                        .padding(.top, 8)
+                VStack(spacing: 24) {
+                    VStack(spacing: 12) {
+                        Image(systemName: "square.and.arrow.down")
+                            .font(.system(size: 46, weight: .semibold))
+                            .foregroundStyle(Color.accent)
 
-                    VStack(spacing: 8) {
-                        ForEach(ImportSource.allCases) { source in
-                            ImportSourceOptionCard(
-                                source: source,
-                                isSelected: viewModel.selectedSource == source
-                            ) {
-                                viewModel.chooseSource(source)
+                        Text("Import Workout History")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundStyle(Color.textPrimary)
+
+                        Text("Bring over past workouts from FitNotes or Strong now, or start fresh and import later from Settings.")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                    }
+
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Source")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.textSecondary)
+
+                        HStack(spacing: 12) {
+                            ForEach(ImportSource.allCases) { source in
+                                onboardingSourceTile(source)
                             }
                         }
-                    }
-                    .padding(.horizontal, 20)
 
-                    if viewModel.selectedSource == .fitNotes {
-                        ImportUnitSystemChooser(
-                            selectedUnitSystem: viewModel.selectedFitNotesUnitSystem
-                        ) { unitSystem in
-                            viewModel.chooseFitNotesUnitSystem(unitSystem)
-                        }
-                        .padding(.horizontal, 20)
-                    } else if viewModel.selectedSource.requiresUnitSystem {
-                        ImportUnitSystemChooser(
-                            selectedUnitSystem: viewModel.selectedStrongUnitSystem
-                        ) { unitSystem in
-                            viewModel.chooseStrongUnitSystem(unitSystem)
-                        }
-                        .padding(.horizontal, 20)
-                    }
-
-                    Button {
-                        viewModel.showFilePicker = true
-                    } label: {
-                        Label(viewModel.selectedSource.fileSelectionTitle, systemImage: "doc.badge.plus")
+                        Text("Units in CSV")
                             .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .padding(.horizontal, 32)
-                    .disabled(!viewModel.canSelectFile)
+                            .foregroundStyle(Color.textSecondary)
+                            .padding(.top, 4)
 
-                    ImportSupportCallout(isCompact: true)
-                        .padding(.horizontal, 32)
+                        onboardingUnitPicker
+                    }
+                    .padding(.horizontal, 32)
                 }
+                .padding(.top, 24)
                 .padding(.bottom, 12)
             }
 
-            VStack(spacing: 12) {
-                Button("Get Started") { onFinish() }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .disabled(isSaving)
+            VStack(spacing: 10) {
+                Button {
+                    viewModel.showFilePicker = true
+                } label: {
+                    Label(viewModel.selectedSource.fileSelectionTitle, systemImage: "doc.badge.plus")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(!viewModel.canSelectFile || isSaving)
 
-                Button("Skip") { onSkip() }
-                    .foregroundStyle(Color.textSecondary)
-                    .disabled(isSaving)
+                Button {
+                    onSkip()
+                } label: {
+                    Label("Start Without Importing", systemImage: "arrow.right.circle")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .disabled(isSaving)
+
+                ImportSupportCallout(isCompact: true)
             }
             .padding(.horizontal, 32)
             .padding(.top, 12)
             .padding(.bottom, 24)
             .background(Color.bg)
+        }
+    }
+
+    private func onboardingSourceTile(_ source: ImportSource) -> some View {
+        Button {
+            viewModel.chooseSource(source)
+        } label: {
+            VStack(spacing: 10) {
+                Image(systemName: source.systemImageName)
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(viewModel.selectedSource == source ? Color.accent : Color.textSecondary)
+
+                Text(source.displayName)
+                    .font(.headline)
+                    .foregroundStyle(Color.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+
+                Image(systemName: viewModel.selectedSource == source ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(viewModel.selectedSource == source ? Color.accent : Color.textSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 112)
+            .background(Color.bgCard, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(viewModel.selectedSource == source ? Color.accent : Color.clear, lineWidth: 2)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var onboardingUnitPicker: some View {
+        HStack(spacing: 8) {
+            ForEach(ImportUnitSystem.allCases) { unitSystem in
+                Button {
+                    selectUnitSystem(unitSystem)
+                } label: {
+                    Text(unitSystem.displayName)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.textPrimary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 42)
+                        .background(
+                            selectedUnitSystem == unitSystem
+                                ? Color.accent
+                                : Color.bgCard,
+                            in: RoundedRectangle(cornerRadius: 10)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var selectedUnitSystem: ImportUnitSystem? {
+        switch viewModel.selectedSource {
+        case .fitNotes:
+            return viewModel.selectedFitNotesUnitSystem
+        case .strong:
+            return viewModel.selectedStrongUnitSystem
+        }
+    }
+
+    private func selectUnitSystem(_ unitSystem: ImportUnitSystem) {
+        switch viewModel.selectedSource {
+        case .fitNotes:
+            viewModel.chooseFitNotesUnitSystem(unitSystem)
+        case .strong:
+            viewModel.chooseStrongUnitSystem(unitSystem)
         }
     }
 
@@ -284,7 +359,7 @@ struct ImportStepView: View {
             Spacer()
 
             HStack(spacing: 16) {
-                Button("Skip") { onSkip() }
+                Button("Start Without Importing") { onSkip() }
                     .buttonStyle(.bordered)
                     .frame(maxWidth: .infinity)
 

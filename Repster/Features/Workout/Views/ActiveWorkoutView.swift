@@ -79,6 +79,7 @@ struct ActiveWorkoutView: View {
             settingsService: services.settingsService,
             loadPrescriptionService: services.loadPrescriptionService,
             accessControlService: services.accessControlService,
+            analyticsService: services.analyticsService,
             fatigueLearningService: services.fatigueLearningService
         ))
         self.services = services
@@ -112,6 +113,7 @@ struct ActiveWorkoutView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: bottomAccessoryAnimationKey)
         .task {
+            services.analyticsService.screen(.activeWorkout)
             await viewModel.loadActiveWorkout()
         }
         // Recalculate rest timer when returning from background (WP06 T030)
@@ -147,6 +149,9 @@ struct ActiveWorkoutView: View {
         // Finish workout summary sheet (WP07 T032)
         .sheet(isPresented: $viewModel.showFinishSheet) {
             WorkoutSummarySheet(viewModel: viewModel)
+                .onAppear {
+                    services.analyticsService.screen(.workoutSummary)
+                }
         }
         // Dismiss active workout screen after finish (WP07 T035)
         .onChange(of: viewModel.isWorkoutFinished) { _, finished in

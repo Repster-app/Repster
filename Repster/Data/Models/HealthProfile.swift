@@ -4,7 +4,7 @@ import SwiftData
 @Model
 final class HealthProfile {
     var id: UUID
-    var unitPreference: UnitPreference
+    var unitPreferenceRawValue: String = UnitPreference.metric.rawValue
     var includeWarmupsInVolume: Bool
     var includeWarmupsInPRs: Bool
     var e1RMFormula: String
@@ -62,6 +62,15 @@ final class HealthProfile {
     var createdAt: Date
     var updatedAt: Date
 
+    var unitPreference: UnitPreference {
+        get {
+            UnitPreference(rawValue: unitPreferenceRawValue) ?? .metric
+        }
+        set {
+            unitPreferenceRawValue = newValue.rawValue
+        }
+    }
+
     init(
         id: UUID = UUID(),
         unitPreference: UnitPreference = .metric,
@@ -87,7 +96,7 @@ final class HealthProfile {
         updatedAt: Date = Date()
     ) {
         self.id = id
-        self.unitPreference = unitPreference
+        self.unitPreferenceRawValue = unitPreference.rawValue
         self.includeWarmupsInVolume = includeWarmupsInVolume
         self.includeWarmupsInPRs = includeWarmupsInPRs
         self.e1RMFormula = e1RMFormula

@@ -73,6 +73,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
 
     func testFinishWorkoutForwardsSummaryMetadataAndMarksWorkoutFinished() async throws {
         let workoutService = WorkoutServiceStub()
+        let analyticsService = AnalyticsServiceSpy()
         let profile = HealthProfile()
         let viewModel = ActiveWorkoutViewModel(
             workoutService: workoutService,
@@ -83,6 +84,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
             settingsService: SettingsServiceStub(profile: profile),
             loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            analyticsService: analyticsService,
             fatigueLearningService: makeStubFatigueLearningService()
         )
 
@@ -94,7 +96,9 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             status: .inProgress
         )
         viewModel.exercises = [makeExercise(name: "Back Squat")]
-        viewModel.setsByExercise = [viewModel.exercises[0].id: [makeSet(exerciseId: viewModel.exercises[0].id, order: 1, reps: 5)]]
+        let completedSet = makeSet(exerciseId: viewModel.exercises[0].id, order: 1, reps: 5)
+        completedSet.completed = true
+        viewModel.setsByExercise = [viewModel.exercises[0].id: [completedSet]]
 
         await viewModel.finishWorkout(
             title: "Leg Day",
@@ -111,6 +115,14 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         XCTAssertNil(viewModel.workout)
         XCTAssertTrue(viewModel.exercises.isEmpty)
         XCTAssertTrue(viewModel.setsByExercise.isEmpty)
+
+        let completionEvent = try XCTUnwrap(analyticsService.events.first { $0.event == .workoutCompleted })
+        XCTAssertEqual(completionEvent.properties[.durationBucket], .string("under_30m"))
+        XCTAssertEqual(completionEvent.properties[.setCountBucket], .string("1"))
+        XCTAssertEqual(completionEvent.properties[.exerciseCountBucket], .string("1"))
+        XCTAssertEqual(completionEvent.properties[.perceivedEffortEntered], .bool(true))
+        XCTAssertEqual(completionEvent.properties[.notesEntered], .bool(true))
+        XCTAssertEqual(completionEvent.properties[.excludedFromProgression], .bool(false))
     }
 
     func testLoadActiveWorkoutRestoresPausedElapsedTimeForMatchingWorkout() async throws {
@@ -3865,6 +3877,27 @@ private final class WorkoutServiceStub: @unchecked Sendable, WorkoutServiceProto
     }
     func deleteWorkout(_ workoutId: UUID) async throws {
         let _ = workoutId
+    }
+}
+
+private final class AnalyticsServiceSpy: AnalyticsServiceProtocol {
+    var isCollectionEnabled = true
+    private(set) var screens: [(screen: AnalyticsScreen, properties: [AnalyticsPropertyKey: AnalyticsPropertyValue])] = []
+    private(set) var events: [(event: AnalyticsEvent, properties: [AnalyticsPropertyKey: AnalyticsPropertyValue])] = []
+
+    func configure() {}
+
+    func setCollectionEnabled(_ enabled: Bool) {
+        isCollectionEnabled = enabled
+    }
+
+    func screen(_ screen: AnalyticsScreen, properties: [AnalyticsPropertyKey: AnalyticsPropertyValue]) {
+        screens.append((screen, properties))
+    }
+
+    func track(_ event: AnalyticsEvent, properties: [AnalyticsPropertyKey: AnalyticsPropertyValue]) {
+        guard isCollectionEnabled else { return }
+        events.append((event, properties))
     }
 }
 

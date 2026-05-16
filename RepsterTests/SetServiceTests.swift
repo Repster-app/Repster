@@ -291,6 +291,158 @@ final class SetServiceTests: XCTestCase {
         XCTAssertEqual(persistedSet?.prStatus, .current)
     }
 
+    func testSaveMatchingDominatedRepBucketDoesNotShowMatchBadge() async throws {
+        let context = try makeContext()
+        let exercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest"
+        )
+        let firstDate = makeDate(2026, 3, 22, 9, 0)
+        let secondDate = makeDate(2026, 3, 29, 9, 0)
+        let thirdDate = makeDate(2026, 4, 5, 9, 0)
+        let firstWorkout = Workout(date: firstDate, title: "Week 1", startTime: firstDate, status: .completed)
+        let secondWorkout = Workout(date: secondDate, title: "Week 2", startTime: secondDate, status: .completed)
+        let thirdWorkout = Workout(date: thirdDate, title: "Week 3", startTime: thirdDate, status: .completed)
+
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(firstWorkout)
+        try await context.workoutRepo.save(secondWorkout)
+        try await context.workoutRepo.save(thirdWorkout)
+
+        let eightRepOwner = WorkoutSet(
+            workoutId: firstWorkout.id,
+            exerciseId: exercise.id,
+            date: firstDate,
+            completedAt: firstDate.addingTimeInterval(300),
+            weight: 100,
+            reps: 8,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+        let tenRepOwner = WorkoutSet(
+            workoutId: secondWorkout.id,
+            exerciseId: exercise.id,
+            date: secondDate,
+            completedAt: secondDate.addingTimeInterval(300),
+            weight: 100,
+            reps: 10,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+        let eightRepRepeat = WorkoutSet(
+            workoutId: thirdWorkout.id,
+            exerciseId: exercise.id,
+            date: thirdDate,
+            completedAt: thirdDate.addingTimeInterval(300),
+            weight: 100,
+            reps: 8,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+
+        let firstResult = try await context.setService.save(eightRepOwner)
+        let secondResult = try await context.setService.save(tenRepOwner)
+        let thirdResult = try await context.setService.save(eightRepRepeat)
+
+        let persistedEightOwner = try await context.setRepo.fetch(byId: eightRepOwner.id)
+        let persistedTenOwner = try await context.setRepo.fetch(byId: tenRepOwner.id)
+        let persistedEightRepeat = try await context.setRepo.fetch(byId: eightRepRepeat.id)
+        let table = try await context.prService.fetchPRTable(for: exercise.id)
+
+        XCTAssertEqual(firstResult.prResult.newStatus, .current)
+        XCTAssertEqual(secondResult.prResult.newStatus, .current)
+        XCTAssertNil(thirdResult.prResult.newStatus)
+        XCTAssertEqual(persistedEightOwner?.prStatus, .dominated)
+        XCTAssertEqual(persistedTenOwner?.prStatus, .current)
+        XCTAssertNil(persistedEightRepeat?.prStatus)
+        XCTAssertEqual(table.map(\.reps), [10])
+    }
+
+    func testRebuildClearsMatchBadgesForDominatedRepBuckets() async throws {
+        let context = try makeContext()
+        let exercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest"
+        )
+        let firstDate = makeDate(2026, 3, 22, 9, 0)
+        let secondDate = makeDate(2026, 3, 29, 9, 0)
+        let thirdDate = makeDate(2026, 4, 5, 9, 0)
+        let firstWorkout = Workout(date: firstDate, title: "Week 1", startTime: firstDate, status: .completed)
+        let secondWorkout = Workout(date: secondDate, title: "Week 2", startTime: secondDate, status: .completed)
+        let thirdWorkout = Workout(date: thirdDate, title: "Week 3", startTime: thirdDate, status: .completed)
+
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(firstWorkout)
+        try await context.workoutRepo.save(secondWorkout)
+        try await context.workoutRepo.save(thirdWorkout)
+
+        let eightRepOwner = WorkoutSet(
+            workoutId: firstWorkout.id,
+            exerciseId: exercise.id,
+            date: firstDate,
+            completedAt: firstDate.addingTimeInterval(300),
+            weight: 100,
+            effectiveWeight: 100,
+            reps: 8,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+        let tenRepOwner = WorkoutSet(
+            workoutId: secondWorkout.id,
+            exerciseId: exercise.id,
+            date: secondDate,
+            completedAt: secondDate.addingTimeInterval(300),
+            weight: 100,
+            effectiveWeight: 100,
+            reps: 10,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+        let eightRepRepeat = WorkoutSet(
+            workoutId: thirdWorkout.id,
+            exerciseId: exercise.id,
+            date: thirdDate,
+            completedAt: thirdDate.addingTimeInterval(300),
+            weight: 100,
+            effectiveWeight: 100,
+            reps: 8,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+
+        try await context.setRepo.save(eightRepOwner)
+        try await context.setRepo.save(tenRepOwner)
+        try await context.setRepo.save(eightRepRepeat)
+
+        try await context.prService.rebuild(for: exercise.id)
+
+        let persistedEightOwner = try await context.setRepo.fetch(byId: eightRepOwner.id)
+        let persistedTenOwner = try await context.setRepo.fetch(byId: tenRepOwner.id)
+        let persistedEightRepeat = try await context.setRepo.fetch(byId: eightRepRepeat.id)
+        let table = try await context.prService.fetchPRTable(for: exercise.id)
+
+        XCTAssertEqual(persistedEightOwner?.prStatus, .dominated)
+        XCTAssertEqual(persistedTenOwner?.prStatus, .current)
+        XCTAssertNil(persistedEightRepeat?.prStatus)
+        XCTAssertEqual(table.map(\.reps), [10])
+    }
+
     func testUncompleteUsesPreviousContributionWhenCompletedSetRepsWereDraftEditedFirst() async throws {
         let context = try makeContext()
         let workoutDate = makeDate(2026, 3, 22, 9, 5)

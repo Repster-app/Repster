@@ -112,9 +112,11 @@ enum UnitConversion {
     static func exerciseWeightIncrementOptions(for unitPreference: UnitPreference) -> [WeightIncrementOption] {
         switch unitPreference {
         case .metric:
-            return [1.25, 2.5, 5.0, 10.0, 20.0].map { ($0, $0) }
+            return [1.0, 1.25, 2.0, 2.5, 5.0, 10.0, 20.0].map { ($0, $0) }
         case .imperial:
-            return displayWeightIncrementOptions(for: unitPreference)
+            return [1.0, 2.0, 2.5, 5.0, 10.0, 15.0, 20.0, 25.0].map {
+                ($0, lbsToKg($0))
+            }
         }
     }
 

@@ -5,7 +5,7 @@ enum CachedPRStatus: String, Codable, CaseIterable {
     case current
     /// PR owner but dominated by a higher-rep PR at equal or greater weight → no badge.
     case dominated
-    /// Ties the current PR (exact weight match at same reps) → shows = badge.
+    /// Ties a visible frontier PR (exact weight match at same reps) → shows = badge.
     case matched
     /// Was a PR owner, now beaten by a better set → no badge.
     case previous

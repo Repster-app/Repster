@@ -53,6 +53,7 @@ struct SettingsView: View {
     private let workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol
     private let subscriptionService: any SubscriptionServiceProtocol
     private let accessControlService: any AccessControlServiceProtocol
+    private let analyticsService: any AnalyticsServiceProtocol
     private let fatigueLearningService: FatigueLearningService
 
     // MARK: - Init
@@ -64,6 +65,7 @@ struct SettingsView: View {
          workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol,
          subscriptionService: any SubscriptionServiceProtocol,
          accessControlService: any AccessControlServiceProtocol,
+         analyticsService: any AnalyticsServiceProtocol,
          fatigueLearningService: FatigueLearningService) {
         _viewModel = State(initialValue: SettingsViewModel(settingsService: settingsService))
         _accessSnapshot = accessSnapshot
@@ -73,6 +75,7 @@ struct SettingsView: View {
         self.workoutHistoryBackupService = workoutHistoryBackupService
         self.subscriptionService = subscriptionService
         self.accessControlService = accessControlService
+        self.analyticsService = analyticsService
         self.fatigueLearningService = fatigueLearningService
     }
 
@@ -225,7 +228,8 @@ struct SettingsView: View {
                 MembershipSettingsView(
                     accessSnapshot: $accessSnapshot,
                     subscriptionService: subscriptionService,
-                    accessControlService: accessControlService
+                    accessControlService: accessControlService,
+                    analyticsService: analyticsService
                 )
             } label: {
                 SettingsNavigationRow(
@@ -352,6 +356,7 @@ private struct MembershipSettingsView: View {
     @Binding var accessSnapshot: AccessSnapshot
     let subscriptionService: any SubscriptionServiceProtocol
     let accessControlService: any AccessControlServiceProtocol
+    let analyticsService: any AnalyticsServiceProtocol
 
     @State private var subscriptionSnapshot = SubscriptionSnapshot.unknown(
         entitlementIdentifier: RevenueCatConfiguration.entitlementIdentifier
@@ -468,9 +473,34 @@ private struct MembershipSettingsView: View {
             Text("Lifetime access unlocks Repster permanently. Your subscription will keep renewing until you cancel it in Apple subscriptions.")
         }
         .sheet(isPresented: $showPaywall, onDismiss: {
+            analyticsService.track(.paywallDismissed)
             Task { await refreshMembershipStatus(forceSubscriptionRefresh: true) }
         }) {
             PaywallView()
+                .onPurchaseStarted { _ in
+                    analyticsService.track(.purchaseStarted, properties: [
+                        .source: .string("paywall")
+                    ])
+                }
+                .onPurchaseCompleted { _ in
+                    analyticsService.track(.purchaseCompleted, properties: [
+                        .source: .string("paywall")
+                    ])
+                }
+                .onPurchaseCancelled {
+                    analyticsService.track(.purchaseCancelled, properties: [
+                        .source: .string("paywall")
+                    ])
+                }
+                .onRestoreStarted {
+                    analyticsService.track(.restorePurchasesTapped, properties: [
+                        .source: .string("paywall")
+                    ])
+                }
+                .onAppear {
+                    analyticsService.screen(.paywall)
+                    analyticsService.track(.paywallShown)
+                }
         }
     }
 
@@ -521,6 +551,7 @@ private struct MembershipSettingsView: View {
     @MainActor
     private func restorePurchases() async {
         guard !isRestoringPurchases else { return }
+        analyticsService.track(.restorePurchasesTapped)
         isRestoringPurchases = true
         defer { isRestoringPurchases = false }
         showManageSubscriptionAction = false
@@ -548,6 +579,9 @@ private struct MembershipSettingsView: View {
     @MainActor
     private func purchaseLifetime() async {
         guard !isPurchasingLifetime else { return }
+        analyticsService.track(.purchaseStarted, properties: [
+            .source: .string("membership_settings")
+        ])
         isPurchasingLifetime = true
         defer { isPurchasingLifetime = false }
         showManageSubscriptionAction = false
@@ -556,11 +590,17 @@ private struct MembershipSettingsView: View {
             let subscriptionSnapshot = try await subscriptionService.purchaseLifetime()
             self.subscriptionSnapshot = subscriptionSnapshot
             accessSnapshot = await accessControlService.currentAccessSnapshot()
+            analyticsService.track(.purchaseCompleted, properties: [
+                .source: .string("membership_settings")
+            ])
             showManageSubscriptionAction = true
             membershipAlertTitle = "Lifetime Access Active"
             membershipAlertMessage = "Repster now has lifetime access. Your subscription may still renew until you cancel it in Apple subscriptions."
             showMembershipAlert = true
         } catch MonetizationError.purchaseCancelled {
+            analyticsService.track(.purchaseCancelled, properties: [
+                .source: .string("membership_settings")
+            ])
             await refreshMembershipStatus(forceSubscriptionRefresh: true)
         } catch {
             showManageSubscriptionAction = false
@@ -804,6 +844,7 @@ private struct DataBackupsView: View {
     let workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol
     let settingsService: any SettingsServiceProtocol
     let onDataReset: @MainActor @Sendable () async -> Void
+    @State private var shareAnonymousAnalytics = true
     @Environment(ServiceContainer.self) private var services
 
     var body: some View {
@@ -812,7 +853,8 @@ private struct DataBackupsView: View {
                 NavigationLink {
                     ImportView(
                         importService: importService,
-                        defaultUnitPreference: services.unitPreference
+                        defaultUnitPreference: services.unitPreference,
+                        analyticsService: services.analyticsService
                     )
                 } label: {
                     SettingsNavigationRow(
@@ -823,7 +865,10 @@ private struct DataBackupsView: View {
                 }
 
                 NavigationLink {
-                    ExportView(workoutHistoryBackupService: workoutHistoryBackupService)
+                    ExportView(
+                        workoutHistoryBackupService: workoutHistoryBackupService,
+                        analyticsService: services.analyticsService
+                    )
                 } label: {
                     SettingsNavigationRow(
                         title: SettingsDataDestination.exportBackup.title,
@@ -845,6 +890,8 @@ private struct DataBackupsView: View {
                 Text("Import training data from a CSV file, create a Repster backup archive, or restore workout history. Restoring replaces workout history only. Templates, programs, bodyweight logs, and settings stay untouched.")
                     .foregroundStyle(Color.textTertiary)
             }
+
+            anonymousAnalyticsSection
 
             Section {
                 NavigationLink {
@@ -869,6 +916,27 @@ private struct DataBackupsView: View {
         .background(Color.bg)
         .navigationTitle("Data & Backups")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            shareAnonymousAnalytics = services.analyticsService.isCollectionEnabled
+        }
+    }
+
+    private var anonymousAnalyticsSection: some View {
+        Section {
+            Toggle(isOn: Binding(
+                get: { shareAnonymousAnalytics },
+                set: { enabled in
+                    shareAnonymousAnalytics = enabled
+                    services.analyticsService.setCollectionEnabled(enabled)
+                }
+            )) {
+                Label("Share Anonymous Analytics", systemImage: "chart.bar")
+                    .foregroundStyle(Color.textPrimary)
+            }
+        } footer: {
+            Text("Shares anonymous product usage only. Workout notes, exercise names, set weights, reps, CSV contents, and bodyweight values are never sent.")
+                .foregroundStyle(Color.textTertiary)
+        }
     }
 }
 

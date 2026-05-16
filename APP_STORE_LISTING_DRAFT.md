@@ -1,6 +1,6 @@
 # Repster App Store Listing Draft
 
-Prepared from the current app code, public Repster pages, and App Store Connect requirements checked on May 9, 2026.
+Prepared from the current app code, public Repster pages, and App Store Connect requirements checked on May 15, 2026.
 
 ## Core Metadata
 
@@ -62,7 +62,9 @@ Notes:
 
 ## Screenshots
 
-Screenshots are in progress. Recommended order:
+Launch screenshot frames are now generated in `marketing/generated/app-store/` at `1320 x 2868` PNG.
+
+Recommended order:
 
 1. Active workout logging: set table, previous performance, rest timer.
 2. Home: recent PRs, recent workouts, quick start.
@@ -73,38 +75,78 @@ Screenshots are in progress. Recommended order:
 
 Apple currently allows 1 to 10 screenshots per localization and accepts `.jpeg`, `.jpg`, and `.png`.
 
+Current launch frame copy:
+
+- Log sets without slowing down
+- Start from your saved routines
+- Know what you did last time
+- Track PRs automatically
+- See progress beyond one workout
+- Import history and keep control
+
+Frame 6 is a draft frame until a final import, export, or backup settings capture is available. The complete App Store product page brief and 20-30 second app preview storyboard live in `marketing/app-store/product-page.md`.
+
+## Launch Marketing Kit
+
+Implemented local marketing materials:
+
+- App Store screenshot frames: `marketing/generated/app-store/`
+- Social static posts: `marketing/generated/social/static/`
+- Short-form video cover frames and scripts: `marketing/generated/social/video-covers/` and `marketing/social/social-launch-kit.md`
+- Creator and press pitch: `marketing/press/creator-press-kit.md`
+- Website refresh draft: `marketing/website/index.html`
+- Measurement plan: `marketing/metrics/launch-measurement.md`
+
 ## App Privacy Questionnaire
 
-Recommended answers based on the current app:
+Recommended answers based on the current app with simplified anonymous PostHog EU product analytics enabled:
 
 Does the app collect data?
 Yes.
 
-Data type:
-Purchases -> Purchase History
+Data types:
+- Purchases -> Purchase History
+- Health & Fitness -> Fitness
+- Usage Data -> Product Interaction
+- Identifiers -> Device ID
 
 Purposes:
-- App Functionality
-- Analytics
+- Purchase History: App Functionality and Analytics
+- Fitness: Analytics
+- Product Interaction: Analytics
+- Device ID: Analytics
 
 Linked to user:
-No, if RevenueCat stays configured with anonymous app user IDs and Repster does not add accounts, email login, or custom RevenueCat user IDs tied to contact information.
+- Fitness: No
+- Product Interaction: No
+- Device ID: No
+- Purchase History: Use RevenueCat's anonymous-ID guidance. If Repster still has no accounts, emails, or custom user IDs tied to a real identity, answer No. If you later connect RevenueCat IDs to an email/account/support identity, revisit this.
 
 Used for tracking:
 No.
 
+Analytics implementation notes:
+- PostHog host is EU cloud: `https://eu.i.posthog.com`.
+- PostHog is configured with no `identify`, no person profiles, no session replay, no autocapture, no element interactions, no surveys, no rage click capture, and no IDFA/ads/tracking.
+- Custom analytics is limited to main screen views, workout started/completed/discarded, paywall/purchase/restore, import completed, and backup exported.
+- Workout duration is sent only as `under_30m` or `30m_or_more`.
+- Import size/workout counts use coarse buckets only.
+- Do not send exercise names, set weights, reps, notes, CSV contents, bodyweight values, individual workout logs, or exercise-level detail.
+- `Identifiers -> Device ID` is included because PostHog uses an anonymous distinct/install identifier. Confirm the final App Store Connect wording during legal/privacy review.
+
 Do not declare these as collected by Repster if current behavior stays the same:
-- Health & Fitness: workout/bodyweight data is stored locally and is not transmitted to Repster servers.
+- Health & Fitness -> Body Measurements: bodyweight data is stored locally and is not transmitted to Repster servers.
+- Usage Data -> Other Usage Data: not needed for the current simplified analytics plan; use Product Interaction for app launches, screen views, sessions, paywall actions, import/export actions, and similar app behavior.
 - Contact Info: feedback/support email is optional and user-initiated.
-- Identifiers: no IDFA and no custom account/user ID in the current app.
-- Usage Data/Diagnostics: no analytics or crash SDK was found beyond RevenueCat purchase handling and Apple-controlled diagnostics.
+- User ID: no account/user ID in the current app.
+- Diagnostics: no crash SDK was added beyond Apple-controlled diagnostics.
 - Location, Contacts, Photos, Audio, Browsing/Search History, Sensitive Info: no.
 
 Important RevenueCat note:
 RevenueCat says apps using RevenueCat must disclose Purchase History. RevenueCat also says Purchase History should include both App Functionality and Analytics. If you later identify users with a custom app user ID tied to email or another identity, revisit `Linked to user` and possibly add `Identifiers -> User ID`.
 
 Local manifest follow-up:
-`Repster/PrivacyInfo.xcprivacy` currently declares Purchase History as linked to the user and only lists App Functionality. That does not match the recommendation above. Before submission, align the manifest and App Store questionnaire after confirming the final RevenueCat identity setup.
+`Repster/PrivacyInfo.xcprivacy` now declares Purchase History, Fitness, Product Interaction, and Device ID with tracking disabled. Recheck Purchase History linkage after confirming the final RevenueCat identity setup.
 
 ## Age Rating
 
@@ -131,6 +173,8 @@ Repster is a workout logging app and does not require account creation. Workout 
 
 The free tier allows up to 5 completed workouts. After that limit, the app presents the RevenueCat/App Store paywall to unlock unlimited workout logging. Restore Purchases and Manage Subscription are available in Settings -> Membership. Privacy Policy and Terms of Use are available in Settings -> About.
 
+Repster uses anonymous PostHog EU product analytics for aggregate usage statistics only. The analytics setup does not use IDFA, ads, tracking, session replay, autocapture, heatmaps, surveys, or person profiles. Users can turn analytics off in Settings -> Data & Backups -> Share Anonymous Analytics. Analytics do not include exercise names, weights, reps, notes, CSV contents, bodyweight values, or raw workout logs.
+
 Local notifications are used for rest timer alerts. Live Activities are used to show the active workout/rest timer state while a workout is in progress.
 
 ## Pre-Submission Blockers To Clear
@@ -145,6 +189,8 @@ Local notifications are used for rest timer alerts. Live Activities are used to 
 ## References
 
 - Apple App Privacy Details: https://developer.apple.com/app-store/app-privacy-details/
+- Apple Manage App Privacy: https://developer.apple.com/help/app-store-connect/manage-app-information/manage-app-privacy
+- Apple Privacy Manifest Files: https://developer.apple.com/documentation/bundleresources/privacy_manifest_files
 - Apple Platform Version Information: https://developer.apple.com/help/app-store-connect/reference/platform-version-information
 - Apple Screenshot Specifications: https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/
 - Apple Age Rating Values: https://developer.apple.com/help/app-store-connect/reference/app-information/age-ratings-values-and-definitions

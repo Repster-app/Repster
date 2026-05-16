@@ -143,14 +143,20 @@ actor PRService: PRServiceProtocol {
         }
 
         // STEP 5: EXACT MATCH
-        // specdoc S7.3: ALWAYS store "matched" in DB.
-        // UI hides the badge if set is in same workout as PR owner.
-        // PRService does not check workoutId for matches.
+        // Only visible PR-frontier records can be matched. If a higher-rep PR
+        // has equal or greater weight, this rep bucket is dominated and should
+        // not show a match badge.
         if newGrams == existingGrams {
+            let (frontierReps, affectedSets) = try await recomputeFrontierBadges(
+                for: exerciseId,
+                skipUpdateForSetId: setId
+            )
+            let matchedStatus: CachedPRStatus? = frontierReps.contains(reps) ? .matched : nil
+
             return PREvaluationResult(
                 setId: setId,
-                newStatus: .matched,
-                affectedSetIds: [:],
+                newStatus: matchedStatus,
+                affectedSetIds: affectedSets,
                 prRecordChanged: false
             )
         }
@@ -353,7 +359,7 @@ actor PRService: PRServiceProtocol {
         let winnerGrams = UnitConversion.toGrams(winner.effectiveWeight ?? 0)
 
         var editedNewStatus: CachedPRStatus? = nil
-        if editedGramsVsWinner == winnerGrams {
+        if editedGramsVsWinner == winnerGrams && winnerOnFrontier {
             editedNewStatus = .matched
         }
         // If below winner, editedNewStatus stays nil
@@ -548,10 +554,19 @@ actor PRService: PRServiceProtocol {
         // Step 5: Apply suffix-max frontier filtering to all PR owners.
         // Sets on the frontier get .current, others get .dominated.
         // No set to skip — rebuild updates all PR owners directly.
-        let (_, _) = try await recomputeFrontierBadges(
+        let (frontierReps, _) = try await recomputeFrontierBadges(
             for: exerciseId,
             skipUpdateForSetId: nil
         )
+
+        // Match badges are only meaningful for rep buckets that remain on the
+        // visible PR frontier. Clear matches for dominated buckets after rebuild.
+        for set in allSets {
+            if set.prStatus == .matched && !frontierReps.contains(set.prReps) {
+                set.prStatus = nil
+                try await setRepo.save(set)
+            }
+        }
     }
 
     // MARK: - Private Helpers

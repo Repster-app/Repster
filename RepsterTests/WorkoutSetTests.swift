@@ -312,17 +312,42 @@ final class WorkoutSetTests: XCTestCase {
         XCTAssertEqual(metricFromImperial.storedKg, 2.5)
     }
 
+    func testResolvedExerciseIncrementPreservesSmallDumbbellOptions() {
+        let oneKg = UnitConversion.resolvedWeightIncrementOption(
+            exerciseIncrement: 1.0,
+            defaultIncrement: 10,
+            unitPreference: .metric
+        )
+        let twoKg = UnitConversion.resolvedWeightIncrementOption(
+            exerciseIncrement: 2.0,
+            defaultIncrement: 10,
+            unitPreference: .metric
+        )
+        let twoLb = UnitConversion.resolvedWeightIncrementOption(
+            exerciseIncrement: UnitConversion.lbsToKg(2.0),
+            defaultIncrement: 10,
+            unitPreference: .imperial
+        )
+
+        XCTAssertEqual(oneKg.display, 1.0)
+        XCTAssertEqual(oneKg.storedKg, 1.0)
+        XCTAssertEqual(twoKg.display, 2.0)
+        XCTAssertEqual(twoKg.storedKg, 2.0)
+        XCTAssertEqual(twoLb.display, 2.0)
+        XCTAssertEqual(twoLb.storedKg, UnitConversion.lbsToKg(2.0), accuracy: 0.0001)
+    }
+
     func testExerciseSettingsMetricWeightIncrementOptionsRestoreSheetSpecificList() {
         let options = ExerciseSettingsSheet.weightIncrementOptions(for: .metric)
 
-        XCTAssertEqual(options.map(\.display), [1.25, 2.5, 5.0, 10.0, 20.0])
-        XCTAssertEqual(options.map(\.storedKg), [1.25, 2.5, 5.0, 10.0, 20.0])
+        XCTAssertEqual(options.map(\.display), [1.0, 1.25, 2.0, 2.5, 5.0, 10.0, 20.0])
+        XCTAssertEqual(options.map(\.storedKg), [1.0, 1.25, 2.0, 2.5, 5.0, 10.0, 20.0])
     }
 
     func testExerciseSettingsImperialWeightIncrementOptionsStayNativePounds() {
         let options = ExerciseSettingsSheet.weightIncrementOptions(for: .imperial)
 
-        XCTAssertEqual(options.map(\.display), [1.0, 2.5, 5.0, 10.0, 15.0, 20.0, 25.0])
+        XCTAssertEqual(options.map(\.display), [1.0, 2.0, 2.5, 5.0, 10.0, 15.0, 20.0, 25.0])
         XCTAssertEqual(options.map(\.storedKg), options.map { UnitConversion.lbsToKg($0.display) })
     }
 

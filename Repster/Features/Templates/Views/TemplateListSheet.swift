@@ -48,13 +48,15 @@ struct TemplateFlowView: View {
     let beforeStartWorkout: () async -> Bool
     let onStartWorkout: () -> Void
     let workoutStartOptions: WorkoutStartOptions
+    let analyticsService: any AnalyticsServiceProtocol
 
     init(
         templateService: any TemplateServiceProtocol,
         exerciseService: any ExerciseServiceProtocol,
         beforeStartWorkout: @escaping () async -> Bool,
         onStartWorkout: @escaping () -> Void,
-        workoutStartOptions: WorkoutStartOptions = .default
+        workoutStartOptions: WorkoutStartOptions = .default,
+        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService()
     ) {
         self.templateService = templateService
         self.exerciseService = exerciseService
@@ -62,6 +64,7 @@ struct TemplateFlowView: View {
         self.beforeStartWorkout = beforeStartWorkout
         self.onStartWorkout = onStartWorkout
         self.workoutStartOptions = workoutStartOptions
+        self.analyticsService = analyticsService
     }
 
     var body: some View {
@@ -383,6 +386,12 @@ struct TemplateFlowView: View {
                     template.id,
                     options: workoutStartOptions
                 )
+                analyticsService.track(.workoutStarted, properties: [
+                    .source: .string("template"),
+                    .templateUsed: .bool(true),
+                    .copiedPrevious: .bool(false),
+                    .countTowardProgression: .bool(workoutStartOptions.countTowardProgressionHistory)
+                ])
                 onStartWorkout()
             } catch {
                 actionAlert = TemplateActionAlert(

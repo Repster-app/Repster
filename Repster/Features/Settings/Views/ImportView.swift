@@ -11,11 +11,13 @@ struct ImportView: View {
 
     init(
         importService: any ImportServiceProtocol,
-        defaultUnitPreference: UnitPreference = .metric
+        defaultUnitPreference: UnitPreference = .metric,
+        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService()
     ) {
         _viewModel = State(initialValue: ImportViewModel(
             importService: importService,
-            defaultUnitPreference: defaultUnitPreference
+            defaultUnitPreference: defaultUnitPreference,
+            analyticsService: analyticsService
         ))
     }
 

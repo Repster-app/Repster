@@ -27,11 +27,15 @@ final class ServiceContainer {
     let loadPrescriptionService: any LoadPrescriptionServiceProtocol
     let subscriptionService: any SubscriptionServiceProtocol
     let accessControlService: any AccessControlServiceProtocol
+    let analyticsService: any AnalyticsServiceProtocol
     let fatigueLearningService: FatigueLearningService
     let healthProfileRepo: any HealthProfileRepositoryProtocol
     var unitPreference: UnitPreference = .metric
 
-    init(repositoryContainer: RepositoryContainer) {
+    init(
+        repositoryContainer: RepositoryContainer,
+        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService()
+    ) {
         let subscriptionService = SubscriptionService()
         let accessControlService = AccessControlService(subscriptionService: subscriptionService)
 
@@ -170,6 +174,7 @@ final class ServiceContainer {
         self.loadPrescriptionService = loadPrescriptionService
         self.subscriptionService = subscriptionService
         self.accessControlService = accessControlService
+        self.analyticsService = analyticsService
         self.fatigueLearningService = fatigueLearningService
         self.healthProfileRepo = repositoryContainer.healthProfileRepository
     }

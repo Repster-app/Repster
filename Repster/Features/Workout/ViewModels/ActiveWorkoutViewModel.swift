@@ -91,6 +91,7 @@ final class ActiveWorkoutViewModel {
     private let settingsService: any SettingsServiceProtocol
     private let loadPrescriptionService: any LoadPrescriptionServiceProtocol
     private let accessControlService: any AccessControlServiceProtocol
+    private let analyticsService: any AnalyticsServiceProtocol
     let fatigueLearningService: FatigueLearningService
 
     /// Exercise IDs that had at least one prediction snapshot recorded during this workout.
@@ -263,6 +264,7 @@ final class ActiveWorkoutViewModel {
         settingsService: any SettingsServiceProtocol,
         loadPrescriptionService: any LoadPrescriptionServiceProtocol,
         accessControlService: any AccessControlServiceProtocol = NoopAccessControlService(),
+        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService(),
         fatigueLearningService: FatigueLearningService
     ) {
         self.workoutService = workoutService
@@ -274,6 +276,7 @@ final class ActiveWorkoutViewModel {
         self.settingsService = settingsService
         self.loadPrescriptionService = loadPrescriptionService
         self.accessControlService = accessControlService
+        self.analyticsService = analyticsService
         self.fatigueLearningService = fatigueLearningService
     }
 
@@ -1876,6 +1879,7 @@ final class ActiveWorkoutViewModel {
         let referenceDate = Date()
         ensureWorkoutClockInitialized(referenceDate: referenceDate)
         let durationSeconds = Int(currentElapsedTime(referenceDate: referenceDate))
+        let completedSetCount = setsByExercise.values.flatMap { $0 }.filter(\.completed).count
 
         do {
             try await workoutService.finishWorkout(
@@ -1887,6 +1891,15 @@ final class ActiveWorkoutViewModel {
             )
 
             _ = await accessControlService.recordCompletedWorkoutIfNeeded()
+
+            analyticsService.track(.workoutCompleted, properties: [
+                .durationBucket: .string(AnalyticsBuckets.duration(seconds: TimeInterval(durationSeconds))),
+                .setCountBucket: .string(AnalyticsBuckets.count(completedSetCount)),
+                .exerciseCountBucket: .string(AnalyticsBuckets.count(exercises.count)),
+                .perceivedEffortEntered: .bool(perceivedEffort != nil),
+                .notesEntered: .bool(notes?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false),
+                .excludedFromProgression: .bool(workout.excludesEntireWorkoutFromProgressionHistory)
+            ])
 
             // Run adaptive fatigue learning before clearing local state
             await fatigueLearningService.processSessionEnd(workoutId: workout.id)
@@ -1926,9 +1939,18 @@ final class ActiveWorkoutViewModel {
     /// Clears local state and signals the View layer to dismiss.
     func discardWorkout() async {
         guard let workout else { return }
+        let referenceDate = Date()
+        ensureWorkoutClockInitialized(referenceDate: referenceDate)
+        let durationSeconds = currentElapsedTime(referenceDate: referenceDate)
+        let setCount = setsByExercise.values.flatMap { $0 }.count
 
         do {
             try await workoutService.deleteWorkout(workout.id)
+
+            analyticsService.track(.workoutDiscarded, properties: [
+                .durationBucket: .string(AnalyticsBuckets.duration(seconds: durationSeconds)),
+                .setCountBucket: .string(AnalyticsBuckets.count(setCount))
+            ])
 
             stopWorkoutClockTicker()
             clearPersistedWorkoutClockState()

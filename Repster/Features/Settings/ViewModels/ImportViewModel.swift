@@ -49,15 +49,18 @@ final class ImportViewModel {
     // MARK: - Dependencies
 
     private let importService: any ImportServiceProtocol
+    private let analyticsService: any AnalyticsServiceProtocol
     private var importData: Data?
 
     // MARK: - Init
 
     init(
         importService: any ImportServiceProtocol,
-        defaultUnitPreference: UnitPreference = .metric
+        defaultUnitPreference: UnitPreference = .metric,
+        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService()
     ) {
         self.importService = importService
+        self.analyticsService = analyticsService
         self.selectedFitNotesUnitSystem = defaultUnitPreference == .imperial ? .imperial : .metric
     }
 
@@ -194,8 +197,10 @@ final class ImportViewModel {
             self.result = result
             state = .completed
             progressFraction = 1.0
+            analyticsService.track(.importCompleted, properties: importProperties(result: result, outcome: "success"))
 
         case .failed(let error):
+            analyticsService.track(.importCompleted, properties: importProperties(error: error))
             setFailure(error)
         }
     }
@@ -228,5 +233,40 @@ final class ImportViewModel {
         importError = error as? ImportError
         errorMessage = error.localizedDescription
         state = .failed
+    }
+
+    private func importProperties(
+        result: ImportResult? = nil,
+        outcome: String? = nil,
+        error: Error? = nil
+    ) -> [AnalyticsPropertyKey: AnalyticsPropertyValue] {
+        var properties: [AnalyticsPropertyKey: AnalyticsPropertyValue] = [
+            .sourceType: .string(activeSource.rawValue)
+        ]
+
+        if let activeUnitSystem {
+            properties[.unitSystem] = .string(activeUnitSystem.rawValue)
+        }
+
+        if estimatedTotalRows > 0 {
+            properties[.rowCountBucket] = .string(AnalyticsBuckets.count(estimatedTotalRows))
+        }
+
+        if let result {
+            properties[.setCountBucket] = .string(AnalyticsBuckets.count(result.setsImported))
+            properties[.workoutCountBucket] = .string(AnalyticsBuckets.count(result.workoutsCreated))
+            properties[.exerciseCountBucket] = .string(AnalyticsBuckets.count(result.exercisesCreated))
+        }
+
+        if let outcome {
+            properties[.result] = .string(outcome)
+        }
+
+        if let error {
+            properties[.result] = .string("failure")
+            properties[.errorType] = .string(String(describing: type(of: error)))
+        }
+
+        return properties
     }
 }

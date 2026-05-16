@@ -17,11 +17,16 @@ final class ExportViewModel {
     // MARK: - Dependencies
 
     private let workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol
+    private let analyticsService: any AnalyticsServiceProtocol
 
     // MARK: - Init
 
-    init(workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol) {
+    init(
+        workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol,
+        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService()
+    ) {
         self.workoutHistoryBackupService = workoutHistoryBackupService
+        self.analyticsService = analyticsService
     }
 
     // MARK: - Actions
@@ -36,6 +41,7 @@ final class ExportViewModel {
                 let data = try await workoutHistoryBackupService.exportBackup()
                 let url = try temporaryShareURL(for: data)
                 self.shareItem = WorkoutHistoryBackupShareItem(url: url)
+                self.analyticsService.track(.backupExported)
                 self.isExporting = false
             } catch {
                 self.errorMessage = error.localizedDescription

@@ -169,6 +169,7 @@ struct ContentView: View {
                     workoutHistoryBackupService: services.workoutHistoryBackupService,
                     subscriptionService: services.subscriptionService,
                     accessControlService: services.accessControlService,
+                    analyticsService: services.analyticsService,
                     fatigueLearningService: services.fatigueLearningService
                 )
                     .tabItem {
@@ -196,9 +197,34 @@ struct ContentView: View {
             ActiveWorkoutView(services: services)
         }
         .sheet(isPresented: $showPaywall, onDismiss: {
+            services.analyticsService.track(.paywallDismissed)
             Task { await refreshMonetizationState(forceSubscriptionRefresh: true) }
         }) {
             PaywallView()
+                .onPurchaseStarted { _ in
+                    services.analyticsService.track(.purchaseStarted, properties: [
+                        .source: .string("paywall")
+                    ])
+                }
+                .onPurchaseCompleted { _ in
+                    services.analyticsService.track(.purchaseCompleted, properties: [
+                        .source: .string("paywall")
+                    ])
+                }
+                .onPurchaseCancelled {
+                    services.analyticsService.track(.purchaseCancelled, properties: [
+                        .source: .string("paywall")
+                    ])
+                }
+                .onRestoreStarted {
+                    services.analyticsService.track(.restorePurchasesTapped, properties: [
+                        .source: .string("paywall")
+                    ])
+                }
+                .onAppear {
+                    services.analyticsService.screen(.paywall)
+                    services.analyticsService.track(.paywallShown)
+                }
         }
         // Refresh active workout state and HomeView when returning from fullScreenCover
         .onChange(of: showActiveWorkout) { _, isShowing in
@@ -227,6 +253,7 @@ struct ContentView: View {
             }
         }
         .onChange(of: selectedTab) { oldTab, newTab in
+            trackScreen(for: newTab)
             guard oldTab == .settings, newTab == .home else { return }
             Task { await refreshMonetizationState(forceSubscriptionRefresh: true) }
         }
@@ -248,6 +275,7 @@ struct ContentView: View {
             if hasActiveWorkout {
                 showActiveWorkout = true
             }
+            trackScreen(for: selectedTab)
         }
         .onAppear {
             configureTabBarAppearance()
@@ -310,7 +338,8 @@ struct ContentView: View {
                     shouldResumeActiveWorkoutAfterTemplateFlow = true
                     showTemplateFlow = false
                 },
-                workoutStartOptions: pendingWorkoutStartOptions ?? .default
+                workoutStartOptions: pendingWorkoutStartOptions ?? .default,
+                analyticsService: services.analyticsService
             )
         }
     }
@@ -387,6 +416,12 @@ struct ContentView: View {
 
         do {
             _ = try await services.workoutService.startWorkout(options: options)
+            trackWorkoutStarted(
+                source: "empty",
+                templateUsed: false,
+                copiedPrevious: false,
+                options: options
+            )
             hasActiveWorkout = true
             showActiveWorkout = true
         } catch {
@@ -440,6 +475,13 @@ struct ContentView: View {
                     )
                     _ = try await services.setService.save(set)
                 }
+
+                trackWorkoutStarted(
+                    source: "exercise_list",
+                    templateUsed: false,
+                    copiedPrevious: false,
+                    options: .default
+                )
 
                 // 3. Dismiss exercise list and show active workout
                 showExerciseList = false
@@ -523,6 +565,12 @@ struct ContentView: View {
         guard let pendingId = pendingCopyWorkoutId else { return }
         do {
             if let activeWorkout = try await services.workoutService.getActiveWorkout() {
+                let activeSets = try await services.setService.fetchSets(for: activeWorkout.id)
+                services.analyticsService.track(.workoutDiscarded, properties: [
+                    .source: .string("copy_previous"),
+                    .durationBucket: .string(AnalyticsBuckets.duration(seconds: Date().timeIntervalSince(activeWorkout.startTime ?? activeWorkout.date))),
+                    .setCountBucket: .string(AnalyticsBuckets.count(activeSets.count))
+                ])
                 try await services.workoutService.deleteWorkout(activeWorkout.id)
             }
             showDiscardConfirmation = false
@@ -557,6 +605,13 @@ struct ContentView: View {
             _ = try await services.setService.save(newSet)
         }
 
+        trackWorkoutStarted(
+            source: "copy_previous",
+            templateUsed: false,
+            copiedPrevious: true,
+            options: startOptions
+        )
+
         hasActiveWorkout = true
         showCopyPreviousSheet = false
         showActiveWorkout = true
@@ -582,5 +637,32 @@ struct ContentView: View {
 
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
+
+    private func trackScreen(for tab: MainTab) {
+        switch tab {
+        case .home:
+            services.analyticsService.screen(.home)
+        case .calendar:
+            services.analyticsService.screen(.calendar)
+        case .charts:
+            services.analyticsService.screen(.charts)
+        case .settings:
+            services.analyticsService.screen(.settings)
+        }
+    }
+
+    private func trackWorkoutStarted(
+        source: String,
+        templateUsed: Bool,
+        copiedPrevious: Bool,
+        options: WorkoutStartOptions
+    ) {
+        services.analyticsService.track(.workoutStarted, properties: [
+            .source: .string(source),
+            .templateUsed: .bool(templateUsed),
+            .copiedPrevious: .bool(copiedPrevious),
+            .countTowardProgression: .bool(options.countTowardProgressionHistory)
+        ])
     }
 }

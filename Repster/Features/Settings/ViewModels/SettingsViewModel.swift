@@ -191,51 +191,51 @@ final class SettingsViewModel {
     // MARK: - Update Actions
 
     func updateUnitPreference(_ preference: UnitPreference) async {
-        await performUpdate {
+        await performUpdate({
             try await settingsService.updateUnitPreference(preference)
-        }
+        })
     }
 
     func updateE1RMFormula(_ formula: E1RMFormula) async {
-        await performUpdate {
+        await performUpdate({
             try await settingsService.updateE1RMFormula(formula)
-        }
+        })
     }
 
     func updateDefaultRestTime(_ seconds: Int?) async {
-        await performUpdate {
+        await performUpdate({
             try await settingsService.updateDefaultRestTime(seconds)
-        }
+        })
     }
 
     func updateDefaultWarmupRestTime(_ seconds: Int?) async {
-        await performUpdate {
+        await performUpdate({
             try await settingsService.updateDefaultWarmupRestTime(seconds)
-        }
+        })
     }
 
     func updateRestTimerAlert(_ value: String) async {
-        await performUpdate {
+        await performUpdate({
             try await settingsService.updateRestTimerAlert(value)
-        }
+        })
     }
 
     func updatePrescriptionEnabled(_ enabled: Bool) async {
-        await performUpdate {
+        await performUpdate({
             try await settingsService.updatePrescriptionEnabled(enabled)
-        }
+        })
     }
 
     func updatePrescriptionDefaultIncrement(_ increment: Double) async {
-        await performUpdate {
+        await performUpdate({
             try await settingsService.updatePrescriptionDefaultIncrement(increment)
-        }
+        })
     }
 
     func updatePrescriptionAdminModeEnabled(_ enabled: Bool) async {
-        await performUpdate {
+        await performUpdate({
             try await settingsService.updatePrescriptionAdminModeEnabled(enabled)
-        }
+        })
     }
 
     // MARK: - Warmup Toggle Confirmation Flow
@@ -247,9 +247,9 @@ final class SettingsViewModel {
     func toggleWarmupVolume() async {
         guard let current = profile?.includeWarmupsInVolume else { return }
         isRebuilding = true
-        await performUpdate {
+        await performUpdate({
             try await settingsService.updateIncludeWarmupsInVolume(!current)
-        }
+        })
         isRebuilding = false
     }
 
@@ -260,9 +260,9 @@ final class SettingsViewModel {
     func toggleWarmupPRs() async {
         guard let current = profile?.includeWarmupsInPRs else { return }
         isRebuilding = true
-        await performUpdate {
+        await performUpdate({
             try await settingsService.updateIncludeWarmupsInPRs(!current)
-        }
+        })
         isRebuilding = false
     }
 
@@ -314,12 +314,15 @@ final class SettingsViewModel {
         )
     }
 
-    private func performUpdate(_ update: () async throws -> Void) async {
+    @discardableResult
+    private func performUpdate(_ update: () async throws -> Void) async -> Bool {
         do {
             try await update()
             try await reloadProfile()
+            return true
         } catch {
             present(error)
+            return false
         }
     }
 

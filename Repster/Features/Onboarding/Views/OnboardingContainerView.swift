@@ -29,7 +29,6 @@ struct OnboardingContainerView: View {
 
             TabView(selection: $viewModel.currentStep) {
                 WelcomeStepView(
-                    setupMode: $viewModel.setupMode,
                     onNext: { viewModel.next() }
                 )
                     .tag(OnboardingStep.welcome)
@@ -40,14 +39,6 @@ struct OnboardingContainerView: View {
                 )
                 .tag(OnboardingStep.units)
 
-                if viewModel.setupMode == .advanced {
-                    FormulaStepView(
-                        selectedFormula: $viewModel.selectedFormula,
-                        onNext: { viewModel.next() }
-                    )
-                    .tag(OnboardingStep.formula)
-                }
-
                 BodyweightStepView(
                     bodyweightInput: $viewModel.bodyweightInput,
                     unitPreference: viewModel.selectedUnit,
@@ -55,6 +46,13 @@ struct OnboardingContainerView: View {
                     onSkip: { viewModel.skip() }
                 )
                 .tag(OnboardingStep.bodyweight)
+
+                SmartSuggestionsOnboardingStepView(
+                    defaultTargetReps: $viewModel.defaultTargetReps,
+                    defaultTargetRIR: $viewModel.defaultTargetRIR,
+                    onNext: { viewModel.next() }
+                )
+                .tag(OnboardingStep.smartSuggestions)
 
                 ImportStepView(
                     importService: importService,

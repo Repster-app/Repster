@@ -142,7 +142,7 @@
 		AK0003 /* OnboardingContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0003 /* OnboardingContainerView.swift */; };
 		AK0004 /* WelcomeStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0004 /* WelcomeStepView.swift */; };
 		AK0005 /* UnitsStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0005 /* UnitsStepView.swift */; };
-		AK0006 /* FormulaStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0006 /* FormulaStepView.swift */; };
+		AK0006 /* SmartSuggestionsOnboardingStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0006 /* SmartSuggestionsOnboardingStepView.swift */; };
 		AK0007 /* BodyweightStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0007 /* BodyweightStepView.swift */; };
 		AK0008 /* ImportStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0008 /* ImportStepView.swift */; };
 		AL0001 /* CSVParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BL0001 /* CSVParser.swift */; };
@@ -196,6 +196,9 @@
 		FL0004 /* FatigueLearningService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1004 /* FatigueLearningService.swift */; };
 		FL0005 /* FatigueLearningServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1005 /* FatigueLearningServiceTests.swift */; };
 		FL0006 /* FatigueLearningAdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1006 /* FatigueLearningAdminView.swift */; };
+		PH0001 /* AnalyticsServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = PH1001 /* AnalyticsServiceProtocol.swift */; };
+		PH0002 /* AnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = PH1002 /* AnalyticsService.swift */; };
+		PH0003 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = PH2002 /* PostHog */; };
 		RC0002 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = RC2002 /* RevenueCat */; };
 		RC0003 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = RC2003 /* RevenueCatUI */; };
 		TT0001 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */; };
@@ -206,6 +209,7 @@
 		TT0006 /* WorkoutSetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2007 /* WorkoutSetTests.swift */; };
 		TT0007 /* SeedExerciseLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2008 /* SeedExerciseLibraryTests.swift */; };
 		TT0008 /* MonetizationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2009 /* MonetizationServiceTests.swift */; };
+		TT0009 /* AnalyticsServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2010 /* AnalyticsServiceTests.swift */; };
 		ZA0001 /* TrendLineCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZB0001 /* TrendLineCalculator.swift */; };
 		ZA0002 /* ChartsTabViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZB0002 /* ChartsTabViewModel.swift */; };
 		ZA0003 /* BreakdownTabViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZB0003 /* BreakdownTabViewModel.swift */; };
@@ -321,6 +325,8 @@
 		B70006 /* StatsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsService.swift; sourceTree = "<group>"; };
 		B70007 /* SetService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetService.swift; sourceTree = "<group>"; };
 		B70008 /* MonetizationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonetizationService.swift; sourceTree = "<group>"; };
+		PH1001 /* AnalyticsServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsServiceProtocol.swift; sourceTree = "<group>"; };
+		PH1002 /* AnalyticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsService.swift; sourceTree = "<group>"; };
 		B80001 /* WorkoutServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutServiceProtocol.swift; sourceTree = "<group>"; };
 		B80002 /* ExerciseServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseServiceProtocol.swift; sourceTree = "<group>"; };
 		B80003 /* BodyweightServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyweightServiceProtocol.swift; sourceTree = "<group>"; };
@@ -398,7 +404,7 @@
 		BK0003 /* OnboardingContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingContainerView.swift; sourceTree = "<group>"; };
 		BK0004 /* WelcomeStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeStepView.swift; sourceTree = "<group>"; };
 		BK0005 /* UnitsStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnitsStepView.swift; sourceTree = "<group>"; };
-		BK0006 /* FormulaStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormulaStepView.swift; sourceTree = "<group>"; };
+		BK0006 /* SmartSuggestionsOnboardingStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSuggestionsOnboardingStepView.swift; sourceTree = "<group>"; };
 		BK0007 /* BodyweightStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyweightStepView.swift; sourceTree = "<group>"; };
 		BK0008 /* ImportStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportStepView.swift; sourceTree = "<group>"; };
 		BL0001 /* CSVParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVParser.swift; sourceTree = "<group>"; };
@@ -483,6 +489,7 @@
 		ZB0020 /* ExerciseSelectionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseSelectionSheet.swift; sourceTree = "<group>"; };
 		ZB0021 /* StartWorkoutSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartWorkoutSheet.swift; sourceTree = "<group>"; };
 		ZB0030 /* EmbeddedExerciseChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddedExerciseChartView.swift; sourceTree = "<group>"; };
+		TT2010 /* AnalyticsServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsServiceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -513,6 +520,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				PH0003 /* PostHog in Frameworks */,
 				RC0002 /* RevenueCat in Frameworks */,
 				RC0003 /* RevenueCatUI in Frameworks */,
 			);
@@ -920,7 +928,7 @@
 				BK0003 /* OnboardingContainerView.swift */,
 				BK0004 /* WelcomeStepView.swift */,
 				BK0005 /* UnitsStepView.swift */,
-				BK0006 /* FormulaStepView.swift */,
+				BK0006 /* SmartSuggestionsOnboardingStepView.swift */,
 				BK0007 /* BodyweightStepView.swift */,
 				BK0008 /* ImportStepView.swift */,
 			);
@@ -966,6 +974,7 @@
 			isa = PBXGroup;
 			children = (
 				D60001 /* Protocols */,
+				PH1002 /* AnalyticsService.swift */,
 				B70002 /* PRService.swift */,
 				B70006 /* StatsService.swift */,
 				B70007 /* SetService.swift */,
@@ -1104,6 +1113,7 @@
 				BL0002 /* ImportServiceProtocol.swift */,
 				BL0003 /* ExportServiceProtocol.swift */,
 				BT0006 /* TemplateServiceProtocol.swift */,
+				PH1001 /* AnalyticsServiceProtocol.swift */,
 			);
 			path = Protocols;
 			sourceTree = "<group>";
@@ -1240,6 +1250,7 @@
 				TT2008 /* SeedExerciseLibraryTests.swift */,
 				TT2007 /* WorkoutSetTests.swift */,
 				TT2009 /* MonetizationServiceTests.swift */,
+				TT2010 /* AnalyticsServiceTests.swift */,
 				FL1005 /* FatigueLearningServiceTests.swift */,
 			);
 			path = RepsterTests;
@@ -1289,6 +1300,7 @@
 			packageProductDependencies = (
 				RC2002 /* RevenueCat */,
 				RC2003 /* RevenueCatUI */,
+				PH2002 /* PostHog */,
 			);
 			productName = Repster;
 			productReference = B90001 /* Repster.app */;
@@ -1347,6 +1359,7 @@
 			mainGroup = D00001;
 			packageReferences = (
 				RC2001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */,
+				PH2001 /* XCRemoteSwiftPackageReference "posthog-ios" */,
 			);
 			productRefGroup = D90001 /* Products */;
 			projectDirPath = "";
@@ -1556,6 +1569,8 @@
 				ZA0019 /* ChartPreset.swift in Sources */,
 				ZA0020 /* ExerciseSelectionSheet.swift in Sources */,
 				ZA0021 /* StartWorkoutSheet.swift in Sources */,
+				PH0001 /* AnalyticsServiceProtocol.swift in Sources */,
+				PH0002 /* AnalyticsService.swift in Sources */,
 				AI0003 /* ChartSetData.swift in Sources */,
 				AI0002 /* ChartDataService.swift in Sources */,
 				AJ0001 /* E1RMFormula.swift in Sources */,
@@ -1586,7 +1601,7 @@
 				AK0003 /* OnboardingContainerView.swift in Sources */,
 				AK0004 /* WelcomeStepView.swift in Sources */,
 				AK0005 /* UnitsStepView.swift in Sources */,
-				AK0006 /* FormulaStepView.swift in Sources */,
+				AK0006 /* SmartSuggestionsOnboardingStepView.swift in Sources */,
 				AK0007 /* BodyweightStepView.swift in Sources */,
 				AK0008 /* ImportStepView.swift in Sources */,
 				AIM001 /* ImportService.swift in Sources */,
@@ -1638,6 +1653,7 @@
 				TT0007 /* SeedExerciseLibraryTests.swift in Sources */,
 				TT0006 /* WorkoutSetTests.swift in Sources */,
 				TT0008 /* MonetizationServiceTests.swift in Sources */,
+				TT0009 /* AnalyticsServiceTests.swift in Sources */,
 				FL0005 /* FatigueLearningServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1860,6 +1876,8 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.Repster;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				POSTHOG_HOST = "https://eu.i.posthog.com";
+				POSTHOG_PROJECT_TOKEN = phc_sJysoQ23BBpPBsHpsoym4isYSah9xsc9Z2ndgXgqTfiy;
 				REVENUECAT_API_KEY = test_psuJrnnzAOgbJPObjqCZbFITiGs;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -1889,6 +1907,9 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.Repster;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				POSTHOG_HOST = "https://eu.i.posthog.com";
+				POSTHOG_PROJECT_TOKEN = "$(POSTHOG_PROJECT_TOKEN_VALUE)";
+				POSTHOG_PROJECT_TOKEN_VALUE = phc_sJysoQ23BBpPBsHpsoym4isYSah9xsc9Z2ndgXgqTfiy;
 				REVENUECAT_API_KEY = "$(REVENUECAT_IOS_PUBLIC_API_KEY)";
 				REVENUECAT_IOS_PUBLIC_API_KEY = appl_YFMLQYQEAVtMhMdgjHwpxFygGsr;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -1994,6 +2015,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		PH2001 /* XCRemoteSwiftPackageReference "posthog-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/PostHog/posthog-ios.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.58.0;
+			};
+		};
 		RC2001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/RevenueCat/purchases-ios-spm.git";
@@ -2005,6 +2034,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		PH2002 /* PostHog */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = PH2001 /* XCRemoteSwiftPackageReference "posthog-ios" */;
+			productName = PostHog;
+		};
 		RC2002 /* RevenueCat */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = RC2001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;

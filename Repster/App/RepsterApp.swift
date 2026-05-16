@@ -28,7 +28,12 @@ struct RepsterApp: App {
 
             let repoContainer = RepositoryContainer(modelContainer: container)
             self.repositories = repoContainer
-            self.services = ServiceContainer(repositoryContainer: repoContainer)
+            let analyticsService = AnalyticsServiceFactory.makeService()
+            analyticsService.configure()
+            self.services = ServiceContainer(
+                repositoryContainer: repoContainer,
+                analyticsService: analyticsService
+            )
 
             // Clean up any stale Live Activities from a previous app session
             // (e.g., user force-quit the app while a workout was active)

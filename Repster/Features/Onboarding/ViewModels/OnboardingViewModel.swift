@@ -6,23 +6,18 @@
 import Foundation
 import SwiftUI
 
-enum OnboardingSetupMode {
-    case quick    // Skips formula step
-    case advanced // Full flow including formula selection
-}
-
 @Observable @MainActor
 final class OnboardingViewModel {
     // MARK: - Step Progression
 
     var currentStep: OnboardingStep = .welcome
-    var setupMode: OnboardingSetupMode = .quick
 
     // MARK: - User Selections (defaults applied)
 
     var selectedUnit: UnitPreference = .metric
-    var selectedFormula: E1RMFormula = .epley
     var bodyweightInput: String = ""
+    var defaultTargetReps: Int = 8
+    var defaultTargetRIR: Int = 2
 
     // MARK: - State
 
@@ -43,13 +38,7 @@ final class OnboardingViewModel {
 
     var isLastStep: Bool { currentStep == .importPrompt }
 
-    /// Steps visible for the current setup mode.
-    var visibleSteps: [OnboardingStep] {
-        OnboardingStep.allCases.filter { step in
-            if step == .formula && setupMode == .quick { return false }
-            return true
-        }
-    }
+    var visibleSteps: [OnboardingStep] { OnboardingStep.allCases }
 
     var stepProgress: Double {
         guard let index = visibleSteps.firstIndex(of: currentStep) else { return 0 }
@@ -79,7 +68,8 @@ final class OnboardingViewModel {
         isSaving = true
         do {
             try await settingsService.updateUnitPreference(selectedUnit)
-            try await settingsService.updateE1RMFormula(selectedFormula)
+            try await settingsService.updatePrescriptionDefaultTargetReps(defaultTargetReps)
+            try await settingsService.updatePrescriptionDefaultTargetRIR(defaultTargetRIR)
 
             if let weight = Double(bodyweightInput), weight > 0 {
                 let weightKg = selectedUnit == .imperial

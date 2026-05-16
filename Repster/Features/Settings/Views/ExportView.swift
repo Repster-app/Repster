@@ -5,8 +5,14 @@ struct ExportView: View {
 
     @State private var viewModel: ExportViewModel
 
-    init(workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol) {
-        _viewModel = State(initialValue: ExportViewModel(workoutHistoryBackupService: workoutHistoryBackupService))
+    init(
+        workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol,
+        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService()
+    ) {
+        _viewModel = State(initialValue: ExportViewModel(
+            workoutHistoryBackupService: workoutHistoryBackupService,
+            analyticsService: analyticsService
+        ))
     }
 
     var body: some View {
