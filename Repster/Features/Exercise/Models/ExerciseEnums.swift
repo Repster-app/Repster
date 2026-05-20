@@ -19,9 +19,11 @@ enum MainTab: Int, CaseIterable {
 /// Determines how the Exercise List behaves.
 /// - `.browse`: Standalone screen from FAB. Tap card body -> start flow. Tap trailing info -> detail/manage.
 /// - `.addToWorkout`: Sheet from Active Workout. Tap anywhere toggles selection. "Add (N)" button.
+/// - `.manage`: Pushed from Settings. Tap card -> exercise detail. No selection, no start, no close toolbar.
 enum ExerciseListMode {
     case browse
     case addToWorkout
+    case manage
 }
 
 /// Sort options for the exercise list.

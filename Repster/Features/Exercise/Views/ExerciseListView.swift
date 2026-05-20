@@ -19,8 +19,18 @@ struct ExerciseListView: View {
 
     @State private var viewModel: ExerciseListViewModel
     @State private var showCreateSheet = false
+    @State private var showAssignMuscleGroups = false
     @Environment(ServiceContainer.self) private var services
     @Environment(\.dismiss) private var dismiss
+
+    private var unassignedMuscleCount: Int {
+        viewModel.allExercises.reduce(into: 0) { count, exercise in
+            let normalized = ExercisePrimaryGroup.normalizedValue(exercise.primaryMuscle)
+            if normalized == nil || normalized?.isEmpty == true {
+                count += 1
+            }
+        }
+    }
 
     // MARK: - Init
 
@@ -42,6 +52,10 @@ struct ExerciseListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if mode == .manage && unassignedMuscleCount > 0 {
+                unassignedMuscleBanner
+            }
+
             // Filter strip + sort header
             filterHeader
 
@@ -58,10 +72,12 @@ struct ExerciseListView: View {
         }
         .background(Color.bg)
         .searchable(text: $viewModel.searchText, prompt: "Search exercises")
-        .navigationTitle("Exercises")
+        .navigationTitle(mode == .manage ? "Exercise Library" : "Exercises")
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button(mode == .addToWorkout ? "Cancel" : "Close") { dismiss() }
+            if mode != .manage {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(mode == .addToWorkout ? "Cancel" : "Close") { dismiss() }
+                }
             }
             // "Add New" button for creating exercises (T033)
             ToolbarItem(placement: .topBarTrailing) {
@@ -85,9 +101,48 @@ struct ExerciseListView: View {
                 }
             )
         }
+        .sheet(isPresented: $showAssignMuscleGroups, onDismiss: {
+            Task { await viewModel.loadExercises() }
+        }) {
+            AssignMuscleGroupsView(exerciseService: services.exerciseService)
+        }
         .task {
             await viewModel.loadExercises()
         }
+    }
+
+    // MARK: - Unassigned Muscle Banner
+
+    private var unassignedMuscleBanner: some View {
+        Button {
+            showAssignMuscleGroups = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.accent)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(unassignedMuscleCount == 1
+                         ? "1 exercise missing muscle group"
+                         : "\(unassignedMuscleCount) exercises missing muscle group")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.textPrimary)
+                    Text("Tap to assign")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.textSecondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.textTertiary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(Color.bgCard, in: RoundedRectangle(cornerRadius: 10))
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Filter Header
@@ -133,7 +188,8 @@ struct ExerciseListView: View {
         let stats = viewModel.allExerciseStats[exercise.id]
         let isSelected = viewModel.selectedExerciseIds.contains(exercise.id)
 
-        if mode == .browse {
+        switch mode {
+        case .browse:
             HStack(spacing: 8) {
                 Button {
                     onExercisesSelected?([exercise.id])
@@ -159,8 +215,19 @@ struct ExerciseListView: View {
                 }
                 .buttonStyle(.plain)
             }
-        } else {
-            // addToWorkout mode: multi-select toggle
+        case .manage:
+            NavigationLink {
+                ExerciseDetailView(exerciseId: exercise.id, services: services)
+            } label: {
+                ExerciseCardView(
+                    exercise: exercise,
+                    stats: stats,
+                    isSelected: false,
+                    mode: mode
+                )
+            }
+            .buttonStyle(.plain)
+        case .addToWorkout:
             Button {
                 viewModel.toggleSelection(exercise.id)
             } label: {

@@ -9,7 +9,6 @@ import RevenueCatUI
 
 enum SettingsDataDestination: CaseIterable {
     case importCSV
-    case assignMuscleGroups
     case exportBackup
     case restoreBackup
     case resetAppData
@@ -18,8 +17,6 @@ enum SettingsDataDestination: CaseIterable {
         switch self {
         case .importCSV:
             return "Import Data (CSV)"
-        case .assignMuscleGroups:
-            return "Assign Muscle Groups"
         case .exportBackup:
             return "Export Backup"
         case .restoreBackup:
@@ -33,8 +30,6 @@ enum SettingsDataDestination: CaseIterable {
         switch self {
         case .importCSV:
             return "square.and.arrow.down"
-        case .assignMuscleGroups:
-            return "figure.strengthtraining.traditional"
         case .exportBackup:
             return "square.and.arrow.up"
         case .restoreBackup:
@@ -50,6 +45,7 @@ struct SettingsView: View {
     // MARK: - State
 
     @State private var viewModel: SettingsViewModel
+    @State private var pendingMuscleAssignmentCount: Int = 0
     @Environment(ServiceContainer.self) private var services
     @Binding private var accessSnapshot: AccessSnapshot
     private let settingsService: any SettingsServiceProtocol
@@ -102,12 +98,14 @@ struct SettingsView: View {
             .task {
                 await viewModel.loadProfile()
                 await refreshMembershipStatus(forceSubscriptionRefresh: true)
+                await refreshPendingMuscleAssignmentCount()
             }
             .onAppear {
                 guard viewModel.profile != nil else { return }
                 Task {
                     await viewModel.refreshProfile()
                     await refreshMembershipStatus(forceSubscriptionRefresh: true)
+                    await refreshPendingMuscleAssignmentCount()
                 }
             }
             .sheet(isPresented: $viewModel.showUnitsSheet) {
@@ -191,6 +189,30 @@ struct SettingsView: View {
                     systemImage: "wand.and.stars",
                     showChevron: false
                 )
+            }
+
+            NavigationLink {
+                ExerciseListView(mode: .manage, services: services)
+            } label: {
+                SettingsNavigationRow(
+                    title: "Exercise Library",
+                    systemImage: "figure.strengthtraining.traditional",
+                    summary: pendingMuscleAssignmentCount > 0
+                        ? "\(pendingMuscleAssignmentCount) unassigned"
+                        : nil,
+                    summaryColor: pendingMuscleAssignmentCount > 0 ? .accent : .textSecondary,
+                    showChevron: false
+                )
+            }
+        }
+    }
+
+    private func refreshPendingMuscleAssignmentCount() async {
+        guard let exercises = try? await services.exerciseService.fetchAllExercises() else { return }
+        pendingMuscleAssignmentCount = exercises.reduce(into: 0) { count, exercise in
+            let normalized = ExercisePrimaryGroup.normalizedValue(exercise.primaryMuscle)
+            if normalized == nil || normalized?.isEmpty == true {
+                count += 1
             }
         }
     }
@@ -839,7 +861,6 @@ private struct DataBackupsView: View {
     let settingsService: any SettingsServiceProtocol
     let onDataReset: @MainActor @Sendable () async -> Void
     @State private var shareAnonymousAnalytics = true
-    @State private var pendingMuscleAssignmentCount: Int = 0
     @Environment(ServiceContainer.self) private var services
 
     var body: some View {
@@ -856,18 +877,6 @@ private struct DataBackupsView: View {
                     SettingsNavigationRow(
                         title: SettingsDataDestination.importCSV.title,
                         systemImage: SettingsDataDestination.importCSV.systemImage,
-                        showChevron: false
-                    )
-                }
-
-                NavigationLink {
-                    AssignMuscleGroupsView(exerciseService: services.exerciseService)
-                } label: {
-                    SettingsNavigationRow(
-                        title: SettingsDataDestination.assignMuscleGroups.title,
-                        systemImage: SettingsDataDestination.assignMuscleGroups.systemImage,
-                        summary: pendingMuscleAssignmentCount > 0 ? "\(pendingMuscleAssignmentCount) pending" : nil,
-                        summaryColor: pendingMuscleAssignmentCount > 0 ? .accent : .textSecondary,
                         showChevron: false
                     )
                 }
@@ -929,20 +938,6 @@ private struct DataBackupsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             shareAnonymousAnalytics = services.analyticsService.isCollectionEnabled
-            await refreshPendingMuscleAssignmentCount()
-        }
-        .onAppear {
-            Task { await refreshPendingMuscleAssignmentCount() }
-        }
-    }
-
-    private func refreshPendingMuscleAssignmentCount() async {
-        guard let exercises = try? await services.exerciseService.fetchAllExercises() else { return }
-        pendingMuscleAssignmentCount = exercises.reduce(into: 0) { count, exercise in
-            let normalized = ExercisePrimaryGroup.normalizedValue(exercise.primaryMuscle)
-            if normalized == nil || normalized?.isEmpty == true {
-                count += 1
-            }
         }
     }
 
