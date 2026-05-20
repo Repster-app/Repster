@@ -94,9 +94,9 @@ struct ExerciseDetailView: View {
             titleVisibility: .visible
         ) {
             Button("Delete", role: .destructive) {
+                dismiss()
                 Task {
                     try? await viewModel.deleteExercise()
-                    dismiss()
                 }
             }
         } message: {

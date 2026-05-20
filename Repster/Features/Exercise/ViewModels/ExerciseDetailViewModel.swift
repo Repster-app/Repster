@@ -83,6 +83,7 @@ final class ExerciseDetailViewModel {
     // MARK: - Actions
 
     func deleteExercise() async throws {
+        self.exercise = nil
         try await exerciseService.deleteExercise(exerciseId)
     }
 }

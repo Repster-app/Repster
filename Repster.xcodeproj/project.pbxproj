@@ -110,7 +110,6 @@
 		AG0005 /* ExercisePRsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BG0005 /* ExercisePRsView.swift */; };
 		AH0001 /* CreateEditExerciseViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BH0001 /* CreateEditExerciseViewModel.swift */; };
 		AH0002 /* CreateEditExerciseSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BH0002 /* CreateEditExerciseSheet.swift */; };
-		MZ0001 /* AssignMuscleGroupsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = MZ0002 /* AssignMuscleGroupsView.swift */; };
 		AH0003 /* MuscleGroupColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = BH0003 /* MuscleGroupColors.swift */; };
 		AH0004 /* MuscleGroupDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = BH0004 /* MuscleGroupDot.swift */; };
 		AH0005 /* CalendarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BH0005 /* CalendarViewModel.swift */; };
@@ -197,6 +196,7 @@
 		FL0004 /* FatigueLearningService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1004 /* FatigueLearningService.swift */; };
 		FL0005 /* FatigueLearningServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1005 /* FatigueLearningServiceTests.swift */; };
 		FL0006 /* FatigueLearningAdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1006 /* FatigueLearningAdminView.swift */; };
+		MZ0001 /* AssignMuscleGroupsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = MZ0002 /* AssignMuscleGroupsView.swift */; };
 		PH0001 /* AnalyticsServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = PH1001 /* AnalyticsServiceProtocol.swift */; };
 		PH0002 /* AnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = PH1002 /* AnalyticsService.swift */; };
 		PH0003 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = PH2002 /* PostHog */; };
@@ -326,8 +326,6 @@
 		B70006 /* StatsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsService.swift; sourceTree = "<group>"; };
 		B70007 /* SetService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetService.swift; sourceTree = "<group>"; };
 		B70008 /* MonetizationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonetizationService.swift; sourceTree = "<group>"; };
-		PH1001 /* AnalyticsServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsServiceProtocol.swift; sourceTree = "<group>"; };
-		PH1002 /* AnalyticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsService.swift; sourceTree = "<group>"; };
 		B80001 /* WorkoutServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutServiceProtocol.swift; sourceTree = "<group>"; };
 		B80002 /* ExerciseServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseServiceProtocol.swift; sourceTree = "<group>"; };
 		B80003 /* BodyweightServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyweightServiceProtocol.swift; sourceTree = "<group>"; };
@@ -373,7 +371,6 @@
 		BG0005 /* ExercisePRsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExercisePRsView.swift; sourceTree = "<group>"; };
 		BH0001 /* CreateEditExerciseViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateEditExerciseViewModel.swift; sourceTree = "<group>"; };
 		BH0002 /* CreateEditExerciseSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateEditExerciseSheet.swift; sourceTree = "<group>"; };
-		MZ0002 /* AssignMuscleGroupsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignMuscleGroupsView.swift; sourceTree = "<group>"; };
 		BH0003 /* MuscleGroupColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuscleGroupColors.swift; sourceTree = "<group>"; };
 		BH0004 /* MuscleGroupDot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuscleGroupDot.swift; sourceTree = "<group>"; };
 		BH0005 /* CalendarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarViewModel.swift; sourceTree = "<group>"; };
@@ -460,6 +457,9 @@
 		FL1004 /* FatigueLearningService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningService.swift; sourceTree = "<group>"; };
 		FL1005 /* FatigueLearningServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningServiceTests.swift; sourceTree = "<group>"; };
 		FL1006 /* FatigueLearningAdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningAdminView.swift; sourceTree = "<group>"; };
+		MZ0002 /* AssignMuscleGroupsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignMuscleGroupsView.swift; sourceTree = "<group>"; };
+		PH1001 /* AnalyticsServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsServiceProtocol.swift; sourceTree = "<group>"; };
+		PH1002 /* AnalyticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsService.swift; sourceTree = "<group>"; };
 		TT2001 /* RepsterTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RepsterTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutViewModelSuggestionRefreshTests.swift; sourceTree = "<group>"; };
 		TT2003 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
@@ -469,6 +469,7 @@
 		TT2007 /* WorkoutSetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSetTests.swift; sourceTree = "<group>"; };
 		TT2008 /* SeedExerciseLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedExerciseLibraryTests.swift; sourceTree = "<group>"; };
 		TT2009 /* MonetizationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonetizationServiceTests.swift; sourceTree = "<group>"; };
+		TT2010 /* AnalyticsServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsServiceTests.swift; sourceTree = "<group>"; };
 		ZB0001 /* TrendLineCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendLineCalculator.swift; sourceTree = "<group>"; };
 		ZB0002 /* ChartsTabViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartsTabViewModel.swift; sourceTree = "<group>"; };
 		ZB0003 /* BreakdownTabViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreakdownTabViewModel.swift; sourceTree = "<group>"; };
@@ -491,7 +492,6 @@
 		ZB0020 /* ExerciseSelectionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseSelectionSheet.swift; sourceTree = "<group>"; };
 		ZB0021 /* StartWorkoutSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartWorkoutSheet.swift; sourceTree = "<group>"; };
 		ZB0030 /* EmbeddedExerciseChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddedExerciseChartView.swift; sourceTree = "<group>"; };
-		TT2010 /* AnalyticsServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsServiceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1684,7 +1684,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = WorkoutLiveActivity/Info.plist;
@@ -1697,7 +1697,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.Repster.WorkoutLiveActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1717,7 +1717,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = WorkoutLiveActivity/Info.plist;
@@ -1730,7 +1730,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.Repster.WorkoutLiveActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1866,7 +1866,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				ENABLE_PREVIEWS = YES;
@@ -1877,11 +1877,11 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.Repster;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				MARKETING_VERSION = 1.2;
 				POSTHOG_HOST = "https://eu.i.posthog.com";
 				POSTHOG_PROJECT_TOKEN = phc_sJysoQ23BBpPBsHpsoym4isYSah9xsc9Z2ndgXgqTfiy;
+				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.Repster;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				REVENUECAT_API_KEY = test_psuJrnnzAOgbJPObjqCZbFITiGs;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -1897,7 +1897,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				ENABLE_PREVIEWS = YES;
@@ -1908,12 +1908,12 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.Repster;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				MARKETING_VERSION = 1.2;
 				POSTHOG_HOST = "https://eu.i.posthog.com";
 				POSTHOG_PROJECT_TOKEN = "$(POSTHOG_PROJECT_TOKEN_VALUE)";
 				POSTHOG_PROJECT_TOKEN_VALUE = phc_sJysoQ23BBpPBsHpsoym4isYSah9xsc9Z2ndgXgqTfiy;
+				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.Repster;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				REVENUECAT_API_KEY = "$(REVENUECAT_IOS_PUBLIC_API_KEY)";
 				REVENUECAT_IOS_PUBLIC_API_KEY = appl_YFMLQYQEAVtMhMdgjHwpxFygGsr;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
