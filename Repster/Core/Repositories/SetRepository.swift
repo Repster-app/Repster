@@ -30,7 +30,9 @@ actor SetRepository: SetRepositoryProtocol {
             predicate: #Predicate { $0.workoutId == workoutId },
             sortBy: [SortDescriptor(\.orderInWorkout)]
         )
-        return try modelContext.fetch(descriptor)
+        let sets = try modelContext.fetch(descriptor)
+        sets.forEach { $0.markFatigueLearningSnapshotPersisted() }
+        return sets
     }
 
     // MARK: - Exercise Queries (FR-004)
@@ -41,7 +43,9 @@ actor SetRepository: SetRepositoryProtocol {
             sortBy: [SortDescriptor(\.date, order: .reverse)]
         )
         if let limit { descriptor.fetchLimit = limit }
-        return try modelContext.fetch(descriptor)
+        let sets = try modelContext.fetch(descriptor)
+        sets.forEach { $0.markFatigueLearningSnapshotPersisted() }
+        return sets
     }
 
     func fetchSets(for exerciseId: UUID, reps: Int, orderedBy order: SetSortOrder) throws -> [WorkoutSet] {

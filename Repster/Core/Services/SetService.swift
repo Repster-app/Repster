@@ -353,9 +353,7 @@ actor SetService: SetServiceProtocol {
     // MARK: - Fetch (006: Active Workout Screen)
 
     func fetchSets(for workoutId: UUID) async throws -> [WorkoutSet] {
-        let sets = try await setRepo.fetchSets(for: workoutId)
-        sets.forEach { $0.markFatigueLearningSnapshotPersisted() }
-        return sets
+        try await setRepo.fetchSets(for: workoutId)
     }
 
     func fetchExerciseIds(for workoutId: UUID) async throws -> Swift.Set<UUID> {
@@ -365,9 +363,7 @@ actor SetService: SetServiceProtocol {
     // MARK: - Fetch by Exercise (007: Exercise List + Detail)
 
     func fetchSets(for exerciseId: UUID, limit: Int?) async throws -> [WorkoutSet] {
-        let sets = try await setRepo.fetchSets(for: exerciseId, limit: limit)
-        sets.forEach { $0.markFatigueLearningSnapshotPersisted() }
-        return sets
+        try await setRepo.fetchSets(for: exerciseId, limit: limit)
     }
 
     // MARK: - Helpers
