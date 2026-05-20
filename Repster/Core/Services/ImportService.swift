@@ -115,6 +115,7 @@ actor ImportService: ImportServiceProtocol {
                         startTime: workoutPayload.startTime,
                         endTime: workoutPayload.endTime,
                         duration: workoutPayload.durationSeconds,
+                        notes: workoutPayload.notes,
                         status: .completed
                     )
                     context.insert(newWorkout)
@@ -285,6 +286,8 @@ actor ImportService: ImportServiceProtocol {
             return FitNotesCSVImporter()
         case .strong:
             return StrongCSVImporter()
+        case .hevy:
+            return HevyCSVImporter()
         }
     }
 }
@@ -304,6 +307,7 @@ private struct NormalizedWorkoutImport {
     let startTime: Date?
     let endTime: Date?
     let durationSeconds: Int?
+    let notes: String?
     let sets: [NormalizedSetImport]
 }
 
@@ -330,6 +334,20 @@ private protocol CSVImportAdapter {
     var source: ImportSource { get }
     func preview(data: Data, unitSystem: ImportUnitSystem?) throws -> ImportPreview
     func parseDocument(data: Data, unitSystem: ImportUnitSystem?) throws -> ParsedImportDocument
+}
+
+/// Removes emoji characters from imported workout titles and collapses any leftover whitespace.
+/// Operates on grapheme clusters so multi-scalar emoji (skin-tone modifiers, ZWJ sequences, flags)
+/// are dropped as a unit. ASCII digits/`*`/`#` are preserved by gating on scalar value > 0x238C.
+private func stripEmojiAndNormalize(_ value: String) -> String {
+    let withoutEmoji = value.filter { character in
+        !character.unicodeScalars.contains { scalar in
+            scalar.properties.isEmojiPresentation ||
+            (scalar.properties.isEmoji && scalar.value > 0x238C)
+        }
+    }
+    let parts = withoutEmoji.split(whereSeparator: { $0.isWhitespace })
+    return parts.joined(separator: " ")
 }
 
 private extension CSVImportAdapter {
@@ -601,6 +619,7 @@ private struct FitNotesCSVImporter: CSVImportAdapter {
                 startTime: nil,
                 endTime: nil,
                 durationSeconds: nil,
+                notes: nil,
                 sets: rows.map {
                     NormalizedSetImport(
                         date: $0.date,
@@ -703,10 +722,11 @@ private struct StrongCSVImporter: CSVImportAdapter {
             guard let rows = groupedRows[key], !rows.isEmpty else { return nil }
             return NormalizedWorkoutImport(
                 date: key.startTime,
-                title: key.workoutName,
+                title: key.workoutName.isEmpty ? nil : key.workoutName,
                 startTime: key.startTime,
                 endTime: key.durationSeconds.map { key.startTime.addingTimeInterval(TimeInterval($0)) },
                 durationSeconds: key.durationSeconds,
+                notes: nil,
                 sets: rows.map {
                     NormalizedSetImport(
                         date: $0.date,
@@ -782,10 +802,11 @@ private struct StrongCSVImporter: CSVImportAdapter {
             ))
         }
 
-        let workoutName = fields[1].trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !workoutName.isEmpty else {
+        let rawWorkoutName = fields[1].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rawWorkoutName.isEmpty else {
             return .failure(.init(rowNumber: rowNumber, reason: "Missing workout name"))
         }
+        let workoutName = stripEmojiAndNormalize(rawWorkoutName)
 
         let durationText = fields[2].trimmingCharacters(in: .whitespacesAndNewlines)
         let workoutDuration = parseWorkoutDuration(durationText)
@@ -989,6 +1010,359 @@ private struct StrongCSVImporter: CSVImportAdapter {
                 .init(
                     rowNumber: rowNumber,
                     reason: "Unknown set marker '\(value)'; imported as a working set."
+                )
+            )
+        }
+    }
+}
+
+// MARK: - Hevy Importer
+
+private struct HevyCSVImporter: CSVImportAdapter {
+    let source: ImportSource = .hevy
+
+    private static let headers = [
+        "title", "start_time", "end_time", "description", "exercise_title",
+        "superset_id", "exercise_notes", "set_index", "set_type", "weight_kg",
+        "reps", "distance_km", "duration_seconds", "rpe"
+    ]
+
+    func preview(data: Data, unitSystem: ImportUnitSystem?) throws -> ImportPreview {
+        guard unitSystem != nil else {
+            throw ImportError.missingUnitSystem(source: .hevy)
+        }
+
+        let preview = try CSVParser.parsePreview(data: data)
+        try validateHeader(preview.headers, expected: Self.headers)
+        return makePreview(from: preview)
+    }
+
+    func parseDocument(data: Data, unitSystem: ImportUnitSystem?) throws -> ParsedImportDocument {
+        guard let unitSystem else {
+            throw ImportError.missingUnitSystem(source: .hevy)
+        }
+
+        let parseResult = try CSVParser.parse(data: data)
+        try validateHeader(parseResult.headers, expected: Self.headers)
+
+        var groupedRows: [WorkoutGroupKey: [ValidatedRow]] = [:]
+        var workoutOrder: [WorkoutGroupKey] = []
+        var errors: [CSVParser.ValidationError] = []
+        var warnings: [CSVParser.ValidationError] = []
+
+        for (index, row) in parseResult.rows.enumerated() {
+            switch validateRow(row, rowNumber: index + 2, unitSystem: unitSystem) {
+            case .success(let result):
+                if let warning = result.warning {
+                    warnings.append(warning)
+                }
+                if groupedRows[result.key] == nil {
+                    workoutOrder.append(result.key)
+                }
+                groupedRows[result.key, default: []].append(result.row)
+            case .failure(let error):
+                errors.append(error)
+            }
+        }
+
+        let workouts: [NormalizedWorkoutImport] = workoutOrder.compactMap { key -> NormalizedWorkoutImport? in
+            guard let rows = groupedRows[key], !rows.isEmpty else { return nil }
+
+            var seenExerciseNotes: Set<String> = []
+            let normalizedSets: [NormalizedSetImport] = rows.map { row -> NormalizedSetImport in
+                let noteForSet: String?
+                if let note = row.exerciseNotes, !seenExerciseNotes.contains(row.exerciseName) {
+                    seenExerciseNotes.insert(row.exerciseName)
+                    noteForSet = note
+                } else {
+                    noteForSet = nil
+                }
+                return NormalizedSetImport(
+                    date: row.date,
+                    exerciseName: row.exerciseName,
+                    category: nil,
+                    weightKg: row.weightKg,
+                    reps: row.reps,
+                    distanceMeters: row.distanceMeters,
+                    durationSeconds: row.durationSeconds,
+                    rpe: row.rpe,
+                    notes: noteForSet,
+                    trackingType: row.trackingType,
+                    setType: row.setType
+                )
+            }
+
+            return NormalizedWorkoutImport(
+                date: key.startTime,
+                title: key.workoutName.isEmpty ? nil : key.workoutName,
+                startTime: key.startTime,
+                endTime: key.endTime,
+                durationSeconds: key.durationSeconds,
+                notes: key.description,
+                sets: normalizedSets
+            )
+        }
+
+        return ParsedImportDocument(
+            workouts: workouts,
+            totalRows: parseResult.totalRows,
+            errors: errors,
+            warnings: warnings
+        )
+    }
+
+    // MARK: Row Validation
+
+    private struct WorkoutGroupKey: Hashable {
+        let startTime: Date
+        let endTime: Date?
+        let workoutName: String
+        let description: String?
+
+        var durationSeconds: Int? {
+            guard let endTime else { return nil }
+            let diff = Int(endTime.timeIntervalSince(startTime))
+            return diff > 0 ? diff : nil
+        }
+    }
+
+    private struct ValidatedRow {
+        let date: Date
+        let exerciseName: String
+        let exerciseNotes: String?
+        let weightKg: Double?
+        let reps: Int?
+        let distanceMeters: Double?
+        let durationSeconds: Int?
+        let rpe: Double?
+        let trackingType: TrackingType
+        let setType: SetType
+    }
+
+    private struct ValidationSuccess {
+        let key: WorkoutGroupKey
+        let row: ValidatedRow
+        let warning: CSVParser.ValidationError?
+    }
+
+    private func validateRow(
+        _ fields: [String],
+        rowNumber: Int,
+        unitSystem: ImportUnitSystem
+    ) -> Result<ValidationSuccess, CSVParser.ValidationError> {
+        guard fields.count == Self.headers.count else {
+            return .failure(.init(
+                rowNumber: rowNumber,
+                reason: "Expected \(Self.headers.count) columns, found \(fields.count)"
+            ))
+        }
+
+        let rawWorkoutName = fields[0].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rawWorkoutName.isEmpty else {
+            return .failure(.init(rowNumber: rowNumber, reason: "Missing workout title"))
+        }
+        let workoutName = stripEmojiAndNormalize(rawWorkoutName)
+
+        let startText = fields[1].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !startText.isEmpty else {
+            return .failure(.init(rowNumber: rowNumber, reason: "Missing workout start_time"))
+        }
+        guard let startTime = parseHevyDate(startText) else {
+            return .failure(.init(
+                rowNumber: rowNumber,
+                reason: "Invalid start_time: '\(startText)'. Expected format like '8 May 2026, 17:16'."
+            ))
+        }
+
+        let endText = fields[2].trimmingCharacters(in: .whitespacesAndNewlines)
+        let endTime: Date?
+        if endText.isEmpty {
+            endTime = nil
+        } else if let parsed = parseHevyDate(endText) {
+            endTime = parsed
+        } else {
+            return .failure(.init(
+                rowNumber: rowNumber,
+                reason: "Invalid end_time: '\(endText)'. Expected format like '8 May 2026, 17:16'."
+            ))
+        }
+
+        let descriptionText = fields[3].trimmingCharacters(in: .whitespacesAndNewlines)
+        let description = descriptionText.isEmpty ? nil : descriptionText
+
+        let exerciseName = fields[4].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !exerciseName.isEmpty else {
+            return .failure(.init(rowNumber: rowNumber, reason: "Missing exercise_title"))
+        }
+
+        let exerciseNotesText = fields[6].trimmingCharacters(in: .whitespacesAndNewlines)
+        let exerciseNotes = exerciseNotesText.isEmpty ? nil : exerciseNotesText
+
+        let setTypeResult = parseHevySetType(fields[8], rowNumber: rowNumber)
+
+        guard let rawWeight = parseDecimalField(fields[9]) else {
+            return .failure(.init(
+                rowNumber: rowNumber,
+                reason: "Invalid weight value: '\(fields[9].trimmingCharacters(in: .whitespacesAndNewlines))'."
+            ))
+        }
+        let weightKg = rawWeight.map { unitSystem == .imperial ? UnitConversion.lbsToKg($0) : $0 }
+
+        let repsResult = parseWholeNumberField(fields[10], fieldName: "reps", rowNumber: rowNumber)
+        let reps: Int?
+        switch repsResult {
+        case .failure(let error):
+            return .failure(error)
+        case .success(let value):
+            reps = value
+        }
+
+        guard let rawDistance = parseDecimalField(fields[11]) else {
+            return .failure(.init(
+                rowNumber: rowNumber,
+                reason: "Invalid distance value: '\(fields[11].trimmingCharacters(in: .whitespacesAndNewlines))'."
+            ))
+        }
+        let distanceMeters = rawDistance.map {
+            unitSystem == .imperial ? $0 * 1609.34 : $0 * 1000
+        }
+
+        let durationResult = parseWholeNumberField(fields[12], fieldName: "duration_seconds", rowNumber: rowNumber)
+        let durationSeconds: Int?
+        switch durationResult {
+        case .failure(let error):
+            return .failure(error)
+        case .success(let value):
+            durationSeconds = (value ?? 0) > 0 ? value : nil
+        }
+
+        guard let rpe = parseDecimalField(fields[13]) else {
+            return .failure(.init(
+                rowNumber: rowNumber,
+                reason: "Invalid RPE value: '\(fields[13].trimmingCharacters(in: .whitespacesAndNewlines))'."
+            ))
+        }
+
+        let hasData = weightKg != nil || reps != nil || durationSeconds != nil || distanceMeters != nil
+        guard hasData else {
+            return .failure(.init(
+                rowNumber: rowNumber,
+                reason: "Row has no data values (need at least one of weight, reps, duration, or distance)"
+            ))
+        }
+
+        return .success(ValidationSuccess(
+            key: WorkoutGroupKey(
+                startTime: startTime,
+                endTime: endTime,
+                workoutName: workoutName,
+                description: description
+            ),
+            row: ValidatedRow(
+                date: startTime,
+                exerciseName: exerciseName,
+                exerciseNotes: exerciseNotes,
+                weightKg: weightKg,
+                reps: reps,
+                distanceMeters: distanceMeters,
+                durationSeconds: durationSeconds,
+                rpe: rpe,
+                trackingType: inferTrackingType(
+                    weightKg: weightKg,
+                    reps: reps,
+                    distanceMeters: distanceMeters,
+                    durationSeconds: durationSeconds
+                ),
+                setType: setTypeResult.setType
+            ),
+            warning: setTypeResult.warning
+        ))
+    }
+
+    private func parseHevyDate(_ value: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "d MMM yyyy, HH:mm"
+        return formatter.date(from: value)
+    }
+
+    private func parseDecimalField(_ value: String) -> Double?? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return .some(nil) }
+        guard let decimal = Double(trimmed) else { return nil }
+        return .some(decimal)
+    }
+
+    private func parseWholeNumberField(
+        _ value: String,
+        fieldName: String,
+        rowNumber: Int
+    ) -> Result<Int?, CSVParser.ValidationError> {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return .success(nil) }
+        guard let decimal = Double(trimmed) else {
+            return .failure(.init(
+                rowNumber: rowNumber,
+                reason: "Invalid \(fieldName) value: '\(trimmed)'."
+            ))
+        }
+
+        let rounded = decimal.rounded()
+        guard abs(decimal - rounded) < 0.000_001 else {
+            return .failure(.init(
+                rowNumber: rowNumber,
+                reason: "Invalid \(fieldName) value: '\(trimmed)'. Expected a whole number."
+            ))
+        }
+
+        return .success(Int(rounded))
+    }
+
+    private func inferTrackingType(
+        weightKg: Double?,
+        reps: Int?,
+        distanceMeters: Double?,
+        durationSeconds: Int?
+    ) -> TrackingType {
+        let hasDistance = (distanceMeters ?? 0) > 0
+        let hasDuration = (durationSeconds ?? 0) > 0
+        let hasWeight = weightKg != nil
+        let hasReps = reps != nil
+
+        if hasDistance && hasDuration {
+            return .durationDistance
+        }
+        if hasDuration && !hasWeight && !hasReps {
+            return .duration
+        }
+        if hasDistance {
+            return .durationDistance
+        }
+        return .weightReps
+    }
+
+    private func parseHevySetType(
+        _ value: String,
+        rowNumber: Int
+    ) -> (setType: SetType, warning: CSVParser.ValidationError?) {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        switch normalized {
+        case "warmup":
+            return (.warmup, nil)
+        case "normal", "":
+            return (.working, nil)
+        case "failure":
+            return (.failure, nil)
+        case "dropset":
+            return (.dropset, nil)
+        default:
+            return (
+                .working,
+                .init(
+                    rowNumber: rowNumber,
+                    reason: "Unknown set_type '\(value)'; imported as a working set."
                 )
             )
         }

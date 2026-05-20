@@ -9,16 +9,21 @@ struct ImportView: View {
     @State private var viewModel: ImportViewModel
     @Environment(\.dismiss) private var dismiss
 
+    private let exerciseService: any ExerciseServiceProtocol
+
     init(
         importService: any ImportServiceProtocol,
         defaultUnitPreference: UnitPreference = .metric,
-        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService()
+        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService(),
+        exerciseService: any ExerciseServiceProtocol
     ) {
         _viewModel = State(initialValue: ImportViewModel(
             importService: importService,
             defaultUnitPreference: defaultUnitPreference,
-            analyticsService: analyticsService
+            analyticsService: analyticsService,
+            exerciseService: exerciseService
         ))
+        self.exerciseService = exerciseService
     }
 
     var body: some View {
@@ -48,79 +53,71 @@ struct ImportView: View {
         ) { result in
             viewModel.handleFileSelected(result)
         }
+        .sheet(isPresented: $viewModel.showAssignMuscleGroups) {
+            AssignMuscleGroupsView(exerciseService: exerciseService)
+        }
     }
 
     // MARK: - Idle
 
     private var idleView: some View {
         ScrollView {
-            VStack(spacing: 24) {
-                Spacer(minLength: 24)
-
+            VStack(spacing: 18) {
                 Image(systemName: "square.and.arrow.down")
-                    .font(.system(size: 48))
+                    .font(.system(size: 34))
                     .foregroundStyle(Color.textSecondary)
 
-                VStack(spacing: 10) {
+                VStack(spacing: 6) {
                     Text("Import Training Data")
                         .font(.title2.bold())
                         .foregroundStyle(Color.textPrimary)
 
                     Text("Choose the workout app export you want to import.")
-                        .font(.body)
+                        .font(.subheadline)
                         .foregroundStyle(Color.textSecondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
                 }
 
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 10) {
                     Text("Export Source")
                         .font(.headline)
                         .foregroundStyle(Color.textPrimary)
 
-                    ForEach(ImportSource.allCases) { source in
-                        ImportSourceOptionCard(
-                            source: source,
-                            isSelected: viewModel.selectedSource == source
-                        ) {
-                            viewModel.chooseSource(source)
+                    HStack(spacing: 12) {
+                        ForEach(ImportSource.allCases) { source in
+                            compactSourceTile(source)
                         }
                     }
                 }
                 .padding(.horizontal, 20)
 
                 if viewModel.selectedSource == .fitNotes {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 10) {
                         Text("FitNotes Weight Units")
                             .font(.headline)
                             .foregroundStyle(Color.textPrimary)
 
-                        Text("Choose the preferred weight column. If a row is missing that value, Repster imports the populated alternate column and reports a warning.")
-                            .font(.footnote)
-                            .foregroundStyle(Color.textSecondary)
-
-                        ImportUnitSystemChooser(
-                            selectedUnitSystem: viewModel.selectedFitNotesUnitSystem
-                        ) { unitSystem in
-                            viewModel.chooseFitNotesUnitSystem(unitSystem)
-                        }
+                        compactUnitPicker(
+                            selected: viewModel.selectedFitNotesUnitSystem,
+                            onSelect: { viewModel.chooseFitNotesUnitSystem($0) }
+                        )
                     }
                     .padding(.horizontal, 20)
                 } else if viewModel.selectedSource.requiresUnitSystem {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Strong Export Units")
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("\(viewModel.selectedSource.displayName) Export Units")
                             .font(.headline)
                             .foregroundStyle(Color.textPrimary)
 
-                        Text("Strong CSV files do not declare their units, so choose the unit system used in the export before previewing it.")
+                        compactUnitPicker(
+                            selected: viewModel.unitSystem(for: viewModel.selectedSource),
+                            onSelect: { viewModel.chooseUnitSystem($0, for: viewModel.selectedSource) }
+                        )
+
+                        Text(compactUnitHint(for: viewModel.selectedSource))
                             .font(.footnote)
                             .foregroundStyle(Color.textSecondary)
-
-                        ImportUnitSystemChooser(
-                            selectedUnitSystem: viewModel.selectedStrongUnitSystem
-                        ) { unitSystem in
-                            viewModel.chooseStrongUnitSystem(unitSystem)
-                        }
                     }
                     .padding(.horizontal, 20)
                 }
@@ -131,17 +128,84 @@ struct ImportView: View {
                     Label(viewModel.selectedSource.fileSelectionTitle, systemImage: "doc.badge.plus")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+                        .padding(.vertical, 12)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!viewModel.canSelectFile)
                 .padding(.horizontal, 32)
 
-                ImportSupportCallout()
+                ImportSupportCallout(isCompact: true)
                     .padding(.horizontal, 32)
 
-                Spacer(minLength: 32)
+                Spacer(minLength: 16)
             }
+            .padding(.top, 8)
+        }
+    }
+
+    private func compactSourceTile(_ source: ImportSource) -> some View {
+        let isSelected = viewModel.selectedSource == source
+        return Button {
+            viewModel.chooseSource(source)
+        } label: {
+            VStack(spacing: 8) {
+                Image(systemName: source.systemImageName)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(isSelected ? Color.accent : Color.textSecondary)
+
+                Text(source.displayName)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(isSelected ? Color.accent : Color.textSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 92)
+            .background(Color.bgCard, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isSelected ? Color.accent : Color.clear, lineWidth: 2)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func compactUnitPicker(
+        selected: ImportUnitSystem?,
+        onSelect: @escaping (ImportUnitSystem) -> Void
+    ) -> some View {
+        HStack(spacing: 8) {
+            ForEach(ImportUnitSystem.allCases) { unitSystem in
+                Button {
+                    onSelect(unitSystem)
+                } label: {
+                    Text(unitSystem.displayName)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.textPrimary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 42)
+                        .background(
+                            selected == unitSystem ? Color.accent : Color.bgCard,
+                            in: RoundedRectangle(cornerRadius: 10)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func compactUnitHint(for source: ImportSource) -> String {
+        switch source {
+        case .strong:
+            return "Strong exports don't include units — pick the one used in your export."
+        case .hevy:
+            return "Hevy's column is labeled kg but uses your in-app unit — pick the one used in your export."
+        case .fitNotes:
+            return ""
         }
     }
 
@@ -464,68 +528,23 @@ struct ImportView: View {
             case "RPE": return "→ Set RPE"
             default: return "→ Unknown"
             }
-        }
-    }
-}
-
-struct ImportSourceOptionCard: View {
-    let source: ImportSource
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: source.systemImageName)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(isSelected ? Color.accent : Color.textSecondary)
-                    .frame(width: 28, height: 28)
-
-                Text(source.displayName)
-                    .font(.headline)
-                    .foregroundStyle(Color.textPrimary)
-
-                Spacer()
-
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(isSelected ? Color.accent : Color.textSecondary)
-            }
-            .padding()
-            .background(Color.bgCard, in: RoundedRectangle(cornerRadius: 12))
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-struct ImportUnitSystemChooser: View {
-    let selectedUnitSystem: ImportUnitSystem?
-    let onSelect: (ImportUnitSystem) -> Void
-
-    var body: some View {
-        VStack(spacing: 10) {
-            ForEach(ImportUnitSystem.allCases) { unitSystem in
-                Button {
-                    onSelect(unitSystem)
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(unitSystem.displayName)
-                                .font(.headline)
-                                .foregroundStyle(Color.textPrimary)
-                            Text(unitSystem.subtitle)
-                                .font(.caption)
-                                .foregroundStyle(Color.textSecondary)
-                        }
-
-                        Spacer()
-
-                        Image(systemName: selectedUnitSystem == unitSystem ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(selectedUnitSystem == unitSystem ? Color.accent : Color.textSecondary)
-                    }
-                    .padding()
-                    .background(Color.bgCard, in: RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
+        case .hevy:
+            switch header {
+            case "title": return "→ Workout title"
+            case "start_time": return "→ Workout start"
+            case "end_time": return "→ Workout end"
+            case "description": return "→ Workout notes"
+            case "exercise_title": return "→ Exercise name"
+            case "superset_id": return "→ Ignored"
+            case "exercise_notes": return "→ Set notes (first set)"
+            case "set_index": return "→ Set order"
+            case "set_type": return "→ Set tag"
+            case "weight_kg": return "→ Set weight (unit-converted)"
+            case "reps": return "→ Set reps"
+            case "distance_km": return "→ Distance (unit-converted)"
+            case "duration_seconds": return "→ Duration"
+            case "rpe": return "→ Set RPE"
+            default: return "→ Unknown"
             }
         }
     }

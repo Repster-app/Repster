@@ -57,6 +57,7 @@ struct OnboardingContainerView: View {
                 ImportStepView(
                     importService: importService,
                     defaultUnitPreference: viewModel.selectedUnit,
+                    exerciseService: services.exerciseService,
                     isSaving: viewModel.isSaving,
                     onFinish: {
                         Task {

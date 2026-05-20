@@ -5,6 +5,7 @@ import Foundation
 enum ImportSource: String, CaseIterable, Identifiable, Sendable {
     case fitNotes
     case strong
+    case hevy
 
     var id: String { rawValue }
 
@@ -14,6 +15,8 @@ enum ImportSource: String, CaseIterable, Identifiable, Sendable {
             return "FitNotes"
         case .strong:
             return "Strong"
+        case .hevy:
+            return "Hevy"
         }
     }
 
@@ -23,6 +26,8 @@ enum ImportSource: String, CaseIterable, Identifiable, Sendable {
             return "list.bullet.rectangle"
         case .strong:
             return "bolt.heart"
+        case .hevy:
+            return "figure.strengthtraining.traditional"
         }
     }
 
@@ -32,11 +37,18 @@ enum ImportSource: String, CaseIterable, Identifiable, Sendable {
             return "Select FitNotes CSV"
         case .strong:
             return "Select Strong CSV"
+        case .hevy:
+            return "Select Hevy CSV"
         }
     }
 
     var requiresUnitSystem: Bool {
-        self == .strong
+        switch self {
+        case .fitNotes:
+            return false
+        case .strong, .hevy:
+            return true
+        }
     }
 }
 

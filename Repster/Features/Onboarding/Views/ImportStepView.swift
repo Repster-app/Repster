@@ -7,6 +7,7 @@ import UniformTypeIdentifiers
 struct ImportStepView: View {
     @State private var viewModel: ImportViewModel
     private let defaultUnitPreference: UnitPreference
+    private let exerciseService: any ExerciseServiceProtocol
     let isSaving: Bool
     let onFinish: () -> Void
     let onSkip: () -> Void
@@ -14,15 +15,18 @@ struct ImportStepView: View {
     init(
         importService: any ImportServiceProtocol,
         defaultUnitPreference: UnitPreference = .metric,
+        exerciseService: any ExerciseServiceProtocol,
         isSaving: Bool,
         onFinish: @escaping () -> Void,
         onSkip: @escaping () -> Void
     ) {
         _viewModel = State(initialValue: ImportViewModel(
             importService: importService,
-            defaultUnitPreference: defaultUnitPreference
+            defaultUnitPreference: defaultUnitPreference,
+            exerciseService: exerciseService
         ))
         self.defaultUnitPreference = defaultUnitPreference
+        self.exerciseService = exerciseService
         self.isSaving = isSaving
         self.onFinish = onFinish
         self.onSkip = onSkip
@@ -48,6 +52,9 @@ struct ImportStepView: View {
             allowedContentTypes: [.commaSeparatedText]
         ) { result in
             viewModel.handleFileSelected(result)
+        }
+        .sheet(isPresented: $viewModel.showAssignMuscleGroups) {
+            AssignMuscleGroupsView(exerciseService: exerciseService)
         }
         .onAppear {
             let defaultUnitSystem: ImportUnitSystem = defaultUnitPreference == .imperial ? .imperial : .metric
@@ -188,21 +195,11 @@ struct ImportStepView: View {
     }
 
     private var selectedUnitSystem: ImportUnitSystem? {
-        switch viewModel.selectedSource {
-        case .fitNotes:
-            return viewModel.selectedFitNotesUnitSystem
-        case .strong:
-            return viewModel.selectedStrongUnitSystem
-        }
+        viewModel.unitSystem(for: viewModel.selectedSource)
     }
 
     private func selectUnitSystem(_ unitSystem: ImportUnitSystem) {
-        switch viewModel.selectedSource {
-        case .fitNotes:
-            viewModel.chooseFitNotesUnitSystem(unitSystem)
-        case .strong:
-            viewModel.chooseStrongUnitSystem(unitSystem)
-        }
+        viewModel.chooseUnitSystem(unitSystem, for: viewModel.selectedSource)
     }
 
     // MARK: - Preview

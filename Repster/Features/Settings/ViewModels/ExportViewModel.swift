@@ -41,7 +41,7 @@ final class ExportViewModel {
                 let data = try await workoutHistoryBackupService.exportBackup()
                 let url = try temporaryShareURL(for: data)
                 self.shareItem = WorkoutHistoryBackupShareItem(url: url)
-                self.analyticsService.track(.backupExported)
+                self.analyticsService.backupExported()
                 self.isExporting = false
             } catch {
                 self.errorMessage = error.localizedDescription
@@ -94,12 +94,17 @@ final class RestoreBackupViewModel {
     // MARK: - Dependencies
 
     private let workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol
+    private let analyticsService: any AnalyticsServiceProtocol
     private var backupData: Data?
 
     // MARK: - Init
 
-    init(workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol) {
+    init(
+        workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol,
+        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService()
+    ) {
         self.workoutHistoryBackupService = workoutHistoryBackupService
+        self.analyticsService = analyticsService
     }
 
     // MARK: - File Selection
@@ -153,6 +158,7 @@ final class RestoreBackupViewModel {
                 let result = try await workoutHistoryBackupService.restoreBackup(data: backupData)
                 self.result = result
                 self.state = .completed
+                self.analyticsService.backupImported()
             } catch {
                 self.errorMessage = error.localizedDescription
                 self.state = .failed

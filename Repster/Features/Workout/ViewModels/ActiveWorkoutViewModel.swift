@@ -1879,7 +1879,11 @@ final class ActiveWorkoutViewModel {
         let referenceDate = Date()
         ensureWorkoutClockInitialized(referenceDate: referenceDate)
         let durationSeconds = Int(currentElapsedTime(referenceDate: referenceDate))
-        let completedSetCount = setsByExercise.values.flatMap { $0 }.filter(\.completed).count
+        let completedSets = setsByExercise.values.flatMap { $0 }.filter(\.completed)
+        let completedSetCount = completedSets.count
+        let totalReps = completedSets.reduce(0) { $0 + ($1.reps ?? 0) }
+        let prsHit = setsByExercise.values.flatMap { $0 }.filter { $0.prStatus == .current }.count
+        let startContext = WorkoutStartContextStore.recall()
 
         do {
             try await workoutService.finishWorkout(
@@ -1892,14 +1896,21 @@ final class ActiveWorkoutViewModel {
 
             _ = await accessControlService.recordCompletedWorkoutIfNeeded()
 
-            analyticsService.track(.workoutCompleted, properties: [
-                .durationBucket: .string(AnalyticsBuckets.duration(seconds: TimeInterval(durationSeconds))),
-                .setCountBucket: .string(AnalyticsBuckets.count(completedSetCount)),
-                .exerciseCountBucket: .string(AnalyticsBuckets.count(exercises.count)),
-                .perceivedEffortEntered: .bool(perceivedEffort != nil),
-                .notesEntered: .bool(notes?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false),
-                .excludedFromProgression: .bool(workout.excludesEntireWorkoutFromProgressionHistory)
-            ])
+            analyticsService.workoutCompleted(
+                durationSeconds: TimeInterval(durationSeconds),
+                completedSetCount: completedSetCount,
+                exerciseCount: exercises.count,
+                totalReps: totalReps,
+                prsHit: prsHit,
+                date: workout.date,
+                source: startContext.source,
+                templateUsed: startContext.templateUsed,
+                unitSystem: unitPreference.rawValue,
+                perceivedEffortEntered: perceivedEffort != nil,
+                notesEntered: notes?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false,
+                excludedFromProgression: workout.excludesEntireWorkoutFromProgressionHistory
+            )
+            WorkoutStartContextStore.clear()
 
             // Run adaptive fatigue learning before clearing local state
             await fatigueLearningService.processSessionEnd(workoutId: workout.id)
@@ -1943,14 +1954,19 @@ final class ActiveWorkoutViewModel {
         ensureWorkoutClockInitialized(referenceDate: referenceDate)
         let durationSeconds = currentElapsedTime(referenceDate: referenceDate)
         let setCount = setsByExercise.values.flatMap { $0 }.count
+        let startContext = WorkoutStartContextStore.recall()
 
         do {
             try await workoutService.deleteWorkout(workout.id)
 
-            analyticsService.track(.workoutDiscarded, properties: [
-                .durationBucket: .string(AnalyticsBuckets.duration(seconds: durationSeconds)),
-                .setCountBucket: .string(AnalyticsBuckets.count(setCount))
-            ])
+            analyticsService.workoutDiscarded(
+                durationSeconds: durationSeconds,
+                setCount: setCount,
+                date: workout.date,
+                source: startContext.source,
+                templateUsed: startContext.templateUsed
+            )
+            WorkoutStartContextStore.clear()
 
             stopWorkoutClockTicker()
             clearPersistedWorkoutClockState()

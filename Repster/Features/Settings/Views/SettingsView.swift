@@ -9,6 +9,7 @@ import RevenueCatUI
 
 enum SettingsDataDestination: CaseIterable {
     case importCSV
+    case assignMuscleGroups
     case exportBackup
     case restoreBackup
     case resetAppData
@@ -17,6 +18,8 @@ enum SettingsDataDestination: CaseIterable {
         switch self {
         case .importCSV:
             return "Import Data (CSV)"
+        case .assignMuscleGroups:
+            return "Assign Muscle Groups"
         case .exportBackup:
             return "Export Backup"
         case .restoreBackup:
@@ -30,6 +33,8 @@ enum SettingsDataDestination: CaseIterable {
         switch self {
         case .importCSV:
             return "square.and.arrow.down"
+        case .assignMuscleGroups:
+            return "figure.strengthtraining.traditional"
         case .exportBackup:
             return "square.and.arrow.up"
         case .restoreBackup:
@@ -109,10 +114,14 @@ struct SettingsView: View {
                 UnitPickerSheet(
                     currentUnit: viewModel.profile?.unitPreference ?? .metric
                 ) { unit in
+                    let previousUnit = viewModel.profile?.unitPreference
                     Task {
                         await viewModel.updateUnitPreference(unit)
                         if viewModel.profile?.unitPreference == unit {
                             services.updateCachedUnitPreference(unit)
+                            if previousUnit != unit {
+                                services.analyticsService.unitSystemToggled(unitSystem: unit.rawValue)
+                            }
                         }
                     }
                 }
@@ -473,33 +482,24 @@ private struct MembershipSettingsView: View {
             Text("Lifetime access unlocks Repster permanently. Your subscription will keep renewing until you cancel it in Apple subscriptions.")
         }
         .sheet(isPresented: $showPaywall, onDismiss: {
-            analyticsService.track(.paywallDismissed)
+            analyticsService.paywallDismissed(source: .paywall)
             Task { await refreshMembershipStatus(forceSubscriptionRefresh: true) }
         }) {
             PaywallView()
                 .onPurchaseStarted { _ in
-                    analyticsService.track(.purchaseStarted, properties: [
-                        .source: .string("paywall")
-                    ])
+                    analyticsService.purchaseStarted(source: .paywall)
                 }
                 .onPurchaseCompleted { _ in
-                    analyticsService.track(.purchaseCompleted, properties: [
-                        .source: .string("paywall")
-                    ])
+                    analyticsService.purchaseCompleted(source: .paywall)
                 }
                 .onPurchaseCancelled {
-                    analyticsService.track(.purchaseCancelled, properties: [
-                        .source: .string("paywall")
-                    ])
+                    analyticsService.purchaseCancelled(source: .paywall)
                 }
                 .onRestoreStarted {
-                    analyticsService.track(.restorePurchasesTapped, properties: [
-                        .source: .string("paywall")
-                    ])
+                    analyticsService.restorePurchasesTapped(source: .paywall)
                 }
                 .onAppear {
-                    analyticsService.screen(.paywall)
-                    analyticsService.track(.paywallShown)
+                    analyticsService.paywallShown(source: .paywall)
                 }
         }
     }
@@ -551,7 +551,7 @@ private struct MembershipSettingsView: View {
     @MainActor
     private func restorePurchases() async {
         guard !isRestoringPurchases else { return }
-        analyticsService.track(.restorePurchasesTapped)
+        analyticsService.restorePurchasesTapped(source: .settings)
         isRestoringPurchases = true
         defer { isRestoringPurchases = false }
         showManageSubscriptionAction = false
@@ -579,9 +579,7 @@ private struct MembershipSettingsView: View {
     @MainActor
     private func purchaseLifetime() async {
         guard !isPurchasingLifetime else { return }
-        analyticsService.track(.purchaseStarted, properties: [
-            .source: .string("membership_settings")
-        ])
+        analyticsService.purchaseStarted(source: .membershipSettings)
         isPurchasingLifetime = true
         defer { isPurchasingLifetime = false }
         showManageSubscriptionAction = false
@@ -590,17 +588,13 @@ private struct MembershipSettingsView: View {
             let subscriptionSnapshot = try await subscriptionService.purchaseLifetime()
             self.subscriptionSnapshot = subscriptionSnapshot
             accessSnapshot = await accessControlService.currentAccessSnapshot()
-            analyticsService.track(.purchaseCompleted, properties: [
-                .source: .string("membership_settings")
-            ])
+            analyticsService.purchaseCompleted(source: .membershipSettings)
             showManageSubscriptionAction = true
             membershipAlertTitle = "Lifetime Access Active"
             membershipAlertMessage = "Repster now has lifetime access. Your subscription may still renew until you cancel it in Apple subscriptions."
             showMembershipAlert = true
         } catch MonetizationError.purchaseCancelled {
-            analyticsService.track(.purchaseCancelled, properties: [
-                .source: .string("membership_settings")
-            ])
+            analyticsService.purchaseCancelled(source: .membershipSettings)
             await refreshMembershipStatus(forceSubscriptionRefresh: true)
         } catch {
             showManageSubscriptionAction = false
@@ -845,6 +839,7 @@ private struct DataBackupsView: View {
     let settingsService: any SettingsServiceProtocol
     let onDataReset: @MainActor @Sendable () async -> Void
     @State private var shareAnonymousAnalytics = true
+    @State private var pendingMuscleAssignmentCount: Int = 0
     @Environment(ServiceContainer.self) private var services
 
     var body: some View {
@@ -854,12 +849,25 @@ private struct DataBackupsView: View {
                     ImportView(
                         importService: importService,
                         defaultUnitPreference: services.unitPreference,
-                        analyticsService: services.analyticsService
+                        analyticsService: services.analyticsService,
+                        exerciseService: services.exerciseService
                     )
                 } label: {
                     SettingsNavigationRow(
                         title: SettingsDataDestination.importCSV.title,
                         systemImage: SettingsDataDestination.importCSV.systemImage,
+                        showChevron: false
+                    )
+                }
+
+                NavigationLink {
+                    AssignMuscleGroupsView(exerciseService: services.exerciseService)
+                } label: {
+                    SettingsNavigationRow(
+                        title: SettingsDataDestination.assignMuscleGroups.title,
+                        systemImage: SettingsDataDestination.assignMuscleGroups.systemImage,
+                        summary: pendingMuscleAssignmentCount > 0 ? "\(pendingMuscleAssignmentCount) pending" : nil,
+                        summaryColor: pendingMuscleAssignmentCount > 0 ? .accent : .textSecondary,
                         showChevron: false
                     )
                 }
@@ -878,7 +886,10 @@ private struct DataBackupsView: View {
                 }
 
                 NavigationLink {
-                    RestoreBackupView(workoutHistoryBackupService: workoutHistoryBackupService)
+                    RestoreBackupView(
+                        workoutHistoryBackupService: workoutHistoryBackupService,
+                        analyticsService: services.analyticsService
+                    )
                 } label: {
                     SettingsNavigationRow(
                         title: SettingsDataDestination.restoreBackup.title,
@@ -918,6 +929,20 @@ private struct DataBackupsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             shareAnonymousAnalytics = services.analyticsService.isCollectionEnabled
+            await refreshPendingMuscleAssignmentCount()
+        }
+        .onAppear {
+            Task { await refreshPendingMuscleAssignmentCount() }
+        }
+    }
+
+    private func refreshPendingMuscleAssignmentCount() async {
+        guard let exercises = try? await services.exerciseService.fetchAllExercises() else { return }
+        pendingMuscleAssignmentCount = exercises.reduce(into: 0) { count, exercise in
+            let normalized = ExercisePrimaryGroup.normalizedValue(exercise.primaryMuscle)
+            if normalized == nil || normalized?.isEmpty == true {
+                count += 1
+            }
         }
     }
 
@@ -927,7 +952,15 @@ private struct DataBackupsView: View {
                 get: { shareAnonymousAnalytics },
                 set: { enabled in
                     shareAnonymousAnalytics = enabled
-                    services.analyticsService.setCollectionEnabled(enabled)
+                    // When disabling, the event must fire before the opt-out
+                    // takes effect or it is dropped.
+                    if !enabled {
+                        services.analyticsService.analyticsOptOutToggled(enabled: enabled)
+                        services.analyticsService.setCollectionEnabled(enabled)
+                    } else {
+                        services.analyticsService.setCollectionEnabled(enabled)
+                        services.analyticsService.analyticsOptOutToggled(enabled: enabled)
+                    }
                 }
             )) {
                 Label("Share Anonymous Analytics", systemImage: "chart.bar")

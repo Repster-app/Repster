@@ -110,6 +110,7 @@
 		AG0005 /* ExercisePRsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BG0005 /* ExercisePRsView.swift */; };
 		AH0001 /* CreateEditExerciseViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BH0001 /* CreateEditExerciseViewModel.swift */; };
 		AH0002 /* CreateEditExerciseSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BH0002 /* CreateEditExerciseSheet.swift */; };
+		MZ0001 /* AssignMuscleGroupsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = MZ0002 /* AssignMuscleGroupsView.swift */; };
 		AH0003 /* MuscleGroupColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = BH0003 /* MuscleGroupColors.swift */; };
 		AH0004 /* MuscleGroupDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = BH0004 /* MuscleGroupDot.swift */; };
 		AH0005 /* CalendarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BH0005 /* CalendarViewModel.swift */; };
@@ -372,6 +373,7 @@
 		BG0005 /* ExercisePRsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExercisePRsView.swift; sourceTree = "<group>"; };
 		BH0001 /* CreateEditExerciseViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateEditExerciseViewModel.swift; sourceTree = "<group>"; };
 		BH0002 /* CreateEditExerciseSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateEditExerciseSheet.swift; sourceTree = "<group>"; };
+		MZ0002 /* AssignMuscleGroupsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignMuscleGroupsView.swift; sourceTree = "<group>"; };
 		BH0003 /* MuscleGroupColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuscleGroupColors.swift; sourceTree = "<group>"; };
 		BH0004 /* MuscleGroupDot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuscleGroupDot.swift; sourceTree = "<group>"; };
 		BH0005 /* CalendarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarViewModel.swift; sourceTree = "<group>"; };
@@ -755,6 +757,7 @@
 				BE0004 /* ExerciseCardView.swift */,
 				BF0001 /* ExerciseListView.swift */,
 				BH0002 /* CreateEditExerciseSheet.swift */,
+				MZ0002 /* AssignMuscleGroupsView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -1525,6 +1528,7 @@
 				AF0001 /* ExerciseListView.swift in Sources */,
 				AH0001 /* CreateEditExerciseViewModel.swift in Sources */,
 				AH0002 /* CreateEditExerciseSheet.swift in Sources */,
+				MZ0001 /* AssignMuscleGroupsView.swift in Sources */,
 				AH0003 /* MuscleGroupColors.swift in Sources */,
 				AH0004 /* MuscleGroupDot.swift in Sources */,
 				AH0005 /* CalendarViewModel.swift in Sources */,

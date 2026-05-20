@@ -386,12 +386,13 @@ struct TemplateFlowView: View {
                     template.id,
                     options: workoutStartOptions
                 )
-                analyticsService.track(.workoutStarted, properties: [
-                    .source: .string("template"),
-                    .templateUsed: .bool(true),
-                    .copiedPrevious: .bool(false),
-                    .countTowardProgression: .bool(workoutStartOptions.countTowardProgressionHistory)
-                ])
+                WorkoutStartContextStore.remember(source: .template, templateUsed: true)
+                analyticsService.workoutStarted(
+                    source: .template,
+                    templateUsed: true,
+                    copiedPrevious: false,
+                    countTowardProgression: workoutStartOptions.countTowardProgressionHistory
+                )
                 onStartWorkout()
             } catch {
                 actionAlert = TemplateActionAlert(

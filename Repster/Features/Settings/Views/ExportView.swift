@@ -85,8 +85,14 @@ struct RestoreBackupView: View {
 
     @State private var viewModel: RestoreBackupViewModel
 
-    init(workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol) {
-        _viewModel = State(initialValue: RestoreBackupViewModel(workoutHistoryBackupService: workoutHistoryBackupService))
+    init(
+        workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol,
+        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService()
+    ) {
+        _viewModel = State(initialValue: RestoreBackupViewModel(
+            workoutHistoryBackupService: workoutHistoryBackupService,
+            analyticsService: analyticsService
+        ))
     }
 
     var body: some View {

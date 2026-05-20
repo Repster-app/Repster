@@ -197,33 +197,24 @@ struct ContentView: View {
             ActiveWorkoutView(services: services)
         }
         .sheet(isPresented: $showPaywall, onDismiss: {
-            services.analyticsService.track(.paywallDismissed)
+            services.analyticsService.paywallDismissed(source: .paywall)
             Task { await refreshMonetizationState(forceSubscriptionRefresh: true) }
         }) {
             PaywallView()
                 .onPurchaseStarted { _ in
-                    services.analyticsService.track(.purchaseStarted, properties: [
-                        .source: .string("paywall")
-                    ])
+                    services.analyticsService.purchaseStarted(source: .paywall)
                 }
                 .onPurchaseCompleted { _ in
-                    services.analyticsService.track(.purchaseCompleted, properties: [
-                        .source: .string("paywall")
-                    ])
+                    services.analyticsService.purchaseCompleted(source: .paywall)
                 }
                 .onPurchaseCancelled {
-                    services.analyticsService.track(.purchaseCancelled, properties: [
-                        .source: .string("paywall")
-                    ])
+                    services.analyticsService.purchaseCancelled(source: .paywall)
                 }
                 .onRestoreStarted {
-                    services.analyticsService.track(.restorePurchasesTapped, properties: [
-                        .source: .string("paywall")
-                    ])
+                    services.analyticsService.restorePurchasesTapped(source: .paywall)
                 }
                 .onAppear {
-                    services.analyticsService.screen(.paywall)
-                    services.analyticsService.track(.paywallShown)
+                    services.analyticsService.paywallShown(source: .paywall)
                 }
         }
         // Refresh active workout state and HomeView when returning from fullScreenCover
@@ -417,7 +408,7 @@ struct ContentView: View {
         do {
             _ = try await services.workoutService.startWorkout(options: options)
             trackWorkoutStarted(
-                source: "empty",
+                source: .empty,
                 templateUsed: false,
                 copiedPrevious: false,
                 options: options
@@ -477,7 +468,7 @@ struct ContentView: View {
                 }
 
                 trackWorkoutStarted(
-                    source: "exercise_list",
+                    source: .exerciseList,
                     templateUsed: false,
                     copiedPrevious: false,
                     options: .default
@@ -566,11 +557,15 @@ struct ContentView: View {
         do {
             if let activeWorkout = try await services.workoutService.getActiveWorkout() {
                 let activeSets = try await services.setService.fetchSets(for: activeWorkout.id)
-                services.analyticsService.track(.workoutDiscarded, properties: [
-                    .source: .string("copy_previous"),
-                    .durationBucket: .string(AnalyticsBuckets.duration(seconds: Date().timeIntervalSince(activeWorkout.startTime ?? activeWorkout.date))),
-                    .setCountBucket: .string(AnalyticsBuckets.count(activeSets.count))
-                ])
+                let priorContext = WorkoutStartContextStore.recall()
+                services.analyticsService.workoutDiscarded(
+                    durationSeconds: Date().timeIntervalSince(activeWorkout.startTime ?? activeWorkout.date),
+                    setCount: activeSets.count,
+                    date: activeWorkout.date,
+                    source: priorContext.source,
+                    templateUsed: priorContext.templateUsed
+                )
+                WorkoutStartContextStore.clear()
                 try await services.workoutService.deleteWorkout(activeWorkout.id)
             }
             showDiscardConfirmation = false
@@ -606,7 +601,7 @@ struct ContentView: View {
         }
 
         trackWorkoutStarted(
-            source: "copy_previous",
+            source: .copyPrevious,
             templateUsed: false,
             copiedPrevious: true,
             options: startOptions
@@ -653,16 +648,17 @@ struct ContentView: View {
     }
 
     private func trackWorkoutStarted(
-        source: String,
+        source: WorkoutStartSource,
         templateUsed: Bool,
         copiedPrevious: Bool,
         options: WorkoutStartOptions
     ) {
-        services.analyticsService.track(.workoutStarted, properties: [
-            .source: .string(source),
-            .templateUsed: .bool(templateUsed),
-            .copiedPrevious: .bool(copiedPrevious),
-            .countTowardProgression: .bool(options.countTowardProgressionHistory)
-        ])
+        WorkoutStartContextStore.remember(source: source, templateUsed: templateUsed)
+        services.analyticsService.workoutStarted(
+            source: source,
+            templateUsed: templateUsed,
+            copiedPrevious: copiedPrevious,
+            countTowardProgression: options.countTowardProgressionHistory
+        )
     }
 }

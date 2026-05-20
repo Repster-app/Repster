@@ -44,7 +44,7 @@ final class PostHogAnalyticsClient: AnalyticsClientProtocol {
             host: configuration.host
         )
         config.personProfiles = .never
-        config.captureApplicationLifecycleEvents = true
+        config.captureApplicationLifecycleEvents = false
         config.captureScreenViews = false
         config.captureElementInteractions = false
         config.sessionReplay = false
@@ -106,15 +106,25 @@ final class AnalyticsService: AnalyticsServiceProtocol {
     private let client: any AnalyticsClientProtocol
     private let configuration: AnalyticsConfiguration
     private let userDefaults: UserDefaults
+    private let appVersion: String?
+    private let buildNumber: String?
 
     init(
         client: any AnalyticsClientProtocol,
         configuration: AnalyticsConfiguration,
-        userDefaults: UserDefaults = .standard
+        userDefaults: UserDefaults = .standard,
+        appVersion: String? = nil,
+        buildNumber: String? = nil
     ) {
         self.client = client
         self.configuration = configuration
         self.userDefaults = userDefaults
+        self.appVersion = appVersion?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nonEmpty
+        self.buildNumber = buildNumber?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nonEmpty
     }
 
     var isCollectionEnabled: Bool {
@@ -150,9 +160,17 @@ final class AnalyticsService: AnalyticsServiceProtocol {
     }
 
     func sanitize(_ properties: [AnalyticsPropertyKey: AnalyticsPropertyValue]) -> [String: Any] {
-        Dictionary(uniqueKeysWithValues: properties.map { key, value in
-            (key.rawValue, value.rawValue)
-        })
+        var result: [String: Any] = [:]
+        for (key, value) in properties {
+            result[key.rawValue] = value.rawValue
+        }
+        if let appVersion {
+            result[AnalyticsPropertyKey.appVersion.rawValue] = appVersion
+        }
+        if let buildNumber {
+            result[AnalyticsPropertyKey.buildNumber.rawValue] = buildNumber
+        }
+        return result
     }
 
     func sanitizeRawProperties(_ properties: [String: AnalyticsPropertyValue]) -> [String: Any] {
@@ -172,6 +190,10 @@ final class AnalyticsService: AnalyticsServiceProtocol {
     }
 }
 
+private extension String {
+    var nonEmpty: String? { isEmpty ? nil : self }
+}
+
 enum AnalyticsServiceFactory {
     static func makeService(
         bundle: Bundle = .main,
@@ -185,7 +207,9 @@ enum AnalyticsServiceFactory {
         return AnalyticsService(
             client: client ?? PostHogAnalyticsClient(),
             configuration: configuration,
-            userDefaults: userDefaults
+            userDefaults: userDefaults,
+            appVersion: bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+            buildNumber: bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String
         )
     }
 }

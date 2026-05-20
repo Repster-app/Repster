@@ -25,6 +25,7 @@ final class ImportViewModel {
     var selectedSource: ImportSource = .fitNotes
     var selectedFitNotesUnitSystem: ImportUnitSystem
     var selectedStrongUnitSystem: ImportUnitSystem?
+    var selectedHevyUnitSystem: ImportUnitSystem?
 
     // Preview
     var previewHeaders: [String] = []
@@ -46,10 +47,15 @@ final class ImportViewModel {
     var errorMessage: String?
     private(set) var importError: ImportError?
 
+    // MARK: - Post-Import Muscle Assignment
+
+    var showAssignMuscleGroups: Bool = false
+
     // MARK: - Dependencies
 
     private let importService: any ImportServiceProtocol
     private let analyticsService: any AnalyticsServiceProtocol
+    private let exerciseService: (any ExerciseServiceProtocol)?
     private var importData: Data?
 
     // MARK: - Init
@@ -57,10 +63,12 @@ final class ImportViewModel {
     init(
         importService: any ImportServiceProtocol,
         defaultUnitPreference: UnitPreference = .metric,
-        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService()
+        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService(),
+        exerciseService: (any ExerciseServiceProtocol)? = nil
     ) {
         self.importService = importService
         self.analyticsService = analyticsService
+        self.exerciseService = exerciseService
         self.selectedFitNotesUnitSystem = defaultUnitPreference == .imperial ? .imperial : .metric
     }
 
@@ -74,15 +82,32 @@ final class ImportViewModel {
     }
 
     var canSelectFile: Bool {
-        !selectedSource.requiresUnitSystem || selectedStrongUnitSystem != nil
+        !selectedSource.requiresUnitSystem || unitSystem(for: selectedSource) != nil
     }
 
     var selectedUnitSystem: ImportUnitSystem? {
-        switch selectedSource {
+        unitSystem(for: selectedSource)
+    }
+
+    func unitSystem(for source: ImportSource) -> ImportUnitSystem? {
+        switch source {
         case .fitNotes:
             return selectedFitNotesUnitSystem
         case .strong:
             return selectedStrongUnitSystem
+        case .hevy:
+            return selectedHevyUnitSystem
+        }
+    }
+
+    func chooseUnitSystem(_ unitSystem: ImportUnitSystem, for source: ImportSource) {
+        switch source {
+        case .fitNotes:
+            selectedFitNotesUnitSystem = unitSystem
+        case .strong:
+            selectedStrongUnitSystem = unitSystem
+        case .hevy:
+            selectedHevyUnitSystem = unitSystem
         }
     }
 
@@ -157,6 +182,11 @@ final class ImportViewModel {
         progressFraction = 0
         setsInserted = 0
 
+        analyticsService.importStarted(
+            sourceType: activeSource.rawValue,
+            unitSystem: activeUnitSystem?.rawValue
+        )
+
         Task {
             let stream = importService.importData(
                 data: data,
@@ -198,6 +228,7 @@ final class ImportViewModel {
             state = .completed
             progressFraction = 1.0
             analyticsService.track(.importCompleted, properties: importProperties(result: result, outcome: "success"))
+            Task { await loadExercisesNeedingMuscleGroup() }
 
         case .failed(let error):
             analyticsService.track(.importCompleted, properties: importProperties(error: error))
@@ -222,6 +253,21 @@ final class ImportViewModel {
         importError = nil
         activeSource = selectedSource
         activeUnitSystem = selectedUnitSystem
+        showAssignMuscleGroups = false
+    }
+
+    // MARK: - Post-Import Muscle Assignment
+
+    private func loadExercisesNeedingMuscleGroup() async {
+        guard let exerciseService else { return }
+        guard let exercises = try? await exerciseService.fetchAllExercises() else { return }
+
+        let hasMissing = exercises.contains { exercise in
+            let normalized = ExercisePrimaryGroup.normalizedValue(exercise.primaryMuscle)
+            return normalized == nil || normalized?.isEmpty == true
+        }
+
+        showAssignMuscleGroups = hasMissing
     }
 
     func retry() {
