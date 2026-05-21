@@ -13,6 +13,8 @@ struct CalendarView: View {
     @State private var navigationPath = NavigationPath()
     @State private var workoutToSaveAsTemplate: Workout? = nil
     @State private var workoutToEditId: UUID?
+    @State private var workoutToDelete: Workout? = nil
+    @State private var isDeletingWorkout = false
     @State private var saveAsTemplateController = SaveWorkoutAsTemplateController()
     @State private var templateFeedback: TemplateSaveFeedback? = nil
     @Binding var initialDate: Date?
@@ -172,6 +174,60 @@ struct CalendarView: View {
                 guard oldValue != nil, newValue == nil, let selectedDate = viewModel.selectedDate else { return }
                 Task { await viewModel.selectDate(selectedDate) }
             }
+            .confirmationDialog(
+                "Delete Workout",
+                isPresented: Binding(
+                    get: { workoutToDelete != nil },
+                    set: { isPresented in
+                        if !isPresented { workoutToDelete = nil }
+                    }
+                ),
+                titleVisibility: .visible,
+                presenting: workoutToDelete
+            ) { workout in
+                Button("Delete", role: .destructive) {
+                    Task { await deleteWorkout(workout) }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { _ in
+                Text("This will permanently delete this workout and all its sets. PRs and stats will be recalculated. This cannot be undone.")
+            }
+            .overlay {
+                if isDeletingWorkout {
+                    ZStack {
+                        Color.black.opacity(0.3)
+                            .ignoresSafeArea()
+                        VStack(spacing: 12) {
+                            ProgressView()
+                                .tint(Color.accent)
+                            Text("Deleting…")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.textSecondary)
+                        }
+                        .padding(24)
+                        .background(Color.bgCard, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Delete
+
+    private func deleteWorkout(_ workout: Workout) async {
+        isDeletingWorkout = true
+        do {
+            try await services.workoutService.deleteWorkout(workout.id)
+            await viewModel.reloadAllDots()
+            if let selectedDate = viewModel.selectedDate {
+                await viewModel.selectDate(selectedDate)
+            }
+            isDeletingWorkout = false
+        } catch {
+            isDeletingWorkout = false
+            #if DEBUG
+            dbg("[CalendarView] Delete failed: \(error)")
+            #endif
         }
     }
 
@@ -247,6 +303,9 @@ struct CalendarView: View {
                     },
                     onEditWorkout: { workout in
                         workoutToEditId = workout.id
+                    },
+                    onDeleteWorkout: { workout in
+                        workoutToDelete = workout
                     },
                     onExerciseTapped: { exerciseId in
                         navigationPath.append(exerciseId)

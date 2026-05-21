@@ -11,7 +11,26 @@ struct CalendarWorkoutDetailView: View {
     let unitPreference: UnitPreference
     let onSaveAsTemplate: ((Workout) -> Void)?
     let onEditWorkout: ((Workout) -> Void)?
+    let onDeleteWorkout: ((Workout) -> Void)?
     let onExerciseTapped: (UUID) -> Void
+
+    init(
+        workoutDetails: [WorkoutDetail],
+        selectedDate: Date,
+        unitPreference: UnitPreference,
+        onSaveAsTemplate: ((Workout) -> Void)?,
+        onEditWorkout: ((Workout) -> Void)?,
+        onDeleteWorkout: ((Workout) -> Void)? = nil,
+        onExerciseTapped: @escaping (UUID) -> Void
+    ) {
+        self.workoutDetails = workoutDetails
+        self.selectedDate = selectedDate
+        self.unitPreference = unitPreference
+        self.onSaveAsTemplate = onSaveAsTemplate
+        self.onEditWorkout = onEditWorkout
+        self.onDeleteWorkout = onDeleteWorkout
+        self.onExerciseTapped = onExerciseTapped
+    }
 
     var body: some View {
         if workoutDetails.isEmpty {
@@ -37,11 +56,12 @@ struct CalendarWorkoutDetailView: View {
     @ViewBuilder
     private func workoutSection(_ detail: WorkoutDetail) -> some View {
         VStack(spacing: 12) {
-            if onSaveAsTemplate != nil || onEditWorkout != nil {
+            if onSaveAsTemplate != nil || onEditWorkout != nil || onDeleteWorkout != nil {
                 workoutHeader(
                     detail.workout,
                     onSaveAsTemplate: onSaveAsTemplate,
-                    onEditWorkout: onEditWorkout
+                    onEditWorkout: onEditWorkout,
+                    onDeleteWorkout: onDeleteWorkout
                 )
             } else if workoutDetails.count > 1 {
                 sessionLabel(detail.workout)
@@ -72,7 +92,8 @@ struct CalendarWorkoutDetailView: View {
     private func workoutHeader(
         _ workout: Workout,
         onSaveAsTemplate: ((Workout) -> Void)?,
-        onEditWorkout: ((Workout) -> Void)?
+        onEditWorkout: ((Workout) -> Void)?,
+        onDeleteWorkout: ((Workout) -> Void)?
     ) -> some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
@@ -101,6 +122,15 @@ struct CalendarWorkoutDetailView: View {
                         onSaveAsTemplate(workout)
                     } label: {
                         Label("Save as Template", systemImage: "doc.on.doc")
+                    }
+                }
+
+                if let onDeleteWorkout {
+                    Divider()
+                    Button(role: .destructive) {
+                        onDeleteWorkout(workout)
+                    } label: {
+                        Label("Delete Workout", systemImage: "trash")
                     }
                 }
             } label: {

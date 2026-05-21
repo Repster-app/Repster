@@ -115,6 +115,14 @@ final class CalendarViewModel {
         }
     }
 
+    /// Force a reload of all calendar dot data (e.g. after a workout is deleted).
+    func reloadAllDots() async {
+        hasLoadedDots = false
+        calendarDotData = [:]
+        workoutsByDate = [:]
+        await loadAllDots()
+    }
+
     /// Build muscle-group dot data for a subset of date→workout entries.
     private func buildDots(for dateWorkouts: [Date: [Workout]]) async throws -> [Date: [String]] {
         var dotData: [Date: [String]] = [:]

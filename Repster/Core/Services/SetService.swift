@@ -10,7 +10,8 @@ enum SetServiceError: Error {
     case exerciseNotFound(UUID)
 }
 
-actor SetService: SetServiceProtocol {
+@MainActor
+final class SetService: SetServiceProtocol {
     private let setRepo: SetRepositoryProtocol
     private let exerciseRepo: ExerciseRepositoryProtocol
     private let bodyweightEntryRepo: BodyweightEntryRepositoryProtocol
@@ -19,7 +20,7 @@ actor SetService: SetServiceProtocol {
     private let statsService: StatsServiceProtocol
     private let fatigueLearningService: FatigueLearningService
 
-    init(
+    nonisolated init(
         setRepository: SetRepositoryProtocol,
         exerciseRepository: ExerciseRepositoryProtocol,
         bodyweightEntryRepository: BodyweightEntryRepositoryProtocol,
