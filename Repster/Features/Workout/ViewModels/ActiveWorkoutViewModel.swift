@@ -1894,7 +1894,13 @@ final class ActiveWorkoutViewModel {
                 durationSecondsOverride: durationSeconds
             )
 
-            _ = await accessControlService.recordCompletedWorkoutIfNeeded()
+            let accessSnapshot = await accessControlService.recordCompletedWorkoutIfNeeded()
+            let accessTier: String = accessSnapshot.hasFullAccess ? "subscribed" : "free"
+
+            let loggedRIRs = completedSets.compactMap(\.performanceRIR)
+            let averageRIR: Double? = loggedRIRs.isEmpty
+                ? nil
+                : loggedRIRs.reduce(0, +) / Double(loggedRIRs.count)
 
             analyticsService.workoutCompleted(
                 durationSeconds: TimeInterval(durationSeconds),
@@ -1908,7 +1914,11 @@ final class ActiveWorkoutViewModel {
                 unitSystem: unitPreference.rawValue,
                 perceivedEffortEntered: perceivedEffort != nil,
                 notesEntered: notes?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false,
-                excludedFromProgression: workout.excludesEntireWorkoutFromProgressionHistory
+                excludedFromProgression: workout.excludesEntireWorkoutFromProgressionHistory,
+                accessTier: accessTier,
+                remainingFreeWorkouts: accessSnapshot.remainingFreeWorkouts,
+                rirSetCount: loggedRIRs.count,
+                averageRIR: averageRIR
             )
             WorkoutStartContextStore.clear()
 

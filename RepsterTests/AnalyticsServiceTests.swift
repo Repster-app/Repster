@@ -140,7 +140,11 @@ final class AnalyticsServiceTests: XCTestCase {
             unitSystem: "metric",
             perceivedEffortEntered: true,
             notesEntered: false,
-            excludedFromProgression: false
+            excludedFromProgression: false,
+            accessTier: "free",
+            remainingFreeWorkouts: 3,
+            rirSetCount: 8,
+            averageRIR: 2.4
         )
 
         let capture = client.captures.last
@@ -155,6 +159,57 @@ final class AnalyticsServiceTests: XCTestCase {
         XCTAssertEqual(capture?.properties["source"] as? String, "template")
         XCTAssertEqual(capture?.properties["template_used"] as? Bool, true)
         XCTAssertEqual(capture?.properties["unit_system"] as? String, "metric")
+        XCTAssertEqual(capture?.properties["access_tier"] as? String, "free")
+        XCTAssertEqual(capture?.properties["remaining_free_workouts"] as? Int, 3)
+        XCTAssertEqual(capture?.properties["rir_entered"] as? Bool, true)
+        XCTAssertEqual(capture?.properties["rir_set_count_bucket"] as? String, "7-10")
+        XCTAssertEqual(capture?.properties["average_rir_bucket"] as? String, "2")
+    }
+
+    func testRIRBucketsBoundaries() {
+        XCTAssertEqual(AnalyticsBuckets.rir(0), "0")
+        XCTAssertEqual(AnalyticsBuckets.rir(0.4), "0")
+        XCTAssertEqual(AnalyticsBuckets.rir(0.5), "1")
+        XCTAssertEqual(AnalyticsBuckets.rir(1.4), "1")
+        XCTAssertEqual(AnalyticsBuckets.rir(2), "2")
+        XCTAssertEqual(AnalyticsBuckets.rir(2.6), "3")
+        XCTAssertEqual(AnalyticsBuckets.rir(4.4), "4")
+        XCTAssertEqual(AnalyticsBuckets.rir(4.5), "5+")
+        XCTAssertEqual(AnalyticsBuckets.rir(7), "5+")
+    }
+
+    func testWorkoutCompletedOmitsRIRBucketWhenNoSetsLogged() {
+        let (service, client, defaults) = makeService()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        service.configure()
+        let date = Calendar(identifier: .gregorian).date(from: DateComponents(year: 2026, month: 5, day: 19, hour: 7))!
+
+        service.workoutCompleted(
+            durationSeconds: 20 * 60,
+            completedSetCount: 4,
+            exerciseCount: 2,
+            totalReps: 30,
+            prsHit: 0,
+            date: date,
+            source: .empty,
+            templateUsed: false,
+            unitSystem: "imperial",
+            perceivedEffortEntered: false,
+            notesEntered: false,
+            excludedFromProgression: false,
+            accessTier: "subscribed",
+            remainingFreeWorkouts: nil,
+            rirSetCount: 0,
+            averageRIR: nil
+        )
+
+        let capture = client.captures.last
+        XCTAssertEqual(capture?.properties["access_tier"] as? String, "subscribed")
+        XCTAssertNil(capture?.properties["remaining_free_workouts"])
+        XCTAssertEqual(capture?.properties["rir_entered"] as? Bool, false)
+        XCTAssertEqual(capture?.properties["rir_set_count_bucket"] as? String, "0")
+        XCTAssertNil(capture?.properties["average_rir_bucket"])
     }
 
     func testPaywallShownEmitsBothScreenAndEventWithSource() {

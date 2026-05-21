@@ -125,7 +125,11 @@ extension AnalyticsServiceProtocol {
         unitSystem: String?,
         perceivedEffortEntered: Bool,
         notesEntered: Bool,
-        excludedFromProgression: Bool
+        excludedFromProgression: Bool,
+        accessTier: String?,
+        remainingFreeWorkouts: Int?,
+        rirSetCount: Int,
+        averageRIR: Double?
     ) {
         var properties: [AnalyticsPropertyKey: AnalyticsPropertyValue] = [
             .durationBucket: .string(AnalyticsBuckets.duration(seconds: durationSeconds)),
@@ -137,7 +141,9 @@ extension AnalyticsServiceProtocol {
             .dayOfWeek: .string(AnalyticsBuckets.dayOfWeek(date)),
             .perceivedEffortEntered: .bool(perceivedEffortEntered),
             .notesEntered: .bool(notesEntered),
-            .excludedFromProgression: .bool(excludedFromProgression)
+            .excludedFromProgression: .bool(excludedFromProgression),
+            .rirSetCountBucket: .string(AnalyticsBuckets.count(rirSetCount)),
+            .rirEntered: .bool(rirSetCount > 0)
         ]
         if let source {
             properties[.source] = .string(source.rawValue)
@@ -147,6 +153,15 @@ extension AnalyticsServiceProtocol {
         }
         if let unitSystem {
             properties[.unitSystem] = .string(unitSystem)
+        }
+        if let accessTier {
+            properties[.accessTier] = .string(accessTier)
+        }
+        if let remainingFreeWorkouts {
+            properties[.remainingFreeWorkouts] = .int(remainingFreeWorkouts)
+        }
+        if let averageRIR {
+            properties[.averageRirBucket] = .string(AnalyticsBuckets.rir(averageRIR))
         }
         track(.workoutCompleted, properties: properties)
     }
@@ -262,6 +277,11 @@ enum AnalyticsPropertyKey: String, CaseIterable {
     case enabled
     case appVersion = "app_version"
     case buildNumber = "build_number"
+    case accessTier = "access_tier"
+    case remainingFreeWorkouts = "remaining_free_workouts"
+    case rirEntered = "rir_entered"
+    case rirSetCountBucket = "rir_set_count_bucket"
+    case averageRirBucket = "average_rir_bucket"
 }
 
 enum AnalyticsPropertyValue: Equatable {
@@ -353,6 +373,26 @@ enum AnalyticsBuckets {
             return "evening"
         default:
             return "night"
+        }
+    }
+
+    /// Buckets a RIR value (typically 0–5+) into a low-cardinality string so
+    /// PostHog can aggregate without exploding distinct values from per-set
+    /// averages.
+    static func rir(_ value: Double) -> String {
+        switch value {
+        case ..<0.5:
+            return "0"
+        case 0.5..<1.5:
+            return "1"
+        case 1.5..<2.5:
+            return "2"
+        case 2.5..<3.5:
+            return "3"
+        case 3.5..<4.5:
+            return "4"
+        default:
+            return "5+"
         }
     }
 
