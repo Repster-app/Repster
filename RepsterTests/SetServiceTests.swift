@@ -912,7 +912,8 @@ final class SetServiceTests: XCTestCase {
 
         let recentPRs = try await context.statsService.fetchRecentPRs(
             since: supportedDate.addingTimeInterval(-3_600),
-            limit: 3
+            limit: 3,
+            scope: .e1RMOnly
         )
 
         XCTAssertEqual(recentPRs.map(\.exerciseId), [supported.exercise.id])

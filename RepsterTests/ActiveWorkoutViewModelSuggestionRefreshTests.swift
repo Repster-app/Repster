@@ -3949,9 +3949,10 @@ private final class StatsServiceStub: @unchecked Sendable, StatsServiceProtocol 
         return nil
     }
     func fetchAllStats() async throws -> [UUID: ExerciseStats] { [:] }
-    func fetchRecentPRs(since: Date, limit: Int) async throws -> [PerformanceRecord] {
+    func fetchRecentPRs(since: Date, limit: Int, scope: RecentPRScope) async throws -> [PerformanceRecord] {
         let _ = since
         let _ = limit
+        let _ = scope
         return []
     }
 }

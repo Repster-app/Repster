@@ -24,6 +24,20 @@ enum PRDisplayMode: String, Codable, CaseIterable, Equatable {
     }
 }
 
+// MARK: - PR Scope
+
+enum RecentPRScope: String, Codable, CaseIterable, Equatable {
+    case e1RMOnly   // Only show a PR if it's also the exercise's best e1RM
+    case anyPR      // Show any rep-bucket PR (most recent per exercise)
+
+    var displayName: String {
+        switch self {
+        case .e1RMOnly: return "Estimated 1RM only"
+        case .anyPR: return "Any PR"
+        }
+    }
+}
+
 // MARK: - Section ID
 
 enum HomeSectionId: String, Codable, Hashable, Identifiable {
@@ -68,6 +82,7 @@ struct HomeSectionConfig: Equatable {
     var sections: [HomeSectionEntry]
     var recentWorkoutsCount: Int
     var prDisplayMode: PRDisplayMode
+    var recentPRScope: RecentPRScope
 
     static let `default` = HomeSectionConfig(
         sections: [
@@ -76,7 +91,8 @@ struct HomeSectionConfig: Equatable {
             HomeSectionEntry(sectionId: .recentWorkouts, visible: true),
         ],
         recentWorkoutsCount: 5,
-        prDisplayMode: .standard
+        prDisplayMode: .standard,
+        recentPRScope: .e1RMOnly
     )
 
     var visibleSections: [HomeSectionEntry] {
@@ -122,7 +138,8 @@ struct HomeSectionConfig: Equatable {
         return HomeSectionConfig(
             sections: sanitizedSections,
             recentWorkoutsCount: max(1, min(10, recentWorkoutsCount)),
-            prDisplayMode: prDisplayMode
+            prDisplayMode: prDisplayMode,
+            recentPRScope: recentPRScope
         )
     }
 }
@@ -134,6 +151,7 @@ extension HomeSectionConfig: Codable {
         case sections
         case recentWorkoutsCount
         case prDisplayMode
+        case recentPRScope
     }
 
     init(from decoder: Decoder) throws {
@@ -141,5 +159,6 @@ extension HomeSectionConfig: Codable {
         sections = try container.decode([HomeSectionEntry].self, forKey: .sections)
         recentWorkoutsCount = try container.decodeIfPresent(Int.self, forKey: .recentWorkoutsCount) ?? 5
         prDisplayMode = try container.decodeIfPresent(PRDisplayMode.self, forKey: .prDisplayMode) ?? .standard
+        recentPRScope = try container.decodeIfPresent(RecentPRScope.self, forKey: .recentPRScope) ?? .e1RMOnly
     }
 }

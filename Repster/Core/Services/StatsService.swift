@@ -122,14 +122,13 @@ actor StatsService: StatsServiceProtocol {
 
     // MARK: - Recent PRs (Home Screen)
 
-    func fetchRecentPRs(since: Date, limit: Int) async throws -> [PerformanceRecord] {
+    func fetchRecentPRs(since: Date, limit: Int, scope: RecentPRScope) async throws -> [PerformanceRecord] {
         let records = try await performanceRecordRepo.fetchRecentRepMaxRecords(since: since)
 
-        // Resolve the user's e1RM formula once
+        // Resolve the user's e1RM formula once (only used for .e1RMOnly scope)
         let profile = try await healthProfileRepo.fetchOrCreate()
         let formula = E1RMFormula(rawValue: profile.e1RMFormula) ?? .epley
 
-        // Keep only the most recent PR per exercise, but only if it's the e1RM max
         var seen = Set<UUID>()
         var result: [PerformanceRecord] = []
         for record in records {
@@ -141,20 +140,22 @@ actor StatsService: StatsServiceProtocol {
             }
             guard seen.insert(record.exerciseId).inserted else { continue }
 
-            // Check if this record's e1RM is the best across all repMax records for the exercise
-            let allRepMaxes = try await performanceRecordRepo.fetchAll(
-                for: record.exerciseId,
-                recordType: .repMax
-            )
-            let validRepMaxes = allRepMaxes.filter { ($0.reps ?? 0) > 0 }
-            guard !validRepMaxes.isEmpty else { continue }
+            if scope == .e1RMOnly {
+                // Only include the record if its e1RM is the best across all rep buckets
+                let allRepMaxes = try await performanceRecordRepo.fetchAll(
+                    for: record.exerciseId,
+                    recordType: .repMax
+                )
+                let validRepMaxes = allRepMaxes.filter { ($0.reps ?? 0) > 0 }
+                guard !validRepMaxes.isEmpty else { continue }
 
-            let recordE1RM = formula.calculate(weight: record.value, reps: recordReps)
-            let bestE1RM = validRepMaxes.map {
-                formula.calculate(weight: $0.value, reps: $0.reps ?? 1)
-            }.max() ?? 0
+                let recordE1RM = formula.calculate(weight: record.value, reps: recordReps)
+                let bestE1RM = validRepMaxes.map {
+                    formula.calculate(weight: $0.value, reps: $0.reps ?? 1)
+                }.max() ?? 0
 
-            guard recordE1RM >= bestE1RM else { continue }
+                guard recordE1RM >= bestE1RM else { continue }
+            }
 
             result.append(record)
             if result.count >= limit { break }

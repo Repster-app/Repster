@@ -260,7 +260,11 @@ final class HomeViewModel {
     private func loadRecentPRs() async {
         do {
             let fourteenDaysAgo = Calendar.current.date(byAdding: .day, value: -14, to: Date()) ?? Date()
-            let records = try await statsService.fetchRecentPRs(since: fourteenDaysAgo, limit: sectionConfig.prDisplayMode.fetchLimit)
+            let records = try await statsService.fetchRecentPRs(
+                since: fourteenDaysAgo,
+                limit: sectionConfig.prDisplayMode.fetchLimit,
+                scope: sectionConfig.recentPRScope
+            )
 
             var prs: [RecentPR] = []
             for record in records {

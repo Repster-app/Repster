@@ -107,7 +107,12 @@
       "Bash(sips -s format jpeg REPSTERLOGO.png --out _tmp.jpg)",
       "Bash(sips -s format png _tmp.jpg --out REPSTERLOGO.png)",
       "Bash(sips -g hasAlpha -g pixelWidth -g pixelHeight -g profile -g format REPSTERLOGO.png)",
-      "Bash(plutil -lint /Users/nikolettkiraly/Downloads/NewWorkoutProject/Repster.xcodeproj/project.pbxproj)"
+      "Bash(plutil -lint /Users/nikolettkiraly/Downloads/NewWorkoutProject/Repster.xcodeproj/project.pbxproj)",
+      "Read(//Users/nikolettkiraly/Desktop/**)",
+      "Bash(mdfind -onlyin ~ 'kMDItemFSName == \"*.mov\"')",
+      "Bash(mdfind -onlyin ~ 'kMDItemKind == \"Simulator Screen Recording\"')",
+      "Bash(mdfind -onlyin ~ '\\(kMDItemFSName == \"*.mov\" || kMDItemFSName == \"*.mp4\" || kMDItemFSName == \"*.m4v\"\\)')",
+      "Read(//Users/nikolettkiraly/Pictures/**)"
     ]
   }
 }

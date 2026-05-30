@@ -12,6 +12,9 @@ struct EditWorkoutView: View {
     @State private var viewModel: EditWorkoutViewModel
     @State private var showWorkoutProgressionSheet = false
 
+    /// Shared custom keyboard state for set input.
+    @StateObject private var setKeyboardManager = SetEntryKeyboardManager()
+
     // MARK: - Dependencies
 
     private let services: ServiceContainer
@@ -49,7 +52,7 @@ struct EditWorkoutView: View {
                 Spacer()
             } else if viewModel.currentExercise != nil {
                 ScrollView {
-                    SetTableView(dataSource: viewModel)
+                    SetTableView(dataSource: viewModel, keyboardManager: setKeyboardManager)
                         .padding(.horizontal, 20)
                         .padding(.top, 8)
 
@@ -65,6 +68,12 @@ struct EditWorkoutView: View {
             Spacer(minLength: 0)
         }
         .background(Color.bg.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            SetEntryKeyboardOverlay(manager: setKeyboardManager)
+        }
+        .onChange(of: viewModel.selectedExerciseIndex) { _, _ in
+            setKeyboardManager.hide()
+        }
         .task {
             await viewModel.loadWorkout()
         }

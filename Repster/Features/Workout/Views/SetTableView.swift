@@ -390,6 +390,14 @@ private struct SetRowWrapper: View {
     @State private var isAutoUncompleting: Bool = false
     @State private var suppressNextRepsTextChange: Bool = false
 
+    /// True when the user tapped the checkmark on a row missing a required reps value.
+    /// Cleared on the next text edit so the red flag disappears as soon as they start typing.
+    @State private var showsCompletionError: Bool = false
+
+    /// Token bumped to ask SetRowView to focus the keypad on the first empty reps field
+    /// after a blocked checkmark tap.
+    @State private var keypadFocusRequestToken: UUID? = nil
+
     init(
         set: WorkoutSet,
         exercise: Exercise?,
@@ -476,7 +484,9 @@ private struct SetRowWrapper: View {
                 unitPreference: dataSource.unitPreference,
                 defaultWeightIncrement: dataSource.defaultWeightIncrement,
                 suggestedWeight: suggestedWeight,
-                prStatusOverride: prStatusOverride
+                prStatusOverride: prStatusOverride,
+                showsCompletionError: showsCompletionError,
+                keypadFocusRequestToken: keypadFocusRequestToken
             )
         )
     }
@@ -540,9 +550,41 @@ private struct SetRowWrapper: View {
         Task {
             if set.completed {
                 await dataSource.uncompleteSet(set)
-            } else if let input = completionInput(for: exercise) {
-                await dataSource.completeSet(set, input: input)
+                return
             }
+
+            attemptAutoFillRepsFromTarget(for: exercise)
+
+            if let input = completionInput(for: exercise) {
+                await dataSource.completeSet(set, input: input)
+            } else {
+                // Range / no target with empty reps → flag the row and guide the user
+                // straight to the missing field.
+                showsCompletionError = true
+                keypadFocusRequestToken = UUID()
+            }
+        }
+    }
+
+    /// If the user taps the checkmark with empty reps, populate the text field(s)
+    /// from a single-value rep target (e.g. `6-6`) so the saved set carries that
+    /// value. Range or absent targets are left untouched — `completionInput`
+    /// returns nil in that case so completion is blocked.
+    private func attemptAutoFillRepsFromTarget(for exercise: Exercise) {
+        let bounds = set.preferredTargetRepBounds
+        guard let lo = bounds.min, let hi = bounds.max, lo == hi, lo > 0 else { return }
+
+        if exercise.supportsUnilateralLogging, exercise.unilateral {
+            guard !exercise.usesTotalAcrossSidesRepTargets else { return }
+            if leftRepsText.isEmpty {
+                leftRepsText = String(lo)
+            }
+            if rightRepsText.isEmpty {
+                rightRepsText = String(lo)
+            }
+        } else if repsText.isEmpty {
+            suppressNextRepsTextChange = true
+            repsText = String(lo)
         }
     }
 
@@ -583,6 +625,7 @@ private struct SetRowWrapper: View {
     }
 
     private func handleRepsChange(_ newValue: String) {
+        showsCompletionError = false
         if suppressNextRepsTextChange {
             suppressNextRepsTextChange = false
             return
@@ -591,6 +634,7 @@ private struct SetRowWrapper: View {
     }
 
     private func handleLeftRepsChange(_ newValue: String, exercise: Exercise) {
+        showsCompletionError = false
         handleFieldEdit(field: .reps) {
             set.leftReps = Self.singleRepsValue(from: newValue)
             syncDerivedSetFields(for: exercise)
@@ -598,6 +642,7 @@ private struct SetRowWrapper: View {
     }
 
     private func handleRightRepsChange(_ newValue: String, exercise: Exercise) {
+        showsCompletionError = false
         handleFieldEdit(field: .reps) {
             set.rightReps = Self.singleRepsValue(from: newValue)
             syncDerivedSetFields(for: exercise)
@@ -742,10 +787,18 @@ private struct SetRowWrapper: View {
                 return nil
             }
 
+            let distance = UnitConversion.parseDecimal(distanceText)
+            guard
+                (leftReps ?? 0) > 0 ||
+                (rightReps ?? 0) > 0 ||
+                (durationSeconds ?? 0) > 0 ||
+                (distance ?? 0) > 0
+            else { return nil }
+
             return SetCompletionInput(
                 weight: UnitConversion.parseDisplayedWeight(weightText, unitPreference: dataSource.unitPreference),
                 durationSeconds: durationSeconds,
-                distanceMeters: UnitConversion.parseDecimal(distanceText),
+                distanceMeters: distance,
                 leftReps: leftReps,
                 rightReps: rightReps,
                 leftRIR: leftRIRValue,
@@ -760,11 +813,18 @@ private struct SetRowWrapper: View {
             return nil
         }
 
+        let distance = UnitConversion.parseDecimal(distanceText)
+        guard
+            (parsedReps.completionReps ?? 0) > 0 ||
+            (durationSeconds ?? 0) > 0 ||
+            (distance ?? 0) > 0
+        else { return nil }
+
         return SetCompletionInput(
             weight: UnitConversion.parseDisplayedWeight(weightText, unitPreference: dataSource.unitPreference),
             reps: parsedReps.completionReps,
             durationSeconds: durationSeconds,
-            distanceMeters: UnitConversion.parseDecimal(distanceText),
+            distanceMeters: distance,
             rir: rirValue
         )
     }

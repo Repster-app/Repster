@@ -195,6 +195,14 @@ struct SetRowView: View {
     /// Overrides `set.prStatus` for badge display when non-nil (suppresses dominated matches).
     var prStatusOverride: CachedPRStatus?? = nil
 
+    /// When true, the reps input fields render with a soft red tint to flag a missing value
+    /// after a blocked completion attempt. Cleared by the parent on first keystroke.
+    var showsCompletionError: Bool = false
+
+    /// Token changed by the parent to request the keypad be opened on the first empty reps field.
+    /// Used when a blocked checkmark tap should still guide the user to where to type.
+    var keypadFocusRequestToken: UUID? = nil
+
     // MARK: - Body
 
     /// Row-local active input field, used by the custom set-entry keyboard flow.
@@ -288,9 +296,24 @@ struct SetRowView: View {
                 focusedInput = nil
             }
         }
+        .onChange(of: keypadFocusRequestToken) { _, newToken in
+            guard newToken != nil else { return }
+            if let target = firstEmptyRepsField() {
+                activateCustomKeyboard(for: target)
+            }
+        }
         .onDisappear {
             keyboardManager?.hide(ownerSetID: set.id)
         }
+    }
+
+    private func firstEmptyRepsField() -> SetRowInputField? {
+        if exercise.supportsUnilateralLogging, exercise.unilateral {
+            if leftRepsText.isEmpty { return .leftReps }
+            if rightRepsText.isEmpty { return .rightReps }
+            return .leftReps
+        }
+        return .reps
     }
 
     // MARK: - RIR Picker
@@ -392,7 +415,8 @@ struct SetRowView: View {
                     isCompleted: set.completed,
                     isActiveOverride: focusedInput == .reps,
                     isCustomEntry: true,
-                    onCustomTap: { activateCustomKeyboard(for: .reps) }
+                    onCustomTap: { activateCustomKeyboard(for: .reps) },
+                    isErrored: showsCompletionError
                 )
                 .frame(maxWidth: .infinity)
             }
@@ -500,7 +524,8 @@ struct SetRowView: View {
                     isCompleted: set.completed,
                     isActiveOverride: focusedInput == .reps,
                     isCustomEntry: true,
-                    onCustomTap: { activateCustomKeyboard(for: .reps) }
+                    onCustomTap: { activateCustomKeyboard(for: .reps) },
+                    isErrored: showsCompletionError
                 )
                 .frame(maxWidth: .infinity)
 
@@ -536,7 +561,8 @@ struct SetRowView: View {
                 isCompleted: set.completed,
                 isActiveOverride: focusedInput == .reps,
                 isCustomEntry: true,
-                onCustomTap: { activateCustomKeyboard(for: .reps) }
+                onCustomTap: { activateCustomKeyboard(for: .reps) },
+                isErrored: showsCompletionError
             )
             .frame(maxWidth: .infinity)
         }
@@ -839,7 +865,8 @@ struct SetRowView: View {
                 controlHeight: UnilateralSetRowLayout.controlHeight,
                 isActiveOverride: focusedInput == focusedField,
                 isCustomEntry: true,
-                onCustomTap: { activateCustomKeyboard(for: focusedField) }
+                onCustomTap: { activateCustomKeyboard(for: focusedField) },
+                isErrored: showsCompletionError
             )
         }
         .frame(maxWidth: .infinity)

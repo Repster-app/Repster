@@ -52,6 +52,9 @@ struct SetInputField: View {
     /// Tap handler used in custom-entry mode.
     var onCustomTap: (() -> Void)? = nil
 
+    /// When true, applies a soft red tint to flag a required field.
+    var isErrored: Bool = false
+
     /// Internal focus state for tracking keyboard focus.
     @FocusState private var isFocused: Bool
 
@@ -74,7 +77,9 @@ struct SetInputField: View {
     // MARK: - Computed Colors
 
     private var backgroundColor: Color {
-        if isCompleted {
+        if isErrored {
+            return Color.danger.opacity(0.10)
+        } else if isCompleted {
             return Color.success.opacity(0.06)
         } else if isCurrentlyFocused {
             return Color.accent.opacity(0.06)
@@ -84,7 +89,9 @@ struct SetInputField: View {
     }
 
     private var borderColor: Color {
-        if isCompleted {
+        if isErrored {
+            return Color.danger.opacity(0.40)
+        } else if isCompleted {
             return Color.success.opacity(0.15)
         } else if isCurrentlyFocused {
             return Color.accent

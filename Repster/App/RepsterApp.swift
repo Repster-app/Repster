@@ -26,6 +26,9 @@ struct RepsterApp: App {
             let seedContext = ModelContext(container)
             SeedService.seedIfNeeded(modelContext: seedContext)
 
+            // Recover sets persisted with reps=nil from the empty-checkmark bug (one-shot).
+            GhostSetRepsBackfillMigration.runIfNeeded(modelContext: seedContext)
+
             let repoContainer = RepositoryContainer(modelContainer: container)
             self.repositories = repoContainer
             let analyticsService = AnalyticsServiceFactory.makeService()

@@ -155,6 +155,7 @@
 		AM0002 /* SeedDataLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BM0002 /* SeedDataLoader.swift */; };
 		AM0003 /* SeedExerciseDTO+Mapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = BM0003 /* SeedExerciseDTO+Mapping.swift */; };
 		AM0004 /* SeedService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BM0004 /* SeedService.swift */; };
+		AM0005 /* GhostSetRepsBackfillMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BM0005 /* GhostSetRepsBackfillMigration.swift */; };
 		AN0001 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0001 /* HomeViewModel.swift */; };
 		AN0002 /* WeekStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0002 /* WeekStripView.swift */; };
 		AN0003 /* StartWorkoutCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0003 /* StartWorkoutCardView.swift */; };
@@ -416,6 +417,7 @@
 		BM0002 /* SeedDataLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedDataLoader.swift; sourceTree = "<group>"; };
 		BM0003 /* SeedExerciseDTO+Mapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SeedExerciseDTO+Mapping.swift"; sourceTree = "<group>"; };
 		BM0004 /* SeedService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedService.swift; sourceTree = "<group>"; };
+		BM0005 /* GhostSetRepsBackfillMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhostSetRepsBackfillMigration.swift; sourceTree = "<group>"; };
 		BN0001 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
 		BN0002 /* WeekStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekStripView.swift; sourceTree = "<group>"; };
 		BN0003 /* StartWorkoutCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartWorkoutCardView.swift; sourceTree = "<group>"; };
@@ -993,6 +995,7 @@
 				BL0004 /* ExportService.swift */,
 				B70003 /* ServiceContainer.swift */,
 				BM0004 /* SeedService.swift */,
+				BM0005 /* GhostSetRepsBackfillMigration.swift */,
 				BT0007 /* TemplateService.swift */,
 				FL1004 /* FatigueLearningService.swift */,
 			);
@@ -1620,6 +1623,7 @@
 				AM0002 /* SeedDataLoader.swift in Sources */,
 				AM0003 /* SeedExerciseDTO+Mapping.swift in Sources */,
 				AM0004 /* SeedService.swift in Sources */,
+				AM0005 /* GhostSetRepsBackfillMigration.swift in Sources */,
 				AC0015 /* ExerciseInfoData.swift in Sources */,
 				AC0016 /* ExerciseInfoProvider.swift in Sources */,
 				AC0017 /* E1RMCardView.swift in Sources */,

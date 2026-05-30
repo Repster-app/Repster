@@ -117,5 +117,6 @@ protocol StatsServiceProtocol: Sendable {
 
     /// Fetch recent repMax PerformanceRecords across all exercises since a given date.
     /// Returns records sorted by date descending, keeping only the most recent per exercise.
-    func fetchRecentPRs(since: Date, limit: Int) async throws -> [PerformanceRecord]
+    /// When `scope` is `.e1RMOnly`, only records whose e1RM is the exercise's best are returned.
+    func fetchRecentPRs(since: Date, limit: Int, scope: RecentPRScope) async throws -> [PerformanceRecord]
 }

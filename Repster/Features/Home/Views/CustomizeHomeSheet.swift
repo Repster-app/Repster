@@ -79,6 +79,35 @@ struct CustomizeHomeSheet: View {
                         .font(.system(size: 12))
                         .foregroundStyle(Color.textTertiary)
                 }
+
+                // MARK: - PR Scope
+                Section {
+                    ForEach(RecentPRScope.allCases, id: \.self) { scope in
+                        Button {
+                            config.recentPRScope = scope
+                        } label: {
+                            HStack {
+                                Text(scope.displayName)
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(Color.textPrimary)
+                                Spacer()
+                                if config.recentPRScope == scope {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(Color.accent)
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Personal Records Shown")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.textSecondary)
+                } footer: {
+                    Text("Any PR shows the most recent PR per exercise across all rep ranges, not just the estimated 1RM max.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.textTertiary)
+                }
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
