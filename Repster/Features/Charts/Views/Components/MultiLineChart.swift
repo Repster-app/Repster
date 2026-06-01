@@ -26,7 +26,7 @@ struct MultiLineChart: View {
                     )
                     .foregroundStyle(s.color)
                     .lineStyle(StrokeStyle(lineWidth: 1.5))
-                    .interpolationMethod(.catmullRom)
+                    .interpolationMethod(.linear)
                 }
             }
 

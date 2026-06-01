@@ -97,7 +97,7 @@ struct BodyweightLogView: View {
                     y: .value("Weight", weight)
                 )
                 .foregroundStyle(Color.accent)
-                .interpolationMethod(.catmullRom)
+                .interpolationMethod(.linear)
 
                 PointMark(
                     x: .value("Date", entry.date),

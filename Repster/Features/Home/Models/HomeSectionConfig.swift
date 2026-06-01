@@ -92,7 +92,7 @@ struct HomeSectionConfig: Equatable {
         ],
         recentWorkoutsCount: 5,
         prDisplayMode: .standard,
-        recentPRScope: .e1RMOnly
+        recentPRScope: .anyPR
     )
 
     var visibleSections: [HomeSectionEntry] {
@@ -159,6 +159,6 @@ extension HomeSectionConfig: Codable {
         sections = try container.decode([HomeSectionEntry].self, forKey: .sections)
         recentWorkoutsCount = try container.decodeIfPresent(Int.self, forKey: .recentWorkoutsCount) ?? 5
         prDisplayMode = try container.decodeIfPresent(PRDisplayMode.self, forKey: .prDisplayMode) ?? .standard
-        recentPRScope = try container.decodeIfPresent(RecentPRScope.self, forKey: .recentPRScope) ?? .e1RMOnly
+        recentPRScope = try container.decodeIfPresent(RecentPRScope.self, forKey: .recentPRScope) ?? .anyPR
     }
 }

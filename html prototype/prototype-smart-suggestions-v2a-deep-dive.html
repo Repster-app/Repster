@@ -1,0 +1,823 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>V2a Deep Dive — Multi-set + Admin mode</title>
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --bg-elev: #15151a;
+    --bg-elev-2: #1d1d24;
+    --bg-elev-3: #25252e;
+    --stroke: rgba(255,255,255,0.06);
+    --stroke-strong: rgba(255,255,255,0.12);
+    --text: #f4f4f6;
+    --text-dim: #a1a1aa;
+    --text-mute: #6b6b75;
+    --accent: #7c8cff;
+    --accent-2: #b08bff;
+    --accent-soft: rgba(124,140,255,0.14);
+    --accent-stroke: rgba(124,140,255,0.32);
+    --success: #34d399;
+    --warn: #fbbf24;
+    --danger: #fb7185;
+    --info: #60a5fa;
+    --radius-lg: 18px;
+    --radius-md: 14px;
+    --radius-sm: 10px;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 48px 32px 96px;
+  }
+
+  .page-head h1 {
+    font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px;
+  }
+  .page-head p {
+    color: var(--text-dim); max-width: 720px; line-height: 1.55; margin: 0;
+  }
+
+  h2.section {
+    font-size: 16px; font-weight: 700; letter-spacing: -0.01em;
+    margin: 56px 0 4px;
+  }
+  h2.section .sub {
+    font-weight: 500; color: var(--text-mute); margin-left: 8px; font-size: 13px;
+  }
+  .section-note {
+    color: var(--text-dim); font-size: 13px; max-width: 760px; line-height: 1.55;
+    margin: 0 0 24px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 28px;
+  }
+  .grid.wide {
+    grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
+  }
+
+  .variant { display: flex; flex-direction: column; gap: 12px; }
+  .variant header {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  }
+  .variant h3 {
+    font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin: 0;
+  }
+  .variant .tag {
+    font-size: 11px; color: var(--text-mute); letter-spacing: 0.04em;
+  }
+
+  .frame {
+    background: #000;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 28px;
+    padding: 18px;
+  }
+
+  /* Section header (refresh button row) */
+  .section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 4px 12px;
+    gap: 8px;
+  }
+  .section-head .title {
+    font-size: 11px; font-weight: 600; color: var(--text-mute);
+    letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .section-head .meta {
+    margin-left: 8px;
+    font-size: 11px; color: var(--text-mute);
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .section-head .meta.admin-meta {
+    font-family: var(--mono); color: var(--info);
+  }
+  .section-head .spacer { flex: 1; }
+  .section-head .icon-btn {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: var(--bg-elev);
+    border: 1px solid var(--stroke);
+    display: grid; place-items: center;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+  .section-head .admin-pill {
+    font-size: 9px; font-weight: 800;
+    color: var(--info);
+    background: rgba(96,165,250,0.12);
+    border: 1px solid rgba(96,165,250,0.24);
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-family: var(--mono);
+  }
+
+  /* Spinner */
+  .spinner {
+    width: 11px; height: 11px;
+    border: 1.5px solid rgba(255,255,255,0.18);
+    border-top-color: var(--text);
+    border-radius: 50%;
+    display: inline-block;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ============================================================
+     V2a strip (the chosen design)
+     ============================================================ */
+  .strip {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px;
+    background: var(--bg-elev);
+    border: 1px solid var(--stroke);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-md);
+  }
+  .strip + .strip { margin-top: 8px; }
+  .strip .ico {
+    width: 36px; height: 36px; flex: none;
+    border-radius: 10px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: grid; place-items: center;
+  }
+  .strip .body { flex: 1; min-width: 0; }
+  .strip .line1 {
+    font-size: 15px; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .strip .line1 .num { color: var(--accent); }
+  .strip .line2 {
+    color: var(--text-mute); font-size: 12px; margin-top: 2px;
+    line-height: 1.4;
+  }
+  .strip .cta {
+    flex: none;
+    background: transparent;
+    border: 1px solid var(--stroke-strong);
+    color: var(--text);
+    padding: 7px 12px;
+    border-radius: 8px;
+    font: inherit; font-size: 13px; font-weight: 600;
+    cursor: pointer;
+  }
+  .strip .cta.accent {
+    background: var(--accent);
+    color: #fff;
+    border-color: transparent;
+  }
+
+  /* Unavailable strip variant */
+  .strip.unavail {
+    border-left-color: var(--text-mute);
+  }
+  .strip.unavail .ico {
+    background: rgba(255,255,255,0.04);
+    color: var(--text-mute);
+  }
+  .strip.unavail .line1 { color: var(--text-dim); font-weight: 600; }
+  .strip.unavail .cta { color: var(--text-mute); }
+
+  /* Done strip (already applied) */
+  .strip.done {
+    border-left-color: var(--success);
+    background: var(--bg-elev);
+    opacity: 0.7;
+  }
+  .strip.done .ico {
+    background: rgba(52,211,153,0.10);
+    color: var(--success);
+  }
+  .strip.done .cta {
+    color: var(--success); border-color: rgba(52,211,153,0.32);
+    background: rgba(52,211,153,0.08);
+  }
+
+  /* ============================================================
+     Admin mode extensions
+     ============================================================ */
+  .strip.admin {
+    border-left-color: var(--info);
+  }
+  .strip.admin .ico {
+    background: rgba(96,165,250,0.12);
+    color: var(--info);
+  }
+  .strip.admin .line1 {
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  .strip.admin .line2 {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-mute);
+    white-space: normal;
+  }
+  .strip.admin .details-btn {
+    flex: none;
+    background: transparent;
+    border: 1px solid var(--stroke-strong);
+    color: var(--text-dim);
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--mono);
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+
+  /* Admin diagnostics drawer */
+  .diagnostics {
+    margin-top: 8px;
+    padding: 12px 14px;
+    background: var(--bg-elev-2);
+    border: 1px solid var(--stroke);
+    border-radius: var(--radius-sm);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .diagnostics .group {
+    margin-bottom: 12px;
+  }
+  .diagnostics .group:last-child { margin-bottom: 0; }
+  .diagnostics .group-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--info);
+    margin-bottom: 6px;
+    font-weight: 700;
+  }
+  .diagnostics .kv-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 16px;
+  }
+  .diagnostics .kv {
+    display: flex; justify-content: space-between; gap: 8px;
+    padding: 3px 0;
+    border-bottom: 1px dotted rgba(255,255,255,0.05);
+  }
+  .diagnostics .kv .k {
+    color: var(--text-mute);
+  }
+  .diagnostics .kv .v {
+    color: var(--text);
+    text-align: right;
+  }
+  .diagnostics .kv .v.signed-pos { color: var(--success); }
+  .diagnostics .kv .v.signed-neg { color: var(--danger); }
+
+  .alternatives {
+    margin-top: 4px;
+    display: grid;
+    gap: 6px;
+  }
+  .alt-row {
+    background: var(--bg-elev-3);
+    border-radius: 6px;
+    padding: 8px 10px;
+    border: 1px solid var(--stroke);
+  }
+  .alt-row .head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 6px;
+  }
+  .alt-row .reps {
+    font-weight: 700; color: var(--text); font-size: 11px;
+  }
+  .alt-row .selected-pill {
+    font-size: 9px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: 1px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+  }
+  .alt-row .raw {
+    margin-left: auto; color: var(--text-mute); font-size: 10px;
+  }
+  .alt-row .cands {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px;
+  }
+  .cand {
+    padding: 4px 6px;
+    background: var(--bg-elev-2);
+    border-radius: 4px;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .cand .top {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 4px;
+  }
+  .cand .kind {
+    font-size: 9px; color: var(--text-mute); text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .cand.recommended .kind { color: var(--success); font-weight: 700; }
+  .cand.suggested-kind { border: 1px solid var(--accent-stroke); }
+  .cand .w { font-size: 11px; font-weight: 700; color: var(--text); }
+  .cand .meta { font-size: 9px; color: var(--text-mute); }
+
+  /* Annotation callouts */
+  .annot {
+    background: var(--bg-elev);
+    border: 1px solid var(--stroke);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    font-size: 12px; line-height: 1.5;
+    color: var(--text-dim);
+  }
+  .annot b { color: var(--text); font-weight: 600; }
+  .annot .pill {
+    display: inline-block;
+    font-size: 10px; font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .pill.easy { background: rgba(52,211,153,0.14); color: var(--success); }
+  .pill.med { background: rgba(251,191,36,0.14); color: var(--warn); }
+  .pill.choice { background: var(--accent-soft); color: var(--accent); }
+
+  .decisions {
+    background: var(--bg-elev);
+    border: 1px solid var(--stroke);
+    border-radius: var(--radius-md);
+    padding: 22px 24px;
+    margin-top: 48px;
+  }
+  .decisions h3 { margin: 0 0 14px; font-size: 16px; }
+  .decisions ol {
+    margin: 0; padding-left: 20px;
+    color: var(--text-dim); line-height: 1.65; font-size: 14px;
+  }
+  .decisions ol li + li { margin-top: 10px; }
+  .decisions ol li b { color: var(--text); }
+  .decisions code {
+    background: var(--bg-elev-2);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--text);
+    font-family: var(--mono);
+  }
+
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="page-head">
+    <h1>V2a — Multi-set & Admin mode exploration</h1>
+    <p>Taking the inline strip further. The current card crams all suggestions into one container with dividers; with V2a's accent-rail aesthetic, each set wants to live in its own strip — they look like independently-actionable items, which they are. Then admin mode keeps the same shape but re-skins it for diagnostics.</p>
+  </header>
+
+  <!-- ============================================== MULTI-SET ============================================== -->
+  <h2 class="section">User mode · multiple sets</h2>
+  <p class="section-note">Each pending set gets its own strip with its own "Use" button. Section header is shared and shows the count. Compared to the current single-card-with-dividers layout, this reads more like a checklist and the "Use" action is unambiguously per-set.</p>
+
+  <div class="grid">
+
+    <!-- 4 sets pending -->
+    <section class="variant">
+      <header>
+        <h3>4 sets pending</h3>
+        <span class="tag">typical case</span>
+      </header>
+      <div class="frame">
+        <div class="section-head">
+          <span class="title">Smart Suggestions</span>
+          <span class="meta">4 ready</span>
+          <span class="spacer"></span>
+          <button class="icon-btn">↻</button>
+        </div>
+
+        <div class="strip">
+          <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+          <div class="body">
+            <div class="line1">Set 1 · <span class="num">52 kg</span> for 6–8 reps</div>
+            <div class="line2">Working up from last week's top set</div>
+          </div>
+          <button class="cta">Use</button>
+        </div>
+
+        <div class="strip">
+          <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+          <div class="body">
+            <div class="line1">Set 2 · <span class="num">54 kg</span> for 6–8 reps</div>
+            <div class="line2">Based on recent performance</div>
+          </div>
+          <button class="cta">Use</button>
+        </div>
+
+        <div class="strip">
+          <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+          <div class="body">
+            <div class="line1">Set 3 · <span class="num">54 kg</span> for 6–8 reps</div>
+            <div class="line2">Holding load · in-session fatigue applied</div>
+          </div>
+          <button class="cta">Use</button>
+        </div>
+
+        <div class="strip">
+          <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+          <div class="body">
+            <div class="line1">Set 4 · <span class="num">52.5 kg</span> for 6–8 reps</div>
+            <div class="line2">Backing off slightly for fatigue</div>
+          </div>
+          <button class="cta">Use</button>
+        </div>
+      </div>
+      <div class="annot">
+        <span class="pill easy">No engine change</span>
+        Strips render directly from <code>data.rowStates</code>. The "4 ready" count is the same string the current card already produces in <code>availabilitySummary</code>.
+      </div>
+    </section>
+
+    <!-- mid-workout: 2 done, 2 pending -->
+    <section class="variant">
+      <header>
+        <h3>Mid-workout · 2 done, 2 pending</h3>
+        <span class="tag">progress visible</span>
+      </header>
+      <div class="frame">
+        <div class="section-head">
+          <span class="title">Smart Suggestions</span>
+          <span class="meta">2 of 4 · 2 ready</span>
+          <span class="spacer"></span>
+          <button class="icon-btn">↻</button>
+        </div>
+
+        <div class="strip done">
+          <div class="ico">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </div>
+          <div class="body">
+            <div class="line1" style="color: var(--text-dim);">Set 1 · 52 kg × 8 reps</div>
+            <div class="line2">Logged · RIR 1</div>
+          </div>
+          <button class="cta" style="opacity: 0;">Use</button>
+        </div>
+
+        <div class="strip done">
+          <div class="ico">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </div>
+          <div class="body">
+            <div class="line1" style="color: var(--text-dim);">Set 2 · 54 kg × 7 reps</div>
+            <div class="line2">Logged · RIR 2</div>
+          </div>
+          <button class="cta" style="opacity: 0;">Use</button>
+        </div>
+
+        <div class="strip">
+          <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+          <div class="body">
+            <div class="line1">Set 3 · <span class="num">54 kg</span> for 6–8 reps</div>
+            <div class="line2">In line with previous set</div>
+          </div>
+          <button class="cta">Use</button>
+        </div>
+
+        <div class="strip">
+          <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+          <div class="body">
+            <div class="line1">Set 4 · <span class="num">52.5 kg</span> for 6–8 reps</div>
+            <div class="line2">Backing off slightly for fatigue</div>
+          </div>
+          <button class="cta">Use</button>
+        </div>
+      </div>
+      <div class="annot">
+        <span class="pill med">Choice point</span>
+        Should done sets appear in this card? Today they don't — pending-only. Including them <b>does</b> turn this into a "today's set list" too. Could be nice, or could feel redundant with the set table directly below. <span class="pill choice">Decide</span>
+      </div>
+    </section>
+
+    <!-- mixed availability -->
+    <section class="variant">
+      <header>
+        <h3>Mixed availability</h3>
+        <span class="tag">2 ready · 1 unavailable</span>
+      </header>
+      <div class="frame">
+        <div class="section-head">
+          <span class="title">Smart Suggestions</span>
+          <span class="meta">2 ready · 1 unavailable</span>
+          <span class="spacer"></span>
+          <button class="icon-btn">↻</button>
+        </div>
+
+        <div class="strip">
+          <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+          <div class="body">
+            <div class="line1">Set 1 · <span class="num">52 kg</span> for 6–8 reps</div>
+            <div class="line2">Based on recent performance</div>
+          </div>
+          <button class="cta">Use</button>
+        </div>
+
+        <div class="strip unavail">
+          <div class="ico">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          </div>
+          <div class="body">
+            <div class="line1">Set 2 · Missing target</div>
+            <div class="line2">No reps or RIR target set for this set</div>
+          </div>
+          <button class="cta">Set targets</button>
+        </div>
+
+        <div class="strip">
+          <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+          <div class="body">
+            <div class="line1">Set 3 · <span class="num">54 kg</span> for 6–8 reps</div>
+            <div class="line2">Based on recent performance</div>
+          </div>
+          <button class="cta">Use</button>
+        </div>
+      </div>
+      <div class="annot">
+        <span class="pill easy">Already supported</span>
+        <code>SetSuggestionState</code> already has an <code>.unavailable(reason)</code> branch with <code>reason.title</code> and <code>reason.message</code>. Action label adapts to the reason (e.g. "Set targets" for <code>.missingTarget</code>, "Retry" for <code>.calculationFailed</code>).
+      </div>
+    </section>
+
+    <!-- refreshing state -->
+    <section class="variant">
+      <header>
+        <h3>Refreshing</h3>
+        <span class="tag">re-computing after a set</span>
+      </header>
+      <div class="frame">
+        <div class="section-head">
+          <span class="title">Smart Suggestions</span>
+          <span class="meta"><span class="spinner"></span> Updating…</span>
+          <span class="spacer"></span>
+          <button class="icon-btn" style="opacity: 0.4;">↻</button>
+        </div>
+
+        <div class="strip" style="opacity: 0.6;">
+          <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+          <div class="body">
+            <div class="line1">Set 3 · <span class="num">54 kg</span> for 6–8 reps</div>
+            <div class="line2">Recalculating with your latest set…</div>
+          </div>
+          <button class="cta" disabled style="opacity: 0.5;">Use</button>
+        </div>
+
+        <div class="strip" style="opacity: 0.6;">
+          <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+          <div class="body">
+            <div class="line1">Set 4 · <span class="num">52.5 kg</span> for 6–8 reps</div>
+            <div class="line2">Recalculating with your latest set…</div>
+          </div>
+          <button class="cta" disabled style="opacity: 0.5;">Use</button>
+        </div>
+      </div>
+      <div class="annot">
+        <span class="pill easy">Already supported</span>
+        Matches the existing <code>isRefreshing</code> path: the spinner + "Updating…" appear in the header (already implemented in <code>WeightSuggestionModuleView</code>), and we dim/disable the strips for visual hint.
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ============================================== ADMIN MODE ============================================== -->
+  <h2 class="section">Admin mode · same shape, dense data <span class="sub">monospace, diagnostics drawer per strip</span></h2>
+  <p class="section-note">Admin mode today shows: a global e1RM in the header, a tighter "Set N: 54 kg × 6–8 reps" line, a one-line technical summary, and a global "Details" toggle that expands a big diagnostics block for every row at once. Below I rework that into the V2a aesthetic — left rail switches to blue (the "I'm in admin mode" cue), strip text becomes mono, "Details" toggles per-strip, and the diagnostics drawer is structured (groups + key/value grid + alternatives sub-cards) rather than a free-text dump.</p>
+
+  <div class="grid wide">
+
+    <!-- Admin collapsed -->
+    <section class="variant">
+      <header>
+        <h3>Admin · collapsed (multi-set)</h3>
+        <span class="tag">terse one-liner per strip</span>
+      </header>
+      <div class="frame">
+        <div class="section-head">
+          <span class="title">Smart Suggestions</span>
+          <span class="admin-pill">Admin</span>
+          <span class="meta admin-meta">e1RM 64.2 kg · epley · sess 4w</span>
+          <span class="spacer"></span>
+          <button class="icon-btn">↻</button>
+        </div>
+
+        <div class="strip admin">
+          <div class="ico">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+          </div>
+          <div class="body">
+            <div class="line1">Set 1: <b>52.0 kg</b> × 6–8 @ RIR 1</div>
+            <div class="line2">64.2 kg cap from recent · readiness +0.0% · target from template</div>
+          </div>
+          <button class="details-btn">Details ▾</button>
+        </div>
+
+        <div class="strip admin">
+          <div class="ico">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+          </div>
+          <div class="body">
+            <div class="line1">Set 2: <b>54.0 kg</b> × 6–8 @ RIR 1</div>
+            <div class="line2">64.2 kg cap · 63.1 kg session cap · readiness −1.7% · fatigue 0.983</div>
+          </div>
+          <button class="details-btn">Details ▾</button>
+        </div>
+
+        <div class="strip admin">
+          <div class="ico">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+          </div>
+          <div class="body">
+            <div class="line1">Set 3: <b>54.0 kg</b> × 6–8 @ RIR 1</div>
+            <div class="line2">readiness −3.1% · fatigue 0.967 · projected 0.012 · rest 150s</div>
+          </div>
+          <button class="details-btn">Details ▾</button>
+        </div>
+      </div>
+      <div class="annot">
+        <span class="pill easy">No data changes</span>
+        Every value here is already produced by <code>SuggestionExplanation.adminSummary</code> / <code>SetSuggestionDiagnostics</code>. Visual changes only: monospace, blue rail, per-row Details toggle (instead of one global toggle that expands every row).
+      </div>
+    </section>
+
+    <!-- Admin expanded (one row) -->
+    <section class="variant">
+      <header>
+        <h3>Admin · one strip expanded</h3>
+        <span class="tag">structured diagnostics drawer</span>
+      </header>
+      <div class="frame">
+        <div class="section-head">
+          <span class="title">Smart Suggestions</span>
+          <span class="admin-pill">Admin</span>
+          <span class="meta admin-meta">e1RM 64.2 kg · epley</span>
+          <span class="spacer"></span>
+          <button class="icon-btn">↻</button>
+        </div>
+
+        <div class="strip admin">
+          <div class="ico">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+          </div>
+          <div class="body">
+            <div class="line1">Set 3: <b>54.0 kg</b> × 6–8 @ RIR 1</div>
+            <div class="line2">readiness −3.1% · fatigue 0.967 · selection: best-in-range</div>
+          </div>
+          <button class="details-btn">Details ▴</button>
+        </div>
+
+        <div class="diagnostics">
+          <div class="group">
+            <div class="group-title">e1RM &amp; readiness</div>
+            <div class="kv-grid">
+              <div class="kv"><span class="k">historical base</span><span class="v">64.2 kg</span></div>
+              <div class="kv"><span class="k">session capability</span><span class="v">63.1 kg</span></div>
+              <div class="kv"><span class="k">effective</span><span class="v">62.2 kg</span></div>
+              <div class="kv"><span class="k">readiness</span><span class="v signed-neg">−3.1%</span></div>
+              <div class="kv"><span class="k">capability source</span><span class="v">recent peak</span></div>
+              <div class="kv"><span class="k">baseline source</span><span class="v">recent sessions</span></div>
+            </div>
+          </div>
+
+          <div class="group">
+            <div class="group-title">Fatigue &amp; calibration</div>
+            <div class="kv-grid">
+              <div class="kv"><span class="k">fatigue discount</span><span class="v">0.967</span></div>
+              <div class="kv"><span class="k">projected fatigue</span><span class="v">0.012</span></div>
+              <div class="kv"><span class="k">freshness applied</span><span class="v">no</span></div>
+              <div class="kv"><span class="k">set-type mult.</span><span class="v">1.0×</span></div>
+              <div class="kv"><span class="k">rest used</span><span class="v">150s (configured)</span></div>
+              <div class="kv"><span class="k">calibration</span><span class="v">no adjustment</span></div>
+            </div>
+          </div>
+
+          <div class="group">
+            <div class="group-title">Target &amp; rounding</div>
+            <div class="kv-grid">
+              <div class="kv"><span class="k">display target</span><span class="v">6–8 reps</span></div>
+              <div class="kv"><span class="k">chosen reps</span><span class="v">7</span></div>
+              <div class="kv"><span class="k">target source</span><span class="v">template</span></div>
+              <div class="kv"><span class="k">RIR source</span><span class="v">explicit set</span></div>
+              <div class="kv"><span class="k">intensity factor</span><span class="v">0.869</span></div>
+              <div class="kv"><span class="k">raw → rounded</span><span class="v">54.06 → 54.0 kg</span></div>
+            </div>
+          </div>
+
+          <div class="group">
+            <div class="group-title">Alternatives <span style="color: var(--text-mute); font-weight: 400;">(6–8 rep range)</span></div>
+            <div class="alternatives">
+              <div class="alt-row">
+                <div class="head">
+                  <span class="reps">Reps 6</span>
+                  <span class="raw">raw 56.1 kg</span>
+                </div>
+                <div class="cands">
+                  <div class="cand"><div class="top"><span class="kind">−1 inc</span><span class="w">53.5</span></div><div class="meta">vs effective: −1.3%</div></div>
+                  <div class="cand suggested-kind"><div class="top"><span class="kind">suggested</span><span class="w">56.0</span></div><div class="meta">vs effective: +3.4%</div></div>
+                  <div class="cand"><div class="top"><span class="kind">+1 inc</span><span class="w">58.5</span></div><div class="meta">vs effective: +8.0%</div></div>
+                </div>
+              </div>
+
+              <div class="alt-row">
+                <div class="head">
+                  <span class="reps">Reps 7</span>
+                  <span class="selected-pill">selected</span>
+                  <span class="raw">raw 54.1 kg</span>
+                </div>
+                <div class="cands">
+                  <div class="cand"><div class="top"><span class="kind">−1 inc</span><span class="w">51.5</span></div><div class="meta">vs effective: −2.9%</div></div>
+                  <div class="cand suggested-kind recommended"><div class="top"><span class="kind">suggested ✓</span><span class="w">54.0</span></div><div class="meta">vs effective: +0.2%</div></div>
+                  <div class="cand"><div class="top"><span class="kind">+1 inc</span><span class="w">56.5</span></div><div class="meta">vs effective: +4.9%</div></div>
+                </div>
+              </div>
+
+              <div class="alt-row">
+                <div class="head">
+                  <span class="reps">Reps 8</span>
+                  <span class="raw">raw 52.2 kg</span>
+                </div>
+                <div class="cands">
+                  <div class="cand"><div class="top"><span class="kind">−1 inc</span><span class="w">49.5</span></div><div class="meta">vs effective: −2.8%</div></div>
+                  <div class="cand suggested-kind"><div class="top"><span class="kind">suggested</span><span class="w">52.0</span></div><div class="meta">vs effective: +0.0%</div></div>
+                  <div class="cand"><div class="top"><span class="kind">+1 inc</span><span class="w">54.5</span></div><div class="meta">vs effective: +4.5%</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="annot">
+        <span class="pill easy">No data changes</span>
+        Every value maps to existing <code>SetSuggestionDiagnostics</code> fields. The reorg groups them into <i>e1RM&nbsp;&amp;&nbsp;readiness · Fatigue&nbsp;&amp;&nbsp;calibration · Target&nbsp;&amp;&nbsp;rounding · Alternatives</i> rather than the current free-flowing list — easier to scan.
+      </div>
+      <div class="annot">
+        <span class="pill med">UX change</span>
+        Today the Details button is <b>global</b> — one click expands every row's diagnostics. Per-strip toggles let you compare two rows side by side without scrolling. Small refactor: move <code>@State showDetails</code> off the parent and onto each row.
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ============================================== DECISIONS ============================================== -->
+  <div class="decisions">
+    <h3>Open decisions for you</h3>
+    <ol>
+      <li>
+        <b>Include completed sets in the suggestions module?</b>
+        Pending-only matches today's behavior and keeps the card focused. Including done sets turns it into a per-set summary, which can be nice but overlaps with the set table just below. <br>
+        <span style="color: var(--text-mute);">Recommendation: keep pending-only by default, but show a small "2 of 4 done" line in the header.</span>
+      </li>
+      <li>
+        <b>Per-strip "Use" or one global "Use all"?</b>
+        Per-strip is the safer default — multiple sets often have different suggested weights (e.g. backoff sets). A <em>secondary</em> "Apply all" link in the header could be added later if users keep tapping each one.
+      </li>
+      <li>
+        <b>Admin mode: per-strip Details vs global toggle?</b>
+        Today it's global. Per-strip lets you expand only what you want to inspect, which matters when there are 4 sets each with a ~25-line diagnostics block. Trade-off: more clicks if you want to see them all.
+      </li>
+      <li>
+        <b>Admin rail color: blue (info) or keep accent?</b>
+        I used blue here so admin/user mode are instantly distinguishable from across the room. If you'd rather keep the accent identity, a small "<span class="admin-pill" style="font-size:9px;">Admin</span>" pill in the header alone is enough.
+      </li>
+      <li>
+        <b>Diagnostics structure — groups or single list?</b>
+        Current code is one flat list of text rows. I grouped it (<i>e1RM</i>, <i>Fatigue</i>, <i>Target</i>, <i>Alternatives</i>). Easier to scan but a slightly bigger SwiftUI refactor.
+      </li>
+    </ol>
+  </div>
+
+</div>
+</body>
+</html>

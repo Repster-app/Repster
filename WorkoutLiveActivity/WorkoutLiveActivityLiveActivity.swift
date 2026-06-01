@@ -102,6 +102,8 @@ struct WorkoutLiveActivityWidget: Widget {
                 Text(context.state.exerciseName)
                     .font(.headline)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .layoutPriority(1)
 
                 Spacer()
 
@@ -114,12 +116,14 @@ struct WorkoutLiveActivityWidget: Widget {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                .fixedSize()
             }
 
             // Row 3: Rest timer or ready state
             restTimerSection(context: context)
         }
-        .padding(16)
+        .padding(.vertical, 14)
+        .padding(.horizontal, 10)
         .activityBackgroundTint(.black.opacity(0.75))
         .activitySystemActionForegroundColor(.white)
         .legacyDarkScheme()
