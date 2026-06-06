@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Smart Suggestions — Redesign Implementation Spec</title>
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --bg-card: #15151a;
+    --bg-input: #1d1d24;
+    --bg-hover: #25252e;
+    --stroke: rgba(255,255,255,0.06);
+    --stroke-strong: rgba(255,255,255,0.12);
+    --border: rgba(255,255,255,0.08);
+    --text: #f4f4f6;
+    --text-2: #a1a1aa;
+    --text-3: #6b6b75;
+    --accent: #7c8cff;
+    --accent-soft: rgba(124,140,255,0.10);
+    --accent-stroke: rgba(124,140,255,0.28);
+    --warn: #f5a524;
+    --warn-soft: rgba(245,165,36,0.12);
+    --stale: #94a3b8;
+    --stale-soft: rgba(148,163,184,0.12);
+    --success: #34d399;
+    --success-soft: rgba(52,211,153,0.14);
+    --info: #60a5fa;
+    --info-soft: rgba(96,165,250,0.12);
+    --danger: #fb7185;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.55;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 48px;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 56px 32px 96px;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .toc { position: static !important; }
+  }
+
+  /* TOC sidebar */
+  .toc {
+    position: sticky; top: 56px;
+    align-self: start;
+    font-size: 12px;
+  }
+  .toc-label {
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-3);
+    margin-bottom: 12px;
+  }
+  .toc a {
+    display: block;
+    padding: 5px 10px;
+    color: var(--text-2);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    border-radius: 0 4px 4px 0;
+    transition: background 0.12s, color 0.12s;
+    margin-bottom: 1px;
+  }
+  .toc a:hover {
+    color: var(--text);
+    background: var(--bg-card);
+    border-left-color: var(--accent);
+  }
+  .toc a .num {
+    color: var(--text-3);
+    margin-right: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+
+  /* Main content column */
+  .doc {
+    max-width: 760px;
+  }
+
+  .doc-head {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+    margin-bottom: 32px;
+  }
+  .doc-head .eyebrow {
+    font-size: 11px; font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 8px;
+  }
+  .doc-head h1 {
+    font-size: 32px; font-weight: 700;
+    letter-spacing: -0.025em;
+    margin: 0 0 12px;
+  }
+  .doc-head p {
+    color: var(--text-2);
+    margin: 0;
+    font-size: 14px;
+  }
+  .doc-head p a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px dashed rgba(124,140,255,0.4);
+  }
+  .doc-head p a:hover {
+    border-bottom-style: solid;
+  }
+
+  /* Section */
+  section { margin: 56px 0; scroll-margin-top: 24px; }
+  section:first-of-type { margin-top: 0; }
+
+  h2 {
+    font-size: 22px; font-weight: 700;
+    letter-spacing: -0.015em;
+    margin: 0 0 8px;
+    display: flex; align-items: baseline; gap: 12px;
+  }
+  h2 .nm {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-stroke);
+    padding: 3px 10px;
+    border-radius: 6px;
+    line-height: 1;
+  }
+
+  h3 {
+    font-size: 16px; font-weight: 600;
+    margin: 32px 0 12px;
+    color: var(--text);
+  }
+
+  p { color: var(--text-2); font-size: 14px; margin: 0 0 12px; }
+  p strong, li strong { color: var(--text); font-weight: 600; }
+  p b, li b { color: var(--text); font-weight: 600; }
+  p em, li em { font-style: italic; color: var(--text); }
+
+  ul, ol { color: var(--text-2); font-size: 14px; padding-left: 22px; }
+  li { margin: 6px 0; }
+  li::marker { color: var(--text-3); }
+
+  a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  a:hover { text-decoration: underline; }
+
+  /* Inline code */
+  code {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: var(--bg-card);
+    padding: 1.5px 6px;
+    border-radius: 4px;
+    color: var(--text);
+    border: 1px solid var(--stroke);
+  }
+
+  /* Code blocks */
+  pre {
+    background: var(--bg-card);
+    border: 1px solid var(--stroke);
+    border-radius: 10px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text);
+    margin: 16px 0;
+  }
+  pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-size: 12.5px;
+    color: var(--text);
+  }
+  .kw { color: var(--accent); }
+  .ty { color: #93c5fd; }
+  .com { color: var(--text-3); font-style: italic; }
+  .str { color: var(--success); }
+
+  /* Tables */
+  .table-wrap {
+    border: 1px solid var(--stroke);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 16px 0;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  thead th {
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-3);
+    padding: 10px 12px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+  }
+  tbody td {
+    padding: 10px 12px;
+    vertical-align: top;
+    border-bottom: 1px solid var(--stroke);
+    color: var(--text-2);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: rgba(255,255,255,0.015); }
+  td code { font-size: 11.5px; }
+  td b, td strong { color: var(--text); font-weight: 600; }
+
+  /* Pills */
+  .pill {
+    display: inline-flex; align-items: center;
+    font-size: 10px; font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+    font-family: var(--mono);
+    flex: none;
+    white-space: nowrap;
+  }
+  .pill.s { background: rgba(52,211,153,0.14); color: var(--success); }
+  .pill.m { background: var(--accent-soft); color: var(--accent); }
+  .pill.l { background: var(--warn-soft); color: var(--warn); }
+  .pill.exists { background: rgba(52,211,153,0.10); color: var(--success); }
+  .pill.new { background: var(--accent-soft); color: var(--accent); }
+  .pill.defer { background: rgba(148,163,184,0.14); color: var(--stale); }
+  .pill.decide { background: rgba(124,140,255,0.16); color: var(--accent); }
+  .pill.recommend { background: var(--success-soft); color: var(--success); }
+  .pill.behavior { background: rgba(245,165,36,0.14); color: var(--warn); }
+
+  /* State legend cards (Section 1) */
+  .state-card {
+    background: var(--bg-card);
+    border: 1px solid var(--stroke);
+    border-left: 3px solid var(--accent);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 8px 0;
+  }
+  .state-card.stale { border-left-color: var(--stale); }
+  .state-card.admin { border-left-color: var(--info); }
+  .state-card.unavail { border-left-color: var(--text-3); }
+  .state-card .title {
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 4px;
+    color: var(--text);
+  }
+  .state-card .trigger {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+    margin-bottom: 6px;
+  }
+  .state-card .desc {
+    font-size: 12.5px;
+    color: var(--text-2);
+    line-height: 1.5;
+  }
+
+  /* Callout */
+  .callout {
+    background: var(--bg-card);
+    border: 1px solid var(--stroke);
+    border-left: 3px solid var(--accent);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin: 16px 0;
+    font-size: 13px;
+    color: var(--text-2);
+  }
+  .callout.warn { border-left-color: var(--warn); }
+  .callout.decide { border-left-color: var(--accent); }
+  .callout .label {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-right: 8px;
+  }
+  .callout.warn .label { color: var(--warn); }
+
+  /* Numbered step list (Section 6) */
+  ol.steps {
+    counter-reset: step;
+    list-style: none;
+    padding: 0;
+  }
+  ol.steps li {
+    counter-increment: step;
+    background: var(--bg-card);
+    border: 1px solid var(--stroke);
+    border-radius: 10px;
+    padding: 12px 16px 12px 56px;
+    margin: 8px 0;
+    position: relative;
+    color: var(--text-2);
+  }
+  ol.steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 14px; top: 12px;
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid var(--accent-stroke);
+    display: grid; place-items: center;
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 12px;
+  }
+
+  /* Decision blocks */
+  .decision {
+    background: var(--bg-card);
+    border: 1px solid var(--stroke);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 12px 0;
+  }
+  .decision .q {
+    font-weight: 600;
+    color: var(--text);
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+  .decision .num {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 700;
+    margin-right: 8px;
+  }
+  .decision .body { font-size: 13px; color: var(--text-2); }
+  .decision .rec {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--stroke);
+    font-size: 12.5px;
+    color: var(--text-2);
+  }
+  .decision .rec b {
+    color: var(--success);
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 56px 0;
+  }
+
+  .doc-foot {
+    margin-top: 56px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    color: var(--text-3);
+    font-size: 12px;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Table of contents -->
+  <aside class="toc">
+    <div class="toc-label">Contents</div>
+    <a href="#s1"><span class="num">1</span>What we're building</a>
+    <a href="#s2"><span class="num">2</span>Supported in code today</a>
+    <a href="#s3"><span class="num">3</span>What needs to be built</a>
+    <a href="#s4"><span class="num">4</span>Deferred to v1.1</a>
+    <a href="#s5"><span class="num">5</span>Open decisions</a>
+    <a href="#s6"><span class="num">6</span>Implementation order</a>
+    <a href="#s7"><span class="num">7</span>Not changing</a>
+  </aside>
+
+  <!-- Document body -->
+  <main class="doc">
+
+    <header class="doc-head">
+      <div class="eyebrow">Implementation Spec</div>
+      <h1>Smart Suggestions — Redesign</h1>
+      <p>Companion to the prototypes in this folder. Canonical layout is the "Putting it together" section of <a href="./prototype-smart-suggestions-takeb-with-history.html">prototype-smart-suggestions-takeb-with-history.html</a>.</p>
+    </header>
+
+    <!-- ============================================================ -->
+    <section id="s1">
+      <h2><span class="nm">1</span>What we're building</h2>
+
+      <p>A reshape of the in-workout Smart Suggestions card so it's denser, more honest about its inputs, and prioritises "what to lift now" above everything else.</p>
+
+      <p>The card sits inside <code>WeightSuggestionModuleView</code> (Sets sub-tab), between <code>SetTableView</code> and <code>ExerciseInfoSectionView</code>. The section is rendered only when there's at least one pending suggestion — same trigger as today.</p>
+
+      <h3>Visual structure (top to bottom)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Region</th><th>When shown</th><th>Contents</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>Section header</b></td>
+              <td>always</td>
+              <td><code>SMART SUGGESTIONS</code> (kerned tiny caps, existing) · count chip (<code>· 2 ready · 2 logged</code>) · refresh button. Admin mode adds an <code>Admin</code> pill + monospace <code>e1RM 64.2 · epley</code> meta.</td>
+            </tr>
+            <tr>
+              <td><b>Stale banner</b></td>
+              <td>when <code>e1RMSource.isOutsideRecencyWindow</code></td>
+              <td>Single line: "Based on a workout from <b>Mar 1</b> — outside your recency window. Estimate may be optimistic." Slate tone (calm/archival, <em>not</em> warning-amber).</td>
+            </tr>
+            <tr>
+              <td><b>Pending strips</b></td>
+              <td>one per pending suggestion</td>
+              <td>Take B style: 3px indigo rail, 36×36 wand tile, line 1 <code>Set 3 · 54 kg for 6–8 reps</code> (weight in accent), line 2 short contextual copy or delta. <code>Use</code> button on the right.</td>
+            </tr>
+            <tr>
+              <td><b>"Logged this session" divider</b></td>
+              <td>template flow, when ≥ 1 in-session completed set</td>
+              <td>Small kerned label between two thin rules.</td>
+            </tr>
+            <tr>
+              <td><b>Done strips</b></td>
+              <td>template flow only</td>
+              <td>Take 1: green rail, 22px check tile, single line <code>Set 1 · 52 kg × 8</code> with inline comparison on the right (<code>= suggested</code>, <code>+1 kg vs sug</code>, <code>−1 kg vs sug</code>).</td>
+            </tr>
+            <tr>
+              <td><b>Last-top chip</b></td>
+              <td>when <code>baselineTopSet</code> is populated</td>
+              <td>Quiet single-line footer (~28pt): history icon · <code>LAST TOP</code> label · <code>52 kg × 8 · RIR 1</code> (mono) · <code>8d ago</code>. Subtle bg, doesn't compete with strips.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>State treatments</h3>
+
+      <div class="state-card">
+        <div class="title">Default</div>
+        <div class="trigger">e1RMSource == .recentPerformance</div>
+        <div class="desc">Indigo accent rail/icon, normal weight in accent.</div>
+      </div>
+      <div class="state-card stale">
+        <div class="title">Stale</div>
+        <div class="trigger">e1RMSource.isOutsideRecencyWindow == true</div>
+        <div class="desc">Slate rail/icon/weight + slate banner above strips. Foot description suppressed.</div>
+      </div>
+      <div class="state-card admin">
+        <div class="title">Admin</div>
+        <div class="trigger">isAdminModeEnabled</div>
+        <div class="desc">Blue rail/icon, monospace strip body, admin sub-line per strip, per-strip ▾ Details toggle expanding a structured drawer (4 groups: <em>e1RM &amp; readiness · Fatigue &amp; calibration · Target &amp; rounding · Alternatives</em>).</div>
+      </div>
+      <div class="state-card unavail">
+        <div class="title">Unavailable (per row)</div>
+        <div class="trigger">availability == .unavailable(reason)</div>
+        <div class="desc">Muted rail, <code>reason.title</code> as line 1, <code>reason.message</code> as line 2, action label varies (<code>Set targets</code> for <code>.missingTarget</code>, etc.).</div>
+      </div>
+
+      <h3>Flow assumptions</h3>
+      <ul>
+        <li><b>Default workout (no template) is the hero case.</b> Sets are added one at a time via <code>addSet()</code>, so the typical state is <b>1 pending strip + chip footer</b>.</li>
+        <li><b>Template workout</b> pre-populates sets, so the card shows N strips. Same render path, just iterates over <code>rowStates</code>.</li>
+        <li><b>Done strips</b> only appear in the template/mid-workout flow when at least one in-session set has been completed for the current exercise.</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="s2">
+      <h2><span class="nm">2</span>Supported in code today</h2>
+      <p>References use file paths relative to <code>Repster/</code>.</p>
+
+      <h3>Already on <code>WeightSuggestionData</code></h3>
+<pre><code><span class="kw">struct</span> <span class="ty">WeightSuggestionData</span>: Sendable {
+    <span class="kw">let</span> rowStates: [<span class="ty">SetSuggestionState</span>]   <span class="com">// per-pending-set state</span>
+    <span class="kw">let</span> baseE1RM: <span class="ty">Double</span>?                  <span class="com">// for the admin header</span>
+    <span class="kw">let</span> e1RMSource: <span class="ty">E1RMSource</span>             <span class="com">// .recentPerformance / .staleRecentPerformance / .noData</span>
+    <span class="kw">let</span> availability: <span class="ty">SuggestionAvailability</span>
+}
+
+<span class="kw">extension</span> <span class="ty">E1RMSource</span> {
+    <span class="kw">var</span> isOutsideRecencyWindow: <span class="ty">Bool</span> { <span class="com">/* exists */</span> }
+}</code></pre>
+      <p><code>Features/Workout/Models/WeightSuggestionData.swift</code></p>
+
+      <h3>Already on <code>SetSuggestion</code></h3>
+<pre><code><span class="kw">struct</span> <span class="ty">SetSuggestion</span>: Identifiable, Sendable {
+    <span class="kw">let</span> pendingSetId: <span class="ty">UUID</span>
+    <span class="kw">let</span> setNumber: <span class="ty">Int</span>
+    <span class="kw">let</span> suggestedWeight: <span class="ty">Double</span>
+    <span class="kw">let</span> targetReps: <span class="ty">Int</span>
+    <span class="kw">let</span> targetRIR: <span class="ty">Double</span>
+    <span class="kw">let</span> targetRepMin: <span class="ty">Int</span>?
+    <span class="kw">let</span> targetRepMax: <span class="ty">Int</span>?
+    <span class="kw">let</span> targetDisplayLabel: <span class="ty">String</span>         <span class="com">// e.g. "6–8 reps"</span>
+    <span class="kw">let</span> normalizedTargetLabel: <span class="ty">String</span>?
+    <span class="kw">let</span> explanation: <span class="ty">SuggestionExplanation</span> <span class="com">// .userSummary + .adminSummary</span>
+    <span class="kw">let</span> diagnostics: <span class="ty">SetSuggestionDiagnostics</span>
+}</code></pre>
+      <p>Same file. <code>explanation.adminSummary</code> already produces the dense diagnostic text the admin sub-line will reuse verbatim.</p>
+
+      <h3>Already on <code>SetSuggestionDiagnostics</code></h3>
+      <p>Every value the admin diagnostics drawer renders is already on this struct:</p>
+      <p style="font-family: var(--mono); font-size: 12px; color: var(--text-3); line-height: 1.7;">
+        <code>historicalBaseE1RM</code>, <code>sessionCapabilityE1RM</code>, <code>effectiveE1RM</code>, <code>readinessPercent</code>, <code>fatigueDiscount</code>, <code>projectedSessionFatigue</code>, <code>freshnessApplied</code>, <code>setTypeFatigueMultiplier</code>, <code>restSecondsUsed</code>, <code>restSource</code>, <code>intensityFactor</code>, <code>rawWeight</code>, <code>roundedWeight</code>, <code>weightIncrement</code>, <code>displayTargetReps</code>, <code>chosenReps</code>, <code>targetDisplayLabel</code>, <code>targetSourceLabel</code>, <code>rirSourceLabel</code>, <code>calibrationLabel</code>, <code>selectionPolicy</code>, <code>selectionReferenceE1RM</code>, <code>alternatives</code>.
+      </p>
+      <p><code>alternatives</code> already contains the <code>−1 inc / suggested / +1 inc</code> candidates the drawer's alternatives section uses.</p>
+
+      <h3>Already on <code>SuggestionDecision</code> (engine output, not yet view-surfaced)</h3>
+<pre><code><span class="kw">struct</span> <span class="ty">SuggestionDecision</span> {
+    <span class="com">// ...</span>
+    <span class="kw">let</span> e1RMSource: <span class="ty">E1RMSource</span>
+    <span class="kw">let</span> e1RMSourceWorkoutDate: <span class="ty">Date</span>?       <span class="com">// 👈 anchor date for stale banner copy</span>
+    <span class="com">// ...</span>
+}</code></pre>
+      <p><code>Core/Services/Protocols/LoadPrescriptionServiceProtocol.swift</code></p>
+
+      <h3>Already in <code>SuggestionPreparation</code></h3>
+<pre><code><span class="kw">struct</span> <span class="ty">SuggestionPreparation</span> {
+    <span class="com">// ...</span>
+    <span class="kw">let</span> completedSessionSets: [<span class="ty">SessionSetContext</span>]   <span class="com">// 👈 in-session completed sets</span>
+}</code></pre>
+      <p>So the done-strip data exists in the pipeline; it's just not threaded through <code>WeightSuggestionData</code> yet.</p>
+
+      <h3>Already in the engine</h3>
+      <p><code>LoadPrescriptionService.peakAcrossRecentWorkouts</code> already locates the top set behind the baseline e1RM and returns its workout date. It just discards the actual <code>WorkoutSet</code>.</p>
+
+      <h3>Already in <code>ActiveWorkoutViewModel</code></h3>
+      <ul>
+        <li><code>addSet(for:)</code> invalidates and refreshes suggestions (line ~566).</li>
+        <li><code>suggestedWeight(for: setId)</code> proxies to <code>WeightSuggestionData</code>.</li>
+        <li>Cache key in <code>SuggestionCoordinator.cacheKey</code> already captures all relevant inputs; the refresh path is fine.</li>
+      </ul>
+
+      <h3>Already in <code>SetTableView</code> (the keyboard action rail)</h3>
+      <p><code>SetTableView.swift</code> ~1530: when the weight field is focused, the action rail shows a wand button labelled with the suggested weight (e.g. "54 kg") and applies it on tap via <code>applySuggestedWeight(context)</code>.</p>
+      <div class="callout">
+        <span class="label">Note</span>
+        This is the <b>primary apply path</b>. The <code>Use</code> button inside the suggestion card is a secondary, visible affordance.
+      </div>
+
+      <h3>Already in <code>WeightSuggestionCardView</code></h3>
+      <ul>
+        <li>Per-row rendering (<code>rowStates.forEach</code>).</li>
+        <li>User vs admin row branching.</li>
+        <li>Diagnostics expansion (global toggle today — needs to become per-row).</li>
+        <li>Unavailable-row rendering with reason.</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="s3">
+      <h2><span class="nm">3</span>What needs to be built</h2>
+      <p>Grouped by area. Sized roughly: <span class="pill s">S</span> a few lines, <span class="pill m">M</span> small file, <span class="pill l">L</span> small feature with cross-cutting touches.</p>
+
+      <h3>A · Engine — minimal</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th style="width: 50px;">#</th><th>Change</th><th style="width: 80px;">Size</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><b>A1</b></td>
+              <td>Extend <code>peakAcrossRecentWorkouts</code> to also return the source <code>WorkoutSet</code> (or just <code>weight: Double</code>, <code>reps: Int</code>, <code>rir: Double?</code>).</td>
+              <td><span class="pill s">S</span></td>
+              <td>Pure refactor of an existing internal helper.</td>
+            </tr>
+            <tr>
+              <td><b>A2</b></td>
+              <td>Extend <code>BaseE1RMEstimate</code> and <code>SuggestionEngineInput</code> to carry the new "top set" snapshot through to <code>SuggestionDecision</code>.</td>
+              <td><span class="pill s">S</span></td>
+              <td>Mirror the existing <code>sourceWorkoutDate</code> plumbing.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>B · Data model — three new optional fields</h3>
+      <p>All three are non-breaking optionals on existing structs.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th style="width: 50px;">#</th><th>Field</th><th>On</th><th>Source</th><th style="width: 80px;">Size</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><b>B1</b></td>
+              <td><code>e1RMSourceWorkoutDate: Date?</code></td>
+              <td><code>WeightSuggestionData</code></td>
+              <td>Mirror from <code>evaluation.decisions.first?.e1RMSourceWorkoutDate</code> in <code>SuggestionExplainer.makeWeightSuggestionData</code>.</td>
+              <td><span class="pill s">S</span></td>
+            </tr>
+            <tr>
+              <td><b>B2</b></td>
+              <td><code>baselineTopSet: HistoricalSetSnapshot?</code> (struct: <code>weight</code>, <code>reps</code>, <code>rir</code>, <code>date</code>)</td>
+              <td><code>WeightSuggestionData</code></td>
+              <td>Populated alongside B1 from the new engine output.</td>
+              <td><span class="pill s">S</span></td>
+            </tr>
+            <tr>
+              <td><b>B3</b></td>
+              <td><code>completedInSessionSets: [CompletedSetSnapshot]</code><br>(struct: <code>setNumber</code>, <code>weight</code>, <code>reps</code>, <code>rir</code>, <code>suggestedWeight?</code>, <code>suggestedTargetLabel?</code>)</td>
+              <td><code>WeightSuggestionData</code></td>
+              <td>Built in <code>SuggestionExplainer.makeWeightSuggestionData</code> from <code>preparation.completedSessionSets</code>.</td>
+              <td><span class="pill m">M</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout decide">
+        <span class="label">Decision</span>
+        Include the matching suggestion snapshot in <b>B3</b> so the done-row "vs suggested" comparison doesn't need a secondary VM cache for the common case. If the card is looked at <em>after</em> the workout closes, the suggestion snapshot will be <code>nil</code> and the done strip drops the comparison gracefully — see also D1.
+      </div>
+
+      <h3>C · Pure SwiftUI work in <code>WeightSuggestionCardView</code> &amp; <code>WeightSuggestionModuleView</code></h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th style="width: 50px;">#</th><th>Change</th><th style="width: 80px;">Size</th></tr></thead>
+          <tbody>
+            <tr><td><b>C1</b></td><td>Drop the in-card "Smart Suggestions" header. Section header (in <code>WeightSuggestionModuleView</code>) becomes the only title.</td><td><span class="pill s">S</span></td></tr>
+            <tr><td><b>C2</b></td><td>Move the count summary (<code>"4 ready"</code>, <code>"2 ready · 2 logged"</code>) into the section header as a quiet trailing fragment.</td><td><span class="pill s">S</span></td></tr>
+            <tr><td><b>C3</b></td><td>Replace the current row layout with the Take B 2-line strip (accent rail, 36px wand tile, line 1 weight + target, line 2 contextual / delta, <code>Use</code> button).</td><td><span class="pill m">M</span></td></tr>
+            <tr><td><b>C4</b></td><td>Implement the done strip (Take 1 single-line with inline comparison) and the "Logged this session" divider. Only rendered when <code>completedInSessionSets</code> is non-empty.</td><td><span class="pill m">M</span></td></tr>
+            <tr><td><b>C5</b></td><td>Implement the slate stale banner. Suppress the foot description while the banner is shown.</td><td><span class="pill s">S</span></td></tr>
+            <tr><td><b>C6</b></td><td>Move admin pill + <code>e1RM ## · formula</code> meta into the section header.</td><td><span class="pill s">S</span></td></tr>
+            <tr><td><b>C7</b></td><td>Admin strip styling: blue rail, mono body, admin sub-line consuming <code>explanation.adminSummary</code> verbatim.</td><td><span class="pill s">S</span></td></tr>
+            <tr><td><b>C8</b></td><td><b>Move <code>@State showDetails</code> from card root to row body</b> so Details is per-strip rather than global.</td><td><span class="pill s">S</span></td></tr>
+            <tr><td><b>C9</b></td><td>Structured diagnostics drawer: 4 labeled groups (<code>e1RM &amp; readiness</code>, <code>Fatigue &amp; calibration</code>, <code>Target &amp; rounding</code>, <code>Alternatives</code>) consuming the existing <code>SetSuggestionDiagnostics</code> fields.</td><td><span class="pill m">M</span></td></tr>
+            <tr><td><b>C10</b></td><td>Last-top chip footer: single-line, history icon, label, mono value, relative date.</td><td><span class="pill s">S</span></td></tr>
+            <tr><td><b>C11</b></td><td>New colour token: <code>--stale</code> slate (<code>#94a3b8</code> family) for the stale state. Add to <code>Color</code> extensions used by the card.</td><td><span class="pill s">S</span></td></tr>
+            <tr><td><b>C12</b></td><td><code>Use</code> button wiring — calls the same code path as the keyboard rail's <code>applySuggestedWeight(context)</code>.</td><td><span class="pill s">S</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>D · ViewModel &amp; wiring</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th style="width: 50px;">#</th><th>Change</th><th style="width: 80px;">Size</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><b>D1</b></td>
+              <td>Capture the suggestion snapshot at the moment a set is logged so it can be shown in the done strip after completion. Two viable approaches: <b>(a)</b> read it from the last-known <code>WeightSuggestionData</code> for that set's row state <em>before</em> updating local state in the set-complete path, and persist it on <code>WorkoutSet</code> (extra column, durable post-reopen); <b>(b)</b> keep it in an in-memory <code>[UUID: SuggestionSnapshot]</code> on <code>ActiveWorkoutViewModel</code>, no persistence — comparison vanishes after the workout closes. <b style="color: var(--success);">Recommend (b) for v1.</b></td>
+              <td><span class="pill m">M</span></td>
+            </tr>
+            <tr><td><b>D2</b></td><td>Make B3 (<code>completedInSessionSets</code>) include the snapshot from D1 when present.</td><td><span class="pill s">S</span></td></tr>
+            <tr><td><b>D3</b></td><td><span class="pill behavior">Behavior change</span> Render completed-in-session sets in the suggestion card. Today they're filtered out before rendering. Touch point: <code>SuggestionExplainer.makeWeightSuggestionData</code>.</td><td><span class="pill s">S</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>E · Stays as-is</h3>
+      <ul>
+        <li><code>LoadPrescriptionService.estimateCapacityBaseE1RM</code> — only the helper it calls (A1) changes.</li>
+        <li>The cache-key signature in <code>SuggestionCoordinator</code>.</li>
+        <li>The unavailable-row rendering path (cosmetic restyling only).</li>
+        <li>The keyboard action rail in <code>SetTableView</code>. It remains the primary apply path; the in-card <code>Use</code> button is additive.</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="s4">
+      <h2><span class="nm">4</span>Deferred to v1.1</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th style="width: 50px;">#</th><th>Item</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><b>F1</b></td>
+              <td><b>Contextual per-row copy</b> for pending strips line 2 ("Adjusted up after previous set", "Backing off slightly for fatigue", "Slight bump from last workout's peak", "Working up to top", etc.).</td>
+              <td>Data exists on <code>SetSuggestionDiagnostics</code> (<code>fatigueDiscount</code>, <code>projectedSessionFatigue</code>, comparison to previous in-session set, freshness). Need a new explanation-generation pass with decision rules. For v1, line 2 falls back to either the Variation B delta (<code>↑ +2 kg vs last top (52 × 8)</code>) or a generic <code>Target RIR 1</code>.</td>
+            </tr>
+            <tr>
+              <td><b>F2</b></td>
+              <td>Persist the captured suggestion snapshot onto <code>WorkoutSet</code> so done-strip comparison survives reopening a closed workout.</td>
+              <td>Currently scoped out of v1; D1 option (b) is in-session-only.</td>
+            </tr>
+            <tr>
+              <td><b>F3</b></td>
+              <td>Tap-to-expand on a done strip to show a deeper compare with last workout's same-numbered set.</td>
+              <td>Requires the equivalent-set fetch path; not currently warranted.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="s5">
+      <h2><span class="nm">5</span>Open decisions</h2>
+      <p>These haven't been locked yet — flagged for a call before we cut the implementation ticket.</p>
+
+      <div class="decision">
+        <div class="q"><span class="num">1.</span><code>Use</code> button on pending strips: keep or drop?</div>
+        <div class="body">The keyboard action rail already applies the suggestion when the weight field is focused, so the in-card button is redundant by action — but it <em>is</em> the visible affordance that tells users the card is interactive at all.</div>
+        <div class="rec"><b>Recommendation:</b> keep, on the grounds of discoverability.</div>
+      </div>
+
+      <div class="decision">
+        <div class="q"><span class="num">2.</span>Per-row vs global Details toggle in admin mode.</div>
+        <div class="body">Today it's global. Per-row makes diff'ing two rows easier and stops a single tap from exploding the entire card.</div>
+        <div class="rec"><b>Recommendation:</b> per-row (C8 above).</div>
+      </div>
+
+      <div class="decision">
+        <div class="q"><span class="num">3.</span>Stale state — banner copy.</div>
+        <div class="body">Current: <em>"Based on a workout from Mar 1 — outside your recency window. Estimate may be optimistic."</em> Anchor date format (<code>Mar 1</code> vs <code>Mar 1, 2026</code> vs <code>13w ago</code>): final call.</div>
+      </div>
+
+      <div class="decision">
+        <div class="q"><span class="num">4.</span>Done strip cap.</div>
+        <div class="body">In a long template (10+ sets), do done strips stack indefinitely, scroll internally, or collapse to a count?</div>
+        <div class="rec"><b>Recommendation:</b> stack — the card is inside the scroll view of the Sets sub-tab so the host already handles long content gracefully.</div>
+      </div>
+
+      <div class="decision">
+        <div class="q"><span class="num">5.</span>B3 shape — embed snapshot or join externally.</div>
+        <div class="body">Whether <code>completedInSessionSets[i].suggestedWeight</code> lives on the <code>CompletedSetSnapshot</code> directly or stays in a separate VM dict the view reads in parallel.</div>
+        <div class="rec"><b>Recommendation:</b> embed, for one fewer lookup at render time.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="s6">
+      <h2><span class="nm">6</span>Implementation order</h2>
+      <p>A rough sequence that minimises blocked time:</p>
+      <ol class="steps">
+        <li><b>B1</b> + <b>B2</b> + <b>A1</b> + <b>A2</b> in one ticket — surfaces <code>baselineTopSet</code> and <code>e1RMSourceWorkoutDate</code>. Pure data plumbing; no UI changes yet.</li>
+        <li><b>D1</b> + <b>B3</b> + <b>D3</b> — in-session suggestion snapshot cache and the <code>completedInSessionSets</code> data path.</li>
+        <li><b>C1</b>–<b>C3</b> — restructure the user-mode card with Take B strips and the new section header. Drop the in-card title. <em>(Visible win, biggest user impact.)</em></li>
+        <li><b>C4</b> — done strips + divider.</li>
+        <li><b>C5</b> + <b>C11</b> — stale state + slate colour token.</li>
+        <li><b>C6</b> + <b>C7</b> + <b>C8</b> + <b>C9</b> — admin mode + structured diagnostics drawer + per-row Details state.</li>
+        <li><b>C10</b> — last-top chip footer.</li>
+        <li><b>C12</b> — <code>Use</code> button wiring (if kept per decision 1).</li>
+      </ol>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="s7">
+      <h2><span class="nm">7</span>Things explicitly not changing</h2>
+      <ul>
+        <li>The suggestion engine (<code>SuggestionEngine.evaluate</code>) and its math.</li>
+        <li>The cache-key shape and refresh triggers.</li>
+        <li>The keyboard action rail's wand button (it stays as the primary apply path).</li>
+        <li><code>unavailableReason</code> semantics and copy.</li>
+        <li>Sub-tab layout / placement of the module within <code>ActiveWorkoutView</code>.</li>
+      </ul>
+    </section>
+
+    <div class="doc-foot">
+      Implementation should land behind the same module wrapper, so no callers outside of <code>WeightSuggestionCardView</code> / <code>WeightSuggestionModuleView</code> need to be aware of the redesign.
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

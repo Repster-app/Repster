@@ -25,7 +25,6 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
     private let setRepo: SetRepositoryProtocol
     private let exerciseRepo: ExerciseRepositoryProtocol
     private let workoutRepo: WorkoutRepositoryProtocol
-    private let performanceRecordRepo: PerformanceRecordRepositoryProtocol
     private let healthProfileRepo: HealthProfileRepositoryProtocol
     private let calibrationProvider: any SuggestionCalibrationProviderProtocol
 
@@ -38,14 +37,12 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         setRepository: SetRepositoryProtocol,
         exerciseRepository: ExerciseRepositoryProtocol,
         workoutRepository: WorkoutRepositoryProtocol,
-        performanceRecordRepository: PerformanceRecordRepositoryProtocol,
         healthProfileRepository: HealthProfileRepositoryProtocol,
         calibrationProvider: any SuggestionCalibrationProviderProtocol = NeutralSuggestionCalibrationProvider()
     ) {
         self.setRepo = setRepository
         self.exerciseRepo = exerciseRepository
         self.workoutRepo = workoutRepository
-        self.performanceRecordRepo = performanceRecordRepository
         self.healthProfileRepo = healthProfileRepository
         self.calibrationProvider = calibrationProvider
     }
@@ -59,12 +56,11 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         let profile = try await healthProfileRepo.fetchOrCreate()
         let formula = E1RMFormula(rawValue: profile.e1RMFormula) ?? .epley
 
-        let historical = try await estimateCapacityBaseE1RM(
+        return try await estimateCapacityBaseE1RM(
             exerciseId: exerciseId,
             recencyWeeks: profile.prescriptionRecencyWeeks ?? 6,
             formula: formula
         )
-        return BaseE1RMEstimate(value: historical.0, source: historical.1)
     }
 
     func evaluateSuggestions(
@@ -113,6 +109,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         let input = SuggestionEngineInput(
             baseE1RM: baseE1RM,
             baseSource: baseEstimate.source,
+            baseSourceWorkoutDate: baseEstimate.sourceWorkoutDate,
             completedSessionSets: completedSessionSets,
             pendingSets: pendingSets,
             settings: SuggestionSettingsSnapshot(
@@ -189,6 +186,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
                 fatigueDiscount: result.fatigueDiscount,
                 freshnessApplied: result.freshnessApplied,
                 e1RMSource: result.e1RMSource,
+                e1RMSourceWorkoutDate: result.e1RMSourceWorkoutDate,
                 bestReps: result.bestReps
             )
         }
@@ -196,96 +194,112 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
 
     // MARK: - Base e1RM Estimation
 
-    /// Estimate capacity baseline e1RM from recent workout history.
+    /// Estimate capacity baseline e1RM from logged workout history.
     ///
-    /// Steps:
-    /// 1) Keep eligible working sets in recency window
-    /// 2) Compute per-workout peak e1RM from stored snapshots
-    /// 3) Take the top value across the last N completed workouts
-    /// 4) Fallback to PR table when history is insufficient
+    /// Two-tier fallback:
+    /// 1. **In-window peak** — eligible sets inside the configured recency window;
+    ///    peak across the last N completed workouts. Returns `.recentPerformance`.
+    /// 2. **Most recent workout (any age)** — if the window is empty, walk back
+    ///    through all logged sets and use the peak from the *most recent* eligible
+    ///    workout, regardless of age. Returns `.staleRecentPerformance` with the
+    ///    anchor workout's date so the UI can flag the suggestion as low-confidence.
+    /// 3. **No data** — returns `.noData` if the exercise has never been logged.
+    ///
+    /// Note: there is no PR-table fallback. `PerformanceRecord` entries in this app
+    /// are only created from logged sets (see `PRService`), so a present PR implies
+    /// a present logged set — tier 2 will always reach it first.
     private func estimateCapacityBaseE1RM(
         exerciseId: UUID,
         recencyWeeks: Int,
-        formula: E1RMFormula
-    ) async throws -> (Double?, E1RMSource) {
+        formula _: E1RMFormula
+    ) async throws -> BaseE1RMEstimate {
 
         let now = Date()
         let windowStart = Calendar.current.date(byAdding: .weekOfYear, value: -recencyWeeks, to: now)!
 
-        // Fetch recent sets within the recency window
+        // --- Tier 1: in-window recent sets ---
         let recentSets = try await setRepo.fetchSets(
             exerciseId: exerciseId,
             from: windowStart,
             to: now
         )
-        let excludedWorkoutIds = try await excludedWorkoutIds(
+        let inWindowExcluded = try await excludedWorkoutIds(
             for: exerciseId,
             workoutIds: Set(recentSets.map(\.workoutId))
         )
+        let inWindowEligible = recentSets.filter { isEligibleForCapacity(set: $0, excludedWorkoutIds: inWindowExcluded) }
 
-        // Filter to completed non-warmup sets with stored e1RM snapshots.
-        let eligibleSets = recentSets.filter { set in
-            return set.completed &&
-                !excludedWorkoutIds.contains(set.workoutId) &&
-                set.setType != .warmup &&
-                set.setType != .partial &&
-                (set.e1RM ?? 0) > 0
+        if let inWindow = peakAcrossRecentWorkouts(
+            inWindowEligible,
+            limit: Self.recentWorkoutPeakWindow
+        ) {
+            return BaseE1RMEstimate(
+                value: inWindow.value,
+                source: .recentPerformance,
+                sourceWorkoutDate: inWindow.workoutDate
+            )
         }
 
-        if !eligibleSets.isEmpty {
-            let workouts = Dictionary(grouping: eligibleSets, by: \.workoutId)
-                .compactMap { (_, sets) -> (date: Date, value: Double)? in
-                    guard let workoutDate = sets.map(\.date).max() else { return nil }
-                    let workoutBest = sets.compactMap(\.e1RM).max() ?? 0
-                    guard workoutBest > 0 else { return nil }
-                    return (date: workoutDate, value: workoutBest)
-                }
-                .sorted { $0.date > $1.date }
+        // --- Tier 2: most recent eligible workout of any age ---
+        let allSets = try await setRepo.fetchSets(
+            exerciseId: exerciseId,
+            from: nil,
+            to: now
+        )
+        let allExcluded = try await excludedWorkoutIds(
+            for: exerciseId,
+            workoutIds: Set(allSets.map(\.workoutId))
+        )
+        let allEligible = allSets.filter { isEligibleForCapacity(set: $0, excludedWorkoutIds: allExcluded) }
 
-            if !workouts.isEmpty {
-                let recentWorkouts = workouts.prefix(Self.recentWorkoutPeakWindow)
-                let capacity = recentWorkouts.map(\.value).max() ?? 0
-                if capacity > 0 {
-                    return (capacity, .recentPerformance)
-                }
-            }
+        if let mostRecent = peakAcrossRecentWorkouts(allEligible, limit: 1) {
+            dbg("""
+                [Prescription] No in-window data; falling back to most recent workout \
+                from \(mostRecent.workoutDate) (e1RM = \(String(format: "%.1f", mostRecent.value)) kg)
+                """)
+            return BaseE1RMEstimate(
+                value: mostRecent.value,
+                source: .staleRecentPerformance,
+                sourceWorkoutDate: mostRecent.workoutDate
+            )
         }
 
-        // Final fallback: use the PR table
-        let prE1RM = try await estimateFromPRTable(exerciseId: exerciseId, formula: formula)
-        if let prE1RM, prE1RM > 0 {
-            dbg("[Prescription] Using PR table fallback: e1RM = \(String(format: "%.1f", prE1RM)) kg")
-            return (prE1RM, .historicalPR)
-        }
-
-        return (nil, .noData)
+        // --- Tier 3: no logged sets ever ---
+        return BaseE1RMEstimate(value: nil, source: .noData, sourceWorkoutDate: nil)
     }
 
-    /// Estimate e1RM from the PR table (PerformanceRecord) as a fallback.
-    ///
-    /// Uses the highest-weight PR and applies the user's selected formula to estimate 1RM.
-    private func estimateFromPRTable(exerciseId: UUID, formula: E1RMFormula) async throws -> Double? {
-        let records = try await performanceRecordRepo.fetchAll(
-            for: exerciseId,
-            recordType: .repMax
-        )
+    /// Whether a set is eligible to contribute to the capacity baseline:
+    /// completed, non-warmup, non-partial, has a stored e1RM, and not part of an
+    /// excluded workout.
+    private func isEligibleForCapacity(set: WorkoutSet, excludedWorkoutIds: Set<UUID>) -> Bool {
+        return set.completed &&
+            !excludedWorkoutIds.contains(set.workoutId) &&
+            set.setType != .warmup &&
+            set.setType != .partial &&
+            (set.e1RM ?? 0) > 0
+    }
 
-        guard !records.isEmpty else { return nil }
+    /// Group eligible sets by workout, take each workout's peak e1RM, sort
+    /// most-recent-first, and return the highest peak across the first `limit`
+    /// workouts along with the date of the workout that produced that peak.
+    private func peakAcrossRecentWorkouts(
+        _ eligibleSets: [WorkoutSet],
+        limit: Int
+    ) -> (value: Double, workoutDate: Date)? {
+        guard !eligibleSets.isEmpty, limit > 0 else { return nil }
 
-        // Find the PR that gives the highest e1RM estimate
-        var bestE1RM: Double = 0
+        let workouts = Dictionary(grouping: eligibleSets, by: \.workoutId)
+            .compactMap { (_, sets) -> (date: Date, value: Double)? in
+                guard let workoutDate = sets.map(\.date).max() else { return nil }
+                let workoutBest = sets.compactMap(\.e1RM).max() ?? 0
+                guard workoutBest > 0 else { return nil }
+                return (date: workoutDate, value: workoutBest)
+            }
+            .sorted { $0.date > $1.date }
 
-        for record in records {
-            let reps = record.reps ?? 1
-            let weight = record.value
-
-            guard weight > 0, reps > 0 else { continue }
-
-            let e1RM = formula.calculate(weight: weight, reps: reps)
-            bestE1RM = max(bestE1RM, e1RM)
-        }
-
-        return bestE1RM > 0 ? bestE1RM : nil
+        let candidates = Array(workouts.prefix(limit))
+        guard let winner = candidates.max(by: { $0.value < $1.value }) else { return nil }
+        return (value: winner.value, workoutDate: winner.date)
     }
 
     private func excludedWorkoutIds(

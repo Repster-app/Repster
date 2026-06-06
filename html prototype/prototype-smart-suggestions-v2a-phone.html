@@ -1,0 +1,925 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>V2a — Phone scale, stale state, admin</title>
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --bg-card: #15151a;   /* maps to Color.bgCard */
+    --bg-input: #1d1d24;
+    --bg-hover: #25252e;
+    --stroke: rgba(255,255,255,0.06);
+    --stroke-strong: rgba(255,255,255,0.12);
+    --border: rgba(255,255,255,0.08); /* Color.border */
+    --text: #f4f4f6;        /* Color.textPrimary */
+    --text-2: #a1a1aa;      /* Color.textSecondary */
+    --text-3: #6b6b75;      /* Color.textTertiary */
+    --accent: #7c8cff;      /* Color.accent */
+    --accent-soft: rgba(124,140,255,0.10);
+    --accent-stroke: rgba(124,140,255,0.28);
+    --warn: #f5a524;
+    --warn-soft: rgba(245,165,36,0.12);
+    --warn-stroke: rgba(245,165,36,0.32);
+    --success: #34d399;
+    --danger: #fb7185;
+    --info: #60a5fa;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 1320px; margin: 0 auto; padding: 48px 32px 96px; }
+  .page-head h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .page-head p { color: var(--text-2); max-width: 740px; line-height: 1.55; margin: 0; }
+  h2.section { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; margin: 56px 0 4px; }
+  h2.section .sub { font-weight: 500; color: var(--text-3); margin-left: 8px; font-size: 13px; }
+  .section-note { color: var(--text-2); font-size: 13px; max-width: 760px; line-height: 1.55; margin: 0 0 24px; }
+  .row { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; }
+  .variant { display: flex; flex-direction: column; gap: 12px; }
+  .variant header { padding: 0 4px; }
+  .variant h3 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 2px; }
+  .variant .tag { font-size: 11px; color: var(--text-3); }
+
+  /* ─────────────────────────────────────────
+     Phone frame — iPhone 15/16 base width
+     390pt content. Side bezel + status bar
+     ───────────────────────────────────────── */
+  .phone {
+    width: 390px;
+    background: #000;
+    border-radius: 44px;
+    border: 1px solid rgba(255,255,255,0.10);
+    padding: 8px 8px 16px;
+    box-shadow: 0 24px 48px rgba(0,0,0,0.5);
+  }
+  .phone .notch {
+    width: 112px; height: 28px;
+    background: #000;
+    border-radius: 999px;
+    margin: 0 auto 8px;
+  }
+  .phone .screen {
+    background: var(--bg);
+    border-radius: 36px;
+    overflow: hidden;
+    padding: 8px 16px 16px;
+    min-height: 200px;
+  }
+  .phone .home-indicator {
+    width: 110px; height: 4px;
+    background: rgba(255,255,255,0.4);
+    border-radius: 999px;
+    margin: 12px auto 0;
+  }
+
+  /* ─────────────────────────────────────────
+     Section header (exists today)
+     SMART SUGGESTIONS, 11pt 600, kerning 0.8
+     ───────────────────────────────────────── */
+  .sec-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 2px 8px;
+  }
+  .sec-head .lbl {
+    font-size: 11px; font-weight: 600;
+    color: var(--text-3);
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+  }
+  .sec-head .spacer { flex: 1; }
+  .sec-head .refresh {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: var(--bg-card);
+    display: grid; place-items: center;
+    color: var(--text-2);
+    border: none;
+    cursor: pointer;
+  }
+  .sec-head .updating {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 500; color: var(--text-2);
+  }
+  .spinner {
+    width: 11px; height: 11px;
+    border: 1.5px solid rgba(255,255,255,0.18);
+    border-top-color: var(--text-2);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─────────────────────────────────────────
+     Today's card — recreated from screenshot
+     ───────────────────────────────────────── */
+  .card-today {
+    background: var(--bg-card);
+    border-radius: 14px;
+    padding: 14px;
+  }
+  .card-today .hdr {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px;
+  }
+  .card-today .wand {
+    width: 22px; height: 22px;
+    background: var(--accent-soft);
+    border-radius: 6px;
+    color: var(--accent);
+    display: grid; place-items: center;
+  }
+  .card-today .hdr .ttl {
+    font-size: 12px; font-weight: 500; color: var(--text-2);
+  }
+  .card-today .ready {
+    font-size: 11px; font-weight: 500; color: var(--text-3);
+    margin-bottom: 8px;
+  }
+  .card-today .row-block {
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 2px 0;
+  }
+  .card-today .set-n {
+    font-size: 11px; font-weight: 600; color: var(--text-2);
+  }
+  .card-today .weight-line {
+    display: flex; align-items: baseline; gap: 6px;
+  }
+  .card-today .kg {
+    font-size: 24px; font-weight: 700; color: var(--text);
+  }
+  .card-today .reps {
+    font-size: 14px; font-weight: 500; color: var(--text-2);
+  }
+  .card-today .desc {
+    font-size: 11px; color: var(--text-3); line-height: 1.45;
+  }
+  .card-today .divider {
+    height: 1px; background: var(--border);
+    margin: 2px 0;
+  }
+
+  /* ─────────────────────────────────────────
+     Proposed card (V2a applied)
+     Same container, denser rows.
+     ───────────────────────────────────────── */
+  .card-new {
+    background: var(--bg-card);
+    border-radius: 14px;
+    padding: 14px;
+  }
+  .card-new .hdr {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 12px;
+  }
+  .card-new .wand {
+    width: 22px; height: 22px;
+    background: var(--accent-soft);
+    border-radius: 6px;
+    color: var(--accent);
+    display: grid; place-items: center;
+    flex: none;
+  }
+  .card-new .hdr .ttl {
+    font-size: 13px; font-weight: 600; color: var(--text);
+  }
+  .card-new .hdr .count {
+    font-size: 11px; color: var(--text-3); margin-left: 2px;
+  }
+  .card-new .hdr .spacer { flex: 1; }
+
+  .card-new .rows {
+    display: flex; flex-direction: column;
+  }
+  .card-new .r {
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+  }
+  .card-new .r + .r { border-top: 1px solid var(--border); }
+  .card-new .r .num {
+    font-size: 11px; font-weight: 600;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .card-new .r .data {
+    display: flex; align-items: baseline; gap: 6px;
+    min-width: 0;
+  }
+  .card-new .r .data .w {
+    font-size: 17px; font-weight: 700; color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  .card-new .r .data .x {
+    font-size: 13px; color: var(--text-3);
+  }
+  .card-new .r .data .reps {
+    font-size: 13px; color: var(--text-2); font-weight: 500;
+  }
+  .card-new .r .extra {
+    font-size: 10px; color: var(--text-3);
+    text-align: right;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .card-new .foot {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--text-3);
+    line-height: 1.45;
+  }
+
+  /* Unavailable row */
+  .card-new .r.unavail .data .w { color: var(--text-2); font-weight: 600; font-size: 14px; }
+  .card-new .r.unavail .data .reps { color: var(--text-3); }
+
+  /* ─────────────────────────────────────────
+     Stale state additions
+     ───────────────────────────────────────── */
+  .stale-banner {
+    background: var(--warn-soft);
+    border: 1px solid var(--warn-stroke);
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: flex; align-items: flex-start; gap: 8px;
+    margin-bottom: 10px;
+    color: var(--warn);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .stale-banner .ico { flex: none; margin-top: 1px; }
+  .stale-banner .body { flex: 1; color: var(--text-2); }
+  .stale-banner b { color: var(--warn); font-weight: 600; }
+
+  /* Stale wand */
+  .card-new.is-stale .wand {
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+
+  /* ─────────────────────────────────────────
+     Admin treatments
+     ───────────────────────────────────────── */
+  .card-new .admin-pill {
+    font-size: 9px; font-weight: 700;
+    color: var(--info);
+    background: rgba(96,165,250,0.12);
+    border: 1px solid rgba(96,165,250,0.24);
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-family: var(--mono);
+  }
+  .card-new .admin-meta {
+    font-size: 10px; color: var(--info);
+    font-family: var(--mono);
+    margin-left: auto;
+  }
+  .card-new.is-admin .r .data .w,
+  .card-new.is-admin .r .data .reps,
+  .card-new.is-admin .r .data .x {
+    font-family: var(--mono);
+  }
+  .card-new.is-admin .r .data .w { font-size: 14px; }
+  .card-new.is-admin .r .data .reps,
+  .card-new.is-admin .r .data .x { font-size: 12px; }
+
+  .card-new .r .admin-sub {
+    grid-column: 2 / -1;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-3);
+    line-height: 1.45;
+    margin-top: 2px;
+  }
+  .card-new .r .det-btn {
+    border: 1px solid var(--stroke-strong);
+    background: transparent;
+    color: var(--text-2);
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--mono);
+    cursor: pointer;
+  }
+
+  /* Diagnostics drawer */
+  .diag {
+    grid-column: 1 / -1;
+    margin-top: 8px;
+    padding: 10px;
+    background: var(--bg-input);
+    border-radius: 8px;
+    border: 1px solid var(--stroke);
+    font-family: var(--mono);
+  }
+  .diag .g + .g { margin-top: 10px; }
+  .diag .g-ttl {
+    font-size: 9px; color: var(--info);
+    font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; margin-bottom: 5px;
+  }
+  .diag .kv {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 12px;
+    row-gap: 3px;
+  }
+  .diag .k {
+    display: flex; justify-content: space-between; gap: 6px;
+    font-size: 10px;
+  }
+  .diag .k .lab { color: var(--text-3); }
+  .diag .k .val { color: var(--text); }
+  .diag .k .val.neg { color: var(--danger); }
+  .diag .k .val.pos { color: var(--success); }
+  .diag .alt {
+    background: var(--bg-hover);
+    border-radius: 6px;
+    padding: 6px 8px;
+    margin-top: 4px;
+  }
+  .diag .alt .alt-head {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10px; margin-bottom: 4px;
+  }
+  .diag .alt .alt-head .r { color: var(--text); font-weight: 700; }
+  .diag .alt .alt-head .raw { color: var(--text-3); margin-left: auto; }
+  .diag .alt .alt-head .sel {
+    font-size: 8px; padding: 1px 5px; border-radius: 3px;
+    background: var(--accent-soft); color: var(--accent);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .diag .alt .c {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px;
+  }
+  .diag .alt .c .cell {
+    background: var(--bg-card);
+    border-radius: 4px;
+    padding: 3px 5px;
+    font-size: 9px;
+    display: flex; flex-direction: column; gap: 1px;
+  }
+  .diag .alt .c .cell.s { border: 1px solid var(--accent-stroke); }
+  .diag .alt .c .cell .lab { color: var(--text-3); font-size: 8px; }
+  .diag .alt .c .cell .v { color: var(--text); font-weight: 700; }
+
+  /* Annotations next to each variant */
+  .notes {
+    background: var(--bg-card);
+    border: 1px solid var(--stroke);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--text-2);
+    max-width: 390px;
+  }
+  .notes b { color: var(--text); font-weight: 600; }
+  .notes ul { margin: 4px 0 0; padding-left: 18px; }
+  .notes li { margin: 3px 0; }
+  .notes code {
+    background: var(--bg-input);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11px;
+    color: var(--text);
+    font-family: var(--mono);
+  }
+  .notes .pill {
+    display: inline-block;
+    font-size: 10px; font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 999px;
+    margin-right: 6px;
+  }
+  .pill.easy { background: rgba(52,211,153,0.14); color: var(--success); }
+  .pill.tiny { background: rgba(245,165,36,0.14); color: var(--warn); }
+
+  .compare-tag {
+    display: inline-block;
+    font-size: 10px; font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .compare-tag.today { background: rgba(255,255,255,0.06); color: var(--text-3); }
+  .compare-tag.new { background: var(--accent-soft); color: var(--accent); }
+
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="page-head">
+    <h1>V2a · phone-scale, stale state, admin mode</h1>
+    <p>Everything below renders at iPhone 15/16 base width (390pt) so the density is realistic. I dropped the per-strip "Use" buttons — the keyboard action rail (<code style="background:var(--bg-card);padding:1px 5px;border-radius:3px;font-size:11px;color:var(--text);">SetTableView.swift:1530</code>) already has a wand button that shows the suggested weight and applies it, so duplicating it inside the card would be clutter. The proposed card is the <em>same single container with dividers</em> the code uses today — just denser per row, with a shared explanation at the bottom instead of repeating it per set.</p>
+  </header>
+
+  <!-- ============================================ COMPARE ============================================ -->
+  <h2 class="section">Today's card vs. the V2a-applied card</h2>
+  <p class="section-note">Same data (4 pending sets, default explanation). Watch the vertical real estate — the proposed version is ~40% shorter while showing more useful info per row.</p>
+
+  <div class="row">
+    <div class="variant">
+      <header>
+        <span class="compare-tag today">Today</span>
+        <h3>Current — 4 pending sets</h3>
+        <span class="tag">~14 lines tall in the screen</span>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="spacer"></span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="card-today">
+            <div class="hdr">
+              <div class="wand">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg>
+              </div>
+              <span class="ttl">Smart Suggestions</span>
+            </div>
+            <div class="ready">4 suggestions ready</div>
+
+            <div class="row-block">
+              <div class="set-n">Set 1</div>
+              <div class="weight-line"><span class="kg">52 kg</span><span class="reps">for 6–8 reps</span></div>
+              <div class="desc">Based on your recent performance and adjusted for this workout.</div>
+            </div>
+            <div class="divider"></div>
+            <div class="row-block">
+              <div class="set-n">Set 2</div>
+              <div class="weight-line"><span class="kg">54 kg</span><span class="reps">for 6–8 reps</span></div>
+              <div class="desc">Based on your recent performance and adjusted for this workout.</div>
+            </div>
+            <div class="divider"></div>
+            <div class="row-block">
+              <div class="set-n">Set 3</div>
+              <div class="weight-line"><span class="kg">54 kg</span><span class="reps">for 6–8 reps</span></div>
+              <div class="desc">Based on your recent performance and adjusted for this workout.</div>
+            </div>
+            <div class="divider"></div>
+            <div class="row-block">
+              <div class="set-n">Set 4</div>
+              <div class="weight-line"><span class="kg">52.5 kg</span><span class="reps">for 6–8 reps</span></div>
+              <div class="desc">Based on your recent performance and adjusted for this workout.</div>
+            </div>
+          </div>
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="variant">
+      <header>
+        <span class="compare-tag new">Proposed</span>
+        <h3>V2a applied — 4 pending sets</h3>
+        <span class="tag">single description, denser rows</span>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="spacer"></span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="card-new">
+            <div class="hdr">
+              <div class="wand">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg>
+              </div>
+              <span class="ttl">Smart Suggestions</span>
+              <span class="count">· 4 ready</span>
+              <span class="spacer"></span>
+            </div>
+
+            <div class="rows">
+              <div class="r"><div class="num">Set 1</div>
+                <div class="data"><span class="w">52 kg</span><span class="x">×</span><span class="reps">6–8</span></div>
+                <div></div>
+              </div>
+              <div class="r"><div class="num">Set 2</div>
+                <div class="data"><span class="w">54 kg</span><span class="x">×</span><span class="reps">6–8</span></div>
+                <div></div>
+              </div>
+              <div class="r"><div class="num">Set 3</div>
+                <div class="data"><span class="w">54 kg</span><span class="x">×</span><span class="reps">6–8</span></div>
+                <div></div>
+              </div>
+              <div class="r"><div class="num">Set 4</div>
+                <div class="data"><span class="w">52.5 kg</span><span class="x">×</span><span class="reps">6–8</span></div>
+                <div></div>
+              </div>
+            </div>
+
+            <div class="foot">Based on your recent performance and adjusted for this workout.</div>
+          </div>
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+
+      <div class="notes">
+        <span class="pill easy">No code complexity added</span>
+        Every change here is SwiftUI-only:
+        <ul>
+          <li><b>Single description</b> instead of one per row — same string (<code>explanation.userSummary</code>) is identical across rows in practice, so we render it once at the card foot.</li>
+          <li><b>Row format</b> goes from 3 lines to 1 line (Set N · weight × reps). Weight drops from 24pt to 17pt — still the most prominent thing per row, but four of them don't stack into a wall.</li>
+          <li><b>No "Use" buttons</b> — keyboard rail handles application (<code>SetTableView.swift:1531</code>).</li>
+          <li><b>"4 suggestions ready"</b> moves up to the header as a small count.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ STALE ============================================ -->
+  <h2 class="section">Stale state · <code style="background:var(--bg-card);padding:1px 6px;border-radius:4px;font-size:13px;color:var(--text);">e1RMSource.isOutsideRecencyWindow</code></h2>
+  <p class="section-note">When the baseline e1RM comes from outside the configured recency window (the user's screenshot date was Mar 1, 2026 — 13 weeks ago vs. today's Jun 2, 2026), the suggestion is still valid but lower-confidence. Add a subtle warn-tone banner inside the card, swap the wand icon to amber, and surface the anchor date. Nothing per-row changes.</p>
+
+  <div class="row">
+    <div class="variant">
+      <header>
+        <span class="compare-tag new">Proposed</span>
+        <h3>Stale baseline · 1 suggestion ready</h3>
+        <span class="tag">single-set case</span>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="spacer"></span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="card-new is-stale">
+            <div class="hdr">
+              <div class="wand">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg>
+              </div>
+              <span class="ttl">Smart Suggestions</span>
+              <span class="count">· 1 ready</span>
+              <span class="spacer"></span>
+            </div>
+
+            <div class="stale-banner">
+              <div class="ico">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <div class="body">Based on a workout from <b>Mar 1</b> — outside your recency window. The estimate may be optimistic.</div>
+            </div>
+
+            <div class="rows">
+              <div class="r"><div class="num">Set 3</div>
+                <div class="data"><span class="w">54 kg</span><span class="x">×</span><span class="reps">6–8</span></div>
+                <div></div>
+              </div>
+            </div>
+          </div>
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="pill easy">Almost free</span>
+        <ul>
+          <li><code>data.e1RMSource.isOutsideRecencyWindow</code> already exists — drives the banner + amber wand.</li>
+          <li><span class="pill tiny">Tiny add</span> Mirror <code>e1RMSourceWorkoutDate</code> onto <code>WeightSuggestionData</code> (currently only on the per-decision struct). One <code>Date?</code> field, one assignment in <code>SuggestionExplainer.makeWeightSuggestionData</code>. All rows share the same anchor so a top-level field is the right shape.</li>
+          <li>When stale, the regular "Based on your recent performance…" footer can be omitted — the banner replaces it. (Today's <code>userSummary</code> already changes copy based on conditions; this is just one more branch.)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="variant">
+      <header>
+        <span class="compare-tag new">Proposed</span>
+        <h3>Stale baseline · 4 sets</h3>
+        <span class="tag">multi-set case</span>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="spacer"></span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="card-new is-stale">
+            <div class="hdr">
+              <div class="wand">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg>
+              </div>
+              <span class="ttl">Smart Suggestions</span>
+              <span class="count">· 4 ready</span>
+              <span class="spacer"></span>
+            </div>
+
+            <div class="stale-banner">
+              <div class="ico">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <div class="body">Based on a workout from <b>Mar 1</b> — outside your recency window. The estimate may be optimistic.</div>
+            </div>
+
+            <div class="rows">
+              <div class="r"><div class="num">Set 1</div>
+                <div class="data"><span class="w">52 kg</span><span class="x">×</span><span class="reps">6–8</span></div>
+                <div></div>
+              </div>
+              <div class="r"><div class="num">Set 2</div>
+                <div class="data"><span class="w">54 kg</span><span class="x">×</span><span class="reps">6–8</span></div>
+                <div></div>
+              </div>
+              <div class="r"><div class="num">Set 3</div>
+                <div class="data"><span class="w">54 kg</span><span class="x">×</span><span class="reps">6–8</span></div>
+                <div></div>
+              </div>
+              <div class="r"><div class="num">Set 4</div>
+                <div class="data"><span class="w">52.5 kg</span><span class="x">×</span><span class="reps">6–8</span></div>
+                <div></div>
+              </div>
+            </div>
+          </div>
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="pill easy">Same machinery scales</span>
+        Banner sits above the rows; rows themselves are unchanged. Banner is shown when <code>data.e1RMSource == .staleRecentPerformance</code> — exactly the boolean already exposed.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ ADMIN ============================================ -->
+  <h2 class="section">Admin mode · same container, denser data</h2>
+  <p class="section-note">Today admin mode adds e1RM in the header, a compact "Set N: weight × target" line, a free-text technical summary per row, and a <em>global</em> "Details" toggle that expands every row at once. Below I keep the same container and the same data, but: (a) move e1RM into a small monospace meta line in the header, (b) keep per-row layout consistent with user mode (just add the admin summary line below), and (c) make Details a per-row toggle so you can inspect one row without expanding the others. All values shown already exist on <code>SetSuggestionDiagnostics</code>.</p>
+
+  <div class="row">
+    <div class="variant">
+      <header>
+        <span class="compare-tag new">Proposed</span>
+        <h3>Admin · collapsed</h3>
+        <span class="tag">3 sets, no expansions</span>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="spacer"></span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="card-new is-admin">
+            <div class="hdr">
+              <div class="wand">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg>
+              </div>
+              <span class="ttl">Smart Suggestions</span>
+              <span class="admin-pill">Admin</span>
+              <span class="admin-meta">e1RM 64.2 · epley</span>
+            </div>
+
+            <div class="rows">
+              <div class="r"><div class="num">Set 1</div>
+                <div class="data"><span class="w">52.0 kg</span><span class="x">×</span><span class="reps">6–8 @ RIR 1</span></div>
+                <button class="det-btn">▾</button>
+                <div class="admin-sub">64.2 cap · readiness +0.0% · target: template</div>
+              </div>
+              <div class="r"><div class="num">Set 2</div>
+                <div class="data"><span class="w">54.0 kg</span><span class="x">×</span><span class="reps">6–8 @ RIR 1</span></div>
+                <button class="det-btn">▾</button>
+                <div class="admin-sub">readiness −1.7% · fatigue 0.983</div>
+              </div>
+              <div class="r"><div class="num">Set 3</div>
+                <div class="data"><span class="w">54.0 kg</span><span class="x">×</span><span class="reps">6–8 @ RIR 1</span></div>
+                <button class="det-btn">▾</button>
+                <div class="admin-sub">readiness −3.1% · fatigue 0.967 · projected 0.012</div>
+              </div>
+            </div>
+          </div>
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="pill easy">No data changes</span>
+        <ul>
+          <li>Admin sub-line uses fields from <code>SuggestionExplanation.adminSummary</code> — already populated.</li>
+          <li>Global e1RM is <code>data.baseE1RM</code> + formula label (currently shown as "e1RM: 64.2 kg").</li>
+          <li>"Admin" pill is purely visual — no new data needed.</li>
+          <li><span class="pill tiny">Tiny UX change</span> Today's <code>@State showDetails</code> is on the parent card and toggles all rows at once. Move it to per-row state — same data, less code, more useful.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="variant">
+      <header>
+        <span class="compare-tag new">Proposed</span>
+        <h3>Admin · 1 row expanded</h3>
+        <span class="tag">structured diagnostics</span>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="spacer"></span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="card-new is-admin">
+            <div class="hdr">
+              <div class="wand">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg>
+              </div>
+              <span class="ttl">Smart Suggestions</span>
+              <span class="admin-pill">Admin</span>
+              <span class="admin-meta">e1RM 64.2 · epley</span>
+            </div>
+
+            <div class="rows">
+              <div class="r"><div class="num">Set 3</div>
+                <div class="data"><span class="w">54.0 kg</span><span class="x">×</span><span class="reps">6–8 @ RIR 1</span></div>
+                <button class="det-btn">▴</button>
+                <div class="admin-sub">readiness −3.1% · fatigue 0.967 · projected 0.012</div>
+
+                <div class="diag">
+                  <div class="g">
+                    <div class="g-ttl">e1RM &amp; readiness</div>
+                    <div class="kv">
+                      <div class="k"><span class="lab">historical</span><span class="val">64.2 kg</span></div>
+                      <div class="k"><span class="lab">session cap</span><span class="val">63.1 kg</span></div>
+                      <div class="k"><span class="lab">effective</span><span class="val">62.2 kg</span></div>
+                      <div class="k"><span class="lab">readiness</span><span class="val neg">−3.1%</span></div>
+                      <div class="k"><span class="lab">cap source</span><span class="val">recent peak</span></div>
+                      <div class="k"><span class="lab">baseline</span><span class="val">recent</span></div>
+                    </div>
+                  </div>
+                  <div class="g">
+                    <div class="g-ttl">Fatigue &amp; calibration</div>
+                    <div class="kv">
+                      <div class="k"><span class="lab">discount</span><span class="val">0.967</span></div>
+                      <div class="k"><span class="lab">projected</span><span class="val">0.012</span></div>
+                      <div class="k"><span class="lab">freshness</span><span class="val">no</span></div>
+                      <div class="k"><span class="lab">type mult</span><span class="val">1.0×</span></div>
+                      <div class="k"><span class="lab">rest</span><span class="val">150s</span></div>
+                      <div class="k"><span class="lab">calibration</span><span class="val">none</span></div>
+                    </div>
+                  </div>
+                  <div class="g">
+                    <div class="g-ttl">Target &amp; rounding</div>
+                    <div class="kv">
+                      <div class="k"><span class="lab">display</span><span class="val">6–8</span></div>
+                      <div class="k"><span class="lab">chosen</span><span class="val">7</span></div>
+                      <div class="k"><span class="lab">target src</span><span class="val">template</span></div>
+                      <div class="k"><span class="lab">RIR src</span><span class="val">explicit</span></div>
+                      <div class="k"><span class="lab">intensity</span><span class="val">0.869</span></div>
+                      <div class="k"><span class="lab">raw → rnd</span><span class="val">54.06 → 54.0</span></div>
+                    </div>
+                  </div>
+                  <div class="g">
+                    <div class="g-ttl">Alternatives (6–8)</div>
+                    <div class="alt">
+                      <div class="alt-head"><span class="r">7 reps</span><span class="sel">selected</span><span class="raw">raw 54.1</span></div>
+                      <div class="c">
+                        <div class="cell"><span class="lab">−inc</span><span class="v">51.5</span></div>
+                        <div class="cell s"><span class="lab">suggested ✓</span><span class="v">54.0</span></div>
+                        <div class="cell"><span class="lab">+inc</span><span class="v">56.5</span></div>
+                      </div>
+                    </div>
+                    <div class="alt">
+                      <div class="alt-head"><span class="r">6 reps</span><span class="raw">raw 56.1</span></div>
+                      <div class="c">
+                        <div class="cell"><span class="lab">−inc</span><span class="v">53.5</span></div>
+                        <div class="cell s"><span class="lab">suggested</span><span class="v">56.0</span></div>
+                        <div class="cell"><span class="lab">+inc</span><span class="v">58.5</span></div>
+                      </div>
+                    </div>
+                    <div class="alt">
+                      <div class="alt-head"><span class="r">8 reps</span><span class="raw">raw 52.2</span></div>
+                      <div class="c">
+                        <div class="cell"><span class="lab">−inc</span><span class="v">49.5</span></div>
+                        <div class="cell s"><span class="lab">suggested</span><span class="v">52.0</span></div>
+                        <div class="cell"><span class="lab">+inc</span><span class="v">54.5</span></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="pill easy">All existing fields</span>
+        Every value is from <code>SetSuggestionDiagnostics</code>:
+        <ul>
+          <li><b>e1RM &amp; readiness</b>: <code>historicalBaseE1RM</code>, <code>sessionCapabilityE1RM</code>, <code>effectiveE1RM</code>, <code>readinessPercent</code>, <code>sessionCapabilitySourceLabel</code>, <code>baselineSourceLabel</code></li>
+          <li><b>Fatigue &amp; calibration</b>: <code>fatigueDiscount</code>, <code>projectedSessionFatigue</code>, <code>freshnessApplied</code>, <code>setTypeFatigueMultiplier</code>, <code>restSecondsUsed</code>, <code>calibrationLabel</code></li>
+          <li><b>Target &amp; rounding</b>: <code>targetDisplayLabel</code>, <code>chosenReps</code>, <code>targetSourceLabel</code>, <code>rirSourceLabel</code>, <code>intensityFactor</code>, <code>rawWeight</code>, <code>roundedWeight</code></li>
+          <li><b>Alternatives</b>: <code>diagnostics.alternatives</code> with the three <code>candidate.kind</code> cases</li>
+        </ul>
+        Only the <em>grouping</em> is new; the data isn't.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ stale + admin ============================================ -->
+  <h2 class="section">Stale + admin (just to confirm they compose)</h2>
+  <p class="section-note">If the e1RM is stale and admin mode is on, both treatments coexist: the warn banner sits above the rows, the admin pill sits in the header, and the admin meta line still shows the e1RM.</p>
+
+  <div class="row">
+    <div class="variant">
+      <header>
+        <span class="compare-tag new">Proposed</span>
+        <h3>Stale + admin</h3>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="spacer"></span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="card-new is-admin is-stale">
+            <div class="hdr">
+              <div class="wand">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg>
+              </div>
+              <span class="ttl">Smart Suggestions</span>
+              <span class="admin-pill">Admin</span>
+              <span class="admin-meta">e1RM 64.2 · stale</span>
+            </div>
+
+            <div class="stale-banner">
+              <div class="ico">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <div class="body">Based on a workout from <b>Mar 1</b> — outside your recency window. The estimate may be optimistic.</div>
+            </div>
+
+            <div class="rows">
+              <div class="r"><div class="num">Set 1</div>
+                <div class="data"><span class="w">52.0 kg</span><span class="x">×</span><span class="reps">6–8 @ RIR 1</span></div>
+                <button class="det-btn">▾</button>
+                <div class="admin-sub">stale · 13w old · cap source: older workout</div>
+              </div>
+              <div class="r"><div class="num">Set 2</div>
+                <div class="data"><span class="w">54.0 kg</span><span class="x">×</span><span class="reps">6–8 @ RIR 1</span></div>
+                <button class="det-btn">▾</button>
+                <div class="admin-sub">stale · readiness −1.7% · fatigue 0.983</div>
+              </div>
+            </div>
+          </div>
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        Composes cleanly — admin meta swaps "epley" for "stale" so the technical state is obvious at a glance, banner content stays the same. Per-row admin sub-line could optionally prefix "stale · " for emphasis.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ checklist ============================================ -->
+  <h2 class="section">What it costs in code <span class="sub">summary</span></h2>
+  <div class="notes" style="max-width: 760px;">
+    <ul>
+      <li><span class="pill easy">SwiftUI-only</span> Restructure rows to single-line, move description to card foot, drop the per-row description.</li>
+      <li><span class="pill easy">SwiftUI-only</span> Banner + amber wand driven by existing <code>data.e1RMSource.isOutsideRecencyWindow</code>.</li>
+      <li><span class="pill tiny">+1 field</span> Surface anchor date: add <code>e1RMSourceWorkoutDate: Date?</code> to <code>WeightSuggestionData</code>, assigned from <code>evaluation.decisions.first?.e1RMSourceWorkoutDate</code> in <code>SuggestionExplainer.makeWeightSuggestionData</code> (alongside the existing <code>baseE1RM</code> / <code>e1RMSource</code> assignment).</li>
+      <li><span class="pill easy">SwiftUI-only</span> Admin row format change. Same data from <code>SuggestionExplanation.adminSummary</code> / <code>SetSuggestionDiagnostics</code>.</li>
+      <li><span class="pill easy">SwiftUI-only</span> Per-row Details toggle replaces global. Move <code>@State showDetails</code> off the card root and into the row view, indexed by suggestion id.</li>
+      <li><span class="pill easy">SwiftUI-only</span> Diagnostics grouping. Same fields, just rendered into 4 labeled groups instead of a flat list.</li>
+    </ul>
+    <p style="margin: 10px 0 0;">No engine changes. No new VM methods. No new explanation strings beyond an optional stale-banner copy that lives in the view.</p>
+  </div>
+
+</div>
+</body>
+</html>

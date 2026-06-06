@@ -156,7 +156,6 @@ final class ServiceContainer {
             setRepository: repositoryContainer.setRepository,
             exerciseRepository: repositoryContainer.exerciseRepository,
             workoutRepository: repositoryContainer.workoutRepository,
-            performanceRecordRepository: repositoryContainer.performanceRecordRepository,
             healthProfileRepository: repositoryContainer.healthProfileRepository
         )
 

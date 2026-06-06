@@ -1,0 +1,862 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Take B + history · completed strips</title>
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --bg-card: #15151a;
+    --bg-input: #1d1d24;
+    --bg-hover: #25252e;
+    --stroke: rgba(255,255,255,0.06);
+    --stroke-strong: rgba(255,255,255,0.12);
+    --border: rgba(255,255,255,0.08);
+    --text: #f4f4f6;
+    --text-2: #a1a1aa;
+    --text-3: #6b6b75;
+    --accent: #7c8cff;
+    --accent-soft: rgba(124,140,255,0.10);
+    --accent-stroke: rgba(124,140,255,0.28);
+    --warn: #f5a524;
+    --warn-soft: rgba(245,165,36,0.12);
+    --warn-stroke: rgba(245,165,36,0.32);
+    --stale: #94a3b8;
+    --stale-soft: rgba(148,163,184,0.10);
+    --stale-stroke: rgba(148,163,184,0.30);
+    --success: #34d399;
+    --success-soft: rgba(52,211,153,0.10);
+    --success-stroke: rgba(52,211,153,0.32);
+    --danger: #fb7185;
+    --info: #60a5fa;
+    --info-soft: rgba(96,165,250,0.12);
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+  .page { max-width: 1400px; margin: 0 auto; padding: 48px 32px 96px; }
+  .page-head h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .page-head p { color: var(--text-2); max-width: 760px; line-height: 1.55; margin: 0; }
+  .page-head p + p { margin-top: 10px; }
+  .page-head b { color: var(--text); }
+  .page-head code { background: var(--bg-card); padding: 1px 5px; border-radius: 3px; font-size: 13px; color: var(--text); font-family: var(--mono); }
+  h2.section { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; margin: 56px 0 4px; }
+  h2.section .sub { font-weight: 500; color: var(--text-3); margin-left: 8px; font-size: 13px; }
+  .section-note { color: var(--text-2); font-size: 13px; max-width: 760px; line-height: 1.55; margin: 0 0 24px; }
+  .row { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; }
+  .variant { display: flex; flex-direction: column; gap: 12px; }
+  .variant > header { padding: 0 4px; }
+  .variant h3 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 2px; }
+  .variant .tag { font-size: 11px; color: var(--text-3); }
+
+  /* Phone */
+  .phone { width: 390px; background: #000; border-radius: 44px; border: 1px solid rgba(255,255,255,0.10); padding: 8px 8px 16px; }
+  .phone .notch { width: 112px; height: 28px; background: #000; border-radius: 999px; margin: 0 auto 8px; }
+  .phone .screen { background: var(--bg); border-radius: 36px; overflow: hidden; padding: 8px 16px 16px; min-height: 200px; }
+  .phone .home-indicator { width: 110px; height: 4px; background: rgba(255,255,255,0.4); border-radius: 999px; margin: 12px auto 0; }
+
+  /* Section header (no in-card title) */
+  .sec-head { display: flex; align-items: center; gap: 8px; padding: 0 2px 10px; }
+  .sec-head .lbl { font-size: 11px; font-weight: 600; color: var(--text-3); letter-spacing: 0.8px; text-transform: uppercase; }
+  .sec-head .count { font-size: 11px; font-weight: 500; color: var(--text-3); }
+  .sec-head .spacer { flex: 1; }
+  .sec-head .refresh { width: 28px; height: 28px; border-radius: 8px; background: var(--bg-card); display: grid; place-items: center; color: var(--text-2); border: none; cursor: pointer; }
+
+  /* ─────────────────────────────────────
+     PENDING STRIP — Take B, 2 lines
+     ───────────────────────────────────── */
+  .strip {
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 12px;
+    padding: 10px 12px;
+  }
+  .strip + .strip { margin-top: 6px; }
+  .strip .ico { width: 36px; height: 36px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; flex: none; }
+  .strip .ico svg { width: 16px; height: 16px; }
+  .strip .body { min-width: 0; }
+  .strip .line1 { font-size: 15px; font-weight: 600; }
+  .strip .line1 .set { color: var(--text); }
+  .strip .line1 .w { color: var(--accent); font-weight: 700; }
+  .strip .line1 .for { color: var(--text-2); font-size: 14px; font-weight: 500; }
+  .strip .line2 { font-size: 11px; color: var(--text-3); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+  .strip .line2 .lab {
+    font-size: 9px; font-weight: 700;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: rgba(255,255,255,0.04);
+    padding: 1px 5px;
+    border-radius: 3px;
+    flex: none;
+  }
+  .strip .line2 .historical {
+    font-family: var(--mono);
+    color: var(--text-2);
+  }
+  .strip .line2 .delta-up { color: var(--success); font-weight: 600; }
+  .strip .line2 .delta-flat { color: var(--text-2); font-weight: 600; }
+  .strip .line2 .meta { color: var(--text-3); }
+  .strip .use {
+    flex: none;
+    background: transparent;
+    border: 1px solid var(--stroke-strong);
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* ─────────────────────────────────────
+     COMPLETED STRIP — smaller, quieter
+     Three takes for layout
+     ───────────────────────────────────── */
+  .done-strip {
+    display: grid;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--success);
+    border-radius: 10px;
+    padding: 7px 10px;
+  }
+  .done-strip + .strip,
+  .done-strip + .done-strip { margin-top: 6px; }
+  .done-strip .check {
+    border-radius: 6px;
+    background: var(--success-soft);
+    color: var(--success);
+    display: grid; place-items: center;
+    flex: none;
+  }
+  .done-strip .check svg { stroke: currentColor; }
+
+  /* DONE — Take 1 · single line with inline comparison */
+  .done-strip.t1 {
+    grid-template-columns: 22px 1fr auto;
+    padding: 6px 10px;
+  }
+  .done-strip.t1 .check { width: 22px; height: 22px; }
+  .done-strip.t1 .check svg { width: 11px; height: 11px; }
+  .done-strip.t1 .line {
+    font-size: 13px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--text-2);
+  }
+  .done-strip.t1 .line .set { font-weight: 600; color: var(--text-2); }
+  .done-strip.t1 .line .actual { color: var(--text); font-weight: 600; }
+  .done-strip.t1 .vs {
+    font-size: 10px;
+    color: var(--text-3);
+    font-family: var(--mono);
+    flex: none;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .done-strip.t1 .vs .match {
+    color: var(--success);
+  }
+  .done-strip.t1 .vs .over {
+    color: var(--accent);
+  }
+  .done-strip.t1 .vs .under {
+    color: var(--warn);
+  }
+
+  /* ─────────────────────────────────────
+     Last-top reference chip — single-line footer
+     Lives at the bottom of the card as a quiet
+     reference, not as a header. Pending strips
+     come first so the user sees what to lift.
+     ───────────────────────────────────── */
+  .last-top-chip {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px;
+    background: rgba(255,255,255,0.015);
+    border: 1px solid var(--stroke);
+    border-radius: 8px;
+    margin-top: 10px;
+    font-size: 11px;
+    line-height: 1.2;
+  }
+  .last-top-chip .ico {
+    color: var(--text-3);
+    display: grid; place-items: center;
+    flex: none;
+    opacity: 0.85;
+  }
+  .last-top-chip .label {
+    font-size: 9px; font-weight: 700;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    flex: none;
+  }
+  .last-top-chip .value {
+    color: var(--text-2);
+    font-family: var(--mono);
+    font-size: 11px;
+    flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .last-top-chip .value .num { color: var(--text); font-weight: 600; }
+  .last-top-chip .date {
+    font-size: 10px;
+    color: var(--text-3);
+    font-family: var(--mono);
+    flex: none;
+  }
+
+  /* Foot description */
+  .foot {
+    margin-top: 10px;
+    padding: 0 4px;
+    font-size: 11px;
+    color: var(--text-3);
+    line-height: 1.45;
+    display: flex; align-items: flex-start; gap: 6px;
+  }
+  .foot .i { color: var(--text-3); flex: none; margin-top: 1px; }
+
+  /* Divider between done and pending */
+  .group-divider {
+    display: flex; align-items: center; gap: 8px;
+    margin: 12px 2px 8px;
+  }
+  .group-divider .gl {
+    flex: 1; height: 1px; background: var(--border);
+  }
+  .group-divider .lbl {
+    font-size: 9px; font-weight: 700;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* ─────────────────────────────────────
+     Stale strip — quiet slate, not warning
+     ───────────────────────────────────── */
+  .strip.stale { border-left-color: var(--stale); }
+  .strip.stale .ico { background: var(--stale-soft); color: var(--stale); }
+  .strip.stale .line1 .w { color: var(--stale); }
+  .stale-banner {
+    background: var(--stale-soft);
+    border: 1px solid var(--stale-stroke);
+    border-radius: 10px;
+    padding: 8px 10px;
+    display: flex; align-items: flex-start; gap: 8px;
+    margin-bottom: 8px;
+    color: var(--stale);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .stale-banner .ico { flex: none; margin-top: 1px; }
+  .stale-banner .body { flex: 1; color: var(--text-2); }
+  .stale-banner b { color: var(--stale); font-weight: 600; }
+
+  /* ─────────────────────────────────────
+     Admin strip
+     ───────────────────────────────────── */
+  .sec-head .admin-pill { font-size: 9px; font-weight: 700; color: var(--info); background: var(--info-soft); border: 1px solid rgba(96,165,250,0.32); padding: 2px 6px; border-radius: 4px; letter-spacing: 0.06em; text-transform: uppercase; font-family: var(--mono); }
+  .sec-head .admin-meta { font-size: 10px; color: var(--info); font-family: var(--mono); }
+  .strip.admin { border-left-color: var(--info); }
+  .strip.admin .ico { background: var(--info-soft); color: var(--info); }
+  .strip.admin .line1 { font-family: var(--mono); font-size: 13px; }
+  .strip.admin .line1 .w { color: var(--info); }
+  .strip.admin .line2 { font-family: var(--mono); font-size: 10px; }
+  .strip.admin .det-btn { background: transparent; border: 1px solid var(--stroke-strong); color: var(--text-2); padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; font-family: var(--mono); cursor: pointer; flex: none; }
+
+  /* Diagnostics drawer (sits below an expanded admin strip) */
+  .diag { margin-top: 6px; padding: 10px; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--stroke); font-family: var(--mono); }
+  .diag .g + .g { margin-top: 10px; }
+  .diag .g-ttl { font-size: 9px; color: var(--info); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 5px; }
+  .diag .kv { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; row-gap: 3px; }
+  .diag .k { display: flex; justify-content: space-between; gap: 6px; font-size: 10px; }
+  .diag .k .lab { color: var(--text-3); }
+  .diag .k .val { color: var(--text); }
+  .diag .k .val.neg { color: var(--warn); }
+  .diag .alt { background: var(--bg-hover); border-radius: 6px; padding: 6px 8px; margin-top: 4px; }
+  .diag .alt .alt-head { display: flex; align-items: center; gap: 6px; font-size: 10px; margin-bottom: 4px; }
+  .diag .alt .alt-head .r { color: var(--text); font-weight: 700; }
+  .diag .alt .alt-head .raw { color: var(--text-3); margin-left: auto; }
+  .diag .alt .alt-head .sel { font-size: 8px; padding: 1px 5px; border-radius: 3px; background: var(--accent-soft); color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; }
+  .diag .alt .c { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+  .diag .alt .c .cell { background: var(--bg-card); border-radius: 4px; padding: 3px 5px; font-size: 9px; display: flex; flex-direction: column; gap: 1px; }
+  .diag .alt .c .cell.s { border: 1px solid var(--accent-stroke); }
+  .diag .alt .c .cell .lab { color: var(--text-3); font-size: 8px; }
+  .diag .alt .c .cell .v { color: var(--text); font-weight: 700; }
+
+  /* Notes */
+  .notes { background: var(--bg-card); border: 1px solid var(--stroke); border-radius: 12px; padding: 12px 14px; font-size: 12px; line-height: 1.55; color: var(--text-2); max-width: 390px; }
+  .notes b { color: var(--text); font-weight: 600; }
+  .notes ul { margin: 4px 0 0; padding-left: 18px; }
+  .notes li { margin: 3px 0; }
+  .notes code { background: var(--bg-input); padding: 1px 5px; border-radius: 3px; font-size: 11px; color: var(--text); font-family: var(--mono); }
+  .notes .pill { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; margin-right: 6px; }
+  .pill.easy { background: rgba(52,211,153,0.14); color: var(--success); }
+  .pill.tiny { background: var(--warn-soft); color: var(--warn); }
+  .pill.note { background: var(--accent-soft); color: var(--accent); }
+  .pill.hero { background: var(--accent-soft); color: var(--accent); }
+
+  .which { display: inline-block; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.06em; background: var(--accent-soft); color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="page-head">
+    <h1>Take B with last-workout context, plus completed/stale/admin states</h1>
+    <p>All of the per-state treatments in one place:</p>
+    <ol style="color: var(--text-2); margin: 8px 0 0; padding-left: 20px; line-height: 1.55;">
+      <li><b>Last-workout delta (Variation B)</b> — "+2 kg vs last top". The top set is what the engine already uses as baseline in <code>LoadPrescriptionService.peakAcrossRecentWorkouts</code>; surfacing it is a small struct change.</li>
+      <li><b>Completed strips</b> — smaller, quieter, with suggestion-vs-actual inline. Two density takes.</li>
+      <li><b>Stale state</b> — when the baseline workout is outside your recency window. Slate banner + slate strip (quiet, archival).</li>
+      <li><b>Admin mode</b> — same shape, monospace, blue rail, structured diagnostics drawer.</li>
+    </ol>
+  </header>
+
+  <!-- ============================================ LAST WORKOUT REFERENCE — 3 takes ============================================ -->
+  <h2 class="section">Take B · delta vs last top</h2>
+  <p class="section-note">"+2 kg vs last top" — uses the top set from the most recent workout the engine already references as the baseline anchor. Phrasing leans progression-focused.</p>
+
+  <div class="row">
+
+    <!-- Variation B — delta -->
+    <div class="variant">
+      <header>
+        <span class="which">Variation B</span>
+        <h3>Delta: "+2 kg vs last top"</h3>
+        <span class="tag">progression-focused</span>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="spacer"></span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="strip">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body">
+              <div class="line1"><span class="set">Set 1</span> · <span class="w">54 kg</span> <span class="for">for 6–8 reps</span></div>
+              <div class="line2">
+                <span class="delta-up">↑ +2 kg</span>
+                <span class="meta">vs last top set (52 × 8)</span>
+              </div>
+            </div>
+            <button class="use">Use</button>
+          </div>
+
+          <div class="foot">
+            <span class="i"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+            <span>Based on your recent performance and adjusted for this workout.</span>
+          </div>
+
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="pill easy">Same field, different copy</span>
+        <ul>
+          <li><b>Field needed:</b> add <code>baselineTopSet: (weight, reps, rir, date)?</code> on <code>WeightSuggestionData</code>, populated from the source set behind <code>peakAcrossRecentWorkouts</code>.</li>
+          <li>Negative deltas (backoff/deload) need neutral colour, not red — "+0" / "−2 kg" should read as planned, not failure.</li>
+          <li>In a template, the same delta line repeats per row since the anchor is per-exercise. That's honest, just visually redundant.</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================ COMPLETED STRIPS ============================================ -->
+  <h2 class="section">Completed strips · single-line with inline comparison</h2>
+  <p class="section-note">Smaller than pending strips. Suggestion-vs-actual shown inline on the right: <code style="background:var(--bg-card);padding:1px 5px;border-radius:3px;font-size:12px;color:var(--text);font-family:var(--mono);">= suggested</code> when matched, <code style="background:var(--bg-card);padding:1px 5px;border-radius:3px;font-size:12px;color:var(--text);font-family:var(--mono);">+1 kg vs sug</code> when over, <code style="background:var(--bg-card);padding:1px 5px;border-radius:3px;font-size:12px;color:var(--text);font-family:var(--mono);">−1 kg vs sug</code> when under.</p>
+
+  <div class="row">
+
+    <!-- DONE Take 1 — single line with inline comparison -->
+    <div class="variant">
+      <header>
+        <span class="which">Done · Take 1</span>
+        <h3>Inline comparison · single line</h3>
+        <span class="tag">readable, slightly chunky</span>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="count">· 2 done · 2 ready</span>
+            <span class="spacer"></span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="done-strip t1">
+            <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="line"><span class="set">Set 1</span> · <span class="actual">52 kg × 8</span></div>
+            <div class="vs"><span class="match">= suggested</span></div>
+          </div>
+          <div class="done-strip t1">
+            <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="line"><span class="set">Set 2</span> · <span class="actual">55 kg × 7</span></div>
+            <div class="vs"><span class="over">+1 kg vs sug</span></div>
+          </div>
+
+          <div class="group-divider">
+            <div class="gl"></div>
+            <div class="lbl">Up next</div>
+            <div class="gl"></div>
+          </div>
+
+          <div class="strip">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body">
+              <div class="line1"><span class="set">Set 3</span> · <span class="w">55 kg</span> <span class="for">for 6–8 reps</span></div>
+              <div class="line2"><span class="meta">Adjusted up to match your last set</span></div>
+            </div>
+            <button class="use">Use</button>
+          </div>
+          <div class="strip">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body">
+              <div class="line1"><span class="set">Set 4</span> · <span class="w">52.5 kg</span> <span class="for">for 6–8 reps</span></div>
+              <div class="line2"><span class="meta">Backing off slightly for fatigue</span></div>
+            </div>
+            <button class="use">Use</button>
+          </div>
+
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="pill note">Behavior change</span>
+        Completed sets currently never appear in this card. This take adds them as quiet strips above an "Up next" divider.
+        <ul>
+          <li>"= suggested" / "+1 kg vs sug" / "−2 kg vs sug" / "−1 rep vs sug" — easy to compute when both the actual and the suggested are known in-session.</li>
+          <li><span class="pill tiny">Caveat</span> Requires the VM to <em>retain</em> the suggestion for each set when it transitions pending → completed. Currently suggestions are only computed for pending sets — after completion they're discarded. Adding a small dictionary keyed by set ID would solve it without persistence.</li>
+          <li>After the workout ends and is reopened later, the comparison would vanish (or could be persisted onto the <code>WorkoutSet</code> for permanence — bigger lift).</li>
+        </ul>
+      </div>
+    </div>
+
+
+  </div>
+
+  <!-- ============================================ STALE ============================================ -->
+  <h2 class="section">Stale state · baseline outside recency window</h2>
+  <p class="section-note">Driven by <code style="background:var(--bg-card);padding:1px 5px;border-radius:3px;font-size:12px;color:var(--text);font-family:var(--mono);">data.e1RMSource.isOutsideRecencyWindow</code>. Anchor date needs one new top-level field (<code style="background:var(--bg-card);padding:1px 5px;border-radius:3px;font-size:12px;color:var(--text);font-family:var(--mono);">e1RMSourceWorkoutDate</code> mirrored onto <code style="background:var(--bg-card);padding:1px 5px;border-radius:3px;font-size:12px;color:var(--text);font-family:var(--mono);">WeightSuggestionData</code>). Slate banner + slate strip — quiet/archival tone rather than warning. The data is still valid, just older than your recency window; the visual treatment shouldn't read as an error. Foot description suppressed (banner replaces it).</p>
+
+  <div class="row">
+
+    <!-- Stale · 1 strip -->
+    <div class="variant">
+      <header>
+        <span class="which">Stale · default</span>
+        <h3>1 strip · stale baseline</h3>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="spacer"></span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="stale-banner">
+            <div class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            <div class="body">Based on a workout from <b>Mar 1</b> — outside your recency window. Estimate may be optimistic.</div>
+          </div>
+
+          <div class="strip stale">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body">
+              <div class="line1"><span class="set">Set 1</span> · <span class="w">54 kg</span> <span class="for">for 6–8 reps</span></div>
+              <div class="line2">
+                <span class="meta">Anchor: 52 × 8 · Mar 1 · 13w ago</span>
+              </div>
+            </div>
+            <button class="use">Use</button>
+          </div>
+
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="pill easy">Toggled by existing field</span>
+        Banner driven by <code>data.e1RMSource.isOutsideRecencyWindow</code>. Date comes from the new <code>e1RMSourceWorkoutDate</code> field. The Take B per-row delta line is replaced by an anchor-and-age line, since "+X kg vs last top" reads strange when the anchor is months old.
+      </div>
+    </div>
+
+    <!-- Stale · template -->
+    <div class="variant">
+      <header>
+        <span class="which">Stale · template</span>
+        <h3>4 strips · banner once at top</h3>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="count">· 4 ready</span>
+            <span class="spacer"></span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="stale-banner">
+            <div class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            <div class="body">Based on a workout from <b>Mar 1</b> — outside your recency window. Estimate may be optimistic.</div>
+          </div>
+
+          <div class="strip stale">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body">
+              <div class="line1"><span class="set">Set 1</span> · <span class="w">52 kg</span> <span class="for">for 6–8 reps</span></div>
+              <div class="line2"><span class="meta">Anchor 52 × 8 · 13w ago</span></div>
+            </div>
+            <button class="use">Use</button>
+          </div>
+          <div class="strip stale">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body">
+              <div class="line1"><span class="set">Set 2</span> · <span class="w">54 kg</span> <span class="for">for 6–8 reps</span></div>
+              <div class="line2"><span class="meta">Anchor 52 × 8 · 13w ago</span></div>
+            </div>
+            <button class="use">Use</button>
+          </div>
+          <div class="strip stale">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body">
+              <div class="line1"><span class="set">Set 3</span> · <span class="w">54 kg</span> <span class="for">for 6–8 reps</span></div>
+              <div class="line2"><span class="meta">Anchor 52 × 8 · 13w ago</span></div>
+            </div>
+            <button class="use">Use</button>
+          </div>
+          <div class="strip stale">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body">
+              <div class="line1"><span class="set">Set 4</span> · <span class="w">52.5 kg</span> <span class="for">for 6–8 reps</span></div>
+              <div class="line2"><span class="meta">Anchor 52 × 8 · 13w ago</span></div>
+            </div>
+            <button class="use">Use</button>
+          </div>
+
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        Banner once at top; all strips share the amber treatment. Anchor is per-exercise so the banner doesn't repeat.
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================ ADMIN MODE ============================================ -->
+  <h2 class="section">Admin mode · same shape, denser data</h2>
+  <p class="section-note">Same data the current admin row already exposes (<code style="background:var(--bg-card);padding:1px 5px;border-radius:3px;font-size:12px;color:var(--text);font-family:var(--mono);">SuggestionExplanation.adminSummary</code> + <code style="background:var(--bg-card);padding:1px 5px;border-radius:3px;font-size:12px;color:var(--text);font-family:var(--mono);">SetSuggestionDiagnostics</code>) — re-skinned for the strip shape. Admin pill + e1RM meta move into the section header. Per-strip Details toggle replaces today's global toggle.</p>
+
+  <div class="row">
+
+    <!-- Admin collapsed -->
+    <div class="variant">
+      <header>
+        <span class="which">Admin · default</span>
+        <h3>1 strip · collapsed</h3>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="admin-pill">Admin</span>
+            <span class="spacer"></span>
+            <span class="admin-meta">e1RM 64.2 · epley</span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="strip admin">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
+            <div class="body">
+              <div class="line1"><span class="set">Set 1</span>: <span class="w">54.0 kg</span> <span class="for">× 6–8 @ RIR 1</span></div>
+              <div class="line2"><span class="meta">readiness +0.0% · target: template · cap: recent peak</span></div>
+            </div>
+            <button class="det-btn">▾</button>
+          </div>
+
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="pill easy">No data changes</span>
+        Sub-line = existing <code>SuggestionExplanation.adminSummary</code>. Admin pill + meta = visual only. Per-row Details toggle (not global).
+      </div>
+    </div>
+
+    <!-- Admin expanded -->
+    <div class="variant">
+      <header>
+        <span class="which">Admin · default</span>
+        <h3>1 strip · expanded diagnostics</h3>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="admin-pill">Admin</span>
+            <span class="spacer"></span>
+            <span class="admin-meta">e1RM 64.2 · epley</span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="strip admin">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
+            <div class="body">
+              <div class="line1"><span class="set">Set 1</span>: <span class="w">54.0 kg</span> <span class="for">× 6–8 @ RIR 1</span></div>
+              <div class="line2"><span class="meta">readiness +0.0% · target: template · cap: recent peak</span></div>
+            </div>
+            <button class="det-btn">▴</button>
+          </div>
+
+          <div class="diag">
+            <div class="g">
+              <div class="g-ttl">e1RM &amp; readiness</div>
+              <div class="kv">
+                <div class="k"><span class="lab">historical</span><span class="val">64.2 kg</span></div>
+                <div class="k"><span class="lab">session cap</span><span class="val">64.2 kg</span></div>
+                <div class="k"><span class="lab">effective</span><span class="val">64.2 kg</span></div>
+                <div class="k"><span class="lab">readiness</span><span class="val">+0.0%</span></div>
+                <div class="k"><span class="lab">cap source</span><span class="val">recent peak</span></div>
+                <div class="k"><span class="lab">baseline</span><span class="val">recent</span></div>
+              </div>
+            </div>
+            <div class="g">
+              <div class="g-ttl">Fatigue &amp; calibration</div>
+              <div class="kv">
+                <div class="k"><span class="lab">discount</span><span class="val">1.000</span></div>
+                <div class="k"><span class="lab">projected</span><span class="val">0.000</span></div>
+                <div class="k"><span class="lab">freshness</span><span class="val">no</span></div>
+                <div class="k"><span class="lab">type mult</span><span class="val">1.0×</span></div>
+                <div class="k"><span class="lab">rest</span><span class="val">150s</span></div>
+                <div class="k"><span class="lab">calibration</span><span class="val">none</span></div>
+              </div>
+            </div>
+            <div class="g">
+              <div class="g-ttl">Target &amp; rounding</div>
+              <div class="kv">
+                <div class="k"><span class="lab">display</span><span class="val">6–8</span></div>
+                <div class="k"><span class="lab">chosen</span><span class="val">7</span></div>
+                <div class="k"><span class="lab">target src</span><span class="val">template</span></div>
+                <div class="k"><span class="lab">RIR src</span><span class="val">explicit</span></div>
+                <div class="k"><span class="lab">intensity</span><span class="val">0.842</span></div>
+                <div class="k"><span class="lab">raw → rnd</span><span class="val">54.06 → 54.0</span></div>
+              </div>
+            </div>
+            <div class="g">
+              <div class="g-ttl">Alternatives (6–8)</div>
+              <div class="alt">
+                <div class="alt-head"><span class="r">7 reps</span><span class="sel">selected</span><span class="raw">raw 54.1</span></div>
+                <div class="c">
+                  <div class="cell"><span class="lab">−inc</span><span class="v">51.5</span></div>
+                  <div class="cell s"><span class="lab">sug ✓</span><span class="v">54.0</span></div>
+                  <div class="cell"><span class="lab">+inc</span><span class="v">56.5</span></div>
+                </div>
+              </div>
+              <div class="alt">
+                <div class="alt-head"><span class="r">6 reps</span><span class="raw">raw 56.1</span></div>
+                <div class="c">
+                  <div class="cell"><span class="lab">−inc</span><span class="v">53.5</span></div>
+                  <div class="cell s"><span class="lab">sug</span><span class="v">56.0</span></div>
+                  <div class="cell"><span class="lab">+inc</span><span class="v">58.5</span></div>
+                </div>
+              </div>
+              <div class="alt">
+                <div class="alt-head"><span class="r">8 reps</span><span class="raw">raw 52.2</span></div>
+                <div class="c">
+                  <div class="cell"><span class="lab">−inc</span><span class="v">49.5</span></div>
+                  <div class="cell s"><span class="lab">sug</span><span class="v">52.0</span></div>
+                  <div class="cell"><span class="lab">+inc</span><span class="v">54.5</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="pill easy">All existing fields</span>
+        Every value maps to <code>SetSuggestionDiagnostics</code>. Grouping is the only new thing.
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================ ALL TOGETHER ============================================ -->
+  <h2 class="section">Putting it together · my recommendation</h2>
+  <p class="section-note">Pending strips at the top so the user immediately sees what to lift. Done strips and the "Last top" reference live below — they're useful context but not the headline. Chip is shrunk to a single quiet footer line.</p>
+
+  <div class="row">
+
+    <div class="variant">
+      <header>
+        <h3>Mid-workout template · everything on</h3>
+        <span class="tag">2 done · 2 pending</span>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="count">· 2 ready · 2 logged</span>
+            <span class="spacer"></span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="strip">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body">
+              <div class="line1"><span class="set">Set 3</span> · <span class="w">55 kg</span> <span class="for">for 6–8 reps</span></div>
+              <div class="line2"><span class="meta">Adjusted up after your previous set</span></div>
+            </div>
+            <button class="use">Use</button>
+          </div>
+          <div class="strip">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body">
+              <div class="line1"><span class="set">Set 4</span> · <span class="w">52.5 kg</span> <span class="for">for 6–8 reps</span></div>
+              <div class="line2"><span class="meta">Backing off slightly for fatigue</span></div>
+            </div>
+            <button class="use">Use</button>
+          </div>
+
+          <div class="group-divider">
+            <div class="gl"></div>
+            <div class="lbl">Logged this session</div>
+            <div class="gl"></div>
+          </div>
+
+          <div class="done-strip t1">
+            <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="line"><span class="set">Set 1</span> · <span class="actual">52 kg × 8</span></div>
+            <div class="vs"><span class="match">= suggested</span></div>
+          </div>
+          <div class="done-strip t1">
+            <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="line"><span class="set">Set 2</span> · <span class="actual">55 kg × 7</span></div>
+            <div class="vs"><span class="over">+1 kg vs sug</span></div>
+          </div>
+
+          <div class="last-top-chip">
+            <div class="ico"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg></div>
+            <span class="label">Last top</span>
+            <span class="value"><span class="num">52 kg</span> × 8 · RIR 1</span>
+            <span class="date">8d ago</span>
+          </div>
+
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="pill hero">Recommended combination</span>
+        <ul>
+          <li><b>Pending strips first</b> — what the user needs to lift is the first thing on screen, no scrolling past chrome.</li>
+          <li>Completed sets below the "Logged this session" divider, small with inline suggestion comparison.</li>
+          <li>"Last top" reference as a quiet single-line footer at the bottom — provides the anchor without dominating.</li>
+          <li>Pending strip line 2 uses contextual copy ("Adjusted up", "Backing off"). This requires new copy generation — for v1 use generic "Target RIR 1" or leave blank.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="variant">
+      <header>
+        <h3>Default flow · 1 pending</h3>
+        <span class="tag">pending strip at top, reference as footer</span>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="spacer"></span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="strip">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body">
+              <div class="line1"><span class="set">Set 1</span> · <span class="w">54 kg</span> <span class="for">for 6–8 reps</span></div>
+              <div class="line2"><span class="meta">Slight bump from last workout's peak</span></div>
+            </div>
+            <button class="use">Use</button>
+          </div>
+
+          <div class="last-top-chip">
+            <div class="ico"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg></div>
+            <span class="label">Last top</span>
+            <span class="value"><span class="num">52 kg</span> × 8 · RIR 1</span>
+            <span class="date">8d ago</span>
+          </div>
+
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        Default 1-strip case: pending strip at top, "Last top" reference as a small footer below. No chrome between the section header and what the user needs to lift.
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================ COST ============================================ -->
+  <h2 class="section">What this costs</h2>
+  <div class="notes" style="max-width: 760px;">
+    <p style="margin: 0 0 8px;"><b>Last-top delta line (Variation B)</b></p>
+    <ul>
+      <li><span class="pill tiny">Engine · small</span> Modify <code>peakAcrossRecentWorkouts</code> to also return the source <code>WorkoutSet</code> (or just <code>weight</code>, <code>reps</code>, <code>rir</code>). Currently returns <code>(value, workoutDate)</code> — extend to <code>(value, workoutDate, sourceSet)</code>. ~5 lines.</li>
+      <li><span class="pill tiny">Data model · 1 field</span> Add <code>baselineTopSet: HistoricalSetSnapshot?</code> on <code>WeightSuggestionData</code>, populated in <code>SuggestionExplainer.makeWeightSuggestionData</code>.</li>
+    </ul>
+
+    <p style="margin: 14px 0 8px;"><b>Completed strips · suggestion vs actual</b></p>
+    <ul>
+      <li><span class="pill tiny">VM · small</span> Retain the most recent suggestion when a set transitions pending → completed. A <code>[UUID: SuggestionSnapshot]</code> on <code>ActiveWorkoutViewModel</code>, populated on every weight-suggestion refresh. No persistence — comparison disappears after the workout closes, which is fine.</li>
+      <li><span class="pill easy">SwiftUI</span> Done-strip rendering (Take 1 or Take 2). Group divider between done and pending.</li>
+      <li><span class="pill note">Behavior change</span> Today's card never shows completed sets — this adds them.</li>
+    </ul>
+
+    <p style="margin: 14px 0 8px;"><b>Stale state</b></p>
+    <ul>
+      <li><span class="pill easy">No engine work</span> Toggled by existing <code>data.e1RMSource.isOutsideRecencyWindow</code>.</li>
+      <li><span class="pill tiny">+1 field</span> Surface <code>e1RMSourceWorkoutDate: Date?</code> on <code>WeightSuggestionData</code> for the anchor date in the banner copy.</li>
+      <li><span class="pill easy">SwiftUI</span> Banner above strips, amber rail + amber wand on each strip. Foot description suppressed when banner is shown.</li>
+    </ul>
+
+    <p style="margin: 14px 0 8px;"><b>Admin mode</b></p>
+    <ul>
+      <li><span class="pill easy">No data changes</span> Sub-line = existing <code>SuggestionExplanation.adminSummary</code>. Drawer = existing <code>SetSuggestionDiagnostics</code>, regrouped into 4 labeled groups.</li>
+      <li><span class="pill easy">SwiftUI</span> Admin pill + e1RM meta in section header. Blue rail + monospace strip body. Per-row Details toggle (move <code>@State showDetails</code> from card root to row).</li>
+    </ul>
+
+    <p style="margin: 14px 0 8px;"><b>Deferred to v1.1</b></p>
+    <ul>
+      <li><span class="pill note">Optional</span> Per-row contextual copy ("Backing off for fatigue", "Adjusted up after previous set") is real new copy generation. Data exists in <code>SetSuggestionDiagnostics</code>. For v1 use generic "Target RIR 1" or leave blank.</li>
+    </ul>
+
+    <p style="margin: 12px 0 0;">Total: one small engine helper change, three new optional fields on existing structs, one in-session VM cache, the rest SwiftUI.</p>
+  </div>
+
+</div>
+</body>
+</html>

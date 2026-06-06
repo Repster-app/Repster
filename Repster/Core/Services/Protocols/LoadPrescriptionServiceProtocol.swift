@@ -300,10 +300,32 @@ struct SuggestionSettingsSnapshot: Sendable {
 struct SuggestionEngineInput: Sendable {
     let baseE1RM: Double
     let baseSource: E1RMSource
+    /// Date of the workout the base e1RM is anchored on (nil when not derived
+    /// from a specific workout). Threaded through to `SuggestionDecision` so the
+    /// UI can surface anchor dates without re-querying.
+    let baseSourceWorkoutDate: Date?
     let completedSessionSets: [SessionSetContext]
     let pendingSets: [SuggestionPendingSetInput]
     let settings: SuggestionSettingsSnapshot
     let calibrationAdjustment: SuggestionCalibrationAdjustment
+
+    init(
+        baseE1RM: Double,
+        baseSource: E1RMSource,
+        baseSourceWorkoutDate: Date? = nil,
+        completedSessionSets: [SessionSetContext],
+        pendingSets: [SuggestionPendingSetInput],
+        settings: SuggestionSettingsSnapshot,
+        calibrationAdjustment: SuggestionCalibrationAdjustment
+    ) {
+        self.baseE1RM = baseE1RM
+        self.baseSource = baseSource
+        self.baseSourceWorkoutDate = baseSourceWorkoutDate
+        self.completedSessionSets = completedSessionSets
+        self.pendingSets = pendingSets
+        self.settings = settings
+        self.calibrationAdjustment = calibrationAdjustment
+    }
 }
 
 /// Pure decision output for one pending set.
@@ -323,6 +345,9 @@ struct SuggestionDecision: Sendable {
     let fatigueDiscount: Double
     let freshnessApplied: Bool
     let e1RMSource: E1RMSource
+    /// Date of the workout the base e1RM was sourced from, when available.
+    /// Forwarded from `SuggestionEngineInput.baseSourceWorkoutDate`.
+    let e1RMSourceWorkoutDate: Date?
     let sessionCapabilitySourceLabel: String
     let bestReps: Int?
     let selectionPolicy: SuggestionSelectionPolicy
@@ -404,23 +429,65 @@ struct PrescriptionResult: Sendable {
     let freshnessApplied: Bool
     /// Source of the e1RM estimate.
     let e1RMSource: E1RMSource
+    /// Date of the workout the base e1RM was sourced from, when available.
+    /// Nil for `.noData` or when the source isn't tied to a specific workout.
+    let e1RMSourceWorkoutDate: Date?
     /// When rep range optimization was used, the optimal rep count chosen.
     /// Nil when no range was provided (single target reps).
     let bestReps: Int?
+
+    init(
+        prescribedWeight: Double,
+        rawWeight: Double,
+        weightIncrement: Double,
+        baseE1RM: Double,
+        effectiveE1RM: Double,
+        intensityFactor: Double,
+        fatigueDiscount: Double,
+        freshnessApplied: Bool,
+        e1RMSource: E1RMSource,
+        e1RMSourceWorkoutDate: Date? = nil,
+        bestReps: Int?
+    ) {
+        self.prescribedWeight = prescribedWeight
+        self.rawWeight = rawWeight
+        self.weightIncrement = weightIncrement
+        self.baseE1RM = baseE1RM
+        self.effectiveE1RM = effectiveE1RM
+        self.intensityFactor = intensityFactor
+        self.fatigueDiscount = fatigueDiscount
+        self.freshnessApplied = freshnessApplied
+        self.e1RMSource = e1RMSource
+        self.e1RMSourceWorkoutDate = e1RMSourceWorkoutDate
+        self.bestReps = bestReps
+    }
 }
 
 /// Shared base e1RM estimate result for consumers that need a consistent source/value pair.
 struct BaseE1RMEstimate: Sendable {
     let value: Double?
     let source: E1RMSource
+    /// Date of the workout the estimate is anchored on, when sourced from logged performance.
+    /// Nil for `.noData`. Used by the UI to render "based on workout from X weeks ago" copy
+    /// and to detect stale data even within the `.recentPerformance` window if desired.
+    let sourceWorkoutDate: Date?
+
+    init(value: Double?, source: E1RMSource, sourceWorkoutDate: Date? = nil) {
+        self.value = value
+        self.source = source
+        self.sourceWorkoutDate = sourceWorkoutDate
+    }
 }
 
 /// How the base e1RM was determined.
 enum E1RMSource: Sendable {
-    /// From recent workout history in the recency window (top-performance baseline).
+    /// From recent workout history inside the configured recency window
+    /// (top-performance baseline across the last few workouts).
     case recentPerformance
-    /// From the PR table (PerformanceRecord) — less reliable for current strength.
-    case historicalPR
+    /// From the most recent logged workout, but that workout falls outside the
+    /// configured recency window. Should be surfaced to the user as a lower-confidence
+    /// suggestion (the data is real, just older than they asked for).
+    case staleRecentPerformance
     /// No data available — prescription not possible.
     case noData
 
@@ -428,10 +495,21 @@ enum E1RMSource: Sendable {
         switch self {
         case .recentPerformance:
             return "recent top workouts"
-        case .historicalPR:
-            return "PR history"
+        case .staleRecentPerformance:
+            return "older workout (outside recency window)"
         case .noData:
             return "no data"
+        }
+    }
+
+    /// Whether this source represents data drawn from outside the configured
+    /// recency window. Convenience for UI gating on a single boolean.
+    var isOutsideRecencyWindow: Bool {
+        switch self {
+        case .recentPerformance, .noData:
+            return false
+        case .staleRecentPerformance:
+            return true
         }
     }
 }
@@ -659,6 +737,7 @@ enum SuggestionEngine {
                 fatigueDiscount: readinessState.fatigueDiscount,
                 freshnessApplied: readinessState.freshnessApplied,
                 e1RMSource: input.baseSource,
+                e1RMSourceWorkoutDate: input.baseSourceWorkoutDate,
                 sessionCapabilitySourceLabel: sessionCapabilitySourceLabel,
                 bestReps: bestReps,
                 selectionPolicy: selectionPolicy,
@@ -863,7 +942,11 @@ enum SuggestionEngine {
               set.weight > 0,
               set.reps > 0,
               let actualRIR = set.rir,
-              actualRIR >= 0 else { return nil }
+              actualRIR >= 0,
+              actualRIR < 3 else { return nil }
+        // RIR ≥ 3 sets are weak evidence of true capacity (RIR self-report is unreliable
+        // far from failure and e1RM formulas degrade past ~10 reps to failure), so they
+        // don't move sessionCapabilityE1RM. They still contribute to session fatigue.
 
         let totalReps = max(1, set.reps + Int(actualRIR))
         let observedEffectiveE1RM = formula.calculate(weight: set.weight, reps: totalReps)
@@ -951,7 +1034,9 @@ protocol LoadPrescriptionServiceProtocol: Sendable {
 
     /// Estimate base e1RM capacity baseline for an exercise using the same logic as prescription generation.
     ///
-    /// Uses recent workout history in the recency window, then PR fallback when needed.
+    /// Uses recent workout history in the recency window, then falls back to the most
+    /// recent logged workout of any age (flagged as `.staleRecentPerformance`). Returns
+    /// `.noData` if the exercise has never been logged.
     /// - Parameters:
     ///   - exerciseId: The exercise to estimate for.
     ///   - completedSessionSets: Completed sets from the current session context.

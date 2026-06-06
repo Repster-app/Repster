@@ -2135,6 +2135,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
             fatigueDiscount: fatigueDiscount,
             freshnessApplied: freshnessApplied,
             e1RMSource: .recentPerformance,
+            e1RMSourceWorkoutDate: nil,
             sessionCapabilitySourceLabel: SessionCapabilityPolicy.observed.label,
             bestReps: nil,
             selectionPolicy: selectionPolicy,
@@ -4612,7 +4613,10 @@ final class FatigueModelV2Tests: XCTestCase {
         XCTAssertNil(decision.selectionReferenceE1RM)
     }
 
-    func testHistoricalPRSourceDoesNotUseFirstSetBias() {
+    func testStaleRecentPerformanceSourceDoesNotUseFirstSetBias() {
+        // First-set progression bias should only fire when the base e1RM is from
+        // in-window recent performance. Out-of-window (stale) data is anchored on
+        // an old workout and shouldn't be pushed above the (stale) peak.
         let pendingSet = SuggestionPendingSetInput(
             setId: UUID(),
             setIndex: 0,
@@ -4628,7 +4632,8 @@ final class FatigueModelV2Tests: XCTestCase {
         )
         let input = SuggestionEngineInput(
             baseE1RM: 104,
-            baseSource: .historicalPR,
+            baseSource: .staleRecentPerformance,
+            baseSourceWorkoutDate: Calendar.current.date(byAdding: .weekOfYear, value: -8, to: Date()),
             completedSessionSets: [],
             pendingSets: [pendingSet],
             settings: SuggestionSettingsSnapshot(
@@ -4651,6 +4656,8 @@ final class FatigueModelV2Tests: XCTestCase {
         XCTAssertEqual(decision.bestReps, 9)
         XCTAssertEqual(decision.selectionPolicy, .closestMatch)
         XCTAssertNil(decision.selectionReferenceE1RM)
+        XCTAssertEqual(decision.e1RMSource, .staleRecentPerformance)
+        XCTAssertNotNil(decision.e1RMSourceWorkoutDate)
     }
 
     func testLaterSetsDoNotUseFirstSetBias() {
@@ -4775,7 +4782,7 @@ final class FatigueModelV2Tests: XCTestCase {
 
     // MARK: - Session capability blend
 
-    func testSessionCapabilityBlendRaisesRecommendationAfterEasyTopSet() {
+    func testSessionCapabilityIgnoresHighRIRSets() {
         let pendingSet = SuggestionPendingSetInput(
             setId: UUID(),
             setIndex: 1,
@@ -4819,10 +4826,9 @@ final class FatigueModelV2Tests: XCTestCase {
         )
 
         let decision = try! XCTUnwrap(SuggestionEngine.evaluate(input).first)
-        // With .observed policy, sessionCapability = observed e1RM directly (no blend with prior)
-        // 40kg × (8+4) reps Epley = 40 × (1 + 12/30) = 56.0
-        XCTAssertEqual(decision.sessionCapabilityE1RM, 56.0, accuracy: 0.001)
-        XCTAssertEqual(decision.bestReps, 8)
+        // RIR 4 set is weak capability evidence (gated at RIR ≥ 3), so sessionCapabilityE1RM
+        // stays at the historical baseE1RM of 50.67 instead of moving to the observed 56.0.
+        XCTAssertEqual(decision.sessionCapabilityE1RM, 50.67, accuracy: 0.001)
     }
 
     func testSessionCapabilityBlendLowersRecommendationAfterMissedTopSet() {

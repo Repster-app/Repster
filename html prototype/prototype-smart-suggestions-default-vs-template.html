@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Smart Suggestions — Default vs Template flows</title>
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --bg-card: #15151a;
+    --bg-input: #1d1d24;
+    --bg-hover: #25252e;
+    --stroke: rgba(255,255,255,0.06);
+    --stroke-strong: rgba(255,255,255,0.12);
+    --border: rgba(255,255,255,0.08);
+    --text: #f4f4f6;
+    --text-2: #a1a1aa;
+    --text-3: #6b6b75;
+    --accent: #7c8cff;
+    --accent-soft: rgba(124,140,255,0.10);
+    --accent-stroke: rgba(124,140,255,0.28);
+    --warn: #f5a524;
+    --warn-soft: rgba(245,165,36,0.12);
+    --warn-stroke: rgba(245,165,36,0.32);
+    --success: #34d399;
+    --success-soft: rgba(52,211,153,0.10);
+    --info: #60a5fa;
+    --info-soft: rgba(96,165,250,0.12);
+    --info-stroke: rgba(96,165,250,0.32);
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+  .page { max-width: 1400px; margin: 0 auto; padding: 48px 32px 96px; }
+  .page-head h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .page-head p { color: var(--text-2); max-width: 760px; line-height: 1.55; margin: 0; }
+  .page-head p + p { margin-top: 10px; }
+  .page-head b { color: var(--text); }
+  h2.section { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; margin: 56px 0 4px; }
+  h2.section .sub { font-weight: 500; color: var(--text-3); margin-left: 8px; font-size: 13px; }
+  .section-note { color: var(--text-2); font-size: 13px; max-width: 760px; line-height: 1.55; margin: 0 0 24px; }
+  .row { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; }
+  .variant { display: flex; flex-direction: column; gap: 12px; }
+  .variant > header { padding: 0 4px; }
+  .variant h3 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 2px; }
+  .variant .tag { font-size: 11px; color: var(--text-3); }
+
+  /* Phone */
+  .phone { width: 390px; background: #000; border-radius: 44px; border: 1px solid rgba(255,255,255,0.10); padding: 8px 8px 16px; }
+  .phone .notch { width: 112px; height: 28px; background: #000; border-radius: 999px; margin: 0 auto 8px; }
+  .phone .screen { background: var(--bg); border-radius: 36px; overflow: hidden; padding: 8px 16px 16px; min-height: 200px; }
+  .phone .home-indicator { width: 110px; height: 4px; background: rgba(255,255,255,0.4); border-radius: 999px; margin: 12px auto 0; }
+
+  /* Section header — only chrome above the strip(s). No in-card title anymore. */
+  .sec-head { display: flex; align-items: center; gap: 8px; padding: 0 2px 10px; }
+  .sec-head .lbl { font-size: 11px; font-weight: 600; color: var(--text-3); letter-spacing: 0.8px; text-transform: uppercase; }
+  .sec-head .count { font-size: 11px; font-weight: 500; color: var(--text-3); }
+  .sec-head .admin-pill { font-size: 9px; font-weight: 700; color: var(--info); background: var(--info-soft); border: 1px solid var(--info-stroke); padding: 2px 6px; border-radius: 4px; letter-spacing: 0.06em; text-transform: uppercase; font-family: var(--mono); }
+  .sec-head .admin-meta { font-size: 10px; color: var(--info); font-family: var(--mono); }
+  .sec-head .spacer { flex: 1; }
+  .sec-head .refresh { width: 28px; height: 28px; border-radius: 8px; background: var(--bg-card); display: grid; place-items: center; color: var(--text-2); border: none; cursor: pointer; }
+
+  /* Strip — Take A style by default */
+  .strip {
+    display: grid;
+    grid-template-columns: 30px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 12px;
+    padding: 10px 12px;
+  }
+  .strip + .strip { margin-top: 6px; }
+  .strip .ico { width: 30px; height: 30px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; flex: none; }
+  .strip .ico svg { width: 14px; height: 14px; }
+  .strip .body { min-width: 0; }
+  .strip .line { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .strip .line .set { font-weight: 600; color: var(--text-2); }
+  .strip .line .w { font-weight: 700; color: var(--accent); }
+  .strip .line .for { color: var(--text-3); font-size: 13px; }
+  .strip .line .reps { color: var(--text); font-weight: 500; }
+  .strip .use { background: transparent; border: 1px solid var(--stroke-strong); color: var(--text); padding: 5px 10px; border-radius: 8px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+  /* States */
+  .strip.stale { border-left-color: var(--warn); }
+  .strip.stale .ico { background: var(--warn-soft); color: var(--warn); }
+  .strip.stale .line .w { color: var(--warn); }
+  .strip.admin { border-left-color: var(--info); }
+  .strip.admin .ico { background: var(--info-soft); color: var(--info); }
+  .strip.admin .line .w { color: var(--info); }
+  .strip.admin .line { font-family: var(--mono); font-size: 13px; }
+  .strip.admin .sub { grid-column: 2 / -1; font-family: var(--mono); font-size: 10px; color: var(--text-3); line-height: 1.45; margin-top: 2px; }
+  .strip.admin .det-btn { background: transparent; border: 1px solid var(--stroke-strong); color: var(--text-2); padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; font-family: var(--mono); cursor: pointer; }
+
+  /* Foot description shared at bottom — sits *below* strips, not inside any "card" */
+  .foot {
+    margin-top: 10px;
+    padding: 0 4px;
+    font-size: 11px;
+    color: var(--text-3);
+    line-height: 1.45;
+    display: flex; align-items: flex-start; gap: 6px;
+  }
+  .foot .i { color: var(--text-3); flex: none; margin-top: 1px; }
+
+  /* Stale banner sits inline between section header and the strips */
+  .stale-banner {
+    background: var(--warn-soft);
+    border: 1px solid var(--warn-stroke);
+    border-radius: 10px;
+    padding: 8px 10px;
+    display: flex; align-items: flex-start; gap: 8px;
+    margin-bottom: 8px;
+    color: var(--warn);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .stale-banner .ico { flex: none; margin-top: 1px; }
+  .stale-banner .body { flex: 1; color: var(--text-2); }
+  .stale-banner b { color: var(--warn); font-weight: 600; }
+
+  /* Diagnostics drawer for admin expanded */
+  .diag { margin-top: 6px; padding: 10px; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--stroke); font-family: var(--mono); }
+  .diag .g + .g { margin-top: 10px; }
+  .diag .g-ttl { font-size: 9px; color: var(--info); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 5px; }
+  .diag .kv { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; row-gap: 3px; }
+  .diag .k { display: flex; justify-content: space-between; gap: 6px; font-size: 10px; }
+  .diag .k .lab { color: var(--text-3); }
+  .diag .k .val { color: var(--text); }
+  .diag .k .val.neg { color: var(--warn); }
+  .diag .alt { background: var(--bg-hover); border-radius: 6px; padding: 6px 8px; margin-top: 4px; }
+  .diag .alt .alt-head { display: flex; align-items: center; gap: 6px; font-size: 10px; margin-bottom: 4px; }
+  .diag .alt .alt-head .r { color: var(--text); font-weight: 700; }
+  .diag .alt .alt-head .raw { color: var(--text-3); margin-left: auto; }
+  .diag .alt .alt-head .sel { font-size: 8px; padding: 1px 5px; border-radius: 3px; background: var(--accent-soft); color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; }
+  .diag .alt .c { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+  .diag .alt .c .cell { background: var(--bg-card); border-radius: 4px; padding: 3px 5px; font-size: 9px; display: flex; flex-direction: column; gap: 1px; }
+  .diag .alt .c .cell.s { border: 1px solid var(--accent-stroke); }
+  .diag .alt .c .cell .lab { color: var(--text-3); font-size: 8px; }
+  .diag .alt .c .cell .v { color: var(--text); font-weight: 700; }
+
+  /* Notes */
+  .notes { background: var(--bg-card); border: 1px solid var(--stroke); border-radius: 12px; padding: 12px 14px; font-size: 12px; line-height: 1.55; color: var(--text-2); max-width: 390px; }
+  .notes b { color: var(--text); font-weight: 600; }
+  .notes ul { margin: 4px 0 0; padding-left: 18px; }
+  .notes li { margin: 3px 0; }
+  .notes code { background: var(--bg-input); padding: 1px 5px; border-radius: 3px; font-size: 11px; color: var(--text); font-family: var(--mono); }
+  .notes .pill { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; margin-right: 6px; }
+  .pill.easy { background: rgba(52,211,153,0.14); color: var(--success); }
+  .pill.tiny { background: var(--warn-soft); color: var(--warn); }
+  .pill.note { background: var(--accent-soft); color: var(--accent); }
+  .pill.hero { background: var(--accent-soft); color: var(--accent); }
+
+  .which { display: inline-block; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .which.default-flow { background: var(--accent-soft); color: var(--accent); }
+  .which.template-flow { background: rgba(255,255,255,0.06); color: var(--text-2); }
+  .which.state { background: var(--warn-soft); color: var(--warn); }
+  .which.admin-flow { background: var(--info-soft); color: var(--info); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="page-head">
+    <h1>Default vs template — 1 strip is the hero</h1>
+    <p>Confirmed by reading <code style="background:var(--bg-card);padding:1px 5px;border-radius:3px;font-size:12px;color:var(--text);">ActiveWorkoutViewModel.addSet()</code>: in a non-template workout, sets are added one-by-one as the user goes. So the typical state is <b>0 or 1 pending sets visible</b>. Multiple pending strips only happen when starting from a template with pre-populated sets.</p>
+    <p>That also means the in-card "Smart Suggestions" title that today sits below the section header (which already says the same thing) is even more redundant when there's only one strip below it. <b>This redesign drops the in-card title entirely</b> — the section header is the only label. The wand icon on the strip carries the visual identity.</p>
+  </header>
+
+  <!-- ============================================ DEFAULT FLOW ============================================ -->
+  <h2 class="section">Default flow · single pending set <span class="sub">the common case</span></h2>
+  <p class="section-note">First exercise, first set, no template. Or any time the user is one set ahead of themselves in a non-template workout.</p>
+
+  <div class="row">
+
+    <div class="variant">
+      <header>
+        <span class="which default-flow">Default · common</span>
+        <h3>1 pending suggestion</h3>
+        <span class="tag">section header is the only chrome</span>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="spacer"></span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="strip">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body"><div class="line"><span class="set">Set 1</span> · <span class="w">54 kg</span> <span class="for">for</span> <span class="reps">6–8</span></div></div>
+            <button class="use">Use</button>
+          </div>
+
+          <div class="foot">
+            <span class="i"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+            <span>Based on your recent performance and adjusted for this workout.</span>
+          </div>
+
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="pill hero">This is what users see most</span>
+        Section header, one strip, one foot description. No duplicate title, no container chrome wasted on a one-row card.
+        <ul>
+          <li>Drops the in-card "Smart Suggestions" header that exists today (lines 36–55 of <code>WeightSuggestionCardView.swift</code>).</li>
+          <li>No outer card background — the strip <em>is</em> the visual unit.</li>
+          <li>"Use" button stays for discoverability (the keyboard rail still owns the primary path).</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="variant">
+      <header>
+        <span class="which default-flow">Default · common</span>
+        <h3>After logging Set 1 (no next set yet)</h3>
+        <span class="tag">card hidden until user adds Set 2</span>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head" style="opacity: 0.4;">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="spacer"></span>
+          </div>
+          <div style="padding: 24px 8px; text-align: center; color: var(--text-3); font-size: 11px; font-style: italic; border: 1px dashed var(--stroke); border-radius: 12px;">
+            (module hides itself · <code style="background:none; color: var(--text-3); font-size: 11px;">rowStates.isEmpty</code>)
+          </div>
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="pill easy">Already correct</span>
+        Today's <code>WeightSuggestionModuleView</code> already hides when there are no pending row states. Just noting it here so the full flow is visible — user logs Set 1, suggestion vanishes, reappears when they tap "Add set".
+      </div>
+    </div>
+
+    <div class="variant">
+      <header>
+        <span class="which default-flow">Default</span>
+        <h3>Set 2 added · new suggestion</h3>
+        <span class="tag">after tapping "Add set"</span>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="spacer"></span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="strip">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body"><div class="line"><span class="set">Set 2</span> · <span class="w">54 kg</span> <span class="for">for</span> <span class="reps">6–8</span></div></div>
+            <button class="use">Use</button>
+          </div>
+
+          <div class="foot">
+            <span class="i"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+            <span>Based on your recent performance and adjusted for this workout.</span>
+          </div>
+
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="pill easy">No new code</span>
+        Same shape as the first strip, just for Set 2. The cache invalidates on <code>addSet()</code> (line 566 in <code>ActiveWorkoutViewModel</code> already does this), so the new suggestion appears as soon as the row is added.
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================ TEMPLATE FLOW ============================================ -->
+  <h2 class="section">Template flow · multiple pending sets <span class="sub">the less-common case</span></h2>
+  <p class="section-note">Workout started from a template, all sets pre-populated. Same strip shape — just more of them. Foot description stays one-time at the bottom.</p>
+
+  <div class="row">
+
+    <div class="variant">
+      <header>
+        <span class="which template-flow">Template</span>
+        <h3>4 pending sets · start of exercise</h3>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="count">· 4 ready</span>
+            <span class="spacer"></span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="strip">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body"><div class="line"><span class="set">Set 1</span> · <span class="w">52 kg</span> <span class="for">for</span> <span class="reps">6–8</span></div></div>
+            <button class="use">Use</button>
+          </div>
+          <div class="strip">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body"><div class="line"><span class="set">Set 2</span> · <span class="w">54 kg</span> <span class="for">for</span> <span class="reps">6–8</span></div></div>
+            <button class="use">Use</button>
+          </div>
+          <div class="strip">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body"><div class="line"><span class="set">Set 3</span> · <span class="w">54 kg</span> <span class="for">for</span> <span class="reps">6–8</span></div></div>
+            <button class="use">Use</button>
+          </div>
+          <div class="strip">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body"><div class="line"><span class="set">Set 4</span> · <span class="w">52.5 kg</span> <span class="for">for</span> <span class="reps">6–8</span></div></div>
+            <button class="use">Use</button>
+          </div>
+
+          <div class="foot">
+            <span class="i"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+            <span>Based on your recent performance and adjusted for this workout.</span>
+          </div>
+
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="pill easy">Same code path</span>
+        Same renderer, just iterating over <code>data.rowStates</code>. Count moves into the section header now that the in-card title is gone — the "4 ready" sits as a quiet trailing fragment after "SMART SUGGESTIONS".
+      </div>
+    </div>
+
+    <div class="variant">
+      <header>
+        <span class="which template-flow">Template · mid-workout</span>
+        <h3>2 of 4 done · 2 still pending</h3>
+        <span class="tag">done sets stay in the set table, not here</span>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="count">· 2 ready</span>
+            <span class="spacer"></span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="strip">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body"><div class="line"><span class="set">Set 3</span> · <span class="w">54 kg</span> <span class="for">for</span> <span class="reps">6–8</span></div></div>
+            <button class="use">Use</button>
+          </div>
+          <div class="strip">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body"><div class="line"><span class="set">Set 4</span> · <span class="w">52.5 kg</span> <span class="for">for</span> <span class="reps">6–8</span></div></div>
+            <button class="use">Use</button>
+          </div>
+
+          <div class="foot">
+            <span class="i"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+            <span>Based on your recent performance and adjusted for this workout.</span>
+          </div>
+
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="pill easy">Matches current behavior</span>
+        Today's code already filters out completed sets from suggestions — done sets only appear in the set table below. We <em>don't</em> show "Set 1 ✓" / "Set 2 ✓" entries inside this module. That avoids overlap with the set table and keeps the module focused on "what's next".
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================ STALE — IN DEFAULT FLOW ============================================ -->
+  <h2 class="section">Stale state · in the default 1-strip flow</h2>
+  <p class="section-note">Stale almost always appears in the 1-strip case in practice (you just opened the app, no recent baseline). Banner above, amber rail + wand on the strip, foot description suppressed (banner replaces it).</p>
+
+  <div class="row">
+
+    <div class="variant">
+      <header>
+        <span class="which state">Stale · default</span>
+        <h3>1 strip · stale baseline</h3>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="spacer"></span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="stale-banner">
+            <div class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            <div class="body">Based on a workout from <b>Mar 1</b> — outside your recency window. Estimate may be optimistic.</div>
+          </div>
+
+          <div class="strip stale">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body"><div class="line"><span class="set">Set 1</span> · <span class="w">54 kg</span> <span class="for">for</span> <span class="reps">6–8</span></div></div>
+            <button class="use">Use</button>
+          </div>
+
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="pill easy">Toggled by existing field</span>
+        Banner driven by <code>data.e1RMSource.isOutsideRecencyWindow</code>. Date needs one new top-level field (<code>e1RMSourceWorkoutDate</code> mirrored onto <code>WeightSuggestionData</code>).
+      </div>
+    </div>
+
+    <div class="variant">
+      <header>
+        <span class="which state">Stale · template</span>
+        <h3>4 strips · stale baseline</h3>
+        <span class="tag">banner doesn't repeat per row</span>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="count">· 4 ready</span>
+            <span class="spacer"></span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="stale-banner">
+            <div class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            <div class="body">Based on a workout from <b>Mar 1</b> — outside your recency window. Estimate may be optimistic.</div>
+          </div>
+
+          <div class="strip stale">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body"><div class="line"><span class="set">Set 1</span> · <span class="w">52 kg</span> <span class="for">for</span> <span class="reps">6–8</span></div></div>
+            <button class="use">Use</button>
+          </div>
+          <div class="strip stale">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body"><div class="line"><span class="set">Set 2</span> · <span class="w">54 kg</span> <span class="for">for</span> <span class="reps">6–8</span></div></div>
+            <button class="use">Use</button>
+          </div>
+          <div class="strip stale">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body"><div class="line"><span class="set">Set 3</span> · <span class="w">54 kg</span> <span class="for">for</span> <span class="reps">6–8</span></div></div>
+            <button class="use">Use</button>
+          </div>
+          <div class="strip stale">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.8 4.6L18 8l-3.6 3 1 4.6L12 13.6 8.6 15.6l1-4.6L6 8l4.2-1.4z"/></svg></div>
+            <div class="body"><div class="line"><span class="set">Set 4</span> · <span class="w">52.5 kg</span> <span class="for">for</span> <span class="reps">6–8</span></div></div>
+            <button class="use">Use</button>
+          </div>
+
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="pill easy">Same scaling</span>
+        Banner once at top, all strips share the amber treatment. Anchor date is per-exercise, not per-set, so a single banner is the honest representation.
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================ ADMIN — IN DEFAULT FLOW ============================================ -->
+  <h2 class="section">Admin mode · in the default 1-strip flow</h2>
+  <p class="section-note">Admin pill and e1RM meta sit in the section header. The strip carries the mono treatment + admin sub-line. Per-strip Details toggle expands the structured diagnostics drawer.</p>
+
+  <div class="row">
+
+    <div class="variant">
+      <header>
+        <span class="which admin-flow">Admin · default</span>
+        <h3>1 strip · collapsed</h3>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="admin-pill">Admin</span>
+            <span class="spacer"></span>
+            <span class="admin-meta">e1RM 64.2 · epley</span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="strip admin">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
+            <div class="body"><div class="line"><span class="set">Set 1</span>: <span class="w">54.0 kg</span> <span class="for">× 6–8 @ RIR 1</span></div></div>
+            <button class="det-btn">▾</button>
+            <div class="sub">readiness +0.0% · target: template · cap: recent peak</div>
+          </div>
+
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="pill easy">No data changes</span>
+        Sub-line is <code>SuggestionExplanation.adminSummary</code>. Admin pill + meta = visual only. No more global Details toggle — moves to per-row.
+      </div>
+    </div>
+
+    <div class="variant">
+      <header>
+        <span class="which admin-flow">Admin · default</span>
+        <h3>1 strip · expanded</h3>
+      </header>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="sec-head">
+            <span class="lbl">Smart Suggestions</span>
+            <span class="admin-pill">Admin</span>
+            <span class="spacer"></span>
+            <span class="admin-meta">e1RM 64.2 · epley</span>
+            <button class="refresh">↻</button>
+          </div>
+
+          <div class="strip admin">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
+            <div class="body"><div class="line"><span class="set">Set 1</span>: <span class="w">54.0 kg</span> <span class="for">× 6–8 @ RIR 1</span></div></div>
+            <button class="det-btn">▴</button>
+            <div class="sub">readiness +0.0% · target: template · cap: recent peak</div>
+
+            <div class="diag" style="grid-column: 1 / -1;">
+              <div class="g">
+                <div class="g-ttl">e1RM &amp; readiness</div>
+                <div class="kv">
+                  <div class="k"><span class="lab">historical</span><span class="val">64.2 kg</span></div>
+                  <div class="k"><span class="lab">session cap</span><span class="val">64.2 kg</span></div>
+                  <div class="k"><span class="lab">effective</span><span class="val">64.2 kg</span></div>
+                  <div class="k"><span class="lab">readiness</span><span class="val">+0.0%</span></div>
+                  <div class="k"><span class="lab">cap source</span><span class="val">recent peak</span></div>
+                  <div class="k"><span class="lab">baseline</span><span class="val">recent</span></div>
+                </div>
+              </div>
+              <div class="g">
+                <div class="g-ttl">Fatigue &amp; calibration</div>
+                <div class="kv">
+                  <div class="k"><span class="lab">discount</span><span class="val">1.000</span></div>
+                  <div class="k"><span class="lab">projected</span><span class="val">0.000</span></div>
+                  <div class="k"><span class="lab">freshness</span><span class="val">no</span></div>
+                  <div class="k"><span class="lab">type mult</span><span class="val">1.0×</span></div>
+                  <div class="k"><span class="lab">rest</span><span class="val">150s</span></div>
+                  <div class="k"><span class="lab">calibration</span><span class="val">none</span></div>
+                </div>
+              </div>
+              <div class="g">
+                <div class="g-ttl">Target &amp; rounding</div>
+                <div class="kv">
+                  <div class="k"><span class="lab">display</span><span class="val">6–8</span></div>
+                  <div class="k"><span class="lab">chosen</span><span class="val">7</span></div>
+                  <div class="k"><span class="lab">target src</span><span class="val">template</span></div>
+                  <div class="k"><span class="lab">RIR src</span><span class="val">explicit</span></div>
+                  <div class="k"><span class="lab">intensity</span><span class="val">0.842</span></div>
+                  <div class="k"><span class="lab">raw → rnd</span><span class="val">54.06 → 54.0</span></div>
+                </div>
+              </div>
+              <div class="g">
+                <div class="g-ttl">Alternatives (6–8)</div>
+                <div class="alt">
+                  <div class="alt-head"><span class="r">7 reps</span><span class="sel">selected</span><span class="raw">raw 54.1</span></div>
+                  <div class="c">
+                    <div class="cell"><span class="lab">−inc</span><span class="v">51.5</span></div>
+                    <div class="cell s"><span class="lab">sug ✓</span><span class="v">54.0</span></div>
+                    <div class="cell"><span class="lab">+inc</span><span class="v">56.5</span></div>
+                  </div>
+                </div>
+                <div class="alt">
+                  <div class="alt-head"><span class="r">6 reps</span><span class="raw">raw 56.1</span></div>
+                  <div class="c">
+                    <div class="cell"><span class="lab">−inc</span><span class="v">53.5</span></div>
+                    <div class="cell s"><span class="lab">sug</span><span class="v">56.0</span></div>
+                    <div class="cell"><span class="lab">+inc</span><span class="v">58.5</span></div>
+                  </div>
+                </div>
+                <div class="alt">
+                  <div class="alt-head"><span class="r">8 reps</span><span class="raw">raw 52.2</span></div>
+                  <div class="c">
+                    <div class="cell"><span class="lab">−inc</span><span class="v">49.5</span></div>
+                    <div class="cell s"><span class="lab">sug</span><span class="v">52.0</span></div>
+                    <div class="cell"><span class="lab">+inc</span><span class="v">54.5</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <div class="notes">
+        <span class="pill easy">All existing fields</span>
+        Drawer values all come from <code>SetSuggestionDiagnostics</code>. Per-row toggle means in a template you can expand just the one row you care about, not all 4 at once.
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================ summary ============================================ -->
+  <h2 class="section">Summary of what changes</h2>
+  <div class="notes" style="max-width: 760px;">
+    <ul>
+      <li><span class="pill easy">SwiftUI</span> Drop the in-card "Smart Suggestions" header — section header alone is enough. Visible impact: tighter look, no double titling.</li>
+      <li><span class="pill easy">SwiftUI</span> No outer card container — strips <em>are</em> the visual unit (matches the "lives between sets" Take A philosophy). Default flow is one strip + foot description; that's the minimum chrome possible.</li>
+      <li><span class="pill easy">SwiftUI</span> Count ("4 ready") moves into the section header as a quiet trailing fragment.</li>
+      <li><span class="pill easy">SwiftUI</span> Admin pill + e1RM meta also live in the section header instead of in the card.</li>
+      <li><span class="pill tiny">+1 field</span> Surface <code>e1RMSourceWorkoutDate</code> on <code>WeightSuggestionData</code> for the stale banner copy.</li>
+      <li><span class="pill easy">SwiftUI</span> Per-row Details toggle (move <code>@State showDetails</code> from card root to row body).</li>
+      <li><span class="pill note">Decide</span> Keep the "Use" button on strips, or drop it (keyboard rail owns the action either way).</li>
+    </ul>
+    <p style="margin: 10px 0 0;">No engine changes. The shape scales gracefully from 1 strip (default) to N strips (template) without different rendering paths.</p>
+  </div>
+
+</div>
+</body>
+</html>
