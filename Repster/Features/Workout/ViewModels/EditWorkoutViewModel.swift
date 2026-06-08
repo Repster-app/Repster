@@ -180,7 +180,10 @@ final class EditWorkoutViewModel {
                 previousContribution: previousContribution
             )
             set.effectiveWeight = result.effectiveWeight
-            set.prStatus = result.prResult.newStatus
+            // Don't assign result.prResult.newStatus here — when the uncompleted
+            // set owned the PR, handleDeletion → findNewPROwner returns the new
+            // winner's setId/status, not this set's. SetService.uncomplete already
+            // cleared set.prStatus = nil on the same @Model reference.
             applyAffectedSets(result.prResult.affectedSetIds)
 
             // Reassign array to trigger @Observable update

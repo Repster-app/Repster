@@ -66,6 +66,23 @@ extension Color {
     /// Red at 8% opacity — Destructive action background
     static let dangerSoft = danger.opacity(0.08)
 
+    /// #60A5FA — Admin-mode rail / pill / monospace meta. Distinct from the
+    /// indigo accent so admin mode reads as a different mode at a glance.
+    static let info = Color(red: 0.376, green: 0.647, blue: 0.980)
+
+    /// Info at 12% opacity — Admin pill background, admin icon tile
+    static let infoSoft = info.opacity(0.12)
+
+    /// #94A3B8 — Stale / archival / lower-confidence states.
+    /// Used by the Smart Suggestions stale banner + rail when the baseline
+    /// e1RM comes from outside the recency window. Deliberately calm (not
+    /// warning amber) — the data is still valid, just older than the user's
+    /// configured window.
+    static let stale = Color(red: 0.580, green: 0.639, blue: 0.722)
+
+    /// Slate at 10% opacity — Stale banner background, stale icon tile
+    static let staleSoft = stale.opacity(0.10)
+
     // MARK: - RIR Intensity Colors (red = hard → green = easy)
 
     /// #E89B3E — Warning / note indicators

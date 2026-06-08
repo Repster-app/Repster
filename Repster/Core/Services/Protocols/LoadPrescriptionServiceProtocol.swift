@@ -304,6 +304,9 @@ struct SuggestionEngineInput: Sendable {
     /// from a specific workout). Threaded through to `SuggestionDecision` so the
     /// UI can surface anchor dates without re-querying.
     let baseSourceWorkoutDate: Date?
+    /// The actual top set behind `baseE1RM`. Threaded through to
+    /// `SuggestionDecision` so the UI can render the "last top" reference.
+    let baseSourceTopSet: HistoricalSetSnapshot?
     let completedSessionSets: [SessionSetContext]
     let pendingSets: [SuggestionPendingSetInput]
     let settings: SuggestionSettingsSnapshot
@@ -313,6 +316,7 @@ struct SuggestionEngineInput: Sendable {
         baseE1RM: Double,
         baseSource: E1RMSource,
         baseSourceWorkoutDate: Date? = nil,
+        baseSourceTopSet: HistoricalSetSnapshot? = nil,
         completedSessionSets: [SessionSetContext],
         pendingSets: [SuggestionPendingSetInput],
         settings: SuggestionSettingsSnapshot,
@@ -321,6 +325,7 @@ struct SuggestionEngineInput: Sendable {
         self.baseE1RM = baseE1RM
         self.baseSource = baseSource
         self.baseSourceWorkoutDate = baseSourceWorkoutDate
+        self.baseSourceTopSet = baseSourceTopSet
         self.completedSessionSets = completedSessionSets
         self.pendingSets = pendingSets
         self.settings = settings
@@ -348,6 +353,9 @@ struct SuggestionDecision: Sendable {
     /// Date of the workout the base e1RM was sourced from, when available.
     /// Forwarded from `SuggestionEngineInput.baseSourceWorkoutDate`.
     let e1RMSourceWorkoutDate: Date?
+    /// The actual top set behind the baseline e1RM, when available.
+    /// Forwarded from `SuggestionEngineInput.baseSourceTopSet`.
+    let e1RMSourceTopSet: HistoricalSetSnapshot?
     let sessionCapabilitySourceLabel: String
     let bestReps: Int?
     let selectionPolicy: SuggestionSelectionPolicy
@@ -463,6 +471,16 @@ struct PrescriptionResult: Sendable {
     }
 }
 
+/// Snapshot of a logged set from history, used as a UI-facing reference
+/// (e.g. "last top set: 52 kg × 8 · RIR 1"). The snapshot is the actual
+/// set behind the baseline e1RM — see `LoadPrescriptionService.peakAcrossRecentWorkouts`.
+struct HistoricalSetSnapshot: Sendable, Equatable {
+    let weight: Double
+    let reps: Int
+    let rir: Double?
+    let date: Date
+}
+
 /// Shared base e1RM estimate result for consumers that need a consistent source/value pair.
 struct BaseE1RMEstimate: Sendable {
     let value: Double?
@@ -471,11 +489,21 @@ struct BaseE1RMEstimate: Sendable {
     /// Nil for `.noData`. Used by the UI to render "based on workout from X weeks ago" copy
     /// and to detect stale data even within the `.recentPerformance` window if desired.
     let sourceWorkoutDate: Date?
+    /// The actual top set (highest implied e1RM) behind this baseline.
+    /// Nil for `.noData` or when no eligible source set could be identified.
+    /// Used by the UI to render "last top: 52 kg × 8 · RIR 1" footer chip.
+    let topSet: HistoricalSetSnapshot?
 
-    init(value: Double?, source: E1RMSource, sourceWorkoutDate: Date? = nil) {
+    init(
+        value: Double?,
+        source: E1RMSource,
+        sourceWorkoutDate: Date? = nil,
+        topSet: HistoricalSetSnapshot? = nil
+    ) {
         self.value = value
         self.source = source
         self.sourceWorkoutDate = sourceWorkoutDate
+        self.topSet = topSet
     }
 }
 
@@ -738,6 +766,7 @@ enum SuggestionEngine {
                 freshnessApplied: readinessState.freshnessApplied,
                 e1RMSource: input.baseSource,
                 e1RMSourceWorkoutDate: input.baseSourceWorkoutDate,
+                e1RMSourceTopSet: input.baseSourceTopSet,
                 sessionCapabilitySourceLabel: sessionCapabilitySourceLabel,
                 bestReps: bestReps,
                 selectionPolicy: selectionPolicy,

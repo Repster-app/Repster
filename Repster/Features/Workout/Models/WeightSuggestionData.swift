@@ -155,6 +155,36 @@ enum SuggestionAvailability: Sendable {
     case unavailable(SuggestionUnavailableReason)
 }
 
+/// Snapshot of what was suggested for a set at the moment it was logged.
+/// Captured in `ActiveWorkoutViewModel.completeSet` before the set transitions
+/// from pending → completed. Used by the done strip to render
+/// "= suggested" / "+1 kg vs sug" comparisons after the fact.
+///
+/// Nil-tolerant: a set logged before the snapshot path existed (or completed
+/// while no suggestion was available) won't have one.
+struct SuggestionSnapshot: Sendable, Equatable {
+    let suggestedWeight: Double
+    let targetReps: Int
+    let targetRepMin: Int?
+    let targetRepMax: Int?
+    let targetDisplayLabel: String
+    let targetRIR: Double
+}
+
+/// A completed working set that should appear in the "Logged this session"
+/// section of the suggestion module, alongside any suggestion snapshot
+/// captured when the user logged it.
+struct CompletedSetSnapshot: Identifiable, Sendable, Equatable {
+    let setId: UUID
+    let setNumber: Int
+    let weight: Double
+    let reps: Int
+    let rir: Double?
+    let suggestion: SuggestionSnapshot?
+
+    var id: UUID { setId }
+}
+
 /// Container for all weight suggestions for the current exercise.
 struct WeightSuggestionData: Sendable {
     /// Ordered row-level state for each pending non-warmup set.
@@ -163,6 +193,18 @@ struct WeightSuggestionData: Sendable {
     let baseE1RM: Double?
     /// Source of the e1RM estimate.
     let e1RMSource: E1RMSource
+    /// Date of the workout the base e1RM is anchored on (nil when not derived
+    /// from a specific workout). Used by the stale banner copy.
+    let e1RMSourceWorkoutDate: Date?
+    /// The actual top set behind the baseline e1RM, when available. Surfaced
+    /// in the "last top" footer chip ("52 kg × 8 · RIR 1 · 8d ago").
+    let baselineTopSet: HistoricalSetSnapshot?
+    /// Working sets completed in the current session for this exercise, in
+    /// workout order. Surfaced as compact done strips above the pending strips
+    /// in the redesigned module. Each entry optionally carries the suggestion
+    /// snapshot captured when the user logged the set, used to render
+    /// "= suggested" / "+1 kg vs sug" inline comparisons.
+    let completedInSessionSets: [CompletedSetSnapshot]
     /// Whether the module is available or unavailable for a typed reason.
     let availability: SuggestionAvailability
 
@@ -192,9 +234,30 @@ struct WeightSuggestionData: Sendable {
 struct SuggestionPreparation: Sendable {
     let cacheKey: String
     let completedSessionSets: [SessionSetContext]
+    /// Completed working sets for the current exercise in workout order,
+    /// surfaced to the UI as compact done strips in the suggestions module.
+    /// Suggestion snapshots (what was suggested at log time) are joined in
+    /// `SuggestionExplainer.makeWeightSuggestionData` from a VM-owned cache.
+    let completedWorkingSetSnapshots: [CompletedSetSnapshot]
     let setResolutions: [SuggestionSetResolution]
     let pendingSets: [SuggestionPendingSetInput]
     let unavailableReason: SuggestionUnavailableReason?
+
+    init(
+        cacheKey: String,
+        completedSessionSets: [SessionSetContext],
+        completedWorkingSetSnapshots: [CompletedSetSnapshot] = [],
+        setResolutions: [SuggestionSetResolution],
+        pendingSets: [SuggestionPendingSetInput],
+        unavailableReason: SuggestionUnavailableReason?
+    ) {
+        self.cacheKey = cacheKey
+        self.completedSessionSets = completedSessionSets
+        self.completedWorkingSetSnapshots = completedWorkingSetSnapshots
+        self.setResolutions = setResolutions
+        self.pendingSets = pendingSets
+        self.unavailableReason = unavailableReason
+    }
 }
 
 /// App-model gathering and cache-key helpers for Smart Suggestions.
@@ -206,7 +269,9 @@ enum SuggestionCoordinator {
         profile: HealthProfile?
     ) -> SuggestionPreparation {
         let completedSessionSets = completedSessionSets(from: sets)
-        let setResolutions = resolvePendingSets(from: sets, exercise: exercise, profile: profile)
+        let resolved = resolveWorkingSets(from: sets, exercise: exercise, profile: profile)
+        let setResolutions = resolved.pending
+        let completedWorkingSetSnapshots = resolved.completed
         let pendingSets = setResolutions.compactMap(pendingSetInput(from:))
 
         let unavailableReason: SuggestionUnavailableReason?
@@ -234,6 +299,7 @@ enum SuggestionCoordinator {
                 unavailableReason: unavailableReason
             ),
             completedSessionSets: completedSessionSets,
+            completedWorkingSetSnapshots: completedWorkingSetSnapshots,
             setResolutions: setResolutions,
             pendingSets: pendingSets,
             unavailableReason: unavailableReason
@@ -260,20 +326,41 @@ enum SuggestionCoordinator {
         exercise.trackingType == .weightReps || exercise.trackingType == .weightRepsDuration
     }
 
-    private static func resolvePendingSets(
+    /// Single-pass walk over working sets producing both:
+    /// - `pending`: resolutions for incomplete working sets (engine input)
+    /// - `completed`: snapshots for completed working sets (UI done strips),
+    ///   with `suggestion = nil`; the explainer joins the suggestion snapshot
+    ///   later from the VM-owned cache.
+    /// Set numbering increments across both buckets so display numbers stay
+    /// stable when a set transitions completed → pending or vice versa.
+    private static func resolveWorkingSets(
         from sets: [WorkoutSet],
         exercise: Exercise?,
         profile: HealthProfile?
-    ) -> [SuggestionSetResolution] {
-        var resolutions: [SuggestionSetResolution] = []
+    ) -> (pending: [SuggestionSetResolution], completed: [CompletedSetSnapshot]) {
+        var pending: [SuggestionSetResolution] = []
+        var completed: [CompletedSetSnapshot] = []
         var workingSetNumber = 0
 
         for (index, set) in sets.enumerated() {
             guard set.setType != .warmup else { continue }
             workingSetNumber += 1
-            guard !set.completed else { continue }
 
-            resolutions.append(
+            if set.completed {
+                completed.append(
+                    CompletedSetSnapshot(
+                        setId: set.id,
+                        setNumber: workingSetNumber,
+                        weight: set.effectiveWeight ?? set.weight ?? 0,
+                        reps: set.prReps,
+                        rir: set.performanceRIR,
+                        suggestion: nil
+                    )
+                )
+                continue
+            }
+
+            pending.append(
                 SuggestionSetResolution(
                     setId: set.id,
                     setIndex: index,
@@ -284,7 +371,7 @@ enum SuggestionCoordinator {
             )
         }
 
-        return resolutions
+        return (pending, completed)
     }
 
     private static func resolveTarget(
@@ -572,7 +659,8 @@ enum SuggestionExplainer {
     static func makeWeightSuggestionData(
         preparation: SuggestionPreparation,
         evaluation: SuggestionEvaluation,
-        unitPreference: UnitPreference
+        unitPreference: UnitPreference,
+        suggestionSnapshots: [UUID: SuggestionSnapshot] = [:]
     ) -> WeightSuggestionData {
         let formula = evaluation.input?.settings.formula ?? .epley
         let configuredRestSeconds = evaluation.input?.settings.restTimerSeconds ?? 150.0
@@ -585,6 +673,19 @@ enum SuggestionExplainer {
                 formula: formula,
                 configuredRestSeconds: configuredRestSeconds,
                 unitPreference: unitPreference
+            )
+        }
+
+        // Join the per-set suggestion snapshot (captured by the VM at log time)
+        // onto each completed snapshot from the preparation pass.
+        let completedInSessionSets = preparation.completedWorkingSetSnapshots.map { snapshot in
+            CompletedSetSnapshot(
+                setId: snapshot.setId,
+                setNumber: snapshot.setNumber,
+                weight: snapshot.weight,
+                reps: snapshot.reps,
+                rir: snapshot.rir,
+                suggestion: suggestionSnapshots[snapshot.setId]
             )
         }
 
@@ -604,6 +705,11 @@ enum SuggestionExplainer {
             rowStates: rowStates,
             baseE1RM: evaluation.decisions.first?.baseE1RM ?? evaluation.input?.baseE1RM,
             e1RMSource: evaluation.decisions.first?.e1RMSource ?? evaluation.input?.baseSource ?? .noData,
+            e1RMSourceWorkoutDate: evaluation.decisions.first?.e1RMSourceWorkoutDate
+                ?? evaluation.input?.baseSourceWorkoutDate,
+            baselineTopSet: evaluation.decisions.first?.e1RMSourceTopSet
+                ?? evaluation.input?.baseSourceTopSet,
+            completedInSessionSets: completedInSessionSets,
             availability: availability
         )
     }

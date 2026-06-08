@@ -2136,6 +2136,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
             freshnessApplied: freshnessApplied,
             e1RMSource: .recentPerformance,
             e1RMSourceWorkoutDate: nil,
+            e1RMSourceTopSet: nil,
             sessionCapabilitySourceLabel: SessionCapabilityPolicy.observed.label,
             bestReps: nil,
             selectionPolicy: selectionPolicy,

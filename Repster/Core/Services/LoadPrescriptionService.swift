@@ -110,6 +110,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
             baseE1RM: baseE1RM,
             baseSource: baseEstimate.source,
             baseSourceWorkoutDate: baseEstimate.sourceWorkoutDate,
+            baseSourceTopSet: baseEstimate.topSet,
             completedSessionSets: completedSessionSets,
             pendingSets: pendingSets,
             settings: SuggestionSettingsSnapshot(
@@ -236,7 +237,8 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
             return BaseE1RMEstimate(
                 value: inWindow.value,
                 source: .recentPerformance,
-                sourceWorkoutDate: inWindow.workoutDate
+                sourceWorkoutDate: inWindow.workoutDate,
+                topSet: inWindow.topSet
             )
         }
 
@@ -260,12 +262,13 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
             return BaseE1RMEstimate(
                 value: mostRecent.value,
                 source: .staleRecentPerformance,
-                sourceWorkoutDate: mostRecent.workoutDate
+                sourceWorkoutDate: mostRecent.workoutDate,
+                topSet: mostRecent.topSet
             )
         }
 
         // --- Tier 3: no logged sets ever ---
-        return BaseE1RMEstimate(value: nil, source: .noData, sourceWorkoutDate: nil)
+        return BaseE1RMEstimate(value: nil, source: .noData, sourceWorkoutDate: nil, topSet: nil)
     }
 
     /// Whether a set is eligible to contribute to the capacity baseline:
@@ -285,21 +288,30 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
     private func peakAcrossRecentWorkouts(
         _ eligibleSets: [WorkoutSet],
         limit: Int
-    ) -> (value: Double, workoutDate: Date)? {
+    ) -> (value: Double, workoutDate: Date, topSet: HistoricalSetSnapshot)? {
         guard !eligibleSets.isEmpty, limit > 0 else { return nil }
 
         let workouts = Dictionary(grouping: eligibleSets, by: \.workoutId)
-            .compactMap { (_, sets) -> (date: Date, value: Double)? in
+            .compactMap { (_, sets) -> (date: Date, value: Double, topSet: HistoricalSetSnapshot)? in
                 guard let workoutDate = sets.map(\.date).max() else { return nil }
-                let workoutBest = sets.compactMap(\.e1RM).max() ?? 0
-                guard workoutBest > 0 else { return nil }
-                return (date: workoutDate, value: workoutBest)
+                // Find the actual set with the highest e1RM in this workout — this
+                // is the set the UI surfaces as the "last top set" reference.
+                guard let topSet = sets.max(by: { ($0.e1RM ?? 0) < ($1.e1RM ?? 0) }),
+                      let topE1RM = topSet.e1RM,
+                      topE1RM > 0 else { return nil }
+                let snapshot = HistoricalSetSnapshot(
+                    weight: topSet.effectiveWeight ?? topSet.weight ?? 0,
+                    reps: topSet.prReps,
+                    rir: topSet.performanceRIR,
+                    date: workoutDate
+                )
+                return (date: workoutDate, value: topE1RM, topSet: snapshot)
             }
             .sorted { $0.date > $1.date }
 
         let candidates = Array(workouts.prefix(limit))
         guard let winner = candidates.max(by: { $0.value < $1.value }) else { return nil }
-        return (value: winner.value, workoutDate: winner.date)
+        return (value: winner.value, workoutDate: winner.date, topSet: winner.topSet)
     }
 
     private func excludedWorkoutIds(

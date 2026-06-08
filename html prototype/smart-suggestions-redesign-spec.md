@@ -232,38 +232,38 @@ All three are non-breaking optionals on existing structs.
 
 ---
 
-## 5 · Open decisions
+## 5 · Resolved decisions
 
-These haven't been locked yet — flagged for a call before we cut the
-implementation ticket.
+All five settled. Build to these.
 
 1. **`Use` button on pending strips: keep or drop?**
    The keyboard action rail already applies the suggestion when the weight
    field is focused, so the in-card button is redundant by action — but it
    *is* the visible affordance that tells users the card is interactive at
-   all. Default recommendation: **keep**, on the grounds of discoverability.
+   all. ✓ **Locked: Keep.** Discoverability wins over the small redundancy.
 
 2. **Per-row vs global Details toggle in admin mode.**
    Today it's global. Per-row makes diff'ing two rows easier and stops a
-   single tap from exploding the entire card. Default recommendation:
-   **per-row** (C8 above).
+   single tap from exploding the entire card. ✓ **Locked: Per-strip**
+   (C8 above). Move `@State showDetails` from card root to row body.
 
-3. **Stale state — banner copy.**
-   Current: *"Based on a workout from Mar 1 — outside your recency window.
-   Estimate may be optimistic."* Anchor date format ("Mar 1" vs "Mar 1,
-   2026" vs "13w ago"): final call.
+3. **Stale state — banner anchor-date format.**
+   Choosing between an absolute date, a relative phrase, or both. ✓
+   **Locked: Absolute short — "Mar 1".** Year implicit. Final banner copy:
+   *"Based on a workout from **Mar 1** — outside your recency window.
+   Estimate may be optimistic."*
 
-4. **Done strip cap.**
-   In a long template (10+ sets), do done strips stack indefinitely, scroll
-   internally, or collapse to a count? Default recommendation: **stack** — the
-   card is inside the scroll view of the Sets sub-tab so the host already
-   handles long content gracefully.
+4. **Done strip behavior in long templates.**
+   In a 10+ set template, do done strips stack indefinitely, paginate, or
+   collapse? ✓ **Locked: Stack indefinitely.** The card lives inside the
+   Sets sub-tab's scroll view, which already handles tall content. No
+   special cap logic.
 
 5. **B3 shape — embed snapshot or join externally.**
    Whether `completedInSessionSets[i].suggestedWeight` lives on the
    `CompletedSetSnapshot` directly or stays in a separate VM dict the view
-   reads in parallel. Default recommendation: **embed** for one fewer
-   lookup at render time.
+   reads in parallel. ✓ **Locked: Embed.** One fewer lookup at render time
+   and matches how the rest of the data flows.
 
 ---
 

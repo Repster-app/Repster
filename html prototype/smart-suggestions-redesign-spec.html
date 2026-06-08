@@ -405,7 +405,7 @@
     <a href="#s2"><span class="num">2</span>Supported in code today</a>
     <a href="#s3"><span class="num">3</span>What needs to be built</a>
     <a href="#s4"><span class="num">4</span>Deferred to v1.1</a>
-    <a href="#s5"><span class="num">5</span>Open decisions</a>
+    <a href="#s5"><span class="num">5</span>Resolved decisions</a>
     <a href="#s6"><span class="num">6</span>Implementation order</a>
     <a href="#s7"><span class="num">7</span>Not changing</a>
   </aside>
@@ -718,36 +718,37 @@
 
     <!-- ============================================================ -->
     <section id="s5">
-      <h2><span class="nm">5</span>Open decisions</h2>
-      <p>These haven't been locked yet — flagged for a call before we cut the implementation ticket.</p>
+      <h2><span class="nm">5</span>Resolved decisions</h2>
+      <p>All five settled. Build to these.</p>
 
       <div class="decision">
         <div class="q"><span class="num">1.</span><code>Use</code> button on pending strips: keep or drop?</div>
         <div class="body">The keyboard action rail already applies the suggestion when the weight field is focused, so the in-card button is redundant by action — but it <em>is</em> the visible affordance that tells users the card is interactive at all.</div>
-        <div class="rec"><b>Recommendation:</b> keep, on the grounds of discoverability.</div>
+        <div class="rec"><b>✓ Locked:</b> <b style="color: var(--success);">Keep.</b> Discoverability wins over the small redundancy.</div>
       </div>
 
       <div class="decision">
         <div class="q"><span class="num">2.</span>Per-row vs global Details toggle in admin mode.</div>
         <div class="body">Today it's global. Per-row makes diff'ing two rows easier and stops a single tap from exploding the entire card.</div>
-        <div class="rec"><b>Recommendation:</b> per-row (C8 above).</div>
+        <div class="rec"><b>✓ Locked:</b> <b style="color: var(--success);">Per-strip</b> (C8 above). Move <code>@State showDetails</code> from card root to row body.</div>
       </div>
 
       <div class="decision">
-        <div class="q"><span class="num">3.</span>Stale state — banner copy.</div>
-        <div class="body">Current: <em>"Based on a workout from Mar 1 — outside your recency window. Estimate may be optimistic."</em> Anchor date format (<code>Mar 1</code> vs <code>Mar 1, 2026</code> vs <code>13w ago</code>): final call.</div>
+        <div class="q"><span class="num">3.</span>Stale state — banner anchor-date format.</div>
+        <div class="body">Choosing between an absolute date, a relative phrase, or both.</div>
+        <div class="rec"><b>✓ Locked:</b> <b style="color: var(--success);">Absolute short — "Mar 1"</b>. Year implicit. Final banner copy: <em>"Based on a workout from <b>Mar 1</b> — outside your recency window. Estimate may be optimistic."</em></div>
       </div>
 
       <div class="decision">
-        <div class="q"><span class="num">4.</span>Done strip cap.</div>
-        <div class="body">In a long template (10+ sets), do done strips stack indefinitely, scroll internally, or collapse to a count?</div>
-        <div class="rec"><b>Recommendation:</b> stack — the card is inside the scroll view of the Sets sub-tab so the host already handles long content gracefully.</div>
+        <div class="q"><span class="num">4.</span>Done strip behavior in long templates.</div>
+        <div class="body">In a 10+ set template, do done strips stack indefinitely, paginate, or collapse?</div>
+        <div class="rec"><b>✓ Locked:</b> <b style="color: var(--success);">Stack indefinitely.</b> The card lives inside the Sets sub-tab's scroll view, which already handles tall content. No special cap logic.</div>
       </div>
 
       <div class="decision">
         <div class="q"><span class="num">5.</span>B3 shape — embed snapshot or join externally.</div>
         <div class="body">Whether <code>completedInSessionSets[i].suggestedWeight</code> lives on the <code>CompletedSetSnapshot</code> directly or stays in a separate VM dict the view reads in parallel.</div>
-        <div class="rec"><b>Recommendation:</b> embed, for one fewer lookup at render time.</div>
+        <div class="rec"><b>✓ Locked:</b> <b style="color: var(--success);">Embed.</b> One fewer lookup at render time and matches how the rest of the data flows.</div>
       </div>
     </section>
 

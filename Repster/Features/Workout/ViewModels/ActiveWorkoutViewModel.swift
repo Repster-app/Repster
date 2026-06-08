@@ -190,6 +190,13 @@ final class ActiveWorkoutViewModel {
     /// The data can represent either available suggestions or a typed unavailable state.
     var weightSuggestionData: WeightSuggestionData?
 
+    /// In-memory cache of suggestions snapshotted at the moment each set
+    /// transitions pending → completed. Keyed by `WorkoutSet.id`. Used by the
+    /// suggestion module's done strips to render "= suggested" / "+1 kg vs sug"
+    /// comparisons. Not persisted — the comparison disappears once the workout
+    /// closes (by design, per v1 spec).
+    var completedSetSuggestionSnapshots: [UUID: SuggestionSnapshot] = [:]
+
     /// Whether the module should show blocking loading UI.
     var isLoadingWeightSuggestions: Bool = false
 
@@ -404,6 +411,19 @@ final class ActiveWorkoutViewModel {
                     formula: E1RMFormula(rawValue: formulaRawValue) ?? .epley
                 )
                 exerciseIdsWithPredictions.insert(set.exerciseId)
+
+                // Also stash a display-layer snapshot for the done strip's
+                // "= suggested" / "+1 kg vs sug" comparison. Captured here for
+                // the same reason as predictionSnapshot — the suggestion is
+                // about to be filtered out of the pending list.
+                completedSetSuggestionSnapshots[set.id] = SuggestionSnapshot(
+                    suggestedWeight: suggestion.suggestedWeight,
+                    targetReps: suggestion.targetReps,
+                    targetRepMin: suggestion.targetRepMin,
+                    targetRepMax: suggestion.targetRepMax,
+                    targetDisplayLabel: suggestion.targetDisplayLabel,
+                    targetRIR: suggestion.targetRIR
+                )
             } else {
                 predictionSnapshot = nil
             }
@@ -501,8 +521,15 @@ final class ActiveWorkoutViewModel {
                 previousContribution: previousContribution
             )
             set.effectiveWeight = result.effectiveWeight
-            set.prStatus = result.prResult.newStatus
+            // Don't assign result.prResult.newStatus here — when the uncompleted
+            // set owned the PR, handleDeletion → findNewPROwner returns the new
+            // winner's setId/status, not this set's. SetService.uncomplete already
+            // cleared set.prStatus = nil on the same @Model reference.
             applyAffectedSets(result.prResult.affectedSetIds)
+
+            // The set is back in the pending list — drop any stale done-strip
+            // snapshot so re-completing later captures a fresh suggestion.
+            completedSetSuggestionSnapshots.removeValue(forKey: set.id)
 
             // Reassign array to trigger @Observable update
             if let sets = setsByExercise[exerciseId] {
@@ -1762,7 +1789,8 @@ final class ActiveWorkoutViewModel {
             weightSuggestionData = SuggestionExplainer.makeWeightSuggestionData(
                 preparation: preparation,
                 evaluation: evaluation,
-                unitPreference: unitPreference
+                unitPreference: unitPreference,
+                suggestionSnapshots: completedSetSuggestionSnapshots
             )
             suggestionsLoadedForKey = preparation.cacheKey
         } catch {
@@ -1773,7 +1801,8 @@ final class ActiveWorkoutViewModel {
             weightSuggestionData = SuggestionExplainer.makeWeightSuggestionData(
                 preparation: preparation,
                 evaluation: .unavailable(.calculationFailed),
-                unitPreference: unitPreference
+                unitPreference: unitPreference,
+                suggestionSnapshots: completedSetSuggestionSnapshots
             )
             suggestionsLoadedForKey = nil
         }
@@ -2109,6 +2138,38 @@ extension ActiveWorkoutViewModel: SetTableDataSource {
 
     func suggestedWeight(for setId: UUID) -> Double? {
         weightSuggestionData?.suggestedWeight(for: setId)
+    }
+
+    /// Writes a suggestion's prescribed weight onto the underlying pending
+    /// `WorkoutSet`. Persisted via `setService.edit` so the value shows up
+    /// in the set table immediately and survives app kill.
+    ///
+    /// Called by the in-card "Use" button on a pending strip. This is the
+    /// secondary apply path; the keyboard action rail in `SetTableView` is
+    /// the primary one (and writes to the keyboard draft, not the persisted
+    /// set). Both ultimately let the user log the set with the suggested
+    /// weight — they just differ in how visible the change is before logging.
+    func applySuggestion(_ suggestion: SetSuggestion) async {
+        guard
+            let set = setsByExercise.values.flatMap({ $0 }).first(where: { $0.id == suggestion.pendingSetId }),
+            !set.completed
+        else { return }
+
+        set.weight = suggestion.suggestedWeight
+        set.updatedAt = Date()
+
+        do {
+            _ = try await setService.edit(set)
+
+            // Trigger @Observable update so the set table reflects the new value.
+            if let sets = setsByExercise[set.exerciseId] {
+                setsByExercise[set.exerciseId] = sets
+            }
+        } catch {
+            #if DEBUG
+            dbg("[ActiveWorkoutViewModel] Failed to apply suggestion to set \(set.id): \(error)")
+            #endif
+        }
     }
 
     func persistTargetRepOverride(_ set: WorkoutSet, min: Int?, max: Int?) async {

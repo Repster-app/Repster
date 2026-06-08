@@ -437,12 +437,10 @@ private struct SetRowWrapper: View {
 
     private func configuredRow(for exercise: Exercise) -> AnyView {
         let unilateralTargetPresentation = SetTableView.unilateralTargetPresentation(for: set, exercise: exercise)
-        let canComplete = completionInput(for: exercise) != nil
         let prStatusOverride = CachedPRStatus.effectiveStatus(for: set, among: siblingsSets)
         let row = rowContent(
             for: exercise,
             presentation: unilateralTargetPresentation,
-            canComplete: canComplete,
             prStatusOverride: prStatusOverride
         )
         let rowWithHandlers = applyingFieldChangeHandlers(to: row, exercise: exercise)
@@ -452,7 +450,6 @@ private struct SetRowWrapper: View {
     private func rowContent(
         for exercise: Exercise,
         presentation: UnilateralTargetPresentation,
-        canComplete: Bool,
         prStatusOverride: CachedPRStatus?
     ) -> AnyView {
         AnyView(
@@ -475,7 +472,13 @@ private struct SetRowWrapper: View {
                 rightRepsPlaceholder: presentation.rightPlaceholder,
                 unilateralTargetHint: presentation.sharedHint,
                 onComplete: { completeOrToggleSet(for: exercise) },
-                canCompleteSet: { canComplete },
+                // Snapshot at construction time. The keyboard overlay re-reads
+                // this via `context.canCompleteSet()`, and the closure stored in
+                // the long-lived `SetEntryKeyboardContext` doesn't reliably see
+                // live @State through self-capture. We keep the snapshot fresh
+                // by overwriting `context.canCompleteSet` from the row's
+                // `onChange` handlers (see `refreshCustomKeyboardIfOwned`).
+                canCompleteSet: { completionInput(for: exercise) != nil },
                 onDelete: deleteCurrentSet,
                 onChangeSetType: changeSetType,
                 onEditNote: beginEditingNote,
@@ -496,21 +499,27 @@ private struct SetRowWrapper: View {
             content
                 .onChange(of: weightText) { _, newValue in
                     handleWeightChange(newValue)
+                    refreshCustomKeyboardIfOwned(for: exercise)
                 }
                 .onChange(of: repsText) { _, newValue in
                     handleRepsChange(newValue)
+                    refreshCustomKeyboardIfOwned(for: exercise)
                 }
                 .onChange(of: leftRepsText) { _, newValue in
                     handleLeftRepsChange(newValue, exercise: exercise)
+                    refreshCustomKeyboardIfOwned(for: exercise)
                 }
                 .onChange(of: rightRepsText) { _, newValue in
                     handleRightRepsChange(newValue, exercise: exercise)
+                    refreshCustomKeyboardIfOwned(for: exercise)
                 }
                 .onChange(of: durationText) { _, newValue in
                     handleDurationChange(newValue)
+                    refreshCustomKeyboardIfOwned(for: exercise)
                 }
                 .onChange(of: distanceText) { _, newValue in
                     handleDistanceChange(newValue)
+                    refreshCustomKeyboardIfOwned(for: exercise)
                 }
                 .onChange(of: rirValue) { _, newValue in
                     handleRIRChange(newValue)
@@ -525,6 +534,27 @@ private struct SetRowWrapper: View {
                     refreshDisplayTextForUnitChange(from: oldValue, to: newValue)
                 }
         )
+    }
+
+    /// Pushes a fresh `canCompleteSet` snapshot into the active keyboard context
+    /// when this row owns it, then nudges the overlay to re-render.
+    ///
+    /// The Done button's `disabled` state is driven by `context.canCompleteSet()`.
+    /// The closure originally captured into the context at activation time
+    /// references `self` of this `SetRowWrapper`, and SwiftUI does not reliably
+    /// propagate live @State through such a self-capture stored on a long-lived
+    /// reference type — so the closure returns the value of `completionInput` as
+    /// it was at the moment the keyboard was opened, leaving the Done button
+    /// disabled until the keyboard is dismissed and re-opened. We work around
+    /// that by computing the Bool here (inside an onChange handler, where `self`
+    /// is current and reads live @State) and stashing a fresh trivial closure
+    /// returning that snapshot.
+    private func refreshCustomKeyboardIfOwned(for exercise: Exercise) {
+        guard let keyboardManager else { return }
+        guard let context = keyboardManager.context, context.ownerSetID == set.id else { return }
+        let canComplete = completionInput(for: exercise) != nil
+        context.canCompleteSet = { canComplete }
+        keyboardManager.refresh()
     }
 
     private func setNoteAlert(for content: AnyView) -> AnyView {
@@ -998,7 +1028,11 @@ final class SetEntryKeyboardContext {
     let getTargetRepRange: () -> (min: Int?, max: Int?)
     let commitTargetRepRange: (Int?, Int?) -> Void
     let onCompleteSet: (() -> Void)?
-    let canCompleteSet: () -> Bool
+    /// `var` so the owning row can replace this with a fresh snapshot closure on
+    /// every text edit. Capturing self into a closure stored on this long-lived
+    /// class doesn't reliably read live @State, so we re-stuff the snapshot from
+    /// the row's onChange handlers instead.
+    var canCompleteSet: () -> Bool
     let canMovePrevious: () -> Bool
     let canMoveNext: () -> Bool
     let movePrevious: () -> Void
