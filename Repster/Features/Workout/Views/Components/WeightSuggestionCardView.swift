@@ -1,9 +1,9 @@
 // WeightSuggestionCardView.swift
-// Per-set weight suggestion strips (Take B). Each pending suggestion is its
-// own visually distinct strip with an accent rail, icon tile, line 1
-// (set + weight + target reps), line 2 (contextual/delta), and a Use button.
-// Admin mode keeps the existing dense format with a per-row Details toggle
-// pending the full admin restyle in Step 6.
+// Per-set weight suggestion strips. Each pending suggestion is its own
+// visually distinct strip with an accent rail, icon tile, line 1
+// (set + weight + target reps), and line 2 (contextual prompt — one of four
+// variants chosen by the engine signal that most explains the prescription).
+// Admin mode keeps the existing dense format with a per-row Details toggle.
 
 import SwiftUI
 
@@ -11,7 +11,6 @@ struct WeightSuggestionCardView: View {
     let data: WeightSuggestionData
     let unitPreference: UnitPreference
     let isAdminModeEnabled: Bool
-    let onUseSuggestion: (SetSuggestion) -> Void
 
     /// Per-row Details toggle state (admin mode only). Indexed by `setId`.
     /// Replaces the previous global toggle.
@@ -42,17 +41,6 @@ struct WeightSuggestionCardView: View {
             // Pending strips first — the user immediately sees what to lift.
             ForEach(Array(data.rowStates.enumerated()), id: \.element.id) { _, rowState in
                 rowStateRow(rowState)
-            }
-
-            // Done strips below the divider when there's anything logged in
-            // this session for the current exercise.
-            if !data.completedInSessionSets.isEmpty {
-                loggedDivider
-                    .padding(.top, 6)
-
-                ForEach(data.completedInSessionSets) { snapshot in
-                    doneStrip(snapshot)
-                }
             }
 
             // Last-top reference footer — quiet single-line chip.
@@ -154,93 +142,6 @@ struct WeightSuggestionCardView: View {
         return "Based on a workout from \(formatted) — outside your recency window. Estimate may be optimistic."
     }
 
-    // MARK: - "Logged this session" divider
-
-    private var loggedDivider: some View {
-        HStack(spacing: 8) {
-            Rectangle()
-                .fill(Color.border)
-                .frame(height: 1)
-            Text("LOGGED THIS SESSION")
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(Color.textTertiary)
-                .kerning(0.6)
-                .fixedSize()
-            Rectangle()
-                .fill(Color.border)
-                .frame(height: 1)
-        }
-        .padding(.horizontal, 2)
-    }
-
-    // MARK: - Done strip (Take 1, single-line with inline comparison)
-
-    private func doneStrip(_ snapshot: CompletedSetSnapshot) -> some View {
-        HStack(spacing: 0) {
-            Color.success.frame(width: 3)
-            HStack(spacing: 10) {
-                // Smaller check tile (22 vs 36 for pending)
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.success.opacity(0.12))
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Color.success)
-                }
-                .frame(width: 22, height: 22)
-
-                HStack(spacing: 4) {
-                    Text("Set \(snapshot.setNumber)")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.textSecondary)
-                    Text("·")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.textTertiary)
-                    Text("\(formatWeight(snapshot.weight)) × \(snapshot.reps)")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.textPrimary)
-                }
-                .lineLimit(1)
-
-                Spacer(minLength: 6)
-
-                let comparison = comparisonText(for: snapshot)
-                if !comparison.text.isEmpty {
-                    Text(comparison.text)
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(comparison.color)
-                        .lineLimit(1)
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-        }
-        .background(Color.bgCard)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(Color.border, lineWidth: 1)
-        )
-    }
-
-    /// Builds the inline suggestion-vs-actual comparison string for a done
-    /// strip. Compares prescribed weight first (the dominant signal); rep
-    /// targets only matter when the weights match exactly.
-    private func comparisonText(for snapshot: CompletedSetSnapshot) -> (text: String, color: Color) {
-        guard let suggestion = snapshot.suggestion else {
-            return ("", .clear)
-        }
-        let weightDiff = snapshot.weight - suggestion.suggestedWeight
-        let weightTolerance = 0.01
-        if abs(weightDiff) < weightTolerance {
-            return ("= suggested", .success)
-        }
-        if weightDiff > 0 {
-            return ("+\(formatWeight(weightDiff)) vs sug", .accent)
-        }
-        return ("−\(formatWeight(abs(weightDiff))) vs sug", .gold)
-    }
-
     // MARK: - Row dispatcher
 
     @ViewBuilder
@@ -291,8 +192,6 @@ struct WeightSuggestionCardView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-
-                useButton(for: suggestion)
             }
         }
     }
@@ -455,26 +354,6 @@ struct WeightSuggestionCardView: View {
                 .foregroundStyle(tint)
         }
         .frame(width: 36, height: 36)
-    }
-
-    private func useButton(for suggestion: SetSuggestion) -> some View {
-        Button {
-            onUseSuggestion(suggestion)
-        } label: {
-            Text("Use")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.textPrimary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color.bgHover)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(Color.border, lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Use suggested weight for set \(suggestion.setNumber)")
     }
 
     // MARK: - Structured admin diagnostics drawer (C9)

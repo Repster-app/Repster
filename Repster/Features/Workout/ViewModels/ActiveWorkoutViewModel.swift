@@ -2140,38 +2140,6 @@ extension ActiveWorkoutViewModel: SetTableDataSource {
         weightSuggestionData?.suggestedWeight(for: setId)
     }
 
-    /// Writes a suggestion's prescribed weight onto the underlying pending
-    /// `WorkoutSet`. Persisted via `setService.edit` so the value shows up
-    /// in the set table immediately and survives app kill.
-    ///
-    /// Called by the in-card "Use" button on a pending strip. This is the
-    /// secondary apply path; the keyboard action rail in `SetTableView` is
-    /// the primary one (and writes to the keyboard draft, not the persisted
-    /// set). Both ultimately let the user log the set with the suggested
-    /// weight — they just differ in how visible the change is before logging.
-    func applySuggestion(_ suggestion: SetSuggestion) async {
-        guard
-            let set = setsByExercise.values.flatMap({ $0 }).first(where: { $0.id == suggestion.pendingSetId }),
-            !set.completed
-        else { return }
-
-        set.weight = suggestion.suggestedWeight
-        set.updatedAt = Date()
-
-        do {
-            _ = try await setService.edit(set)
-
-            // Trigger @Observable update so the set table reflects the new value.
-            if let sets = setsByExercise[set.exerciseId] {
-                setsByExercise[set.exerciseId] = sets
-            }
-        } catch {
-            #if DEBUG
-            dbg("[ActiveWorkoutViewModel] Failed to apply suggestion to set \(set.id): \(error)")
-            #endif
-        }
-    }
-
     func persistTargetRepOverride(_ set: WorkoutSet, min: Int?, max: Int?) async {
         do {
             try await setService.updateInProgressTargetRepOverride(

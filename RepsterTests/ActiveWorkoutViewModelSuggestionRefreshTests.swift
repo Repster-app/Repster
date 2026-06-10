@@ -117,7 +117,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         XCTAssertTrue(viewModel.setsByExercise.isEmpty)
 
         let completionEvent = try XCTUnwrap(analyticsService.events.first { $0.event == .workoutCompleted })
-        XCTAssertEqual(completionEvent.properties[.durationBucket], .string("under_30m"))
+        XCTAssertEqual(completionEvent.properties[.durationBucket], .string("15-30m"))
         XCTAssertEqual(completionEvent.properties[.setCountBucket], .string("1"))
         XCTAssertEqual(completionEvent.properties[.exerciseCountBucket], .string("1"))
         XCTAssertEqual(completionEvent.properties[.perceivedEffortEntered], .bool(true))
@@ -1619,7 +1619,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         XCTAssertEqual(data.suggestion(for: set.id)?.explanation.defaultUsageLabel, "using default target")
         XCTAssertEqual(
             data.suggestion(for: set.id)?.explanation.userSummary,
-            "Based on your recent performance and this set's target. Missing targets used your Smart Suggestions defaults."
+            "Based on your recent performance for this rep target. Missing targets used your Smart Suggestions defaults."
         )
         XCTAssertTrue(
             data.suggestion(for: set.id)?.explanation.adminSummary.contains("target from Smart Suggestions default") == true
@@ -1685,7 +1685,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
 
         XCTAssertEqual(
             suggestion.explanation.userSummary,
-            "Based on your recent performance and adjusted for this workout."
+            "Easing off slightly to manage session fatigue."
         )
         XCTAssertTrue(suggestion.explanation.adminSummary.contains("capacity from"))
         XCTAssertTrue(suggestion.explanation.adminSummary.contains("readiness"))

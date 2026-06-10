@@ -102,21 +102,15 @@ struct WorkoutLiveActivityWidget: Widget {
                 Text(context.state.exerciseName)
                     .font(.headline)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.7)
                     .layoutPriority(1)
 
                 Spacer()
 
-                HStack(spacing: 4) {
-                    Text("Set \(context.state.currentSetNumber)/\(context.state.totalSets)")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-
-                    Text("(\(context.state.setTypeLabel.lowercased()))")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .fixedSize()
+                Text("Set \(context.state.currentSetNumber)/\(context.state.totalSets)")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .fixedSize()
             }
 
             // Row 3: Rest timer or ready state
@@ -136,31 +130,30 @@ struct WorkoutLiveActivityWidget: Widget {
         context: ActivityViewContext<WorkoutActivityAttributes>
     ) -> some View {
         if context.state.isWorkoutPaused {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Image(systemName: "pause.circle.fill")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
                 if let remaining = context.state.restTimerRemainingSeconds {
-                    Text("\(formatTime(remaining)) rest paused")
+                    Text("\(formatTime(remaining)) paused")
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
                 } else {
-                    Text("Workout paused")
+                    Text("Paused")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-
-                Spacer()
             }
+            .frame(maxWidth: .infinity)
         } else if context.state.isRestTimerPaused {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Image(systemName: "pause.circle")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
                 if let remaining = context.state.restTimerRemainingSeconds {
-                    Text("\(formatTime(remaining)) rest paused")
+                    Text("\(formatTime(remaining)) paused")
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
                 } else {
@@ -168,11 +161,10 @@ struct WorkoutLiveActivityWidget: Widget {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-
-                Spacer()
             }
+            .frame(maxWidth: .infinity)
         } else if context.state.isRestTimerRunning, let endDate = context.state.restTimerEndDate {
-            // Active rest timer — countdown only (no progress bar)
+            // Active rest timer — centered countdown
             HStack(spacing: 6) {
                 Image(systemName: "timer")
                     .font(.caption)
@@ -182,34 +174,22 @@ struct WorkoutLiveActivityWidget: Widget {
                     .font(.caption.monospacedDigit())
                     .fontWeight(.semibold)
                     .foregroundStyle(.blue)
-                    .multilineTextAlignment(.leading)
-
-                Spacer()
-
-                Text("remaining")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize()
             }
+            .frame(maxWidth: .infinity)
         } else if context.state.isRestTimerFinished {
             // Timer finished — prominent rest complete indicator
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.title3)
+                    .font(.subheadline)
                     .foregroundStyle(.green)
                 Text("REST COMPLETE")
                     .font(.subheadline)
                     .fontWeight(.bold)
                     .foregroundStyle(.green)
-                Spacer()
-                Text("GO")
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(.green)
-                    .cornerRadius(8)
             }
+            .frame(maxWidth: .infinity)
         } else {
             // No timer — ready for next set
             HStack(spacing: 6) {
@@ -219,8 +199,8 @@ struct WorkoutLiveActivityWidget: Widget {
                 Text("Ready for next set")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Spacer()
             }
+            .frame(maxWidth: .infinity)
         }
     }
 

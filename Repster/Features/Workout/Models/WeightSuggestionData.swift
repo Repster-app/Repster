@@ -814,20 +814,7 @@ enum SuggestionExplainer {
         }
         let adminSummary = summaryParts.joined(separator: ", ")
 
-        let hasWorkoutAdjustment =
-            abs(decision.sessionCapabilityE1RM - decision.historicalBaseE1RM) > 0.05 ||
-            abs(decision.fatigueDiscount - 1.0) > 0.001 ||
-            decision.freshnessApplied ||
-            abs(decision.projectedSessionFatigue) > 0.001
-        let userSummaryPrefix = hasWorkoutAdjustment
-            ? "Based on your recent performance and adjusted for this workout."
-            : "Based on your recent performance and this set's target."
-        let userSummary: String
-        if decision.targetDefaultUsageLabel != nil {
-            userSummary = "\(userSummaryPrefix) Missing targets used your Smart Suggestions defaults."
-        } else {
-            userSummary = userSummaryPrefix
-        }
+        let userSummary = contextualUserSummary(for: decision)
 
         return SuggestionExplanation(
             userSummary: userSummary,
@@ -842,6 +829,33 @@ enum SuggestionExplainer {
             sessionCapabilitySourceLabel: decision.sessionCapabilitySourceLabel,
             calibrationLabel: decision.calibrationAdjustment.explanation
         )
+    }
+
+    /// Picks one of four contextual one-liners based on which engine signal
+    /// most explains the prescribed weight. Priority: progression bump >
+    /// session fatigue > in-session readjustment > generic baseline.
+    private static func contextualUserSummary(for decision: SuggestionDecision) -> String {
+        let hasProgressionBump = decision.freshnessApplied
+            || decision.selectionPolicy == .firstSetProgressionAboveRecentPeak
+        let meaningfulFatigue = decision.fatigueDiscount < 0.99
+            || decision.projectedSessionFatigue > 0.01
+        let sessionAdjusted = abs(decision.sessionCapabilityE1RM - decision.historicalBaseE1RM) > 0.05
+
+        let base: String
+        if hasProgressionBump {
+            base = "Nudging up from your last workout's peak."
+        } else if meaningfulFatigue {
+            base = "Easing off slightly to manage session fatigue."
+        } else if sessionAdjusted {
+            base = "Adjusted from how this session is going."
+        } else {
+            base = "Based on your recent performance for this rep target."
+        }
+
+        if decision.targetDefaultUsageLabel != nil {
+            return "\(base) Missing targets used your Smart Suggestions defaults."
+        }
+        return base
     }
 
     private static func diagnostics(

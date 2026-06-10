@@ -112,7 +112,18 @@
       "Bash(mdfind -onlyin ~ 'kMDItemFSName == \"*.mov\"')",
       "Bash(mdfind -onlyin ~ 'kMDItemKind == \"Simulator Screen Recording\"')",
       "Bash(mdfind -onlyin ~ '\\(kMDItemFSName == \"*.mov\" || kMDItemFSName == \"*.mp4\" || kMDItemFSName == \"*.m4v\"\\)')",
-      "Read(//Users/nikolettkiraly/Pictures/**)"
+      "Read(//Users/nikolettkiraly/Pictures/**)",
+      "Bash(ls /Users/nikolettkiraly/.claude/plugins/cache/local/aso-appstore-screenshots/unknown/skills/aso-appstore-screenshots/scripts/assets/device_frame.png 2>/dev/null || echo \"FRAME MISSING\")",
+      "Read(//Library/Fonts/**)",
+      "Bash(find /System/Library/Fonts -iname \"*.ttf\" -o -iname \"*.otf\" | head -40; echo \"---\"; ls ~/Library/Fonts/ 2>/dev/null)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://api.github.com/repos/Repster-app/Repster)",
+      "Bash(curl -s https://api.github.com/repos/Repster-app/Repster)",
+      "Bash(curl -s \"https://api.github.com/repos/Repster-app/Repster/branches?per_page=100\")",
+      "Bash(rm -rf /tmp/repster-tests.xcresult && xcodebuild test -project Repster.xcodeproj -scheme Repster -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -resultBundlePath /tmp/repster-tests.xcresult 2>&1 | grep -E \"Test [Cc]ase|failed|passed|error\" | tail -40)",
+      "Bash(xcrun xcresulttool *)",
+      "Bash(git rm *)",
+      "mcp__visualize__read_me",
+      "mcp__visualize__show_widget"
     ]
   }
 }

@@ -226,11 +226,6 @@ struct ActiveWorkoutView: View {
                                 presentation: .preserveExisting
                             )
                         }
-                    },
-                    onUseSuggestion: { suggestion in
-                        Task {
-                            await viewModel.applySuggestion(suggestion)
-                        }
                     }
                 )
                 .padding(.horizontal, 20)

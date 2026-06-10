@@ -15,7 +15,6 @@ struct WeightSuggestionModuleView: View {
     let isLoading: Bool
     let isRefreshing: Bool
     let onRefresh: () -> Void
-    let onUseSuggestion: (SetSuggestion) -> Void
 
     var body: some View {
         if let data, !isLoading {
@@ -29,8 +28,7 @@ struct WeightSuggestionModuleView: View {
                     WeightSuggestionCardView(
                         data: data,
                         unitPreference: unitPreference,
-                        isAdminModeEnabled: isAdminModeEnabled,
-                        onUseSuggestion: onUseSuggestion
+                        isAdminModeEnabled: isAdminModeEnabled
                     )
                 }
             } else if let reason = data.unavailableReason, reason != .featureDisabled {
@@ -114,12 +112,11 @@ struct WeightSuggestionModuleView: View {
     }
 
     /// Compact count summary that lives next to the section header label.
-    /// Returns e.g. "4 ready" / "2 ready · 1 unavailable" / "2 ready · 2 logged".
+    /// Returns e.g. "4 ready" / "2 ready · 1 unavailable".
     /// `nil` when there's nothing meaningful to show.
     private func availabilitySummary(for data: WeightSuggestionData) -> String? {
         let readyCount = data.suggestions.count
         let unavailableCount = data.rowStates.count - readyCount
-        let loggedCount = data.completedInSessionSets.count
 
         var parts: [String] = []
         if readyCount > 0 {
@@ -129,9 +126,6 @@ struct WeightSuggestionModuleView: View {
         }
         if unavailableCount > 0, readyCount > 0 {
             parts.append("\(unavailableCount) unavailable")
-        }
-        if loggedCount > 0 {
-            parts.append("\(loggedCount) logged")
         }
 
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
