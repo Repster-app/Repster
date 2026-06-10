@@ -39,3 +39,6 @@ Pods/
 
 # Local agent worktrees
 .claude/worktrees/
+
+# Xcode distribution exports
+Repster 20*/
