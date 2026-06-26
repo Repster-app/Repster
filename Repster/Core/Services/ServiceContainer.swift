@@ -29,6 +29,7 @@ final class ServiceContainer {
     let accessControlService: any AccessControlServiceProtocol
     let analyticsService: any AnalyticsServiceProtocol
     let fatigueLearningService: FatigueLearningService
+    let insightsService: any InsightsServiceProtocol
     let healthProfileRepo: any HealthProfileRepositoryProtocol
     var unitPreference: UnitPreference = .metric
 
@@ -159,6 +160,11 @@ final class ServiceContainer {
             healthProfileRepository: repositoryContainer.healthProfileRepository
         )
 
+        // 14. InsightsService — reads the store directly via its own ModelActor context
+        let insightsService = InsightsService(
+            modelContainer: repositoryContainer.modelContainer
+        )
+
         self.prService = prService
         self.statsService = statsService
         self.setService = setService
@@ -175,6 +181,7 @@ final class ServiceContainer {
         self.accessControlService = accessControlService
         self.analyticsService = analyticsService
         self.fatigueLearningService = fatigueLearningService
+        self.insightsService = insightsService
         self.healthProfileRepo = repositoryContainer.healthProfileRepository
     }
 

@@ -5,6 +5,9 @@
 
 import SwiftUI
 
+/// Navigation token for pushing the Insights feed from Home.
+struct InsightsRoute: Hashable {}
+
 struct HomeView: View {
     @State private var viewModel: HomeViewModel
     @State private var navigationPath = NavigationPath()
@@ -24,6 +27,7 @@ struct HomeView: View {
         exerciseService: any ExerciseServiceProtocol,
         chartDataService: any ChartDataServiceProtocol,
         statsService: any StatsServiceProtocol,
+        insightsService: (any InsightsServiceProtocol)? = nil,
         refreshTrigger: UUID,
         popToRootTrigger: UUID = UUID(),
         workoutAccessMessage: String? = nil,
@@ -37,7 +41,8 @@ struct HomeView: View {
             setService: setService,
             exerciseService: exerciseService,
             chartDataService: chartDataService,
-            statsService: statsService
+            statsService: statsService,
+            insightsService: insightsService
         ))
         self.refreshTrigger = refreshTrigger
         self.popToRootTrigger = popToRootTrigger
@@ -77,6 +82,14 @@ struct HomeView: View {
                         refreshAfterWorkoutDeletion()
                     }
                 )
+            }
+            .navigationDestination(for: InsightsRoute.self) { _ in
+                InsightsView(insightsService: services.insightsService)
+                    .onDisappear {
+                        // Reading the feed clears the badge; reload so the
+                        // teaser card reflects it.
+                        Task { await viewModel.loadInsightsSummary() }
+                    }
             }
         }
         .task(id: refreshTrigger) {
@@ -122,6 +135,14 @@ struct HomeView: View {
                     displayMode: viewModel.sectionConfig.prDisplayMode
                 )
             }
+        case .insights:
+            NavigationLink(value: InsightsRoute()) {
+                InsightsTeaserCardView(
+                    newCount: viewModel.newInsightCount,
+                    topHeadline: viewModel.topInsightHeadline
+                )
+            }
+            .buttonStyle(.plain)
         case .recentWorkouts:
             recentWorkoutsSection
         case .legacyTrendingUp:

@@ -73,6 +73,8 @@ final class HomeViewModel {
     // Customizable sections
     var monthlyStats: MonthlyStats? = nil
     var recentPRs: [RecentPR] = []
+    var newInsightCount: Int = 0
+    var topInsightHeadline: String? = nil
 
     // Section customization
     var sectionConfig: HomeSectionConfig = HomeSectionConfig.load()
@@ -88,6 +90,7 @@ final class HomeViewModel {
     private let exerciseService: ExerciseServiceProtocol
     private let chartDataService: ChartDataServiceProtocol
     private let statsService: StatsServiceProtocol
+    private let insightsService: (any InsightsServiceProtocol)?
 
     // MARK: - Cache
 
@@ -99,13 +102,15 @@ final class HomeViewModel {
         setService: SetServiceProtocol,
         exerciseService: ExerciseServiceProtocol,
         chartDataService: ChartDataServiceProtocol,
-        statsService: StatsServiceProtocol
+        statsService: StatsServiceProtocol,
+        insightsService: (any InsightsServiceProtocol)? = nil
     ) {
         self.workoutService = workoutService
         self.setService = setService
         self.exerciseService = exerciseService
         self.chartDataService = chartDataService
         self.statsService = statsService
+        self.insightsService = insightsService
     }
 
     // MARK: - Data Loading
@@ -124,6 +129,22 @@ final class HomeViewModel {
         await loadRecentWorkouts()
         await loadMonthlyStats()
         await loadRecentPRs()
+        await loadInsightsSummary()
+    }
+
+    /// Refreshes the analysis if workout data changed, then loads the badge
+    /// count and top headline for the teaser card.
+    func loadInsightsSummary() async {
+        guard let insightsService else { return }
+        do {
+            try await insightsService.refreshIfNeeded()
+            newInsightCount = try await insightsService.newInsightCount()
+            topInsightHeadline = try await insightsService.fetchActiveInsights().first?.headline
+        } catch {
+            dbg("[HomeViewModel] Failed to load insights summary: \(error)")
+            newInsightCount = 0
+            topInsightHeadline = nil
+        }
     }
 
     func checkActiveWorkout() async {

@@ -42,6 +42,7 @@ enum RecentPRScope: String, Codable, CaseIterable, Equatable {
 
 enum HomeSectionId: String, Codable, Hashable, Identifiable {
     case monthlyStats
+    case insights
     case recentPRs
     case recentWorkouts
     case legacyTrendingUp = "trendingUp"
@@ -51,6 +52,7 @@ enum HomeSectionId: String, Codable, Hashable, Identifiable {
     var displayName: String {
         switch self {
         case .monthlyStats: return "Monthly Stats"
+        case .insights: return "Insights"
         case .recentPRs: return "Recent PRs"
         case .recentWorkouts: return "Recent Workouts"
         case .legacyTrendingUp: return "Trending Up"
@@ -59,7 +61,7 @@ enum HomeSectionId: String, Codable, Hashable, Identifiable {
 
     var isSupportedHomeSection: Bool {
         switch self {
-        case .monthlyStats, .recentPRs, .recentWorkouts:
+        case .monthlyStats, .insights, .recentPRs, .recentWorkouts:
             return true
         case .legacyTrendingUp:
             return false
@@ -87,6 +89,7 @@ struct HomeSectionConfig: Equatable {
     static let `default` = HomeSectionConfig(
         sections: [
             HomeSectionEntry(sectionId: .monthlyStats, visible: true),
+            HomeSectionEntry(sectionId: .insights, visible: true),
             HomeSectionEntry(sectionId: .recentPRs, visible: true),
             HomeSectionEntry(sectionId: .recentWorkouts, visible: true),
         ],
@@ -122,7 +125,7 @@ struct HomeSectionConfig: Equatable {
     }
 
     private func sanitized() -> HomeSectionConfig {
-        let supportedOrder: [HomeSectionId] = [.monthlyStats, .recentPRs, .recentWorkouts]
+        let supportedOrder: [HomeSectionId] = [.monthlyStats, .insights, .recentPRs, .recentWorkouts]
         var seen = Set<HomeSectionId>()
         var sanitizedSections: [HomeSectionEntry] = []
 

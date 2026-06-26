@@ -123,7 +123,10 @@
       "Bash(xcrun xcresulttool *)",
       "Bash(git rm *)",
       "mcp__visualize__read_me",
-      "mcp__visualize__show_widget"
+      "mcp__visualize__show_widget",
+      "Bash(ruby -e \"require 'xcodeproj'; puts 'xcodeproj available'\")",
+      "Bash(plutil -lint Repster.xcodeproj/project.pbxproj)",
+      "Bash(set -o pipefail)"
     ]
   }
 }

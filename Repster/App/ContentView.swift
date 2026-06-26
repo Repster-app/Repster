@@ -124,6 +124,7 @@ struct ContentView: View {
                     exerciseService: services.exerciseService,
                     chartDataService: services.chartDataService,
                     statsService: services.statsService,
+                    insightsService: services.insightsService,
                     refreshTrigger: homeRefreshTrigger,
                     popToRootTrigger: homePopToRootTrigger,
                     workoutAccessMessage: workoutAccessMessage,
