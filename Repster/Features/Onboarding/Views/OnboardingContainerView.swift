@@ -14,10 +14,12 @@ struct OnboardingContainerView: View {
     init(settingsService: any SettingsServiceProtocol,
          bodyweightService: any BodyweightServiceProtocol,
          importService: any ImportServiceProtocol,
+         analyticsService: any AnalyticsServiceProtocol,
          onComplete: @escaping () -> Void) {
         _viewModel = State(initialValue: OnboardingViewModel(
             settingsService: settingsService,
-            bodyweightService: bodyweightService
+            bodyweightService: bodyweightService,
+            analyticsService: analyticsService
         ))
         self.importService = importService
         self.onComplete = onComplete
@@ -80,6 +82,10 @@ struct OnboardingContainerView: View {
             .animation(.easeInOut, value: viewModel.currentStep)
         }
         .background(Color.bg)
+        .onAppear { viewModel.trackStepViewed(viewModel.currentStep) }
+        .onChange(of: viewModel.currentStep) { _, step in
+            viewModel.trackStepViewed(step)
+        }
     }
 
     // MARK: - Progress Dots

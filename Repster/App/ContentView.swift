@@ -6,6 +6,7 @@
 
 import SwiftUI
 import RevenueCatUI
+import StoreKit
 
 enum StartupPRRebuildMaintenance {
     static let currentVersion = 1
@@ -32,6 +33,12 @@ struct ContentView: View {
 
     @Environment(ServiceContainer.self) private var services
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.requestReview) private var requestReview
+
+    /// Decides when an App Store rating prompt is appropriate. Held here rather
+    /// than in ServiceContainer because the prompt is inherently a view-layer
+    /// concern — it needs the SwiftUI `requestReview` environment action.
+    @State private var reviewPrompt: any ReviewPromptServiceProtocol = ReviewPromptService()
 
     // MARK: - State
 
@@ -216,6 +223,9 @@ struct ContentView: View {
                 }
                 .onAppear {
                     services.analyticsService.paywallShown(source: .paywall)
+                    // Asking for five stars moments after asking for money is a
+                    // reliable way to earn one star instead.
+                    reviewPrompt.suppressForThisSession()
                 }
         }
         // Refresh active workout state and HomeView when returning from fullScreenCover
@@ -225,6 +235,7 @@ struct ContentView: View {
                 Task {
                     await refreshActiveWorkoutState()
                     await refreshMonetizationState(forceSubscriptionRefresh: true)
+                    await requestReviewIfEarned()
                 }
             }
         }
@@ -264,7 +275,11 @@ struct ContentView: View {
             await services.refreshUnitPreference()
             await refreshActiveWorkoutState()
             await refreshMonetizationState(forceSubscriptionRefresh: true)
+            // Read before reporting abandonment, which clears the marker.
+            let inFlightSetCount = ActiveWorkoutSessionMarker.setCount()
+            reportAbandonedWorkoutIfNeeded()
             if hasActiveWorkout {
+                services.analyticsService.workoutResumed(setCount: inFlightSetCount)
                 showActiveWorkout = true
             }
             trackScreen(for: selectedTab)
@@ -633,6 +648,47 @@ struct ContentView: View {
 
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
+
+    /// Asks for an App Store rating after the active workout screen closes, which
+    /// is the best moment Repster has: the user just finished training and the
+    /// summary is behind them.
+    ///
+    /// `ReviewPromptService` owns the "is this earned" decision — milestone,
+    /// once-per-version, and a 60-day floor on top of StoreKit's own 3-per-year
+    /// throttle. The short delay lets the fullScreenCover finish dismissing so the
+    /// system alert doesn't fight the transition.
+    private func requestReviewIfEarned() async {
+        guard reviewPrompt.shouldRequestReview() else { return }
+
+        try? await Task.sleep(for: .seconds(1.5))
+        guard !showActiveWorkout else { return }
+
+        services.analyticsService.reviewPromptRequested(
+            trigger: "workout_completed",
+            completedWorkoutCount: reviewPrompt.completedWorkoutCount
+        )
+        reviewPrompt.markReviewRequested()
+        requestReview()
+    }
+
+    /// Reports a workout that was started but never finished or discarded.
+    ///
+    /// This is the population the event stream used to lose entirely: `workout
+    /// started` with no terminal event, indistinguishable from a user who is
+    /// mid-session. Only fires once the session is stale enough that resuming is
+    /// implausible, and only clears the analytics marker — the workout itself is
+    /// left untouched so the user can still resume or discard it themselves.
+    private func reportAbandonedWorkoutIfNeeded() {
+        guard ActiveWorkoutSessionMarker.isAbandoned() else { return }
+
+        let context = WorkoutStartContextStore.recall()
+        services.analyticsService.workoutAbandoned(
+            setCount: ActiveWorkoutSessionMarker.setCount(),
+            source: context.source,
+            templateUsed: context.templateUsed
+        )
+        ActiveWorkoutSessionMarker.clear()
     }
 
     private func trackScreen(for tab: MainTab) {

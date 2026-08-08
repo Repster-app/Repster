@@ -52,7 +52,12 @@ protocol ExerciseServiceProtocol: Sendable {
     ///
     /// - Parameter exercise: The Exercise with updated values.
     /// - Parameter originalTrackingType: The trackingType before edit, for immutability check.
-    func updateExercise(_ exercise: Exercise, originalTrackingType: TrackingType) async throws
+    /// Persist an edited exercise.
+    ///
+    /// `original` must be captured before the caller mutates `exercise` — it is
+    /// the only record of the pre-edit values, and drives both trackingType
+    /// immutability and PR/stats rebuild detection.
+    func updateExercise(_ exercise: Exercise, original: ExerciseMetadataSnapshot) async throws
 
     /// Fetch an exercise by ID.
     func fetchExercise(_ exerciseId: UUID) async throws -> Exercise?

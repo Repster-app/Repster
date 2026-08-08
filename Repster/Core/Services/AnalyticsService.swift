@@ -29,7 +29,11 @@ struct AnalyticsConfiguration: Equatable {
 }
 
 protocol AnalyticsClientProtocol {
-    func configure(_ configuration: AnalyticsConfiguration)
+    /// - Parameter startOptedOut: Applied at SDK setup time rather than immediately
+    ///   after, because PostHog captures `Application Installed` / `Application Opened`
+    ///   during `setup(_:)` itself. Opting out afterwards would still leak one
+    ///   lifecycle event per launch for users who turned analytics off.
+    func configure(_ configuration: AnalyticsConfiguration, startOptedOut: Bool)
     func capture(_ event: String, properties: [String: Any])
     func screen(_ screen: String, properties: [String: Any])
     func optIn()
@@ -38,27 +42,68 @@ protocol AnalyticsClientProtocol {
 }
 
 final class PostHogAnalyticsClient: AnalyticsClientProtocol {
-    func configure(_ configuration: AnalyticsConfiguration) {
+    func configure(_ configuration: AnalyticsConfiguration, startOptedOut: Bool) {
         let config = PostHogConfig(
             projectToken: configuration.projectToken,
             host: configuration.host
         )
-        config.personProfiles = .never
-        config.captureApplicationLifecycleEvents = false
+        config.optOut = startOptedOut
+        // Person profiles are keyed off PostHog's random per-install distinct_id
+        // (Repster has no accounts, so nothing identity-linked ever reaches it).
+        // Required for retention insights and behavioural cohorts — without it
+        // PostHog cannot answer "what did the users who never came back do?".
+        config.personProfiles = .always
+        config.setDefaultPersonProperties = false
+
+        // Supplies `Application Installed` / `Opened` / `Became Active`, which are
+        // the denominator for every activation and retention funnel.
+        config.captureApplicationLifecycleEvents = true
+
+        // Screen views stay manual so they use the curated `AnalyticsScreen` names.
         config.captureScreenViews = false
         config.captureElementInteractions = false
-        config.sessionReplay = false
-        config.surveys = false
         config.rageClickConfig.enabled = false
         config.preloadFeatureFlags = false
         config.sendFeatureFlagEvent = false
-        config.setDefaultPersonProperties = false
+
+        // In-app surveys (multiple choice only — see the privacy policy) are the
+        // qualitative counterpart to the funnel events.
+        config.surveys = true
+
+        configureSessionReplay(on: config)
 
         #if DEBUG
         config.debug = true
         #endif
 
         PostHogSDK.shared.setup(config)
+    }
+
+    /// Session replay is deliberately configured so that no workout data can leave
+    /// the device. Repster is SwiftUI, so `maskAllTextInputs` masks *every* text
+    /// layer (PostHog masks `SwiftUI.CGDrawingView`), not just editable fields —
+    /// recordings show layout, navigation and taps with all text redacted.
+    ///
+    /// Keep this in sync with `marketing/website/privacy.html` and
+    /// `marketing/app-store/privacy-review-checklist.md`.
+    private func configureSessionReplay(on config: PostHogConfig) {
+        config.sessionReplay = true
+
+        // Wireframe mode renders almost nothing for SwiftUI hierarchies; screenshot
+        // mode is the supported path, and is only safe because of the masking below.
+        config.sessionReplayConfig.screenshotMode = true
+
+        config.sessionReplayConfig.maskAllTextInputs = true
+        config.sessionReplayConfig.maskAllImages = true
+        config.sessionReplayConfig.maskAllSandboxedViews = true
+
+        // Nothing about network traffic or logs is worth the disclosure surface.
+        config.sessionReplayConfig.captureNetworkTelemetry = false
+        config.sessionReplayConfig.captureLogs = false
+
+        // One snapshot per second is plenty for navigation-flow analysis and keeps
+        // the performance cost off the main thread budget during a workout.
+        config.sessionReplayConfig.throttleDelay = 1.0
     }
 
     func capture(_ event: String, properties: [String: Any]) {
@@ -83,7 +128,7 @@ final class PostHogAnalyticsClient: AnalyticsClientProtocol {
 }
 
 final class NoopAnalyticsClient: AnalyticsClientProtocol {
-    func configure(_ configuration: AnalyticsConfiguration) {}
+    func configure(_ configuration: AnalyticsConfiguration, startOptedOut: Bool) {}
     func capture(_ event: String, properties: [String: Any]) {}
     func screen(_ screen: String, properties: [String: Any]) {}
     func optIn() {}
@@ -135,7 +180,7 @@ final class AnalyticsService: AnalyticsServiceProtocol {
     }
 
     func configure() {
-        client.configure(configuration)
+        client.configure(configuration, startOptedOut: !isCollectionEnabled)
         applyCurrentCollectionPreference()
     }
 

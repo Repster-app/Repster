@@ -5,6 +5,7 @@ import SwiftUI
 
 struct InsightsView: View {
     @State private var viewModel: InsightsViewModel
+    @Environment(ServiceContainer.self) private var services
 
     init(insightsService: any InsightsServiceProtocol) {
         _viewModel = State(initialValue: InsightsViewModel(insightsService: insightsService))
@@ -36,6 +37,12 @@ struct InsightsView: View {
         .navigationBarTitleDisplayMode(.large)
         .task {
             await viewModel.load()
+            // Reported after load so the empty state reflects "no findings yet"
+            // rather than "hasn't finished loading".
+            services.analyticsService.screenViewed(
+                .insights,
+                hasData: !viewModel.insights.isEmpty
+            )
         }
     }
 

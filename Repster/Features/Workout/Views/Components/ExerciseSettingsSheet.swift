@@ -140,12 +140,13 @@ struct ExerciseSettingsSheet: View {
         defer { isSaving = false }
 
         // Update exercise model directly
+        let original = ExerciseMetadataSnapshot(from: exercise)
         exercise.defaultRestTime = restTimeSeconds
         exercise.weightIncrement = weightIncrement
         exercise.updatedAt = Date()
 
         do {
-            try await services.exerciseService.updateExercise(exercise, originalTrackingType: exercise.trackingType)
+            try await services.exerciseService.updateExercise(exercise, original: original)
         } catch {
             dbg("[ExerciseSettingsSheet] Failed to save: \(error)")
         }

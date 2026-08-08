@@ -1,6 +1,13 @@
 # App Privacy and Review Checklist
 
-Last checked: May 15, 2026
+Last checked: August 8, 2026
+
+> **Changed in the analytics expansion (August 2026):** PostHog person profiles,
+> application lifecycle events, masked session replay, and multiple-choice surveys
+> are now enabled. Previous versions of this document and the privacy policy stated
+> that replay, surveys, and person profiles were disabled — that is no longer true,
+> and both the live policy and the App Review notes below were updated together.
+> If any of these are turned back off, update all three in the same change.
 
 ## App Store Connect Privacy Answers
 
@@ -13,7 +20,13 @@ Data types to select:
 - `Usage Data` -> `Product Interaction`
 - `Identifiers` -> `Device ID`
 
-Do not select `Usage Data` -> `Other Usage Data` for the current simplified analytics setup.
+Also select:
+
+- `Usage Data` -> `Other Usage Data`
+
+`Other Usage Data` is now required because session replay captures screen imagery
+(masked) and surveys capture multiple-choice answers, neither of which is cleanly
+covered by `Product Interaction`.
 
 ## Per-Data-Type Answers
 
@@ -35,14 +48,21 @@ Do not select `Usage Data` -> `Other Usage Data` for the current simplified anal
 - Purpose: `Analytics`
 - Linked to user: `No`
 - Used for tracking: `No`
-- Reason: screen views, app/session lifecycle, paywall actions, import completed, and backup exported.
+- Reason: screen views, app/session lifecycle, onboarding step progression, exercise and template creation, empty-state impressions, paywall actions, import completed, and backup exported.
+
+`Other Usage Data`
+
+- Purpose: `Analytics`
+- Linked to user: `No`
+- Used for tracking: `No`
+- Reason: masked session recordings (screen imagery with all text and images obscured on device before upload) and multiple-choice in-app survey responses.
 
 `Device ID`
 
 - Purpose: `Analytics`
 - Linked to user: `No`
 - Used for tracking: `No`
-- Reason: PostHog uses an anonymous install/distinct identifier for product analytics.
+- Reason: PostHog uses an anonymous install/distinct identifier for product analytics. Person profiles are now enabled and are keyed off this identifier, which is generated on device and never linked to an account, email, or name — Repster has no accounts.
 
 ## Tracking / ATT
 
@@ -54,13 +74,18 @@ This setup should not require App Tracking Transparency because Repster does not
 
 Add a section like this to the live privacy policy:
 
-> Repster uses PostHog EU cloud for anonymous product analytics. We collect coarse usage events such as app screens viewed, workout started/completed/discarded, whether a workout lasted under 30 minutes or 30 minutes or more, paywall actions, import completion, and backup export. Analytics are enabled by default and can be turned off in Settings -> Data & Backups -> Share Anonymous Analytics.
->
-> Repster does not send exercise names, set weights, reps, notes, CSV contents, bodyweight values, or raw workout logs to analytics.
->
-> Repster uses RevenueCat to manage App Store purchases and entitlements. RevenueCat may process purchase history and anonymous app user identifiers to validate purchases, unlock paid features, and provide purchase analytics.
->
-> Repster does not use analytics for advertising, does not sell data, does not use IDFA, and does not enable PostHog session replay, autocapture, heatmaps, surveys, or person profiles.
+The live policy at `marketing/website/privacy.html` is the source of truth and was
+rewritten on August 8, 2026. It now covers, in addition to the original event
+list: onboarding progression, workout abandonment, masked session recordings,
+multiple-choice surveys, and the anonymous per-install identifier behind person
+profiles. Do not paraphrase it here — read the file.
+
+The two commitments that must stay literally true in the app:
+
+1. All text and images are masked on device before a recording is uploaded
+   (`maskAllTextInputs` / `maskAllImages` in `AnalyticsService.configureSessionReplay`).
+2. The Share Anonymous Analytics toggle disables events, replay, and surveys
+   together (`optOut` is applied at SDK setup, not after it).
 
 ## App Review Notes
 
@@ -68,7 +93,11 @@ Use this in the App Review Notes field:
 
 > Repster is a workout logging app and does not require account creation. Workout history, exercises, templates, bodyweight entries, and settings are stored locally on device unless the user exports or shares them.
 >
-> The app uses anonymous PostHog EU product analytics for aggregate usage statistics only. The analytics setup does not use IDFA, ads, tracking, session replay, autocapture, heatmaps, surveys, or person profiles. Users can turn analytics off in Settings -> Data & Backups -> Share Anonymous Analytics. Analytics do not include exercise names, weights, reps, notes, CSV contents, bodyweight values, or raw workout logs.
+> The app uses anonymous PostHog EU product analytics for aggregate usage statistics only. It does not use IDFA, advertising, tracking, autocapture, or heatmaps. Users can turn all analytics off in Settings -> Data & Backups -> Share Anonymous Analytics, which disables events, session recordings, and surveys together.
+>
+> The app captures masked session recordings to diagnose usability problems. All text and all images are masked on device before any recording is uploaded, so recordings show only layout, navigation, and tap locations. Analytics and recordings do not include exercise names, weights, reps, notes, CSV contents, bodyweight values, or raw workout logs.
+>
+> The app shows occasional optional multiple-choice in-app surveys about the user's experience. No free-text survey responses are collected. Repster has no user accounts, so all analytics data is grouped under a random identifier generated on device at install time and is not linked to any real-world identity.
 >
 > The free tier allows up to 5 completed workouts. After that limit, the app presents the RevenueCat/App Store paywall to unlock unlimited workout logging. Restore Purchases and Manage Subscription are available in Settings -> Membership. Privacy Policy and Terms of Use are available in Settings -> About.
 >

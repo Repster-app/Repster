@@ -58,6 +58,7 @@ struct RepsterApp: App {
                     settingsService: services.settingsService,
                     bodyweightService: services.bodyweightService,
                     importService: services.importService,
+                    analyticsService: services.analyticsService,
                     onComplete: {
                         hasCompletedOnboarding = true
                     }

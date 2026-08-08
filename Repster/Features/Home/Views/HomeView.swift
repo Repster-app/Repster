@@ -13,6 +13,9 @@ struct HomeView: View {
     @State private var navigationPath = NavigationPath()
     @Environment(ServiceContainer.self) private var services
 
+    /// Home is reported once per view lifetime — see `reportHomeContentIfNeeded`.
+    @State private var hasReportedHomeContent = false
+
     let refreshTrigger: UUID
     let popToRootTrigger: UUID
     let workoutAccessMessage: String?
@@ -95,6 +98,7 @@ struct HomeView: View {
         .task(id: refreshTrigger) {
             viewModel.lastLoadTime = nil
             await viewModel.loadData()
+            reportHomeContentIfNeeded()
         }
         .onChange(of: popToRootTrigger) {
             navigationPath = NavigationPath()
@@ -208,6 +212,22 @@ struct HomeView: View {
     // MARK: - Recent Workouts
 
     @ViewBuilder
+    /// Reports whether Home had any workout history to show. A user staring at an
+    /// empty Home screen is the single most common shape of a first session that
+    /// never turns into a second one — previously indistinguishable in analytics
+    /// from a returning user opening the app.
+    ///
+    /// Fires once per view lifetime; Home reloads on every cover dismissal and
+    /// repeat reports would swamp the signal.
+    private func reportHomeContentIfNeeded() {
+        guard !hasReportedHomeContent else { return }
+        hasReportedHomeContent = true
+        services.analyticsService.screenViewed(
+            .home,
+            hasData: !viewModel.recentWorkouts.isEmpty
+        )
+    }
+
     private var recentWorkoutsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("RECENT")

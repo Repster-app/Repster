@@ -30,7 +30,8 @@ struct CreateEditExerciseSheet: View {
         self._viewModel = State(initialValue: CreateEditExerciseViewModel(
             exercise: exercise,
             exerciseService: services.exerciseService,
-            settingsService: services.settingsService
+            settingsService: services.settingsService,
+            analyticsService: services.analyticsService
         ))
         self.onSave = onSave
     }

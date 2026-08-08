@@ -119,6 +119,7 @@ struct TemplateFlowView: View {
                     templateService: templateService,
                     exerciseService: exerciseService,
                     editingTemplateId: route.editingTemplateId,
+                    analyticsService: analyticsService,
                     onSaved: {
                         Task { await viewModel.loadTemplates() }
                     }

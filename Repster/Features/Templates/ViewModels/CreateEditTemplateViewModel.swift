@@ -57,15 +57,18 @@ final class CreateEditTemplateViewModel {
 
     private let templateService: TemplateServiceProtocol
     private let exerciseService: ExerciseServiceProtocol
+    private let analyticsService: any AnalyticsServiceProtocol
 
     init(
         templateService: TemplateServiceProtocol,
         exerciseService: ExerciseServiceProtocol,
-        editingTemplateId: UUID? = nil
+        editingTemplateId: UUID? = nil,
+        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService()
     ) {
         self.templateService = templateService
         self.exerciseService = exerciseService
         self.editingTemplateId = editingTemplateId
+        self.analyticsService = analyticsService
     }
 
     /// Re-initializes editor state for the current presentation and loads template data if editing.
@@ -167,6 +170,12 @@ final class CreateEditTemplateViewModel {
             try await templateService.updateTemplate(templateId, data: data)
         } else {
             _ = try await templateService.createTemplate(data)
+            // Building a template is a commitment signal — it means the user
+            // intends to come back and repeat this session.
+            analyticsService.templateCreated(
+                exerciseCount: exercises.count,
+                source: "create_template_form"
+            )
         }
     }
 

@@ -51,6 +51,9 @@ enum WorkoutStartContextStore {
     ) {
         userDefaults.set(source.rawValue, forKey: sourceKey)
         userDefaults.set(templateUsed, forKey: templateUsedKey)
+        // Kept in lockstep with the start context so the two can never disagree
+        // about whether a workout is in flight.
+        ActiveWorkoutSessionMarker.markStarted(userDefaults: userDefaults)
     }
 
     static func recall(
@@ -65,6 +68,67 @@ enum WorkoutStartContextStore {
     static func clear(userDefaults: UserDefaults = .standard) {
         userDefaults.removeObject(forKey: sourceKey)
         userDefaults.removeObject(forKey: templateUsedKey)
+        ActiveWorkoutSessionMarker.clear(userDefaults: userDefaults)
+    }
+}
+
+/// Analytics-only bookkeeping for the in-flight workout. Lives in UserDefaults
+/// rather than the model so that nothing here touches workout persistence.
+///
+/// Exists to answer two questions the event stream previously could not:
+///   1. How long after starting a workout does someone log their first set?
+///   2. How many workouts are simply walked away from? A user who starts a
+///      session and never finishes or discards it produced no terminal event at
+///      all, so they were invisible.
+enum ActiveWorkoutSessionMarker {
+    private static let startedAtKey = "analyticsActiveWorkoutStartedAt"
+    private static let firstSetLoggedKey = "analyticsActiveWorkoutFirstSetLogged"
+    private static let setCountKey = "analyticsActiveWorkoutSetCount"
+
+    /// A workout still marked in-flight this long after starting is treated as
+    /// abandoned. Long enough to survive a genuinely slow session plus a phone
+    /// restart; short enough that the event lands the next day.
+    static let abandonmentThreshold: TimeInterval = 12 * 60 * 60
+
+    static func markStarted(at date: Date = Date(), userDefaults: UserDefaults = .standard) {
+        userDefaults.set(date, forKey: startedAtKey)
+        userDefaults.set(false, forKey: firstSetLoggedKey)
+        userDefaults.set(0, forKey: setCountKey)
+    }
+
+    static func startedAt(userDefaults: UserDefaults = .standard) -> Date? {
+        userDefaults.object(forKey: startedAtKey) as? Date
+    }
+
+    static func hasLoggedFirstSet(userDefaults: UserDefaults = .standard) -> Bool {
+        userDefaults.bool(forKey: firstSetLoggedKey)
+    }
+
+    static func setCount(userDefaults: UserDefaults = .standard) -> Int {
+        userDefaults.integer(forKey: setCountKey)
+    }
+
+    /// Returns true only the first time it's called for a given workout, so the
+    /// caller can fire `first set logged` exactly once.
+    static func markFirstSetLogged(userDefaults: UserDefaults = .standard) -> Bool {
+        guard !hasLoggedFirstSet(userDefaults: userDefaults) else { return false }
+        userDefaults.set(true, forKey: firstSetLoggedKey)
+        return true
+    }
+
+    static func incrementSetCount(userDefaults: UserDefaults = .standard) {
+        userDefaults.set(setCount(userDefaults: userDefaults) + 1, forKey: setCountKey)
+    }
+
+    static func isAbandoned(now: Date = Date(), userDefaults: UserDefaults = .standard) -> Bool {
+        guard let startedAt = startedAt(userDefaults: userDefaults) else { return false }
+        return now.timeIntervalSince(startedAt) > abandonmentThreshold
+    }
+
+    static func clear(userDefaults: UserDefaults = .standard) {
+        userDefaults.removeObject(forKey: startedAtKey)
+        userDefaults.removeObject(forKey: firstSetLoggedKey)
+        userDefaults.removeObject(forKey: setCountKey)
     }
 }
 
@@ -223,6 +287,119 @@ extension AnalyticsServiceProtocol {
             .enabled: .bool(enabled)
         ])
     }
+
+    // Onboarding
+    //
+    // Onboarding was previously untracked end to end, which made install ->
+    // activation impossible to measure: a user who bounced on step 2 looked
+    // identical to one who never opened the app.
+
+    func onboardingStepViewed(_ step: OnboardingStep) {
+        track(.onboardingStepViewed, properties: [
+            .step: .string(step.analyticsName),
+            .stepIndex: .int(step.rawValue)
+        ])
+    }
+
+    func onboardingStepSkipped(_ step: OnboardingStep) {
+        track(.onboardingStepSkipped, properties: [
+            .step: .string(step.analyticsName),
+            .stepIndex: .int(step.rawValue)
+        ])
+    }
+
+    func onboardingCompleted(lastStep: OnboardingStep, unitSystem: String?) {
+        var properties: [AnalyticsPropertyKey: AnalyticsPropertyValue] = [
+            .step: .string(lastStep.analyticsName),
+            .stepIndex: .int(lastStep.rawValue)
+        ]
+        if let unitSystem {
+            properties[.unitSystem] = .string(unitSystem)
+        }
+        track(.onboardingCompleted, properties: properties)
+    }
+
+    // Activation
+
+    func exerciseCreated(source: String) {
+        track(.exerciseCreated, properties: [.source: .string(source)])
+    }
+
+    func templateCreated(exerciseCount: Int, source: String) {
+        track(.templateCreated, properties: [
+            .exerciseCountBucket: .string(AnalyticsBuckets.count(exerciseCount)),
+            .source: .string(source)
+        ])
+    }
+
+    /// Fired once per workout, on the first completed set. Separates "opened a
+    /// workout and stared at it" from "actually logged something".
+    func firstSetLogged(source: WorkoutStartSource?, secondsSinceStart: TimeInterval) {
+        var properties: [AnalyticsPropertyKey: AnalyticsPropertyValue] = [
+            .elapsedSecondsBucket: .string(AnalyticsBuckets.shortDuration(seconds: secondsSinceStart))
+        ]
+        if let source {
+            properties[.source] = .string(source.rawValue)
+        }
+        track(.firstSetLogged, properties: properties)
+    }
+
+    func workoutResumed(setCount: Int) {
+        track(.workoutResumed, properties: [
+            .setCountBucket: .string(AnalyticsBuckets.count(setCount))
+        ])
+    }
+
+    /// A workout that was started but never completed or discarded — the user
+    /// left the app mid-session and never came back to it. Detected on next
+    /// launch, so it always lags the actual abandonment by one app open.
+    func workoutAbandoned(setCount: Int, source: WorkoutStartSource?, templateUsed: Bool?) {
+        var properties: [AnalyticsPropertyKey: AnalyticsPropertyValue] = [
+            .setCountBucket: .string(AnalyticsBuckets.count(setCount))
+        ]
+        if let source {
+            properties[.source] = .string(source.rawValue)
+        }
+        if let templateUsed {
+            properties[.templateUsed] = .bool(templateUsed)
+        }
+        track(.workoutAbandoned, properties: properties)
+    }
+
+    /// A screen that rendered with nothing in it. "Charts with no data" is a
+    /// prime suspect for a silent first-session bounce.
+    func emptyStateShown(screen: AnalyticsScreen) {
+        track(.emptyStateShown, properties: [
+            .screenName: .string(screen.rawValue),
+            .hasData: .bool(false)
+        ])
+    }
+
+    func screenViewed(_ screen: AnalyticsScreen, hasData: Bool) {
+        self.screen(screen, properties: [.hasData: .bool(hasData)])
+        if !hasData {
+            emptyStateShown(screen: screen)
+        }
+    }
+
+    func reviewPromptRequested(trigger: String, completedWorkoutCount: Int) {
+        track(.reviewPromptRequested, properties: [
+            .trigger: .string(trigger),
+            .completedWorkoutCount: .string(AnalyticsBuckets.count(completedWorkoutCount))
+        ])
+    }
+}
+
+extension OnboardingStep {
+    var analyticsName: String {
+        switch self {
+        case .welcome: return "welcome"
+        case .units: return "units"
+        case .bodyweight: return "bodyweight"
+        case .smartSuggestions: return "smart_suggestions"
+        case .importPrompt: return "import_prompt"
+        }
+    }
 }
 
 enum AnalyticsScreen: String, CaseIterable {
@@ -233,12 +410,26 @@ enum AnalyticsScreen: String, CaseIterable {
     case activeWorkout = "Active Workout"
     case workoutSummary = "Workout Summary"
     case paywall = "Paywall"
+    case insights = "Insights"
+    case exerciseList = "Exercise List"
+    case templates = "Templates"
+    case history = "History"
 }
 
 enum AnalyticsEvent: String, CaseIterable {
     case workoutStarted = "workout started"
     case workoutCompleted = "workout completed"
     case workoutDiscarded = "workout discarded"
+    case workoutAbandoned = "workout abandoned"
+    case workoutResumed = "workout resumed"
+    case firstSetLogged = "first set logged"
+    case onboardingStepViewed = "onboarding step viewed"
+    case onboardingStepSkipped = "onboarding step skipped"
+    case onboardingCompleted = "onboarding completed"
+    case exerciseCreated = "exercise created"
+    case templateCreated = "template created"
+    case emptyStateShown = "empty state shown"
+    case reviewPromptRequested = "review prompt requested"
     case importStarted = "import started"
     case importCompleted = "import completed"
     case backupExported = "backup exported"
@@ -282,6 +473,13 @@ enum AnalyticsPropertyKey: String, CaseIterable {
     case rirEntered = "rir_entered"
     case rirSetCountBucket = "rir_set_count_bucket"
     case averageRirBucket = "average_rir_bucket"
+    case step
+    case stepIndex = "step_index"
+    case hasData = "has_data"
+    case screenName = "screen_name"
+    case completedWorkoutCount = "completed_workout_count"
+    case elapsedSecondsBucket = "elapsed_seconds_bucket"
+    case trigger
 }
 
 enum AnalyticsPropertyValue: Equatable {
@@ -320,6 +518,24 @@ enum AnalyticsBuckets {
             return "60-90m"
         default:
             return "90m_or_more"
+        }
+    }
+
+    /// Sub-workout timescale, for "how long until they logged anything".
+    /// `duration(seconds:)` starts at 15-minute granularity, which is far too
+    /// coarse for time-to-first-set.
+    static func shortDuration(seconds: TimeInterval) -> String {
+        switch max(0, seconds) {
+        case ..<30:
+            return "under_30s"
+        case 30..<60:
+            return "30-60s"
+        case 60..<180:
+            return "1-3m"
+        case 180..<600:
+            return "3-10m"
+        default:
+            return "10m_or_more"
         }
     }
 

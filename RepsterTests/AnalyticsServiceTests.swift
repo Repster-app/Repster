@@ -91,6 +91,80 @@ final class AnalyticsServiceTests: XCTestCase {
         XCTAssertEqual(client.captures.count, 1)
     }
 
+    /// PostHog captures `Application Installed` / `Opened` inside `setup(_:)`, so
+    /// an opted-out user would leak one lifecycle event per launch unless the
+    /// preference is applied at setup time rather than immediately afterwards.
+    func testOptedOutUserStartsSDKAlreadyOptedOut() {
+        let (service, client, defaults) = makeService()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        defaults.set(false, forKey: AnalyticsService.collectionEnabledDefaultsKey)
+        service.configure()
+
+        XCTAssertEqual(client.configuredStartOptedOut, true)
+    }
+
+    func testOptedInUserStartsSDKCollecting() {
+        let (service, client, defaults) = makeService()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        service.configure()
+
+        XCTAssertEqual(client.configuredStartOptedOut, false)
+    }
+
+    func testOnboardingStepEventsCarryStepIdentity() {
+        let (service, client, defaults) = makeService()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        service.configure()
+        service.onboardingStepViewed(.bodyweight)
+        service.onboardingStepSkipped(.bodyweight)
+
+        let viewed = client.captures[client.captures.count - 2]
+        XCTAssertEqual(viewed.event, "onboarding step viewed")
+        XCTAssertEqual(viewed.properties["step"] as? String, "bodyweight")
+        XCTAssertEqual(viewed.properties["step_index"] as? Int, 2)
+
+        XCTAssertEqual(client.captures.last?.event, "onboarding step skipped")
+        XCTAssertEqual(client.captures.last?.properties["step"] as? String, "bodyweight")
+    }
+
+    func testScreenViewedWithoutDataAlsoEmitsEmptyState() {
+        let (service, client, defaults) = makeService()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        service.configure()
+        service.screenViewed(.charts, hasData: false)
+
+        XCTAssertEqual(client.screens.last?.screen, "Charts")
+        XCTAssertEqual(client.screens.last?.properties["has_data"] as? Bool, false)
+        XCTAssertEqual(client.captures.last?.event, "empty state shown")
+        XCTAssertEqual(client.captures.last?.properties["screen_name"] as? String, "Charts")
+    }
+
+    func testScreenViewedWithDataDoesNotEmitEmptyState() {
+        let (service, client, defaults) = makeService()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        service.configure()
+        service.screenViewed(.charts, hasData: true)
+
+        XCTAssertTrue(client.captures.isEmpty)
+    }
+
+    func testFirstSetLoggedBucketsTimeSinceWorkoutStart() {
+        let (service, client, defaults) = makeService()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        service.configure()
+        service.firstSetLogged(source: .template, secondsSinceStart: 125)
+
+        XCTAssertEqual(client.captures.last?.event, "first set logged")
+        XCTAssertEqual(client.captures.last?.properties["elapsed_seconds_bucket"] as? String, "1-3m")
+        XCTAssertEqual(client.captures.last?.properties["source"] as? String, "template")
+    }
+
     func testEveryEventStampsAppVersionAndBuildNumber() {
         let (service, client, defaults) = makeService(appVersion: "1.4.2", buildNumber: "312")
         defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
@@ -244,6 +318,51 @@ final class AnalyticsServiceTests: XCTestCase {
         XCTAssertNil(cleared.templateUsed)
     }
 
+    func testSessionMarkerReportsFirstSetExactlyOnce() {
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        ActiveWorkoutSessionMarker.markStarted(userDefaults: defaults)
+
+        XCTAssertTrue(ActiveWorkoutSessionMarker.markFirstSetLogged(userDefaults: defaults))
+        XCTAssertFalse(ActiveWorkoutSessionMarker.markFirstSetLogged(userDefaults: defaults))
+        XCTAssertFalse(ActiveWorkoutSessionMarker.markFirstSetLogged(userDefaults: defaults))
+    }
+
+    func testSessionMarkerTreatsStaleWorkoutAsAbandoned() {
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let start = Date()
+        ActiveWorkoutSessionMarker.markStarted(at: start, userDefaults: defaults)
+
+        let withinSession = start.addingTimeInterval(3 * 60 * 60)
+        XCTAssertFalse(ActiveWorkoutSessionMarker.isAbandoned(now: withinSession, userDefaults: defaults))
+
+        let nextDay = start.addingTimeInterval(20 * 60 * 60)
+        XCTAssertTrue(ActiveWorkoutSessionMarker.isAbandoned(now: nextDay, userDefaults: defaults))
+    }
+
+    func testSessionMarkerWithNoWorkoutIsNeverAbandoned() {
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        XCTAssertFalse(ActiveWorkoutSessionMarker.isAbandoned(userDefaults: defaults))
+    }
+
+    /// The marker has to be cleared by the same call that clears the start
+    /// context, otherwise a finished workout would later be reported abandoned.
+    func testClearingStartContextAlsoClearsSessionMarker() {
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        WorkoutStartContextStore.remember(source: .empty, templateUsed: false, userDefaults: defaults)
+        XCTAssertNotNil(ActiveWorkoutSessionMarker.startedAt(userDefaults: defaults))
+
+        WorkoutStartContextStore.clear(userDefaults: defaults)
+        XCTAssertNil(ActiveWorkoutSessionMarker.startedAt(userDefaults: defaults))
+    }
+
     func testMissingConfigurationFailsClosed() {
         XCTAssertNil(AnalyticsConfiguration(projectToken: "", host: "https://eu.i.posthog.com"))
         XCTAssertNil(AnalyticsConfiguration(projectToken: "$(POSTHOG_PROJECT_TOKEN)", host: "https://eu.i.posthog.com"))
@@ -283,16 +402,116 @@ final class AnalyticsServiceTests: XCTestCase {
     }
 }
 
+@MainActor
+final class ReviewPromptServiceTests: XCTestCase {
+    private let suiteName = "ReviewPromptServiceTests"
+
+    private func makeService(
+        appVersion: String = "1.4.0",
+        now: @escaping () -> Date = Date.init
+    ) -> (ReviewPromptService, UserDefaults) {
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        return (
+            ReviewPromptService(userDefaults: defaults, appVersion: appVersion, now: now),
+            defaults
+        )
+    }
+
+    func testDoesNotPromptBeforeFirstMilestone() {
+        let (service, defaults) = makeService()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        for _ in 0..<2 {
+            ReviewPromptService.recordCompletedWorkout(userDefaults: defaults)
+            XCTAssertFalse(service.shouldRequestReview())
+        }
+    }
+
+    func testPromptsAtFirstMilestone() {
+        let (service, defaults) = makeService()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        for _ in 0..<3 {
+            ReviewPromptService.recordCompletedWorkout(userDefaults: defaults)
+        }
+
+        XCTAssertEqual(service.completedWorkoutCount, 3)
+        XCTAssertTrue(service.shouldRequestReview())
+    }
+
+    func testDoesNotPromptTwiceOnTheSameVersion() {
+        let (service, defaults) = makeService()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        for _ in 0..<3 {
+            ReviewPromptService.recordCompletedWorkout(userDefaults: defaults)
+        }
+        XCTAssertTrue(service.shouldRequestReview())
+
+        service.markReviewRequested()
+        XCTAssertFalse(service.shouldRequestReview())
+    }
+
+    /// A user who trains hard could reach two milestones inside one release.
+    /// StoreKit only allows three prompts a year, so we keep our own floor.
+    func testEnforcesMinimumGapAcrossVersions() {
+        let day0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let first = ReviewPromptService(userDefaults: defaults, appVersion: "1.4.0", now: { day0 })
+        for _ in 0..<3 { ReviewPromptService.recordCompletedWorkout(userDefaults: defaults) }
+        XCTAssertTrue(first.shouldRequestReview())
+        first.markReviewRequested()
+
+        for _ in 0..<9 { ReviewPromptService.recordCompletedWorkout(userDefaults: defaults) }
+        XCTAssertEqual(first.completedWorkoutCount, 12)
+
+        let tooSoon = day0.addingTimeInterval(30 * 86_400)
+        let second = ReviewPromptService(userDefaults: defaults, appVersion: "1.5.0", now: { tooSoon })
+        XCTAssertFalse(second.shouldRequestReview())
+
+        let longEnough = day0.addingTimeInterval(90 * 86_400)
+        let third = ReviewPromptService(userDefaults: defaults, appVersion: "1.5.0", now: { longEnough })
+        XCTAssertTrue(third.shouldRequestReview())
+    }
+
+    func testSessionSuppressionBlocksPrompt() {
+        let (service, defaults) = makeService()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        for _ in 0..<3 {
+            ReviewPromptService.recordCompletedWorkout(userDefaults: defaults)
+        }
+        XCTAssertTrue(service.shouldRequestReview())
+
+        service.suppressForThisSession()
+        XCTAssertFalse(service.shouldRequestReview())
+    }
+
+    func testWriteReviewURLTargetsAppStoreReviewForm() {
+        let url = ReviewPromptService.writeReviewURL(appStoreID: "123456789")
+        XCTAssertEqual(
+            url?.absoluteString,
+            "https://apps.apple.com/app/id123456789?action=write-review"
+        )
+    }
+}
+
 private final class SpyAnalyticsClient: AnalyticsClientProtocol {
     private(set) var configured: AnalyticsConfiguration?
+    private(set) var configuredStartOptedOut: Bool?
     private(set) var captures: [(event: String, properties: [String: Any])] = []
     private(set) var screens: [(screen: String, properties: [String: Any])] = []
     private(set) var optInCount = 0
     private(set) var optOutCount = 0
     private var optedOut = false
 
-    func configure(_ configuration: AnalyticsConfiguration) {
+    func configure(_ configuration: AnalyticsConfiguration, startOptedOut: Bool) {
         configured = configuration
+        configuredStartOptedOut = startOptedOut
     }
 
     func capture(_ event: String, properties: [String: Any]) {

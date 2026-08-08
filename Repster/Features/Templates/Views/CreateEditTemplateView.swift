@@ -20,13 +20,15 @@ struct CreateEditTemplateView: View {
         templateService: any TemplateServiceProtocol,
         exerciseService: any ExerciseServiceProtocol,
         editingTemplateId: UUID? = nil,
+        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService(),
         onSaved: (() -> Void)? = nil
     ) {
         self.editingTemplateId = editingTemplateId
         self.onSaved = onSaved
         _viewModel = State(initialValue: CreateEditTemplateViewModel(
             templateService: templateService,
-            exerciseService: exerciseService
+            exerciseService: exerciseService,
+            analyticsService: analyticsService
         ))
     }
 

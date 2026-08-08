@@ -63,4 +63,12 @@ final class ChartsTabViewModel {
             await exercisesVM.loadData()
         }
     }
+
+    /// Whether the Breakdown tab has anything to draw. `nil` while the first load
+    /// is still in flight, so callers can avoid reporting an empty state for a
+    /// screen that simply hasn't loaded yet.
+    var breakdownHasData: Bool? {
+        guard let chartData = breakdownVM.chartData else { return nil }
+        return !chartData.isEmpty
+    }
 }

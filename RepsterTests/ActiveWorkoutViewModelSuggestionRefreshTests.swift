@@ -2264,6 +2264,105 @@ final class SmartSuggestionSettingsTests: XCTestCase {
     }
 }
 
+/// Regression coverage for rebuild detection on exercise metadata edits (FR-006,
+/// specdoc S5.6).
+///
+/// The original implementation compared the edited exercise against a re-fetch of
+/// itself. Both came from the same repository context, so SwiftData returned the
+/// same instance and every comparison was a value against itself — rebuilds never
+/// ran. The pre-edit values now have to be captured by the caller.
+final class ExerciseRebuildDetectionTests: XCTestCase {
+
+    private func makeLoggedSet(for exerciseId: UUID) -> WorkoutSet {
+        WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: exerciseId,
+            weight: 100,
+            reps: 5,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+    }
+
+    func testEquipmentTypeChangeRebuildsPRsAndStats() async throws {
+        let context = try makeExerciseRebuildServiceContext()
+        let exercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps
+        )
+        try await context.exerciseRepo.save(exercise)
+        try await context.setRepo.save(makeLoggedSet(for: exercise.id))
+
+        let original = ExerciseMetadataSnapshot(from: exercise)
+        exercise.equipmentType = .bodyweight
+
+        try await context.service.updateExercise(exercise, original: original)
+
+        XCTAssertEqual(context.prService.rebuiltExerciseIds, [exercise.id])
+        XCTAssertEqual(context.statsService.rebuiltExerciseIds, [exercise.id])
+    }
+
+    func testUnilateralAndBodyweightFactorChangesRebuild() async throws {
+        let context = try makeExerciseRebuildServiceContext()
+        let exercise = Exercise(
+            name: "Split Squat",
+            equipmentType: .dumbbell,
+            trackingType: .weightReps
+        )
+        try await context.exerciseRepo.save(exercise)
+        try await context.setRepo.save(makeLoggedSet(for: exercise.id))
+
+        let original = ExerciseMetadataSnapshot(from: exercise)
+        exercise.unilateral = !exercise.unilateral
+        exercise.bodyweightFactor = 0.65
+
+        try await context.service.updateExercise(exercise, original: original)
+
+        XCTAssertEqual(context.prService.rebuiltExerciseIds, [exercise.id])
+        XCTAssertEqual(context.statsService.rebuiltExerciseIds, [exercise.id])
+    }
+
+    func testNonCalculationFieldEditDoesNotRebuild() async throws {
+        let context = try makeExerciseRebuildServiceContext()
+        let exercise = Exercise(
+            name: "Overhead Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps
+        )
+        try await context.exerciseRepo.save(exercise)
+        try await context.setRepo.save(makeLoggedSet(for: exercise.id))
+
+        let original = ExerciseMetadataSnapshot(from: exercise)
+        exercise.defaultRestTime = 180
+        exercise.primaryMuscle = "Shoulders"
+
+        try await context.service.updateExercise(exercise, original: original)
+
+        XCTAssertTrue(context.prService.rebuiltExerciseIds.isEmpty)
+        XCTAssertTrue(context.statsService.rebuiltExerciseIds.isEmpty)
+    }
+
+    func testEquipmentTypeChangeDoesNotRebuildWithoutLoggedSetData() async throws {
+        let context = try makeExerciseRebuildServiceContext()
+        let exercise = Exercise(
+            name: "Landmine Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps
+        )
+        try await context.exerciseRepo.save(exercise)
+
+        let original = ExerciseMetadataSnapshot(from: exercise)
+        exercise.equipmentType = .machinePin
+
+        try await context.service.updateExercise(exercise, original: original)
+
+        XCTAssertTrue(context.prService.rebuiltExerciseIds.isEmpty)
+        XCTAssertTrue(context.statsService.rebuiltExerciseIds.isEmpty)
+    }
+}
+
 final class ExerciseTrackingTypeTests: XCTestCase {
     func testExerciseServiceAllowsTrackingTypeChangeWhenNoSetsExist() async throws {
         let context = try makeExerciseTrackingTypeServiceContext()
@@ -2274,9 +2373,10 @@ final class ExerciseTrackingTypeTests: XCTestCase {
         )
         try await context.exerciseRepo.save(exercise)
 
+        let original = ExerciseMetadataSnapshot(from: exercise)
         exercise.trackingType = .durationDistance
 
-        try await context.service.updateExercise(exercise, originalTrackingType: .duration)
+        try await context.service.updateExercise(exercise, original: original)
 
         let persisted = try await context.exerciseRepo.fetch(byId: exercise.id)
         XCTAssertEqual(persisted?.trackingType, .durationDistance)
@@ -2300,9 +2400,10 @@ final class ExerciseTrackingTypeTests: XCTestCase {
             )
         )
 
+        let original = ExerciseMetadataSnapshot(from: exercise)
         exercise.trackingType = .durationDistance
 
-        try await context.service.updateExercise(exercise, originalTrackingType: .duration)
+        try await context.service.updateExercise(exercise, original: original)
 
         let persisted = try await context.exerciseRepo.fetch(byId: exercise.id)
         XCTAssertEqual(persisted?.trackingType, .durationDistance)
@@ -2328,10 +2429,11 @@ final class ExerciseTrackingTypeTests: XCTestCase {
             )
         )
 
+        let original = ExerciseMetadataSnapshot(from: exercise)
         exercise.trackingType = .durationDistance
 
         do {
-            try await context.service.updateExercise(exercise, originalTrackingType: .duration)
+            try await context.service.updateExercise(exercise, original: original)
             XCTFail("Expected tracking type change to be rejected once logged data exists")
         } catch let error as ExerciseServiceError {
             guard case .trackingTypeImmutable(let exerciseId) = error else {
@@ -3913,9 +4015,9 @@ private final class ExerciseServiceStub: @unchecked Sendable, ExerciseServicePro
     func createExercise(_ exercise: Exercise) async throws {
         createdExercises.append(exercise)
     }
-    func updateExercise(_ exercise: Exercise, originalTrackingType: TrackingType) async throws {
+    func updateExercise(_ exercise: Exercise, original: ExerciseMetadataSnapshot) async throws {
         updatedExercises.append(exercise)
-        let _ = originalTrackingType
+        let _ = original
     }
     func fetchExercise(_ exerciseId: UUID) async throws -> Exercise? {
         fetchedExercises[exerciseId]
@@ -3940,12 +4042,14 @@ private final class ExerciseServiceStub: @unchecked Sendable, ExerciseServicePro
 }
 
 private final class StatsServiceStub: @unchecked Sendable, StatsServiceProtocol {
+    var rebuiltExerciseIds: [UUID] = []
+
     func updateStats(for exerciseId: UUID, event: StatsUpdateEvent) async throws {
         let _ = exerciseId
         let _ = event
     }
     func rebuildAll() async throws {}
-    func rebuild(for exerciseId: UUID) async throws { let _ = exerciseId }
+    func rebuild(for exerciseId: UUID) async throws { rebuiltExerciseIds.append(exerciseId) }
     func fetchStats(for exerciseId: UUID) async throws -> ExerciseStats? {
         let _ = exerciseId
         return nil
@@ -3960,6 +4064,8 @@ private final class StatsServiceStub: @unchecked Sendable, StatsServiceProtocol 
 }
 
 private final class PRServiceStub: @unchecked Sendable, PRServiceProtocol {
+    var rebuiltExerciseIds: [UUID] = []
+
     func evaluate(
         setId: UUID,
         exerciseId: UUID,
@@ -4024,7 +4130,7 @@ private final class PRServiceStub: @unchecked Sendable, PRServiceProtocol {
     }
 
     func rebuildAll() async throws {}
-    func rebuild(for exerciseId: UUID) async throws { let _ = exerciseId }
+    func rebuild(for exerciseId: UUID) async throws { rebuiltExerciseIds.append(exerciseId) }
 }
 
 final class ImportSupportTests: XCTestCase {
@@ -5464,6 +5570,52 @@ private struct ExerciseTrackingTypeServiceContext {
     let service: ExerciseService
     let exerciseRepo: ExerciseRepository
     let setRepo: SetRepository
+}
+
+private struct ExerciseRebuildServiceContext {
+    let service: ExerciseService
+    let exerciseRepo: ExerciseRepository
+    let setRepo: SetRepository
+    let prService: PRServiceStub
+    let statsService: StatsServiceStub
+}
+
+/// Like `makeExerciseTrackingTypeServiceContext`, but with stubbed PR/stats
+/// services so tests can observe whether a rebuild was actually requested.
+private func makeExerciseRebuildServiceContext() throws -> ExerciseRebuildServiceContext {
+    let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try ModelContainer(
+        for: Exercise.self,
+        WorkoutSet.self,
+        ExerciseStats.self,
+        PerformanceRecord.self,
+        HealthProfile.self,
+        configurations: configuration
+    )
+
+    let exerciseRepo = ExerciseRepository(modelContainer: container)
+    let setRepo = SetRepository(modelContainer: container)
+    let exerciseStatsRepo = ExerciseStatsRepository(modelContainer: container)
+    let performanceRecordRepo = PerformanceRecordRepository(modelContainer: container)
+    let prService = PRServiceStub()
+    let statsService = StatsServiceStub()
+    let service = ExerciseService(
+        exerciseRepository: exerciseRepo,
+        setRepository: setRepo,
+        exerciseStatsRepository: exerciseStatsRepo,
+        performanceRecordRepository: performanceRecordRepo,
+        prService: prService,
+        statsService: statsService,
+        fatigueLearningService: makeStubFatigueLearningService()
+    )
+
+    return ExerciseRebuildServiceContext(
+        service: service,
+        exerciseRepo: exerciseRepo,
+        setRepo: setRepo,
+        prService: prService,
+        statsService: statsService
+    )
 }
 
 private func makeExerciseTrackingTypeServiceContext() throws -> ExerciseTrackingTypeServiceContext {

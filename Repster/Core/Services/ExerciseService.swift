@@ -5,6 +5,42 @@
 
 import Foundation
 
+/// The exercise metadata that affects already-stored calculations, captured
+/// before an edit is applied.
+///
+/// `updateExercise` needs the pre-edit values to decide whether PRs and stats
+/// have to be rebuilt, and it cannot recover them from the store: callers mutate
+/// a live `Exercise`, and re-fetching by ID hands back that same instance from
+/// the repository's context, so a "before vs after" comparison would compare
+/// every value to itself and always report no change.
+struct ExerciseMetadataSnapshot: Sendable, Equatable {
+    let trackingType: TrackingType
+    let equipmentType: EquipmentType
+    let unilateral: Bool
+    let bilateralLoadFactor: Double?
+    let bodyweightFactor: Double
+
+    init(from exercise: Exercise) {
+        self.trackingType = exercise.trackingType
+        self.equipmentType = exercise.equipmentType
+        self.unilateral = exercise.unilateral
+        self.bilateralLoadFactor = exercise.bilateralLoadFactor
+        self.bodyweightFactor = exercise.bodyweightFactor
+    }
+
+    /// Whether the fields that invalidate stored effectiveWeight-derived values
+    /// changed (specdoc S5.6).
+    ///
+    /// `trackingType` is deliberately excluded — it is immutable once sets are
+    /// logged, and a change is rejected rather than rebuilt.
+    func requiresRebuild(comparedTo original: ExerciseMetadataSnapshot) -> Bool {
+        equipmentType != original.equipmentType
+            || unilateral != original.unilateral
+            || bilateralLoadFactor != original.bilateralLoadFactor
+            || bodyweightFactor != original.bodyweightFactor
+    }
+}
+
 actor ExerciseService: ExerciseServiceProtocol {
 
     // MARK: - Dependencies
@@ -63,18 +99,22 @@ actor ExerciseService: ExerciseServiceProtocol {
 
     // MARK: - Update with Metadata Enforcement (FR-005, FR-006)
 
-    func updateExercise(_ exercise: Exercise, originalTrackingType: TrackingType) async throws {
+    /// Persist an edited exercise.
+    ///
+    /// `original` must be captured by the caller *before* it mutates `exercise`,
+    /// otherwise no change can be detected — see `ExerciseMetadataSnapshot`.
+    func updateExercise(_ exercise: Exercise, original: ExerciseMetadataSnapshot) async throws {
         let hasLoggedSetData = try await exerciseRepo.hasLoggedSetData(exercise.id)
 
         // FR-005: trackingType immutability (specdoc S5.6)
-        if hasLoggedSetData && exercise.trackingType != originalTrackingType {
+        if hasLoggedSetData && exercise.trackingType != original.trackingType {
             throw ExerciseServiceError.trackingTypeImmutable(exerciseId: exercise.id)
         }
 
         // Detect rebuild-required field changes (specdoc S5.6)
         var needsRebuild = false
         if hasLoggedSetData {
-            needsRebuild = try await detectRebuildRequired(for: exercise)
+            needsRebuild = ExerciseMetadataSnapshot(from: exercise).requiresRebuild(comparedTo: original)
         }
 
         // Persist the update
@@ -116,19 +156,4 @@ actor ExerciseService: ExerciseServiceProtocol {
         try await exerciseRepo.delete(exercise)
     }
 
-    // MARK: - Private Helpers
-
-    /// Detect if any rebuild-required fields have changed.
-    /// Rebuild-required fields (specdoc S5.6):
-    ///   bodyweightFactor, unilateral, bilateralLoadFactor, equipmentType
-    private func detectRebuildRequired(for exercise: Exercise) async throws -> Bool {
-        guard let persisted = try await exerciseRepo.fetch(byId: exercise.id) else {
-            return false
-        }
-
-        return exercise.bodyweightFactor != persisted.bodyweightFactor
-            || exercise.unilateral != persisted.unilateral
-            || exercise.bilateralLoadFactor != persisted.bilateralLoadFactor
-            || exercise.equipmentType != persisted.equipmentType
-    }
 }

@@ -497,11 +497,28 @@ final class ActiveWorkoutViewModel {
                 requestWeightSuggestionRefresh(mode: .preserveExisting, invalidateCache: true)
             }
 
+            // 8. Analytics only — separates "opened a workout" from "logged something".
+            trackFirstSetIfNeeded()
+
         } catch {
             #if DEBUG
             dbg("[ActiveWorkoutViewModel] Failed to complete set: \(error)")
             #endif
         }
+    }
+
+    /// Emits `first set logged` once per workout, with the delay since the
+    /// workout was started. A long or absent time-to-first-set is the clearest
+    /// signal that someone opened a session and couldn't work out what to do.
+    private func trackFirstSetIfNeeded() {
+        ActiveWorkoutSessionMarker.incrementSetCount()
+        guard ActiveWorkoutSessionMarker.markFirstSetLogged() else { return }
+
+        let startedAt = ActiveWorkoutSessionMarker.startedAt() ?? Date()
+        analyticsService.firstSetLogged(
+            source: WorkoutStartContextStore.recall().source,
+            secondsSinceStart: Date().timeIntervalSince(startedAt)
+        )
     }
 
     /// Uncomplete a set, flipping it back to incomplete state.
@@ -1950,6 +1967,7 @@ final class ActiveWorkoutViewModel {
                 averageRIR: averageRIR
             )
             WorkoutStartContextStore.clear()
+            ReviewPromptService.recordCompletedWorkout()
 
             // Run adaptive fatigue learning before clearing local state
             await fatigueLearningService.processSessionEnd(workoutId: workout.id)

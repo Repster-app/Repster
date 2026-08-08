@@ -27,11 +27,18 @@ final class OnboardingViewModel {
 
     private let settingsService: any SettingsServiceProtocol
     private let bodyweightService: any BodyweightServiceProtocol
+    private let analyticsService: any AnalyticsServiceProtocol
+
+    /// Steps already reported as viewed, so swiping back and forth in the page
+    /// TabView doesn't inflate the funnel denominator.
+    private var reportedStepViews: Set<OnboardingStep> = []
 
     init(settingsService: any SettingsServiceProtocol,
-         bodyweightService: any BodyweightServiceProtocol) {
+         bodyweightService: any BodyweightServiceProtocol,
+         analyticsService: any AnalyticsServiceProtocol) {
         self.settingsService = settingsService
         self.bodyweightService = bodyweightService
+        self.analyticsService = analyticsService
     }
 
     // MARK: - Computed Helpers
@@ -57,7 +64,14 @@ final class OnboardingViewModel {
     }
 
     func skip() {
+        analyticsService.onboardingStepSkipped(currentStep)
         next()
+    }
+
+    /// Called from the container's `onAppear` / step change. Idempotent per step.
+    func trackStepViewed(_ step: OnboardingStep) {
+        guard reportedStepViews.insert(step).inserted else { return }
+        analyticsService.onboardingStepViewed(step)
     }
 
     // MARK: - Finish
@@ -80,6 +94,10 @@ final class OnboardingViewModel {
         } catch {
             // Non-fatal — user can adjust in Settings later
         }
+        analyticsService.onboardingCompleted(
+            lastStep: currentStep,
+            unitSystem: selectedUnit.rawValue
+        )
         isSaving = false
     }
 }

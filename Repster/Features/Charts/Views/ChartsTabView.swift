@@ -10,6 +10,10 @@ struct ChartsTabView: View {
     @Environment(ServiceContainer.self) private var services
     @State private var viewModel: ChartsTabViewModel
 
+    /// Charts is reported once per view lifetime — the tab is re-entered often
+    /// and repeat reports would drown the empty-state signal.
+    @State private var hasReportedChartsData = false
+
     init(chartDataService: any ChartDataServiceProtocol,
          exerciseService: any ExerciseServiceProtocol) {
         _viewModel = State(initialValue: ChartsTabViewModel(
@@ -50,6 +54,14 @@ struct ChartsTabView: View {
         }
         .onAppear {
             viewModel.updateUnitPreference(services.unitPreference)
+        }
+        // Reported once the first load resolves rather than on appear, so an
+        // in-flight load isn't miscounted as an empty state. "Opened Charts and
+        // found nothing" is a prime suspect for a silent first-session bounce.
+        .onChange(of: viewModel.breakdownHasData) { _, hasData in
+            guard let hasData, !hasReportedChartsData else { return }
+            hasReportedChartsData = true
+            services.analyticsService.screenViewed(.charts, hasData: hasData)
         }
         .onChange(of: services.unitPreference) { _, newValue in
             viewModel.updateUnitPreference(newValue)

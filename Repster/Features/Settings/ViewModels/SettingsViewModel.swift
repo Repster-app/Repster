@@ -8,7 +8,7 @@ import UIKit
 
 enum BrandingConfiguration {
     static let appName = "Repster"
-    static let supportEmail = "contact@repster.site"
+    static let supportEmail = "repsterworkout@gmail.com"
     static let privacyPolicyURL = URL(string: "https://repster-app.github.io/Repster/privacy.html")!
     static let termsOfUseURL = URL(string: "https://repster-app.github.io/Repster/terms.html")!
 }

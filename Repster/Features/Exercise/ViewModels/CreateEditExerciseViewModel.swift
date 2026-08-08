@@ -13,6 +13,7 @@ final class CreateEditExerciseViewModel {
 
     private let exerciseService: any ExerciseServiceProtocol
     private let settingsService: any SettingsServiceProtocol
+    private let analyticsService: any AnalyticsServiceProtocol
     private let existingExercise: Exercise?
 
     // MARK: - Form Fields
@@ -85,10 +86,12 @@ final class CreateEditExerciseViewModel {
     init(
         exercise: Exercise?,
         exerciseService: any ExerciseServiceProtocol,
-        settingsService: any SettingsServiceProtocol
+        settingsService: any SettingsServiceProtocol,
+        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService()
     ) {
         self.exerciseService = exerciseService
         self.settingsService = settingsService
+        self.analyticsService = analyticsService
         self.existingExercise = exercise
         self.isEditing = exercise != nil
 
@@ -139,7 +142,7 @@ final class CreateEditExerciseViewModel {
             : .perSide
 
         if isEditing, let existing = existingExercise {
-            let originalTrackingType = existing.trackingType
+            let original = ExerciseMetadataSnapshot(from: existing)
             existing.name = trimmedName
             existing.equipmentType = equipmentType
             if !isTrackingTypeLocked {
@@ -156,7 +159,7 @@ final class CreateEditExerciseViewModel {
             existing.defaultRestTime = defaultRestTime
             existing.updatedAt = Date()
 
-            try await exerciseService.updateExercise(existing, originalTrackingType: originalTrackingType)
+            try await exerciseService.updateExercise(existing, original: original)
         } else {
             let exercise = Exercise(
                 name: trimmedName,
@@ -173,6 +176,10 @@ final class CreateEditExerciseViewModel {
                 defaultRestTime: defaultRestTime
             )
             try await exerciseService.createExercise(exercise)
+            // Creating a custom exercise is one of the strongest activation
+            // signals available: it means the seeded library didn't cover what
+            // the user trains, and they cared enough to fix that.
+            analyticsService.exerciseCreated(source: "create_exercise_form")
         }
     }
 

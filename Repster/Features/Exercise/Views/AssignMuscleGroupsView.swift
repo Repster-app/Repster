@@ -215,6 +215,7 @@ struct AssignMuscleGroupsView: View {
 
     private func select(muscle: String, for exercise: Exercise) {
         let previous = assignments[exercise.id]
+        let original = ExerciseMetadataSnapshot(from: exercise)
         assignments[exercise.id] = muscle
         exercise.primaryMuscle = muscle
 
@@ -222,7 +223,7 @@ struct AssignMuscleGroupsView: View {
             do {
                 try await exerciseService.updateExercise(
                     exercise,
-                    originalTrackingType: exercise.trackingType
+                    original: original
                 )
             } catch {
                 await MainActor.run {

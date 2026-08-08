@@ -126,7 +126,20 @@
       "mcp__visualize__show_widget",
       "Bash(ruby -e \"require 'xcodeproj'; puts 'xcodeproj available'\")",
       "Bash(plutil -lint Repster.xcodeproj/project.pbxproj)",
-      "Bash(set -o pipefail)"
+      "Bash(set -o pipefail)",
+      "Bash(ls -la ~/Library/Developer/Xcode/DerivedData/ 2>/dev/null | head -30; echo \"---CRASH LOGS---\"; ls -lat ~/Library/Logs/DiagnosticReports/ 2>/dev/null | head -30)",
+      "Bash(find ~/Library/Developer/Xcode -maxdepth 3 -iname \"*crash*\" 2>/dev/null | head -20; echo \"---CACHES---\"; find ~/Library/Caches/com.apple.dt.Xcode -maxdepth 3 -iname \"*crash*\" -o -maxdepth 3 -iname \"*organizer*\" 2>/dev/null | head -20; echo \"---SIMLOGS---\"; ls -lat ~/Library/Logs/CoreSimulator/*/ 2>/dev/null | head)",
+      "Bash(xargs -n1 basename)",
+      "Bash(git rev-list *)",
+      "Bash(git ls-tree *)",
+      "Bash(gh repo *)",
+      "Bash(gh pr *)",
+      "Bash(git remote *)",
+      "Bash(ls .claude/../ 2>/dev/null | head -5; echo \"=== MEMORY DIR ===\"; ls /Users/nikolettkiraly/.claude/projects/-Users-nikolettkiraly-Downloads-NewWorkoutProject/memory/)",
+      "Bash(sort -t: -k2 -rn)",
+      "Bash(P=/Users/nikolettkiraly/Library/Developer/Xcode/DerivedData/Repster-hjxdomcocdypqyaozeksllqltljz/SourcePackages/checkouts/posthog-ios; grep -rn \"func postHogMask\\\\|postHogMask\" $P/PostHog --include=\"*.swift\" | head -10)",
+      "Bash(sed -n '/^enum AnalyticsEvent/,/^}/p' Repster/Core/Services/Protocols/AnalyticsServiceProtocol.swift)",
+      "Bash(sed -n '/^enum AnalyticsScreen/,/^}/p' Repster/Core/Services/Protocols/AnalyticsServiceProtocol.swift)"
     ]
   }
 }

@@ -15,7 +15,7 @@ Fast workout tracking for lifters: log sets, start from templates, see previous 
 - Support: `https://repster-app.github.io/Repster/support.html`
 - Privacy: `https://repster-app.github.io/Repster/privacy.html`
 - Terms: `https://repster-app.github.io/Repster/terms.html`
-- Contact: `contact@repster.site`
+- Contact: `repsterworkout@gmail.com`
 
 ## Asset Checklist
 
