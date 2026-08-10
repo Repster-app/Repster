@@ -382,6 +382,62 @@ extension AnalyticsServiceProtocol {
         }
     }
 
+    // MARK: - Training Insights
+    //
+    // Every event carries `rule_id`. The question these exist to answer is
+    // which rules to keep, sharpen or cut — an aggregate engagement number
+    // would be a dashboard nobody can act on.
+    //
+    // Never send headline, detail or chart values: those carry exercise names
+    // and real weights, which is training data leaving the device. Counts stay
+    // bucketed, consistent with the rest of this file.
+
+    func insightsOpened(source: String, findingCount: Int, hasNew: Bool, hasBaseline: Bool) {
+        track(.insightsOpened, properties: [
+            .source: .string(source),
+            .findingCount: .int(findingCount),
+            .hasNew: .bool(hasNew),
+            .hasBaseline: .bool(hasBaseline)
+        ])
+    }
+
+    func insightExpanded(ruleId: String) {
+        track(.insightExpanded, properties: [.ruleId: .string(ruleId)])
+    }
+
+    /// The explicit signal. Only reachable from the expanded card, so it
+    /// self-selects for people who actually read the finding.
+    func insightRated(ruleId: String, useful: Bool, ageDays: Int) {
+        track(.insightRated, properties: [
+            .ruleId: .string(ruleId),
+            .rating: .string(useful ? "useful" : "not_useful"),
+            .insightAgeDays: .int(ageDays)
+        ])
+    }
+
+    /// Fixed option list, never free text — PostHog surveys are configured
+    /// multiple-choice only and the privacy policy says so.
+    func insightRatingReason(ruleId: String, reason: String) {
+        track(.insightRatingReason, properties: [
+            .ruleId: .string(ruleId),
+            .reason: .string(reason)
+        ])
+    }
+
+    /// The strongest implicit signal available: actively hiding a finding for
+    /// three weeks is a clearer verdict than any thumbs-down, and it's free of
+    /// response-rate bias.
+    func insightSnoozed(ruleId: String, ageDays: Int) {
+        track(.insightSnoozed, properties: [
+            .ruleId: .string(ruleId),
+            .insightAgeDays: .int(ageDays)
+        ])
+    }
+
+    func musclePanelExpanded(groupCount: Int) {
+        track(.musclePanelExpanded, properties: [.groupCount: .int(groupCount)])
+    }
+
     func reviewPromptRequested(trigger: String, completedWorkoutCount: Int) {
         track(.reviewPromptRequested, properties: [
             .trigger: .string(trigger),
@@ -442,6 +498,12 @@ enum AnalyticsEvent: String, CaseIterable {
     case restorePurchasesTapped = "restore purchases tapped"
     case unitSystemToggled = "unit system toggled"
     case analyticsOptOutToggled = "analytics opt-out toggled"
+    case insightsOpened = "insights opened"
+    case insightExpanded = "insight expanded"
+    case insightRated = "insight rated"
+    case insightRatingReason = "insight rating reason"
+    case insightSnoozed = "insight snoozed"
+    case musclePanelExpanded = "muscle panel expanded"
 }
 
 enum AnalyticsPropertyKey: String, CaseIterable {
@@ -457,6 +519,14 @@ enum AnalyticsPropertyKey: String, CaseIterable {
     case rowCountBucket = "row_count_bucket"
     case totalRepsBucket = "total_reps_bucket"
     case perceivedEffortEntered = "perceived_effort_entered"
+    case ruleId = "rule_id"
+    case rating = "rating"
+    case reason = "reason"
+    case insightAgeDays = "insight_age_days"
+    case findingCount = "finding_count"
+    case hasNew = "has_new"
+    case hasBaseline = "has_baseline"
+    case groupCount = "group_count"
     case notesEntered = "notes_entered"
     case excludedFromProgression = "excluded_from_progression"
     case prsHit = "prs_hit"

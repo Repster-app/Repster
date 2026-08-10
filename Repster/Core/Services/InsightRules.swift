@@ -90,9 +90,11 @@ struct RestSweetSpotInsightRule: InsightRule {
                     Self.formatRest(shortRestMean)
                 ),
                 methodologyText: "\(pairs.count) timed rests at \(Self.formatWeight(modal.key, context: context))",
+                chartKind: .comparison,
                 chartLabels: ["~\(Self.formatRest(shortRestMean))", "~\(Self.formatRest(longRestMean))"],
                 chartValues: [shortMean, longMean],
-                effectSize: min(1.0, effect / 3.0)
+                effectSize: min(1.0, effect / 3.0),
+                tone: .diagnostic
             ))
         }
 
@@ -163,9 +165,11 @@ struct TargetAdherenceInsightRule: InsightRule {
                     ? "Only \(Int(hitRate * 100))% of your recent sets reached their target rep range. Pulling targets down a notch (or weights back ~5%) puts progress back within reach."
                     : "Only \(Int(hitRate * 100))% of your recent sets stayed inside their target range — most went over. Your targets look too easy for where you are now.",
                 methodologyText: "\(total) targeted sets over \(Self.windowDays) days",
+                chartKind: .proportion,
                 chartLabels: ["below", "in range", "above"],
                 chartValues: [Double(below), Double(hits), Double(above)],
-                effectSize: min(1.0, (Self.lowHitRate - hitRate) / Self.lowHitRate + 0.4)
+                effectSize: min(1.0, (Self.lowHitRate - hitRate) / Self.lowHitRate + 0.4),
+                tone: .diagnostic
             )]
         }
 
@@ -238,25 +242,34 @@ struct MuscleBalanceInsightRule: InsightRule {
                 ? "No \(worst.group) sets in the last \(Self.recentWindowDays) days, while your other muscle groups got \(median)+ each. One focused session closes the gap."
                 : "Only \(worst.count) \(worst.group) sets in the last \(Self.recentWindowDays) days versus ~\(median) for your other groups. Worth a few extra sets this week.",
             methodologyText: "Working sets per muscle group, last \(Self.recentWindowDays) days",
-            chartLabels: sortedGroups,
+            chartKind: .ranking,
+                chartLabels: sortedGroups,
             chartValues: sortedGroups.map { Double(recentSets[$0] ?? 0) },
-            effectSize: min(1.0, 1.0 - Double(worst.count) / max(1.0, Double(median)))
+            effectSize: min(1.0, 1.0 - Double(worst.count) / max(1.0, Double(median))),
+                tone: .diagnostic
         )]
     }
 }
 
 // MARK: - PR rhythm
 
-/// Detects exercises whose time since the last PR is well past the user's own
-/// historical PR cadence.
-struct PRRhythmInsightRule: InsightRule {
-    let ruleId = "prRhythm"
+/// PR cadence against the user's own history, in both directions.
+///
+/// Replaces v1's `prRhythm`, which could only report a drought. PRs naturally
+/// slow as a lifter advances, so a drought-only rule nags hardest at the most
+/// committed users — exactly backwards. The good-stretch variant uses the same
+/// data and outranks the drought when both are available.
+struct PRPaceInsightRule: InsightRule {
+    let ruleId = "prPace"
     let actionability = 0.7
 
     static let minimumPRs = 4
     static let minimumDroughtDays = 14
     static let droughtMultiplier = 1.5
     static let stillTrainedWindowDays = 14
+    /// A recent burst has to beat the user's own cadence by this much to count.
+    static let burstWindowDays = 30.0
+    static let burstMultiplier = 1.5
 
     func evaluate(_ context: InsightAnalysisContext) -> [InsightFinding] {
         let calendar = Calendar.current
@@ -276,6 +289,9 @@ struct PRRhythmInsightRule: InsightRule {
         }
 
         var findings: [InsightFinding] = []
+        if let burst = burstFinding(context: context, prDatesByExercise: prDatesByExercise) {
+            findings.append(burst)
+        }
 
         for (exerciseId, dates) in prDatesByExercise {
             guard dates.count >= Self.minimumPRs,
@@ -308,13 +324,66 @@ struct PRRhythmInsightRule: InsightRule {
                     exercise.name, medianGap, daysSinceLastPR
                 ),
                 methodologyText: "\(dates.count) PRs on record; cadence from your own history",
+                chartKind: .timeline,
                 chartLabels: ["typical gap", "current gap"],
                 chartValues: [medianGap, daysSinceLastPR],
-                effectSize: min(1.0, daysSinceLastPR / (medianGap * 3.0))
+                // Ranked below the burst variant so a good stretch wins when
+                // both hold.
+                effectSize: min(0.75, daysSinceLastPR / (medianGap * 3.0)),
+                tone: .diagnostic
             ))
         }
 
         return findings
+    }
+
+    /// "Three PRs this month — your best stretch since March."
+    private func burstFinding(
+        context: InsightAnalysisContext,
+        prDatesByExercise: [UUID: [Date]]
+    ) -> InsightFinding? {
+        let allPRs = prDatesByExercise.values.flatMap { $0 }.sorted()
+        guard allPRs.count >= Self.minimumPRs else { return nil }
+
+        guard let windowStart = Calendar.current.date(
+            byAdding: .day, value: -Int(Self.burstWindowDays), to: context.referenceDate
+        ) else { return nil }
+
+        let recent = allPRs.filter { $0 >= windowStart }
+        guard recent.count >= 2 else { return nil }
+
+        // The user's own typical PRs-per-30-days over their whole history.
+        let historySpanDays = max(
+            Self.burstWindowDays,
+            context.referenceDate.timeIntervalSince(allPRs.first!) / 86_400
+        )
+        let typicalPerWindow = Double(allPRs.count) / historySpanDays * Self.burstWindowDays
+        guard Double(recent.count) >= typicalPerWindow * Self.burstMultiplier else { return nil }
+
+        let names = prDatesByExercise
+            .filter { $0.value.contains { $0 >= windowStart } }
+            .compactMap { context.exercisesById[$0.key]?.name }
+            .sorted()
+
+        let subjects = names.count <= 3
+            ? ListFormatter.localizedString(byJoining: names)
+            : "\(names.count) exercises"
+
+        return InsightFinding(
+            ruleId: ruleId,
+            subjectId: nil,
+            subjectName: nil,
+            headline: "\(recent.count) PRs in the last month",
+            detailText: subjects.isEmpty
+                ? "That's well ahead of your usual pace of about \(Int(typicalPerWindow.rounded())) a month."
+                : "\(subjects) all moved — well ahead of your usual pace of about \(Int(typicalPerWindow.rounded())) a month.",
+            methodologyText: "\(allPRs.count) PRs on record; pace from your own history",
+            chartKind: .timeline,
+            chartLabels: recent.map { _ in "PR" },
+            chartValues: recent.map { $0.timeIntervalSince1970 },
+            effectSize: min(1.0, Double(recent.count) / max(1.0, typicalPerWindow * 2)),
+            tone: .progress
+        )
     }
 }
 
@@ -359,9 +428,11 @@ struct RIRCalibrationInsightRule: InsightRule {
                     ? "Across your recent sets you consistently beat the predicted output by ~\(percent)%. Your logged RIR is likely a rep or two higher in reality — suggestions could push harder."
                     : "Your recent sets came in ~\(percent)% under the predicted output. Your logged RIR may be understating fatigue — easing suggestions off slightly would fit your data better.",
                 methodologyText: "\(observations.count) predicted vs. actual set comparisons",
+                chartKind: .series,
                 chartLabels: recentErrorLabels(observations),
                 chartValues: recentErrorPercents(observations),
-                effectSize: min(1.0, abs(median) / Self.saturationBias)
+                effectSize: min(1.0, abs(median) / Self.saturationBias),
+                tone: .diagnostic
             ))
         }
 

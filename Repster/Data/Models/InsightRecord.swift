@@ -21,6 +21,10 @@ final class InsightRecord {
     var detailText: String
     /// Short "how this was computed" line shown under the card for trust.
     var methodologyText: String
+    /// Which chart component renders this finding. Optional for lightweight
+    /// migration of rows written before v2; nil reads as `.ranking`, which is
+    /// what every v1 record was effectively drawn as.
+    var chartKindRaw: String?
     var chartLabels: [String]
     var chartValues: [Double]
     var generatedAt: Date
@@ -31,6 +35,11 @@ final class InsightRecord {
     var state: InsightState {
         get { InsightState(rawValue: stateRaw) ?? .new }
         set { stateRaw = newValue.rawValue }
+    }
+
+    var chartKind: InsightChartKind {
+        get { chartKindRaw.flatMap(InsightChartKind.init(rawValue:)) ?? .ranking }
+        set { chartKindRaw = newValue.rawValue }
     }
 
     init(
@@ -44,6 +53,7 @@ final class InsightRecord {
         headline: String,
         detailText: String,
         methodologyText: String,
+        chartKind: InsightChartKind = .ranking,
         chartLabels: [String] = [],
         chartValues: [Double] = [],
         generatedAt: Date = Date(),
@@ -61,6 +71,7 @@ final class InsightRecord {
         self.headline = headline
         self.detailText = detailText
         self.methodologyText = methodologyText
+        self.chartKindRaw = chartKind.rawValue
         self.chartLabels = chartLabels
         self.chartValues = chartValues
         self.generatedAt = generatedAt

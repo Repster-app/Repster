@@ -18,17 +18,14 @@ Read these first — they change how several of these features have to be built.
 - **Units are a user preference**, not a constant. `HealthProfile.unitPreferenceRawValue` is metric/imperial. Anything that renders a weight — share cards, widgets, the Watch app — must respect it.
 - **The app is live on the App Store** (since 2026-05-21). All of this is post-launch work on a shipped codebase with real users and real data, so migrations matter.
 
-### ⚠️ Constraint that conflicts with the supersets request
+### ~~⚠️ Constraint that conflicts with the supersets request~~ — RESOLVED 2026-08-08
 
-You previously gave an explicit instruction: **do not change workout-logging code** (`Features/Workout/ViewModels/ActiveWorkoutViewModel.swift` and `Core/Services/SetService.swift`). That instruction caused Phase 0 of the Insights feature to be implemented and then reverted.
+**The "don't change workout-logging code" constraint is lifted.** It was never an architectural boundary — it was a guardrail to stop AI making unrelated changes to `Features/Workout/ViewModels/ActiveWorkoutViewModel.swift` and `Core/Services/SetService.swift`. Relevant, scoped changes to those files are fine.
 
-**Supersets cannot be built without changing exactly that code.** The execution UI lives in `ActiveWorkoutViewModel` and the set-table views. Before scoping item 7, decide one of:
-
-1. The constraint is lifted for supersets specifically (recommended if you want the feature), or
-2. Supersets stay template-only — i.e. you can *define* groupings but the workout screen keeps ignoring them, which is close to useless, or
-3. Supersets are deferred until you're ready to open up the logging code.
-
-This decision gates the whole item. It also affects item 6 (deload) only mildly, and nothing else in this document.
+Consequences for this document:
+- **Item 7 (supersets) is unblocked.** Option (b) auto-advance, as recommended below, can proceed.
+- **Item 6 (deload)** is unaffected — still build it as an Insights rule.
+- Insights Phase 0 (populating `WorkoutSet.startedAt`) is re-doable whenever it's worth the effort.
 
 There is a related dormant issue: `WorkoutSet.startedAt` exists on the model (`Data/Models/WorkoutSet.swift:15`) but is **never populated**, because that was part of the reverted Phase 0. Several features would benefit from real per-set timing. If the logging code opens up for supersets, populating `startedAt` in the same pass is cheap and unlocks better rest analytics.
 
@@ -299,7 +296,7 @@ Items 1, 2, 3 and 6 are mutually independent and can be scoped in parallel. Item
 
 ## Open questions to resolve before detailed scoping
 
-1. **Is the "don't touch workout-logging code" constraint lifted for supersets?** Blocks item 7 entirely.
+1. ~~**Is the "don't touch workout-logging code" constraint lifted for supersets?**~~ **Resolved 2026-08-08: lifted.** Item 7 is unblocked.
 2. **Widget data access:** App Group + SwiftData store migration, or a denormalized snapshot file?
 3. **Where does exercise guidance content come from,** and who writes it?
 4. **Which of these are free vs. behind the RevenueCat entitlement?** Recommendation: share card, widgets and HealthKit free; guidance and deload gated with the rest of Insights.

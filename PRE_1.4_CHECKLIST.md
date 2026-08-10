@@ -1,11 +1,18 @@
 # Pre-1.4 Launch Checklist
 
 Current shipped version: **1.3 (build 3)**. This release adds expanded analytics,
-masked session replay, in-app surveys, and an App Store rating prompt.
+masked session replay, in-app surveys, an App Store rating prompt, and **Apple
+Health integration** (finished workouts are written to Health).
 
-The analytics work is done and tested in the repo. Everything below is work that
-happens **outside** Xcode — in App Store Connect, GitHub Pages, and PostHog — plus
-one verification step that must not be skipped.
+The analytics and HealthKit work is done and tested in the repo. Most of what
+follows happens **outside** Xcode — in App Store Connect, GitHub Pages, and
+PostHog — plus verification steps that must not be skipped.
+
+⚠️ **HealthKit changes the shape of this release.** It is the first feature here
+that needs a real device to verify at all, and the first that touches code
+signing. Items 1.6–1.8, 2.5 and 3 exist because of it. If any of that slips, the
+cleanest answer is to ship 1.4 without HealthKit rather than to ship it unverified
+— the analytics work is independent and doesn't need it.
 
 ---
 
@@ -71,6 +78,58 @@ have to be enabled server-side or nothing will be captured.
 - [ ] Enable **Surveys** in project settings
 - [ ] Confirm the project is still the EU instance (`https://eu.i.posthog.com`)
 
+### 1.6 Privacy policy must describe Apple Health
+
+Apple requires any app with the HealthKit entitlement to have a privacy policy
+covering its health-data handling. `marketing/website/privacy.html` was rewritten
+on 2026-08-08 and predates the integration, so it doesn't mention Health at all.
+
+Repster's story here is short and unusually clean, so say it plainly:
+
+- [ ] Add an **Apple Health** section stating that Repster *writes* finished
+      workouts to Health and **never reads** any health data
+- [ ] State that the integration is off until the user enables it in Settings
+- [ ] State that estimated calories are opt-in, off by default, and estimated
+      rather than measured
+- [ ] State that health data is never sent to Repster's servers or to any third
+      party (it goes only to the user's own Health store on device)
+- [ ] Redeploy and re-confirm the live URL, as in 1.1
+
+Same reasoning as 1.1: shipping the build first means writing to a user's Health
+store under a policy that never mentions it.
+
+### 1.7 App Review Notes — HealthKit
+
+Reviewers check that HealthKit behaviour matches the usage description, and
+write-only integrations get asked about because they're less common than read.
+
+- [ ] State that Repster requests **write access only** — `NSHealthUpdateUsageDescription`
+      is present and there is deliberately no `NSHealthShareUsageDescription`
+- [ ] State where the permission prompt appears: **Settings → Body → Apple Health**,
+      on an explicit toggle. Never at launch, never during onboarding
+- [ ] Note that reviewers must enable the toggle themselves to see anything happen
+- [ ] Note that active energy is a **separate opt-in**, default off, and is a
+      MET-based estimate rather than a measurement
+
+That last point is worth stating before a reviewer infers Repster is claiming to
+measure calories.
+
+### 1.8 App Store Connect — App Privacy (HealthKit changes nothing)
+
+Deliberately a no-op, recorded so it doesn't get re-litigated at submission.
+
+The App Privacy answers describe data the app **collects**. Repster writes to the
+user's Health store and reads nothing back, so no data is collected and no new
+declaration is required. The existing `Health & Fitness → Fitness` entry covers
+analytics about in-app workout activity and is unrelated to HealthKit.
+
+- [ ] Confirm no new App Privacy data type was added for HealthKit
+- [ ] Confirm `Repster/PrivacyInfo.xcprivacy` needs no change — writing to
+      HealthKit is not a required-reason API and collects nothing
+
+If a read path is ever added (bodyweight from Health is the obvious candidate),
+**this stops being true** and `Health & Fitness → Health` has to be declared.
+
 ---
 
 ## 2. Verification — do this on TestFlight, before the App Store release
@@ -117,14 +176,79 @@ Note StoreKit only shows the real prompt a limited number of times per year and
 suppresses it in some builds, so absence isn't proof of a bug — check that
 `review prompt requested` fired in PostHog instead.
 
+### 2.5 Apple Health — **must be done on a physical device**
+
+HealthKit in the simulator is unreliable, so none of this counts if it's only been
+seen on a simulator. This is the one part of 1.4 that cannot be verified at a desk.
+
+**Permission behaviour**
+
+- [ ] Fresh install, complete onboarding, log a workout — confirm **no** Health
+      permission prompt appears anywhere in that flow
+- [ ] Settings → Body → toggle **Apple Health** on — confirm the prompt appears
+      *now*, and lists workouts (and active energy) as write-only
+- [ ] Decline the prompt — confirm the toggle returns to off and the alert points
+      at the Health app rather than silently failing
+
+**The actual write**
+
+- [ ] With the toggle on, finish a workout, then open Apple Health → Browse →
+      Activity → Workouts and confirm it's there
+- [ ] Confirm the type reads **Traditional Strength Training** and the duration
+      matches what Repster showed (paused time should be excluded)
+- [ ] Confirm workouts finished *before* the toggle was enabled did **not**
+      appear — there is deliberately no backfill
+
+**Energy**
+
+- [ ] Confirm **Estimated Calories** is off by default
+- [ ] With it off, confirm the workout in Health shows no active energy
+- [ ] Turn it on with a bodyweight logged, finish a workout, confirm calories
+      appear and are in a sane range (roughly 3.5 × bodyweight-kg × hours)
+- [ ] With **no** bodyweight ever logged, confirm the workout still syncs, just
+      with no energy — and that the "Add your bodyweight" hint shows in Settings
+
+**Deletion and restore — the two that can embarrass you**
+
+- [ ] Delete a synced workout in Repster, confirm it disappears from Health too
+- [ ] Restore a backup containing completed workouts and confirm **nothing** is
+      pushed to Health. Import creates completed workouts directly, so a
+      regression here would dump a user's entire history into their Health app
+
+If the restore check fails, stop — that one is far more damaging than a missing
+workout.
+
 ---
 
 ## 3. Release mechanics
 
+### 3.1 HealthKit capability on the App ID — do this first, on its own
+
+Repster had **no entitlements file at all** before this release. 1.4 introduces
+`Repster/Repster.entitlements` and sets `CODE_SIGN_ENTITLEMENTS` on both app-target
+configs. Signing is `Automatic` on team `8HPA5639FW`, so Xcode should register the
+HealthKit capability on the App ID and refresh provisioning by itself — but that
+has only ever been compiled against a **simulator**, never a real profile.
+
+This is a build-time failure mode, not a compile-time one, which is exactly the
+kind that surfaces at 11pm during an archive.
+
+- [ ] Build to a physical device and confirm signing succeeds
+- [ ] Confirm HealthKit now appears as a capability on the App ID in the developer portal
+- [ ] Do this **before** bundling it with the rest of the release, so a signing
+      problem is isolated from everything else
+
+### 3.2 The rest
+
 - [ ] Bump `MARKETING_VERSION` to `1.4` and `CURRENT_PROJECT_VERSION` to `4`
 - [ ] Commit the analytics work (currently uncommitted on `NewMain`)
+- [ ] Commit the HealthKit work (also uncommitted on `NewMain`) — worth keeping as
+      its own commit, separate from analytics and from the Insights work in the
+      same tree
 - [ ] Archive and upload
-- [ ] Write release notes — the rating prompt and analytics don't need mentioning, but any user-facing changes shipping alongside do
+- [ ] Write release notes — the rating prompt and analytics don't need mentioning,
+      but **Apple Health does**: it's the one user-facing feature in 1.4 and the
+      reason someone might update
 
 ---
 
@@ -158,7 +282,7 @@ App Store Connect's first-time downloads, which deduplicate by Apple ID.
 
 ---
 
-## 5. Keep in sync if analytics settings ever change
+## 5. Keep in sync if privacy-facing settings ever change
 
 These four files describe the same privacy posture. Changing one without the
 others makes the published policy wrong:
@@ -167,6 +291,18 @@ others makes the published policy wrong:
 2. `marketing/website/privacy.html` — the live policy
 3. `marketing/app-store/privacy-review-checklist.md` — ASC answers + review notes
 4. `Repster/PrivacyInfo.xcprivacy` — the privacy manifest
+
+The same applies to HealthKit, with one extra file. **If a read path is ever added**
+— bodyweight from Health being the obvious candidate — all of these change together,
+and `Health & Fitness → Health` becomes a required App Privacy declaration:
+
+1. `Repster/Repster.entitlements` — the entitlement
+2. `Repster/Info.plist` — usage descriptions (`NSHealthShareUsageDescription` would
+   become necessary; today its absence is what proves write-only)
+3. `marketing/website/privacy.html` — the Apple Health section from 1.6
+4. `marketing/app-store/privacy-review-checklist.md` — ASC answers + review notes
+5. `HEALTHKIT_INTEGRATION_EXPLORATION.md` — the design record, which currently
+   documents the read path as explicitly out of scope
 
 ---
 

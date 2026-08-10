@@ -13,27 +13,36 @@ struct InsightsView: View {
 
     var body: some View {
         ScrollView {
+            // Ordered weakest claim to strongest: status describes, the panel
+            // ranks, findings interpret. The first two always render, so the
+            // screen is never empty even when no rule fires.
             VStack(alignment: .leading, spacing: 20) {
-                if viewModel.hasLoaded && viewModel.insights.isEmpty {
-                    emptyState
-                } else {
-                    if !viewModel.newInsights.isEmpty {
-                        section(title: "NEW", insights: viewModel.newInsights)
-                    }
-                    if !viewModel.earlierInsights.isEmpty {
-                        section(
-                            title: viewModel.newInsights.isEmpty ? "FINDINGS" : "EARLIER",
-                            insights: viewModel.earlierInsights
+                if let status = viewModel.status {
+                    TrainingStatusCardView(status: status)
+
+                    if !status.muscles.isEmpty {
+                        MuscleVolumePanelView(
+                            rows: status.muscles,
+                            isExpanded: $viewModel.musclePanelExpanded
                         )
+                        .onChange(of: viewModel.musclePanelExpanded) { _, expanded in
+                            if expanded {
+                                services.analyticsService.musclePanelExpanded(
+                                    groupCount: status.muscles.count
+                                )
+                            }
+                        }
                     }
                 }
+
+                findingsSection
             }
             .padding(.horizontal, 20)
             .padding(.top, 8)
             .padding(.bottom, 100)
         }
         .background(Color.bg)
-        .navigationTitle("Insights")
+        .navigationTitle("Training Insights")
         .navigationBarTitleDisplayMode(.large)
         .task {
             await viewModel.load()
@@ -43,41 +52,76 @@ struct InsightsView: View {
                 .insights,
                 hasData: !viewModel.insights.isEmpty
             )
+            services.analyticsService.insightsOpened(
+                source: "hook",
+                findingCount: viewModel.insights.count,
+                hasNew: !viewModel.newInsights.isEmpty,
+                hasBaseline: viewModel.status?.baselineSets != nil
+            )
         }
     }
 
-    private func section(title: String, insights: [InsightItem]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Color.textTertiary)
-                .kerning(0.8)
+    /// Hidden entirely during cold start — a user three days in shouldn't be
+    /// told what they haven't earned yet. Once there's history, an empty feed
+    /// gets one honest line rather than an icon and an apology.
+    @ViewBuilder
+    private var findingsSection: some View {
+        if !viewModel.insights.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(headerTitle)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.textTertiary)
+                    .kerning(0.8)
 
-            ForEach(insights) { insight in
-                InsightCardView(insight: insight) {
-                    Task { await viewModel.snooze(insight) }
+                ForEach(viewModel.insights) { insight in
+                    InsightCardView(
+                        insight: insight,
+                        onSnooze: {
+                            services.analyticsService.insightSnoozed(
+                                ruleId: insight.ruleId, ageDays: viewModel.ageInDays(of: insight)
+                            )
+                            Task { await viewModel.snooze(insight) }
+                        },
+                        onExpand: {
+                            services.analyticsService.insightExpanded(ruleId: insight.ruleId)
+                        },
+                        onRate: { useful in
+                            services.analyticsService.insightRated(
+                                ruleId: insight.ruleId,
+                                useful: useful,
+                                ageDays: viewModel.ageInDays(of: insight)
+                            )
+                        }
+                    )
                 }
+            }
+        } else if viewModel.hasLoaded, viewModel.status?.baselineSets != nil {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("FINDINGS")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.textTertiary)
+                    .kerning(0.8)
+
+                VStack(spacing: 5) {
+                    Text("Nothing stands out this week")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.textSecondary)
+                    Text("Findings only appear when a pattern is strong enough to trust.")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Color.textTertiary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 22)
+                .padding(.horizontal, 16)
+                .background(Color.bgCard)
+                .cornerRadius(14)
             }
         }
     }
 
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "lightbulb")
-                .font(.system(size: 32, weight: .light))
-                .foregroundStyle(Color.textTertiary)
-
-            Text("No findings yet")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color.textPrimary)
-
-            Text("Insights come from your own training data and only appear once there's enough of it to trust. Keep logging — the next analysis runs after your next workout.")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.textSecondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
-        .padding(.horizontal, 12)
+    private var headerTitle: String {
+        let newCount = viewModel.newInsights.count
+        return newCount > 0 ? "FINDINGS · \(newCount) NEW" : "FINDINGS"
     }
 }

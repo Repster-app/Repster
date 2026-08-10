@@ -21,6 +21,14 @@ final class Workout {
     /// Optional for lightweight migration compatibility; nil behaves as [].
     @Attribute(originalName: "excludedExerciseIdsFromPRsAndSuggestions")
     var excludedExerciseIdsFromProgressionHistory: [UUID]?
+    /// UUID of the mirrored `HKWorkout` in Apple Health, or nil if never written.
+    /// Optional for lightweight migration compatibility.
+    ///
+    /// Doubles as the sync flag (non-nil == already mirrored, so never write twice) and
+    /// as the handle for deleting the sample when the workout is deleted in Repster.
+    /// Deliberately excluded from `WorkoutHistoryArchiveWorkout` — HealthKit UUIDs are
+    /// device-local and must not travel in a backup.
+    var healthKitWorkoutUUID: UUID?
     var createdAt: Date
     var updatedAt: Date
 
@@ -62,6 +70,7 @@ final class Workout {
         status: WorkoutStatus = .inProgress,
         excludeFromProgressionHistory: Bool? = nil,
         excludedExerciseIdsFromProgressionHistory: [UUID]? = nil,
+        healthKitWorkoutUUID: UUID? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -77,6 +86,7 @@ final class Workout {
         self.status = status
         self.excludeFromProgressionHistory = excludeFromProgressionHistory
         self.excludedExerciseIdsFromProgressionHistory = excludedExerciseIdsFromProgressionHistory
+        self.healthKitWorkoutUUID = healthKitWorkoutUUID
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

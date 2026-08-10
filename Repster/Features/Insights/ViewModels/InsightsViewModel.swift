@@ -8,8 +8,12 @@ import SwiftUI
 final class InsightsViewModel {
 
     var insights: [InsightItem] = []
+    /// Nil only before the first load resolves. The status layer always has
+    /// something to say once loaded, so the screen is never blank.
+    var status: TrainingStatus?
     var isLoading = false
     var hasLoaded = false
+    var musclePanelExpanded = false
 
     private let insightsService: any InsightsServiceProtocol
 
@@ -23,10 +27,6 @@ final class InsightsViewModel {
         insights.filter(\.isNew)
     }
 
-    var earlierInsights: [InsightItem] {
-        insights.filter { !$0.isNew }
-    }
-
     func load() async {
         isLoading = true
         defer {
@@ -36,11 +36,20 @@ final class InsightsViewModel {
 
         do {
             try await insightsService.refreshIfNeeded()
+            status = try await insightsService.fetchTrainingStatus()
             insights = try await insightsService.fetchActiveInsights()
             try await insightsService.markAllSeen()
         } catch {
             dbg("[InsightsViewModel] Failed to load insights: \(error)")
         }
+    }
+
+    /// How long the user has had this finding in front of them — a thumbs-down
+    /// on day one means something different from one after three weeks.
+    func ageInDays(of insight: InsightItem) -> Int {
+        max(0, Calendar.current.dateComponents(
+            [.day], from: insight.generatedAt, to: Date()
+        ).day ?? 0)
     }
 
     func snooze(_ insight: InsightItem) async {

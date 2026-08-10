@@ -14,19 +14,25 @@ actor WorkoutService: WorkoutServiceProtocol {
     private let prService: PRServiceProtocol
     private let statsService: StatsServiceProtocol
     private let fatigueLearningService: FatigueLearningService
+    private let bodyweightService: BodyweightServiceProtocol
+    private let healthKitService: HealthKitServiceProtocol
 
     init(
         workoutRepository: WorkoutRepositoryProtocol,
         setRepository: SetRepositoryProtocol,
         prService: PRServiceProtocol,
         statsService: StatsServiceProtocol,
-        fatigueLearningService: FatigueLearningService
+        fatigueLearningService: FatigueLearningService,
+        bodyweightService: BodyweightServiceProtocol,
+        healthKitService: HealthKitServiceProtocol
     ) {
         self.workoutRepo = workoutRepository
         self.setRepo = setRepository
         self.prService = prService
         self.statsService = statsService
         self.fatigueLearningService = fatigueLearningService
+        self.bodyweightService = bodyweightService
+        self.healthKitService = healthKitService
     }
 
     // MARK: - Workout Lifecycle (FR-001, FR-003, FR-004)
@@ -83,6 +89,52 @@ actor WorkoutService: WorkoutServiceProtocol {
 
         workout.updatedAt = Date()
         try await workoutRepo.save(workout)
+
+        // Mirror into Apple Health. Read the dates out here, inside this actor, so only a
+        // plain value crosses the boundary — never the live model (that's the 1.3
+        // EXC_BAD_ACCESS crash class).
+        if let start = workout.startTime, let end = workout.endTime {
+            scheduleHealthKitMirror(workoutId: workoutId, start: start, end: end)
+        }
+    }
+
+    // MARK: - Apple Health Mirroring
+
+    /// Kick off the Health write without blocking the finish.
+    ///
+    /// Fire-and-forget by design, for two reasons:
+    /// 1. `finishWorkout` throwing on a HealthKit error would turn a permissions hiccup
+    ///    into a *lost workout* — `ActiveWorkoutViewModel` awaits this before clearing
+    ///    local state and dismissing.
+    /// 2. It keeps HealthKit latency out of the tap-to-dismiss path.
+    ///
+    /// Note this is reached only from `finishWorkout`, never from a "workout became
+    /// completed" observation — `ImportService` creates completed workouts directly, and
+    /// restoring a backup must not dump a user's entire history into Apple Health.
+    private func scheduleHealthKitMirror(workoutId: UUID, start: Date, end: Date) {
+        guard healthKitService.isAvailable, healthKitService.isEnabled else { return }
+
+        Task {
+            await self.mirrorToHealthKit(workoutId: workoutId, start: start, end: end)
+        }
+    }
+
+    private func mirrorToHealthKit(workoutId: UUID, start: Date, end: Date) async {
+        // No bodyweight logged is a normal state (onboarding lets users skip it), not an
+        // error: the workout is still written, just without an energy sample.
+        let closestEntry = try? await bodyweightService.closestBodyweight(to: start)
+        let payload = HealthKitWorkoutPayload(
+            start: start,
+            end: end,
+            bodyweightKg: closestEntry?.bodyweightKg
+        )
+
+        guard let healthKitUUID = await healthKitService.saveWorkout(payload) else { return }
+
+        // Re-fetch rather than holding the model across the suspension.
+        guard let workout = try? await workoutRepo.fetch(byId: workoutId) else { return }
+        workout.healthKitWorkoutUUID = healthKitUUID
+        try? await workoutRepo.save(workout)
     }
 
     // MARK: - Active Workout (FR-003, AGENT_RULES S7.3)
@@ -168,6 +220,12 @@ actor WorkoutService: WorkoutServiceProtocol {
 
         // 2. Get affected exerciseIds BEFORE deleting sets
         let affectedExerciseIds = try await setRepo.fetchExerciseIds(for: workoutId)
+
+        // 2b. Remove the mirrored Health sample, if we wrote one. Read the UUID out before
+        // the model is deleted. Fire-and-forget — a Health failure must not block deletion.
+        if let healthKitUUID = workout.healthKitWorkoutUUID {
+            Task { await self.healthKitService.deleteWorkout(healthKitUUID: healthKitUUID) }
+        }
 
         // 3. Remove fatigue learning rows tied to this workout before deleting core history.
         try await fatigueLearningService.removeCapturedWorkoutData(workoutId: workoutId)

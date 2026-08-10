@@ -139,7 +139,13 @@
       "Bash(sort -t: -k2 -rn)",
       "Bash(P=/Users/nikolettkiraly/Library/Developer/Xcode/DerivedData/Repster-hjxdomcocdypqyaozeksllqltljz/SourcePackages/checkouts/posthog-ios; grep -rn \"func postHogMask\\\\|postHogMask\" $P/PostHog --include=\"*.swift\" | head -10)",
       "Bash(sed -n '/^enum AnalyticsEvent/,/^}/p' Repster/Core/Services/Protocols/AnalyticsServiceProtocol.swift)",
-      "Bash(sed -n '/^enum AnalyticsScreen/,/^}/p' Repster/Core/Services/Protocols/AnalyticsServiceProtocol.swift)"
+      "Bash(sed -n '/^enum AnalyticsScreen/,/^}/p' Repster/Core/Services/Protocols/AnalyticsServiceProtocol.swift)",
+      "Bash(cd /Users/nikolettkiraly/Library/Developer/Xcode/DerivedData/Repster-hjxdomcocdypqyaozeksllqltljz/Build/Products/Debug-iphonesimulator && xcrun simctl install FDB6AF7A-084C-44EF-A79A-3F3A6FF44F8E Repster.app 2>&1 && xcrun simctl launch FDB6AF7A-084C-44EF-A79A-3F3A6FF44F8E com.magnusespensen.Repster 2>&1)",
+      "Bash(plutil -p __CMDSUB_OUTPUT__/Library/Preferences/com.magnusespensen.Repster.plist)",
+      "Bash(osascript -e 'tell application \"Simulator\" to activate' -e 'delay 1' -e 'tell application \"System Events\" to tell process \"Simulator\" to get position of window 1')",
+      "Bash(CLANG_MODULE_CACHE_PATH=.build/module-cache swift marketing/tools/render_technical_campaign.swift)",
+      "Bash(gem list *)",
+      "Bash(echo \"=== marketing version history ===\" && git log --oneline -15 --all -- Repster.xcodeproj/project.pbxproj | head -15 && echo \"=== current version ===\" && grep -m4 \"MARKETING_VERSION\\\\|CURRENT_PROJECT_VERSION\" Repster.xcodeproj/project.pbxproj && echo \"=== find posthog SDK source ===\" && find ~/Library/Developer/Xcode/DerivedData -type d -name \"posthog-ios\" 2>/dev/null | head -3; find . -type d -name \"posthog-ios\" 2>/dev/null | head -3)"
     ]
   }
 }

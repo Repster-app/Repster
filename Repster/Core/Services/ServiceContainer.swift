@@ -30,6 +30,7 @@ final class ServiceContainer {
     let analyticsService: any AnalyticsServiceProtocol
     let fatigueLearningService: FatigueLearningService
     let insightsService: any InsightsServiceProtocol
+    let healthKitService: any HealthKitServiceProtocol
     let healthProfileRepo: any HealthProfileRepositoryProtocol
     var unitPreference: UnitPreference = .metric
 
@@ -92,13 +93,19 @@ final class ServiceContainer {
             fatigueLearningService: fatigueLearningService
         )
 
+        // 6b. HealthKitService — no dependencies; owns the HKHealthStore
+        let healthKitService = HealthKitService()
+
         // 7. WorkoutService — depends on repos + PRService + StatsService + FatigueLearningService
+        //    + BodyweightService and HealthKitService (Apple Health mirroring on finish)
         let workoutService = WorkoutService(
             workoutRepository: repositoryContainer.workoutRepository,
             setRepository: repositoryContainer.setRepository,
             prService: prService,
             statsService: statsService,
-            fatigueLearningService: fatigueLearningService
+            fatigueLearningService: fatigueLearningService,
+            bodyweightService: bodyweightService,
+            healthKitService: healthKitService
         )
 
         // 8. SettingsService — depends on HealthProfileRepository + PRService + StatsService
@@ -182,6 +189,7 @@ final class ServiceContainer {
         self.analyticsService = analyticsService
         self.fatigueLearningService = fatigueLearningService
         self.insightsService = insightsService
+        self.healthKitService = healthKitService
         self.healthProfileRepo = repositoryContainer.healthProfileRepository
     }
 

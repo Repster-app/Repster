@@ -1208,7 +1208,12 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             setRepository: setRepo,
             prService: prService,
             statsService: statsService,
-            fatigueLearningService: fatigueLearningService
+            fatigueLearningService: fatigueLearningService,
+            bodyweightService: BodyweightService(
+                bodyweightEntryRepository: bodyweightRepo,
+                healthProfileRepository: healthProfileRepo
+            ),
+            healthKitService: NoopHealthKitService()
         )
         let exerciseService = ExerciseService(
             exerciseRepository: exerciseRepo,

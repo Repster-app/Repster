@@ -74,7 +74,7 @@ final class HomeViewModel {
     var monthlyStats: MonthlyStats? = nil
     var recentPRs: [RecentPR] = []
     var newInsightCount: Int = 0
-    var topInsightHeadline: String? = nil
+    var trainingStatus: TrainingStatus? = nil
 
     // Section customization
     var sectionConfig: HomeSectionConfig = HomeSectionConfig.load()
@@ -139,11 +139,11 @@ final class HomeViewModel {
         do {
             try await insightsService.refreshIfNeeded()
             newInsightCount = try await insightsService.newInsightCount()
-            topInsightHeadline = try await insightsService.fetchActiveInsights().first?.headline
+            trainingStatus = try await insightsService.fetchTrainingStatus()
         } catch {
             dbg("[HomeViewModel] Failed to load insights summary: \(error)")
             newInsightCount = 0
-            topInsightHeadline = nil
+            trainingStatus = nil
         }
     }
 

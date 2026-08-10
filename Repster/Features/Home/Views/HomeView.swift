@@ -141,9 +141,9 @@ struct HomeView: View {
             }
         case .insights:
             NavigationLink(value: InsightsRoute()) {
-                InsightsTeaserCardView(
-                    newCount: viewModel.newInsightCount,
-                    topHeadline: viewModel.topInsightHeadline
+                TrainingInsightsHookView(
+                    status: viewModel.trainingStatus,
+                    newCount: viewModel.newInsightCount
                 )
             }
             .buttonStyle(.plain)

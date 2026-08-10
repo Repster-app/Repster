@@ -63,6 +63,8 @@
 	<false/>
 	<key>MinimumOSVersion</key>
 	<string>$(IPHONEOS_DEPLOYMENT_TARGET)</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Repster adds your finished workouts to Apple Health so they appear alongside the rest of your activity. Repster never reads your health data.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

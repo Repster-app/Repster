@@ -6,8 +6,11 @@ import SwiftUI
 struct InsightCardView: View {
     let insight: InsightItem
     let onSnooze: () -> Void
+    var onExpand: (() -> Void)? = nil
+    var onRate: ((Bool) -> Void)? = nil
 
     @State private var isExpanded = false
+    @State private var rating: Bool?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -18,11 +21,7 @@ struct InsightCardView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             if !insight.chartValues.isEmpty {
-                InsightMiniChartView(
-                    labels: insight.chartLabels,
-                    values: insight.chartValues,
-                    color: insight.category.accentColor
-                )
+                InsightChartView(insight: insight, color: insight.category.accentColor)
             }
 
             Text(insight.detailText)
@@ -39,6 +38,8 @@ struct InsightCardView: View {
                         .font(.system(size: 12, weight: .medium))
                 }
                 .foregroundStyle(Color.textTertiary)
+
+                ratingRow
             }
         }
         .padding(14)
@@ -50,7 +51,51 @@ struct InsightCardView: View {
             withAnimation(.easeInOut(duration: 0.2)) {
                 isExpanded.toggle()
             }
+            if isExpanded {
+                onExpand?()
+            }
         }
+    }
+
+    /// Deliberately only in the expanded state. On the collapsed card it would
+    /// clutter the feed and collect reflex taps; here it's answered by people
+    /// who actually read the finding.
+    private var ratingRow: some View {
+        HStack(spacing: 8) {
+            if let rating {
+                Text(rating ? "Thanks — more like this" : "Thanks — noted")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.textTertiary)
+            } else {
+                Text("Was this useful?")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.textTertiary)
+
+                ratingButton(useful: true, symbol: "hand.thumbsup")
+                ratingButton(useful: false, symbol: "hand.thumbsdown")
+            }
+
+            Spacer()
+        }
+        .padding(.top, 2)
+    }
+
+    private func ratingButton(useful: Bool, symbol: String) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                rating = useful
+            }
+            onRate?(useful)
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.textSecondary)
+                .frame(width: 30, height: 26)
+                .background(Color.bgSubtle)
+                .cornerRadius(7)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(useful ? "Useful" : "Not useful")
     }
 
     private var header: some View {
@@ -101,49 +146,19 @@ struct InsightCardView: View {
     }
 }
 
-/// Compact capsule bar chart for the values a finding is based on.
-/// Negative values (e.g. underperformance) render in the danger color.
-struct InsightMiniChartView: View {
-    let labels: [String]
-    let values: [Double]
-    let color: Color
-
-    private var maxMagnitude: Double {
-        max(values.map(abs).max() ?? 1, 0.001)
-    }
-
-    var body: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            ForEach(Array(values.enumerated()), id: \.offset) { index, value in
-                VStack(spacing: 4) {
-                    Capsule()
-                        .fill(value < 0 ? Color.danger : color)
-                        .frame(height: max(6, CGFloat(abs(value) / maxMagnitude) * 44))
-                        .frame(maxHeight: 44, alignment: .bottom)
-
-                    if index < labels.count {
-                        Text(labels[index])
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(Color.textTertiary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-}
-
 extension InsightCategory {
     var accentColor: Color {
         switch self {
         case .restSweetSpot: return .orange
         case .muscleBalance: return .chart7
-        case .prRhythm: return .gold
         case .rirCalibration: return .chart5
         case .targetAdherence: return .accent
+        case .strengthTrend: return .success
+        case .consistency: return .accent
+        case .droppedExercise: return .orange
+        case .volumeRamp: return .chart5
+        case .deloadReadiness: return .danger
+        case .prPace: return .gold
         case .other: return .stale
         }
     }
