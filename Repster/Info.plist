@@ -63,8 +63,10 @@
 	<false/>
 	<key>MinimumOSVersion</key>
 	<string>$(IPHONEOS_DEPLOYMENT_TARGET)</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Repster only looks up the workouts it added to Apple Health itself, so it can remove them again when you delete a workout in Repster. It never reads any other health data.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Repster adds your finished workouts to Apple Health so they appear alongside the rest of your activity. Repster never reads your health data.</string>
+	<string>Repster adds your finished workouts to Apple Health so they appear alongside the rest of your activity.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

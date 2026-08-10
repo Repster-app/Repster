@@ -48,15 +48,11 @@ struct SettingsView: View {
     @State private var pendingMuscleAssignmentCount: Int = 0
     @Environment(ServiceContainer.self) private var services
 
-    // Apple Health integration flags. Device-local, so they live in UserDefaults rather
-    // than HealthProfile — restoring a backup on a new phone must not claim the
-    // integration is already connected. Same keys the service reads.
+    // Read only for the On/Off summary on the row; the integration itself is managed in
+    // `AppleHealthSettingsView`. Device-local, so it lives in UserDefaults rather than
+    // HealthProfile — restoring a backup on a new phone must not claim the integration
+    // is already connected. Same key the service reads.
     @AppStorage(HealthKitPreferences.enabledKey) private var healthKitEnabled = false
-    @AppStorage(HealthKitPreferences.estimatedEnergyKey) private var healthKitEstimatedEnergy = false
-    /// Starts true so the "add your bodyweight" hint doesn't flash before the check lands.
-    @State private var hasBodyweightEntry = true
-    @State private var healthKitAlertMessage: String?
-    @State private var isConnectingHealthKit = false
     @Binding private var accessSnapshot: AccessSnapshot
     private let settingsService: any SettingsServiceProtocol
     private let bodyweightService: any BodyweightServiceProtocol
@@ -109,7 +105,6 @@ struct SettingsView: View {
                 await viewModel.loadProfile()
                 await refreshMembershipStatus(forceSubscriptionRefresh: true)
                 await refreshPendingMuscleAssignmentCount()
-                await refreshBodyweightPresence()
             }
             .onAppear {
                 guard viewModel.profile != nil else { return }
@@ -117,7 +112,6 @@ struct SettingsView: View {
                     await viewModel.refreshProfile()
                     await refreshMembershipStatus(forceSubscriptionRefresh: true)
                     await refreshPendingMuscleAssignmentCount()
-                    await refreshBodyweightPresence()
                 }
             }
             .sheet(isPresented: $viewModel.showUnitsSheet) {
@@ -147,14 +141,6 @@ struct SettingsView: View {
                 Button("OK") {}
             } message: {
                 Text(viewModel.errorMessage)
-            }
-            .alert("Apple Health", isPresented: Binding(
-                get: { healthKitAlertMessage != nil },
-                set: { if !$0 { healthKitAlertMessage = nil } }
-            )) {
-                Button("OK") {}
-            } message: {
-                Text(healthKitAlertMessage ?? "")
             }
         }
     }
@@ -310,90 +296,25 @@ struct SettingsView: View {
                 )
             }
 
+            // Hidden entirely rather than shown-and-disabled on hardware without Health:
+            // there's nothing the user could do with the row.
             if services.healthKitService.isAvailable {
-                appleHealthRows
-            }
-        }
-    }
-
-    // MARK: - Apple Health
-
-    @ViewBuilder
-    private var appleHealthRows: some View {
-        Toggle(isOn: appleHealthBinding) {
-            VStack(alignment: .leading, spacing: 2) {
-                Label("Apple Health", systemImage: "heart.text.square")
-                    .foregroundStyle(Color.textPrimary)
-                Text("Adds finished workouts to Health. Repster never reads your health data.")
-                    .font(.caption)
-                    .foregroundStyle(Color.textSecondary)
-            }
-        }
-        .disabled(isConnectingHealthKit)
-
-        if healthKitEnabled {
-            Toggle(isOn: $healthKitEstimatedEnergy) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Label("Estimated Calories", systemImage: "flame")
-                        .foregroundStyle(Color.textPrimary)
-                    Text("Estimated from your bodyweight and session length — Repster doesn't measure calories.")
-                        .font(.caption)
-                        .foregroundStyle(Color.textSecondary)
+                NavigationLink {
+                    AppleHealthSettingsView(
+                        healthKitService: services.healthKitService,
+                        analyticsService: analyticsService,
+                        bodyweightService: bodyweightService
+                    )
+                } label: {
+                    SettingsNavigationRow(
+                        title: "Apple Health",
+                        systemImage: "heart.text.square",
+                        summary: healthKitEnabled ? "On" : "Off",
+                        showChevron: false
+                    )
                 }
             }
-
-            // Without a bodyweight there's nothing to base the estimate on. The workout
-            // still syncs — it just carries no energy — so this is a hint, not an error,
-            // and the toggle deliberately stays enabled so it starts working by itself
-            // once a weight is logged.
-            if healthKitEstimatedEnergy && !hasBodyweightEntry {
-                Text("Add your bodyweight above to include estimated calories.")
-                    .font(.caption)
-                    .foregroundStyle(Color.textSecondary)
-            }
         }
-    }
-
-    /// Turning the toggle on requests HealthKit authorization — this is the only place
-    /// Repster ever asks, deliberately. Never at launch, never during onboarding.
-    private var appleHealthBinding: Binding<Bool> {
-        Binding(
-            get: { healthKitEnabled },
-            set: { newValue in
-                guard newValue else {
-                    // Leaves already-written workouts in Health: it's the user's health
-                    // data, and silently deleting history on a toggle-off would surprise.
-                    healthKitEnabled = false
-                    return
-                }
-                Task { await connectAppleHealth() }
-            }
-        )
-    }
-
-    private func connectAppleHealth() async {
-        isConnectingHealthKit = true
-        defer { isConnectingHealthKit = false }
-
-        switch await services.healthKitService.requestAuthorization() {
-        case .authorized:
-            healthKitEnabled = true
-            await refreshBodyweightPresence()
-        case .denied:
-            healthKitEnabled = false
-            healthKitAlertMessage = "Repster doesn't have permission to add workouts. You can grant it in the Health app under Sharing → Apps → Repster."
-        case .unavailable:
-            healthKitEnabled = false
-            healthKitAlertMessage = "Apple Health isn't available on this device."
-        case .failed(let message):
-            healthKitEnabled = false
-            healthKitAlertMessage = message
-        }
-    }
-
-    private func refreshBodyweightPresence() async {
-        let entries = (try? await bodyweightService.fetchAllEntries()) ?? []
-        hasBodyweightEntry = !entries.isEmpty
     }
 
     // MARK: - ABOUT Section

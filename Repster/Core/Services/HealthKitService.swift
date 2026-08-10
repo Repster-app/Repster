@@ -1,5 +1,6 @@
 // HealthKitService.swift
-// Writes finished workouts into Apple Health. Write-only — Repster never reads health data.
+// Writes finished workouts into Apple Health. Write-only authorization; the only read is the
+// UUID lookup in deleteWorkout, which resolves samples this app wrote so they can be removed.
 // Spec: HEALTHKIT_INTEGRATION_EXPLORATION.md (direction A)
 
 import Foundation
@@ -15,6 +16,10 @@ import HealthKit
 enum HealthKitPreferences {
     static let enabledKey = "healthkit.enabled"
     static let estimatedEnergyKey = "healthkit.writesEstimatedEnergy"
+    /// Set once Repster has offered the integration in its own UI (onboarding, What's New).
+    /// Stops a user who declined from being asked again by a later surface; Settings is
+    /// always available and is not gated by this.
+    static let hasBeenOfferedKey = "healthkit.hasBeenOffered"
 
     static var isEnabled: Bool {
         UserDefaults.standard.bool(forKey: enabledKey)
@@ -24,8 +29,16 @@ enum HealthKitPreferences {
         UserDefaults.standard.bool(forKey: estimatedEnergyKey)
     }
 
+    static var hasBeenOffered: Bool {
+        UserDefaults.standard.bool(forKey: hasBeenOfferedKey)
+    }
+
     static func setEnabled(_ enabled: Bool) {
         UserDefaults.standard.set(enabled, forKey: enabledKey)
+    }
+
+    static func markOffered() {
+        UserDefaults.standard.set(true, forKey: hasBeenOfferedKey)
     }
 }
 
@@ -62,6 +75,10 @@ actor HealthKitService: HealthKitServiceProtocol {
 
     nonisolated var writesEstimatedEnergy: Bool {
         HealthKitPreferences.writesEstimatedEnergy
+    }
+
+    nonisolated var shouldOfferConnection: Bool {
+        isAvailable && !isEnabled && !HealthKitPreferences.hasBeenOffered
     }
 
     /// Types Repster writes. Requested together so enabling the energy estimate later

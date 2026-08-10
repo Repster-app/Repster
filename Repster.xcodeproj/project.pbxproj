@@ -197,30 +197,33 @@
 		FL0004 /* FatigueLearningService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1004 /* FatigueLearningService.swift */; };
 		FL0005 /* FatigueLearningServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1005 /* FatigueLearningServiceTests.swift */; };
 		FL0006 /* FatigueLearningAdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1006 /* FatigueLearningAdminView.swift */; };
+		HK0001 /* HealthKitServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = HK1001 /* HealthKitServiceProtocol.swift */; };
+		HK0002 /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = HK1002 /* HealthKitService.swift */; };
+		HK0003 /* HealthKitEnergyEstimateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = HK1003 /* HealthKitEnergyEstimateTests.swift */; };
 		IN0001 /* InsightRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1001 /* InsightRecord.swift */; };
 		IN0002 /* InsightsServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1002 /* InsightsServiceProtocol.swift */; };
 		IN0003 /* InsightsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1003 /* InsightsService.swift */; };
 		IN0004 /* InsightRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1004 /* InsightRules.swift */; };
-		RV0001 /* ReviewPromptService.swift in Sources */ = {isa = PBXBuildFile; fileRef = RV1001 /* ReviewPromptService.swift */; };
 		IN0005 /* InsightsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1005 /* InsightsViewModel.swift */; };
+		HLTH01 /* AppleHealthConnectionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = HLTH11 /* AppleHealthConnectionModel.swift */; };
+		HLTH02 /* AppleHealthPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HLTH12 /* AppleHealthPromptView.swift */; };
+		HLTH03 /* AppleHealthSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HLTH13 /* AppleHealthSettingsView.swift */; };
 		IN0006 /* InsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1006 /* InsightsView.swift */; };
 		IN0007 /* InsightCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1007 /* InsightCardView.swift */; };
+		IN0008 /* TrainingInsightsHookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1008 /* TrainingInsightsHookView.swift */; };
+		IN0009 /* InsightsServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1009 /* InsightsServiceTests.swift */; };
 		IN0010 /* TrainingStatusCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1010 /* TrainingStatusCardView.swift */; };
 		IN0011 /* MuscleVolumePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1011 /* MuscleVolumePanelView.swift */; };
 		IN0012 /* InsightChartViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1012 /* InsightChartViews.swift */; };
 		IN0013 /* InsightRules+Progress.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1013 /* InsightRules+Progress.swift */; };
 		IN0014 /* InsightRules+Readiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1014 /* InsightRules+Readiness.swift */; };
-		IN0008 /* TrainingInsightsHookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1008 /* TrainingInsightsHookView.swift */; };
-		IN0009 /* InsightsServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1009 /* InsightsServiceTests.swift */; };
-		HK0001 /* HealthKitServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = HK1001 /* HealthKitServiceProtocol.swift */; };
-		HK0002 /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = HK1002 /* HealthKitService.swift */; };
-		HK0003 /* HealthKitEnergyEstimateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = HK1003 /* HealthKitEnergyEstimateTests.swift */; };
 		MZ0001 /* AssignMuscleGroupsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = MZ0002 /* AssignMuscleGroupsView.swift */; };
 		PH0001 /* AnalyticsServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = PH1001 /* AnalyticsServiceProtocol.swift */; };
 		PH0002 /* AnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = PH1002 /* AnalyticsService.swift */; };
 		PH0003 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = PH2002 /* PostHog */; };
 		RC0002 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = RC2002 /* RevenueCat */; };
 		RC0003 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = RC2003 /* RevenueCatUI */; };
+		RV0001 /* ReviewPromptService.swift in Sources */ = {isa = PBXBuildFile; fileRef = RV1001 /* ReviewPromptService.swift */; };
 		TT0001 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */; };
 		TT0002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = TT2003 /* XCTest.framework */; };
 		TT0003 /* ChartDataServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2004 /* ChartDataServiceTests.swift */; };
@@ -477,27 +480,30 @@
 		FL1004 /* FatigueLearningService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningService.swift; sourceTree = "<group>"; };
 		FL1005 /* FatigueLearningServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningServiceTests.swift; sourceTree = "<group>"; };
 		FL1006 /* FatigueLearningAdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningAdminView.swift; sourceTree = "<group>"; };
+		HK1001 /* HealthKitServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitServiceProtocol.swift; sourceTree = "<group>"; };
+		HK1002 /* HealthKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitService.swift; sourceTree = "<group>"; };
+		HK1003 /* HealthKitEnergyEstimateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitEnergyEstimateTests.swift; sourceTree = "<group>"; };
 		IN1001 /* InsightRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightRecord.swift; sourceTree = "<group>"; };
 		IN1002 /* InsightsServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsServiceProtocol.swift; sourceTree = "<group>"; };
 		IN1003 /* InsightsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsService.swift; sourceTree = "<group>"; };
 		IN1004 /* InsightRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightRules.swift; sourceTree = "<group>"; };
-		RV1001 /* ReviewPromptService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewPromptService.swift; sourceTree = "<group>"; };
 		IN1005 /* InsightsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsViewModel.swift; sourceTree = "<group>"; };
+		HLTH11 /* AppleHealthConnectionModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleHealthConnectionModel.swift; sourceTree = "<group>"; };
+		HLTH12 /* AppleHealthPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleHealthPromptView.swift; sourceTree = "<group>"; };
+		HLTH13 /* AppleHealthSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleHealthSettingsView.swift; sourceTree = "<group>"; };
 		IN1006 /* InsightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsView.swift; sourceTree = "<group>"; };
 		IN1007 /* InsightCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightCardView.swift; sourceTree = "<group>"; };
+		IN1008 /* TrainingInsightsHookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingInsightsHookView.swift; sourceTree = "<group>"; };
+		IN1009 /* InsightsServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsServiceTests.swift; sourceTree = "<group>"; };
 		IN1010 /* TrainingStatusCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingStatusCardView.swift; sourceTree = "<group>"; };
 		IN1011 /* MuscleVolumePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuscleVolumePanelView.swift; sourceTree = "<group>"; };
 		IN1012 /* InsightChartViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightChartViews.swift; sourceTree = "<group>"; };
 		IN1013 /* InsightRules+Progress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InsightRules+Progress.swift"; sourceTree = "<group>"; };
 		IN1014 /* InsightRules+Readiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InsightRules+Readiness.swift"; sourceTree = "<group>"; };
-		IN1008 /* TrainingInsightsHookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingInsightsHookView.swift; sourceTree = "<group>"; };
-		IN1009 /* InsightsServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsServiceTests.swift; sourceTree = "<group>"; };
-		HK1001 /* HealthKitServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitServiceProtocol.swift; sourceTree = "<group>"; };
-		HK1002 /* HealthKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitService.swift; sourceTree = "<group>"; };
-		HK1003 /* HealthKitEnergyEstimateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitEnergyEstimateTests.swift; sourceTree = "<group>"; };
 		MZ0002 /* AssignMuscleGroupsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignMuscleGroupsView.swift; sourceTree = "<group>"; };
 		PH1001 /* AnalyticsServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsServiceProtocol.swift; sourceTree = "<group>"; };
 		PH1002 /* AnalyticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsService.swift; sourceTree = "<group>"; };
+		RV1001 /* ReviewPromptService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewPromptService.swift; sourceTree = "<group>"; };
 		TT2001 /* RepsterTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RepsterTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutViewModelSuggestionRefreshTests.swift; sourceTree = "<group>"; };
 		TT2003 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
@@ -635,6 +641,7 @@
 				D20009 /* Home */,
 				DT0001 /* Templates */,
 				IN2001 /* Insights */,
+				HLTH21 /* Health */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -717,6 +724,15 @@
 				D30010 /* ViewModels */,
 			);
 			path = Settings;
+			sourceTree = "<group>";
+		};
+		HLTH21 /* Health */ = {
+			isa = PBXGroup;
+			children = (
+				HLTH11 /* AppleHealthConnectionModel.swift */,
+				HLTH12 /* AppleHealthPromptView.swift */,
+			);
+			path = Health;
 			sourceTree = "<group>";
 		};
 		D20006 /* Calendar */ = {
@@ -844,6 +860,7 @@
 			children = (
 				D30018 /* Components */,
 				BJ0005 /* SettingsView.swift */,
+				HLTH13 /* AppleHealthSettingsView.swift */,
 				BW0004 /* PrescriptionSettingsView.swift */,
 				FL1006 /* FatigueLearningAdminView.swift */,
 				BJ0009 /* RebuildStatsView.swift */,
@@ -1731,6 +1748,9 @@
 				IN0005 /* InsightsViewModel.swift in Sources */,
 				IN0006 /* InsightsView.swift in Sources */,
 				IN0007 /* InsightCardView.swift in Sources */,
+				HLTH01 /* AppleHealthConnectionModel.swift in Sources */,
+				HLTH02 /* AppleHealthPromptView.swift in Sources */,
+				HLTH03 /* AppleHealthSettingsView.swift in Sources */,
 				IN0010 /* TrainingStatusCardView.swift in Sources */,
 				IN0011 /* MuscleVolumePanelView.swift in Sources */,
 				IN0012 /* InsightChartViews.swift in Sources */,
@@ -1967,7 +1987,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Repster/Repster.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				ENABLE_PREVIEWS = YES;
@@ -1978,7 +1998,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.3;
+				MARKETING_VERSION = 1.4;
 				POSTHOG_HOST = "https://eu.i.posthog.com";
 				POSTHOG_PROJECT_TOKEN = phc_sJysoQ23BBpPBsHpsoym4isYSah9xsc9Z2ndgXgqTfiy;
 				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.Repster;
@@ -1999,7 +2019,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Repster/Repster.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				ENABLE_PREVIEWS = YES;
@@ -2010,7 +2030,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.3;
+				MARKETING_VERSION = 1.4;
 				POSTHOG_HOST = "https://eu.i.posthog.com";
 				POSTHOG_PROJECT_TOKEN = "$(POSTHOG_PROJECT_TOKEN_VALUE)";
 				POSTHOG_PROJECT_TOKEN_VALUE = phc_sJysoQ23BBpPBsHpsoym4isYSah9xsc9Z2ndgXgqTfiy;

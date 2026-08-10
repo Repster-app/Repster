@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Repster privacy policy for workout data, purchases, and anonymous product analytics.">
+  <meta name="description" content="Repster privacy policy for workout data, Apple Health, purchases, and anonymous product analytics.">
   <title>Repster Privacy Policy</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -24,13 +24,20 @@
     <section class="section policy">
       <p class="eyebrow">Privacy Policy</p>
       <h1>Repster Privacy Policy</h1>
-      <p class="updated">Last updated: August 8, 2026</p>
+      <p class="updated">Last updated: August 10, 2026</p>
 
       <h2>Overview</h2>
       <p>Repster is a workout logging app for iOS. Workout history, exercises, templates, bodyweight entries, and settings are stored locally on your device unless you choose to export or share them.</p>
 
       <h2>Workout Data</h2>
       <p>Repster stores your workout data on device so the app can show history, charts, records, templates, and active workout context. Repster does not send exercise names, set weights, reps, notes, CSV contents, bodyweight values, or raw workout logs to product analytics.</p>
+
+      <h2>Apple Health</h2>
+      <p>Repster can add your finished workouts to Apple Health. The integration is <strong>off until you turn it on</strong> in the app at Settings -&gt; Apple Health, and iOS asks for your permission separately before anything is written.</p>
+      <p>When it is on, Repster writes one strength training workout to Health each time you finish a workout, containing only the start time, the end time, and — if you have enabled Estimated Calories — an estimated active energy value. Repster does not write exercise names, set weights, reps, notes, or bodyweight values to Health.</p>
+      <p>Estimated Calories is a separate toggle that is also off by default. When enabled, the estimate is calculated on your device from the workout's length and the most recent bodyweight you logged in Repster, using a fixed activity factor for strength training. It is an estimate, not a measurement, and no estimate is written when you have never logged a bodyweight.</p>
+      <p>Repster does not read your health data. The one exception is deletion: when you delete a workout in Repster, the app looks up the matching workout it previously wrote to Health so it can remove that entry too. This lookup can only find entries Repster itself created, and Repster requests no read permissions for any health data type.</p>
+      <p>Health data written by Repster goes only to the Health store on your own device. It is never sent to Repster, to product analytics, or to any third party. Turning the integration off stops future writes; workouts already written stay in Health until you delete them there or delete the corresponding workout in Repster.</p>
 
       <h2>Anonymous Product Analytics</h2>
       <p>Repster uses PostHog EU cloud for anonymous product analytics. Analytics help us understand aggregate app usage: which screens are opened, how onboarding progresses, when workouts are started, completed, discarded or abandoned, coarse ranges for things like workout duration and set counts, paywall and purchase actions, import completion, and backup export. Repster does not create accounts, and analytics are grouped under a random identifier generated on your device at install time.</p>
@@ -47,7 +54,7 @@
       <p>Repster uses RevenueCat to manage App Store purchases and entitlements. RevenueCat may process purchase history and anonymous app user identifiers to validate purchases, unlock paid features, prevent fraud, and provide purchase analytics.</p>
 
       <h2>What Repster Does Not Do</h2>
-      <p>Repster does not use analytics for advertising, does not sell data, does not use IDFA, and does not enable PostHog autocapture or heatmaps. Repster has no user accounts, so no analytics data is linked to a name, email address, or any other real-world identity. Repster does not send exercise names, set weights, reps, notes, CSV contents, bodyweight values, or raw workout logs to analytics — including in session recordings, where all text is masked.</p>
+      <p>Repster does not use analytics for advertising, does not sell data, does not use IDFA, and does not enable PostHog autocapture or heatmaps. Repster has no user accounts, so no analytics data is linked to a name, email address, or any other real-world identity. Repster does not send exercise names, set weights, reps, notes, CSV contents, bodyweight values, or raw workout logs to analytics — including in session recordings, where all text is masked. Repster does not read health data from Apple Health, and no health data is sent off your device.</p>
 
       <h2>Support</h2>
       <p>If you contact Repster for support, we use the information you provide only to respond to your request.</p>

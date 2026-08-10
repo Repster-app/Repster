@@ -66,11 +66,20 @@ protocol HealthKitServiceProtocol: Sendable {
     /// Whether to attach the MET-based energy estimate. Defaults to `false`.
     var writesEstimatedEnergy: Bool { get }
 
+    /// Whether a surface that offers the integration on its own initiative — the
+    /// onboarding step, a What's New sheet — should offer it. False once the user has
+    /// connected, been asked before, or is on hardware without HealthKit.
+    ///
+    /// Settings deliberately ignores this: an explicit visit is always allowed to connect.
+    var shouldOfferConnection: Bool { get }
+
     /// Request write authorization for workouts and active energy.
     ///
-    /// Call this ONLY from an explicit user action (the Settings toggle) — never at
-    /// launch or during onboarding. Requests both types in one prompt so enabling the
-    /// energy estimate later doesn't trigger a second permission sheet.
+    /// Call this ONLY in direct response to a user tapping "connect" — never at launch,
+    /// and never as a side effect of a screen appearing. iOS shows its permission sheet
+    /// once per app install, so every surface that offers the integration must ask in its
+    /// own UI first and reach this only when the answer is yes. Requests both types in one
+    /// prompt so enabling the energy estimate later doesn't trigger a second sheet.
     func requestAuthorization() async -> HealthKitAuthorizationResult
 
     /// Write a finished workout to Health.
@@ -92,6 +101,7 @@ struct NoopHealthKitService: HealthKitServiceProtocol {
     var isAvailable: Bool { false }
     var isEnabled: Bool { false }
     var writesEstimatedEnergy: Bool { false }
+    var shouldOfferConnection: Bool { false }
 
     func requestAuthorization() async -> HealthKitAuthorizationResult { .unavailable }
     func saveWorkout(_ payload: HealthKitWorkoutPayload) async -> UUID? { nil }

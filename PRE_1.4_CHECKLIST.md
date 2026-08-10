@@ -87,7 +87,9 @@ on 2026-08-08 and predates the integration, so it doesn't mention Health at all.
 Repster's story here is short and unusually clean, so say it plainly:
 
 - [ ] Add an **Apple Health** section stating that Repster *writes* finished
-      workouts to Health and **never reads** any health data
+      workouts to Health, and that the **only** read is looking up a workout
+      Repster itself wrote so it can be deleted from Health again — no other
+      health data is ever read
 - [ ] State that the integration is off until the user enables it in Settings
 - [ ] State that estimated calories are opt-in, off by default, and estimated
       rather than measured
@@ -249,6 +251,62 @@ kind that surfaces at 11pm during an archive.
 - [ ] Write release notes — the rating prompt and analytics don't need mentioning,
       but **Apple Health does**: it's the one user-facing feature in 1.4 and the
       reason someone might update
+
+### 3.3 What's New sheet — only when there's something worth showing
+
+If the What's New sheet ships in this build, what it says is a decision to make
+here, not at archive time.
+
+The sheet is built to stay silent. `WhatsNewRelease.current` returning `nil` means
+no sheet appears at all, and for most releases that's the correct outcome rather
+than a failure to fill it in.
+
+The test for an item is whether **the user can go and look at it in under ten
+seconds**. Apple Health passes: open Settings, connect, see it. "Findings repeat
+less often" doesn't — it's true, it's an improvement, and there's nothing to go
+and check. Unverifiable items are what teach people to dismiss the sheet unread,
+and once that habit sets in the sheet is worthless for the release that actually
+needs it.
+
+Three items is the cap. The fourth is reliably the one that fails the test.
+
+For 1.4 that means Apple Health, plus the Training Insights v2 work only if it
+ships in the same build. Analytics, session replay and the rating prompt are not
+items, for the same reason they're not release notes.
+
+- [ ] Confirm which 1.4 changes pass the ten-second test
+- [ ] Write at most three items, each naming something the user can open and see
+- [ ] If nothing passes, ship with `WhatsNewRelease.current == nil` and confirm no
+      sheet appears on first launch after updating
+- [ ] On TestFlight, confirm the sheet appears once and does not return on the
+      next launch
+
+#### Offering Apple Health from the sheet
+
+Existing users never see onboarding, so the sheet is the only thing that reaches
+them — without it, Health is switched on by whoever happens to open Settings and
+scroll to Body. That is close to nobody.
+
+`AppleHealthPromptView` is built to be presented as-is. The host owns the model
+and reports the impression:
+
+```swift
+let connection = AppleHealthConnectionModel(
+    healthKitService: services.healthKitService,
+    analyticsService: services.analyticsService,
+    source: .whatsNew
+)
+// gate on this, not on `isAvailable` — it's false once the user has already
+// answered anywhere, so a fresh 1.4 install that saw the onboarding step
+// doesn't get asked twice
+if services.healthKitService.shouldOfferConnection { … }
+// then call connection.promptShown() when it's actually on screen
+```
+
+- [ ] Decide whether the offer is one of the three items or a step after them
+- [ ] Confirm a user who answered during onboarding is not asked again
+      (`shouldOfferConnection` is false once `healthkit.hasBeenOffered` is set)
+- [ ] Check `apple health prompt shown` / `answered` arrive with `source: whats_new`
 
 ---
 

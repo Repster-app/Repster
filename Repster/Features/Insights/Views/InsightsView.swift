@@ -47,13 +47,9 @@ struct InsightsView: View {
         .task {
             await viewModel.load()
             // Reported after load so the empty state reflects "no findings yet"
-            // rather than "hasn't finished loading".
-            services.analyticsService.screenViewed(
-                .insights,
-                hasData: !viewModel.insights.isEmpty
-            )
-            services.analyticsService.insightsOpened(
-                source: "hook",
+            // rather than "hasn't finished loading". One event per open: the
+            // screen view carries the finding counts.
+            services.analyticsService.insightsViewed(
                 findingCount: viewModel.insights.count,
                 hasNew: !viewModel.newInsights.isEmpty,
                 hasBaseline: viewModel.status?.baselineSets != nil

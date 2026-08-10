@@ -78,7 +78,7 @@ simulator runs land in production analytics. See gap 6 in section 5.
 ### Onboarding
 | Event | Key properties | Meaning |
 |---|---|---|
-| `onboarding step viewed` | `step`, `step_index` | Steps: `welcome`, `units`, `bodyweight`, `smart_suggestions`, `import_prompt`. |
+| `onboarding step viewed` | `step`, `step_index` | Steps: `welcome`, `units`, `bodyweight`, `smart_suggestions`, `apple_health`, `import_prompt`. `apple_health` is absent on hardware without HealthKit, so it has a smaller denominator than its neighbours by design. |
 | `onboarding step skipped` | `step`, `step_index` | Explicit skip. Not the same as dropping off. |
 | `onboarding completed` | `step` (last step), `unit_system` | Reached the end. |
 
@@ -121,7 +121,7 @@ Every event carries `rule_id`, one of: `strengthTrend`, `consistency`,
 
 | Event | Key properties | Meaning |
 |---|---|---|
-| `insights opened` | `finding_count`, `has_new`, `has_baseline`, `source` | `source` is hardcoded `"hook"` today — ignore that breakdown. |
+| `$screen` where `$screen_name = Insights` | `finding_count`, `has_new`, `has_baseline` | **Opening Insights is a screen event, not its own event.** There is no `insights opened` — it was a duplicate of this screen call and was removed. Filter `$screen` to `$screen_name = Insights` wherever this guide says "Insights opened". |
 | `insight expanded` | `rule_id` | Read the finding. Implicit interest. |
 | `insight rated` | `rule_id`, `rating` (`useful`/`not_useful`), `insight_age_days` | Explicit verdict, only reachable from an expanded card. |
 | `insight snoozed` | `rule_id`, `insight_age_days` | **The strongest kill signal** — hiding a finding for three weeks beats any thumbs-down and has no response-rate bias. |
@@ -136,6 +136,21 @@ Every event carries `rule_id`, one of: `strengthTrend`, `consistency`,
 | `unit system toggled` | `unit_system` | |
 | `analytics opt-out toggled` | `enabled` | Fires in both directions (deliberately sent *before* the opt-out takes effect). |
 | `review prompt requested` | `trigger`, `completed_workout_count` | |
+
+### Apple Health
+| Event | Key properties | Meaning |
+|---|---|---|
+| `apple health prompt shown` | `source` | Repster's own ask, before HealthKit's. Sources: `onboarding`, `settings`, `whats_new`. Only fires where Repster raises the offer itself — the Settings toggle is already a decision, so it goes straight to `answered`. Idempotent per surface. |
+| `apple health prompt answered` | `source`, `result` | `result` is `not_now` (declined in Repster, iOS never asked), `authorized`, `denied`, `unavailable`, or `failed`. |
+| `apple health disabled` | `source` | Switched off again later. Always `settings`. |
+
+`shown` → `answered: authorized` is the connect rate for a surface, and comparing
+`not_now` against `denied` separates "doesn't want it" from "iOS asked and they
+said no" — only the second is unrecoverable without a trip to the Health app.
+
+Note `step_index` for `import_prompt` moved from 4 to 5 in 1.4 when the Apple
+Health step was inserted ahead of it. The `step` name is unchanged; build funnels
+on the name, not the index.
 
 Every event also carries `app_version` and `build_number` — always available as a
 breakdown or filter, and the first thing to check when a metric moves.
@@ -189,8 +204,8 @@ The question: *does hitting the wall convert, and from where?*
 The question: *which of the ten rules do I keep, sharpen, or cut?*
 This is the one that pays for itself.
 
-1. **Insights opened** (Trends, unique users, weekly) — `insights opened`
-2. **Findings shown per open** (Trends, average of `finding_count`) — `insights opened`
+1. **Insights opened** (Trends, unique users, weekly) — `$screen`, filtered to `$screen_name = Insights`
+2. **Findings shown per open** (Trends, average of `finding_count`) — same `$screen` filter
 3. **Expands by rule** (Trends, total count, breakdown `rule_id`) — `insight expanded`
 4. **Verdict by rule** (Trends, total count, breakdown `rule_id`, filtered to `rating = not_useful`) — `insight rated`; duplicate the tile for `rating = useful`
 5. **Snoozes by rule** (Trends, total count, breakdown `rule_id`) — `insight snoozed` — **read this one first**
@@ -307,8 +322,12 @@ is what stops the AI inventing things that don't exist in your project.
 > `droppedExercise`, `volumeRamp`, `restSweetSpot`, `targetAdherence`,
 > `muscleBalance`, `prPace`, `rirCalibration`, `deloadReadiness`.
 >
-> 1. Trend, unique users, weekly: `insights opened`.
-> 2. Trend showing the average of the `finding_count` property on `insights opened`.
+> Opening the Insights screen is recorded as the built-in `$screen` event with
+> `$screen_name = Insights`; the finding properties ride on that same event.
+>
+> 1. Trend, unique users, weekly: `$screen` filtered to `$screen_name = Insights`.
+> 2. Trend showing the average of the `finding_count` property on that same
+>    filtered `$screen` event.
 > 3. Trend, total count, of `insight expanded` broken down by `rule_id`.
 > 4. Trend, total count, of `insight rated` filtered to `rating = useful`, broken
 >    down by `rule_id`.
@@ -335,7 +354,8 @@ is what stops the AI inventing things that don't exist in your project.
 > ORDER BY snooze_per_expand DESC
 > ```
 >
-> Ignore the `source` property on `insights opened` — it is hardcoded to one value.
+> There is no `insights opened` event and no `source` property on the Insights
+> screen view — both were removed as duplicates.
 
 ### Prompt 5 — Health & data ops
 
@@ -379,32 +399,40 @@ Small code fixes that would make the dashboards above meaningfully better.
    `$screen_name` breakdown entirely — which reads as "nobody uses them" rather
    than "not measured".
 
-3. **`insights opened` has a hardcoded source.** [InsightsView.swift:55](Repster/Features/Insights/Views/InsightsView.swift:55)
-   always sends `source: "hook"`. Worth passing the real entry point once there's
-   more than one, otherwise the breakdown is dead weight.
+3. ~~**`insights opened` has a hardcoded source.**~~ **Fixed 2026-08-10.** The
+   event is gone entirely — it duplicated the Insights `$screen` call fired
+   alongside it, so the finding properties moved onto the screen event and the
+   fake `source: "hook"` was dropped. One open now costs one event.
 
-4. **Home fires `$screen` twice, differently.** [ContentView.swift:697](Repster/App/ContentView.swift:697)
-   fires on tab change without `has_data`; [HomeView.swift:225](Repster/Features/Home/Views/HomeView.swift:225)
-   fires once per view lifetime with it. For empty-state analysis, filter to
-   events where `has_data` is set, or Home traffic will look inflated.
+4. ~~**Home fires `$screen` twice, differently.**~~ **Fixed 2026-08-10.** Charts
+   had the same problem. `ContentView` is now the only emitter of `$screen` for
+   the four tabs; `HomeView` and `ChartsTabView` report the empty case with
+   `empty state shown` alone and no longer send a second screen event. `$screen`
+   counts are comparable across all four tabs from this build onward — screen
+   traffic before it is inflated for Home and Charts only.
 
 5. **`exercise created` has one source value.** Only `create_exercise_form` is
    ever sent, so that breakdown is a single bar today.
 
-6. **No dev/production separation — fix this before 1.4 ships.**
-   [AnalyticsService.swift:45](Repster/Core/Services/AnalyticsService.swift:45)
-   reads one `POSTHOG_PROJECT_TOKEN` for every configuration. DEBUG sets
-   `config.debug = true` but still points at the production project, so every
-   simulator run writes to the same place as real users. Today that's obvious
-   because branch-only events can *only* be you; once 1.4 ships, dev events become
-   invisible contamination in real funnels. Two workable fixes:
-   - **Separate dev project** (recommended, matches the existing xcconfig
-     pattern): a second `POSTHOG_PROJECT_TOKEN` in the Debug xcconfig pointing at
-     a "Repster Dev" project. Clean production data, and somewhere to verify
-     events still fire.
-   - **Opt out in DEBUG**: return `NoopAnalyticsService` from
-     `AnalyticsServiceFactory.makeService` under `#if DEBUG`. Simpler, but you
-     lose the ability to check instrumentation locally.
+6. ~~**No dev/production separation.**~~ **Fixed 2026-08-10.** There is still one
+   `POSTHOG_PROJECT_TOKEN`, but `AnalyticsServiceFactory.makeService` now returns
+   `NoopAnalyticsService` under `#if DEBUG`, so simulator runs write nothing to
+   the production project.
+
+   **To verify instrumentation locally**, add this to the scheme's launch
+   arguments for that run (Product → Scheme → Edit Scheme → Run → Arguments):
+
+   ```
+   -analyticsDebugCaptureEnabled YES
+   ```
+
+   That writes to the production project on purpose — use it deliberately, and
+   remember those events land in real funnels. The cleaner long-term fix is still
+   a second "Repster Dev" project token in the Debug xcconfig, at which point this
+   guard can be dropped.
+
+   **Anything captured before 2026-08-10 from a debug build is contamination.**
+   Filter it out of historical funnels where it matters.
 
 7. **`Application Installed` casing.** posthog-ios 3.58.1 — the only version this
    project has ever resolved — emits `Application Installed` with a capital I

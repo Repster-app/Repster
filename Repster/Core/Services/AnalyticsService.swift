@@ -147,6 +147,8 @@ final class NoopAnalyticsService: AnalyticsServiceProtocol {
 
 final class AnalyticsService: AnalyticsServiceProtocol {
     static let collectionEnabledDefaultsKey = "shareAnonymousAnalyticsEnabled"
+    /// DEBUG-only escape hatch — see `AnalyticsServiceFactory.makeService`.
+    static let debugCaptureEnabledDefaultsKey = "analyticsDebugCaptureEnabled"
 
     private let client: any AnalyticsClientProtocol
     private let configuration: AnalyticsConfiguration
@@ -245,6 +247,18 @@ enum AnalyticsServiceFactory {
         userDefaults: UserDefaults = .standard,
         client: (any AnalyticsClientProtocol)? = nil
     ) -> any AnalyticsServiceProtocol {
+        #if DEBUG
+        // There is one PostHog project, so a debug build would otherwise write
+        // simulator runs into the same funnels as real users — invisible
+        // contamination once a version is live. Verifying instrumentation is
+        // still possible: add `-analyticsDebugCaptureEnabled YES` to the scheme's
+        // launch arguments for that run.
+        if client == nil,
+           !userDefaults.bool(forKey: AnalyticsService.debugCaptureEnabledDefaultsKey) {
+            return NoopAnalyticsService()
+        }
+        #endif
+
         guard let configuration = AnalyticsConfiguration(bundle: bundle) else {
             return NoopAnalyticsService()
         }

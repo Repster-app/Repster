@@ -145,7 +145,15 @@
       "Bash(osascript -e 'tell application \"Simulator\" to activate' -e 'delay 1' -e 'tell application \"System Events\" to tell process \"Simulator\" to get position of window 1')",
       "Bash(CLANG_MODULE_CACHE_PATH=.build/module-cache swift marketing/tools/render_technical_campaign.swift)",
       "Bash(gem list *)",
-      "Bash(echo \"=== marketing version history ===\" && git log --oneline -15 --all -- Repster.xcodeproj/project.pbxproj | head -15 && echo \"=== current version ===\" && grep -m4 \"MARKETING_VERSION\\\\|CURRENT_PROJECT_VERSION\" Repster.xcodeproj/project.pbxproj && echo \"=== find posthog SDK source ===\" && find ~/Library/Developer/Xcode/DerivedData -type d -name \"posthog-ios\" 2>/dev/null | head -3; find . -type d -name \"posthog-ios\" 2>/dev/null | head -3)"
+      "Bash(echo \"=== marketing version history ===\" && git log --oneline -15 --all -- Repster.xcodeproj/project.pbxproj | head -15 && echo \"=== current version ===\" && grep -m4 \"MARKETING_VERSION\\\\|CURRENT_PROJECT_VERSION\" Repster.xcodeproj/project.pbxproj && echo \"=== find posthog SDK source ===\" && find ~/Library/Developer/Xcode/DerivedData -type d -name \"posthog-ios\" 2>/dev/null | head -3; find . -type d -name \"posthog-ios\" 2>/dev/null | head -3)",
+      "Bash(plutil -lint Repster/Info.plist)",
+      "Bash(awk '/Begin PBXSourcesBuildPhase/,/End PBXSourcesBuildPhase/' Repster.xcodeproj/project.pbxproj)",
+      "Bash(awk '{print $11, $12, $13}')",
+      "Bash(defaults read *)",
+      "Bash(plutil -p __CMDSUB_OUTPUT__/Library/Preferences/*.plist)",
+      "Bash(awk 'NR>=700 && NR<=745' Repster.xcodeproj/project.pbxproj)",
+      "Bash(awk 'NR>=840 && NR<=880' Repster.xcodeproj/project.pbxproj)",
+      "Bash(awk 'NR>=855 && NR<=875' Repster.xcodeproj/project.pbxproj)"
     ]
   }
 }

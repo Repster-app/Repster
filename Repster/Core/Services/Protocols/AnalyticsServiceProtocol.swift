@@ -375,12 +375,12 @@ extension AnalyticsServiceProtocol {
         ])
     }
 
-    func screenViewed(_ screen: AnalyticsScreen, hasData: Bool) {
-        self.screen(screen, properties: [.hasData: .bool(hasData)])
-        if !hasData {
-            emptyStateShown(screen: screen)
-        }
-    }
+    /// Deliberately absent: a `screenViewed(_:hasData:)` helper. It used to pair a
+    /// `$screen` with an empty-state check, which meant Home and Charts emitted a
+    /// second `$screen` on top of the one `ContentView` already sends on tab
+    /// change — inflating those two tabs against Calendar and Settings. `$screen`
+    /// now has exactly one emitter per screen; call `emptyStateShown` on its own
+    /// when a screen renders with nothing in it.
 
     // MARK: - Training Insights
     //
@@ -392,13 +392,18 @@ extension AnalyticsServiceProtocol {
     // and real weights, which is training data leaving the device. Counts stay
     // bucketed, consistent with the rest of this file.
 
-    func insightsOpened(source: String, findingCount: Int, hasNew: Bool, hasBaseline: Bool) {
-        track(.insightsOpened, properties: [
-            .source: .string(source),
+    /// Opening Insights *is* the screen view, so the finding properties ride on
+    /// the `$screen` event rather than a second `insights opened` alongside it.
+    /// `finding_count == 0` is the empty feed, which is why no `has_data` is sent.
+    func insightsViewed(findingCount: Int, hasNew: Bool, hasBaseline: Bool) {
+        screen(.insights, properties: [
             .findingCount: .int(findingCount),
             .hasNew: .bool(hasNew),
             .hasBaseline: .bool(hasBaseline)
         ])
+        if findingCount == 0 {
+            emptyStateShown(screen: .insights)
+        }
     }
 
     func insightExpanded(ruleId: String) {
@@ -444,6 +449,62 @@ extension AnalyticsServiceProtocol {
             .completedWorkoutCount: .string(AnalyticsBuckets.count(completedWorkoutCount))
         ])
     }
+
+    // Apple Health
+    //
+    // Two questions this has to answer: how many people are offered the
+    // integration at all (Settings alone reaches almost nobody), and what they
+    // answer. `shown` fires only where Repster asks in its own UI before
+    // touching HealthKit — the Settings toggle goes straight to `answered`.
+
+    func appleHealthPromptShown(source: AppleHealthPromptSource) {
+        track(.appleHealthPromptShown, properties: [
+            .source: .string(source.rawValue)
+        ])
+    }
+
+    func appleHealthPromptAnswered(source: AppleHealthPromptSource, result: AppleHealthPromptResult) {
+        track(.appleHealthPromptAnswered, properties: [
+            .source: .string(source.rawValue),
+            .result: .string(result.rawValue)
+        ])
+    }
+
+    func appleHealthDisabled(source: AppleHealthPromptSource) {
+        track(.appleHealthDisabled, properties: [
+            .source: .string(source.rawValue)
+        ])
+    }
+}
+
+/// Where Repster offered the Apple Health integration. Keep the raw values
+/// stable — they're the breakdown dimension on the prompt funnel.
+enum AppleHealthPromptSource: String {
+    case onboarding
+    case settings
+    case whatsNew = "whats_new"
+}
+
+/// The outcome of one offer. `notNow` is Repster's own decline button, which
+/// deliberately never reaches HealthKit: iOS shows its permission sheet once,
+/// so an in-app "no" must stay recoverable.
+enum AppleHealthPromptResult: String {
+    case notNow = "not_now"
+    case authorized
+    case denied
+    case unavailable
+    case failed
+}
+
+extension HealthKitAuthorizationResult {
+    var promptResult: AppleHealthPromptResult {
+        switch self {
+        case .authorized: return .authorized
+        case .denied: return .denied
+        case .unavailable: return .unavailable
+        case .failed: return .failed
+        }
+    }
 }
 
 extension OnboardingStep {
@@ -453,6 +514,7 @@ extension OnboardingStep {
         case .units: return "units"
         case .bodyweight: return "bodyweight"
         case .smartSuggestions: return "smart_suggestions"
+        case .appleHealth: return "apple_health"
         case .importPrompt: return "import_prompt"
         }
     }
@@ -498,12 +560,14 @@ enum AnalyticsEvent: String, CaseIterable {
     case restorePurchasesTapped = "restore purchases tapped"
     case unitSystemToggled = "unit system toggled"
     case analyticsOptOutToggled = "analytics opt-out toggled"
-    case insightsOpened = "insights opened"
     case insightExpanded = "insight expanded"
     case insightRated = "insight rated"
     case insightRatingReason = "insight rating reason"
     case insightSnoozed = "insight snoozed"
     case musclePanelExpanded = "muscle panel expanded"
+    case appleHealthPromptShown = "apple health prompt shown"
+    case appleHealthPromptAnswered = "apple health prompt answered"
+    case appleHealthDisabled = "apple health disabled"
 }
 
 enum AnalyticsPropertyKey: String, CaseIterable {

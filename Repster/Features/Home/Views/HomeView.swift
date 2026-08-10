@@ -212,20 +212,21 @@ struct HomeView: View {
     // MARK: - Recent Workouts
 
     @ViewBuilder
-    /// Reports whether Home had any workout history to show. A user staring at an
-    /// empty Home screen is the single most common shape of a first session that
-    /// never turns into a second one — previously indistinguishable in analytics
-    /// from a returning user opening the app.
+    /// Reports an empty Home — the single most common shape of a first session
+    /// that never turns into a second one, and previously indistinguishable in
+    /// analytics from a returning user opening the app.
+    ///
+    /// Only the empty case is reported. `ContentView` is the sole emitter of
+    /// `$screen` for the tabs, so a screen call here would double-count Home
+    /// against Calendar and Settings.
     ///
     /// Fires once per view lifetime; Home reloads on every cover dismissal and
     /// repeat reports would swamp the signal.
     private func reportHomeContentIfNeeded() {
         guard !hasReportedHomeContent else { return }
         hasReportedHomeContent = true
-        services.analyticsService.screenViewed(
-            .home,
-            hasData: !viewModel.recentWorkouts.isEmpty
-        )
+        guard viewModel.recentWorkouts.isEmpty else { return }
+        services.analyticsService.emptyStateShown(screen: .home)
     }
 
     private var recentWorkoutsSection: some View {

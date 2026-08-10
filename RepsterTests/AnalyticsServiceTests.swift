@@ -130,27 +130,47 @@ final class AnalyticsServiceTests: XCTestCase {
         XCTAssertEqual(client.captures.last?.properties["step"] as? String, "bodyweight")
     }
 
-    func testScreenViewedWithoutDataAlsoEmitsEmptyState() {
+    func testEmptyStateShownDoesNotAlsoEmitAScreen() {
         let (service, client, defaults) = makeService()
         defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
 
         service.configure()
-        service.screenViewed(.charts, hasData: false)
+        service.emptyStateShown(screen: .charts)
 
-        XCTAssertEqual(client.screens.last?.screen, "Charts")
-        XCTAssertEqual(client.screens.last?.properties["has_data"] as? Bool, false)
         XCTAssertEqual(client.captures.last?.event, "empty state shown")
         XCTAssertEqual(client.captures.last?.properties["screen_name"] as? String, "Charts")
+        XCTAssertEqual(client.captures.last?.properties["has_data"] as? Bool, false)
+        // ContentView is the only emitter of `$screen` for the tabs — a second
+        // one here is what used to inflate Home and Charts traffic.
+        XCTAssertTrue(client.screens.isEmpty)
     }
 
-    func testScreenViewedWithDataDoesNotEmitEmptyState() {
+    func testInsightsViewedIsASingleScreenEventCarryingFindingCounts() {
         let (service, client, defaults) = makeService()
         defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
 
         service.configure()
-        service.screenViewed(.charts, hasData: true)
+        service.insightsViewed(findingCount: 3, hasNew: true, hasBaseline: true)
 
+        XCTAssertEqual(client.screens.count, 1)
+        XCTAssertEqual(client.screens.last?.screen, "Insights")
+        XCTAssertEqual(client.screens.last?.properties["finding_count"] as? Int, 3)
+        XCTAssertEqual(client.screens.last?.properties["has_new"] as? Bool, true)
+        XCTAssertEqual(client.screens.last?.properties["has_baseline"] as? Bool, true)
+        // One open, one event: there is no separate `insights opened`.
         XCTAssertTrue(client.captures.isEmpty)
+    }
+
+    func testInsightsViewedWithNoFindingsReportsEmptyState() {
+        let (service, client, defaults) = makeService()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        service.configure()
+        service.insightsViewed(findingCount: 0, hasNew: false, hasBaseline: true)
+
+        XCTAssertEqual(client.screens.count, 1)
+        XCTAssertEqual(client.captures.last?.event, "empty state shown")
+        XCTAssertEqual(client.captures.last?.properties["screen_name"] as? String, "Insights")
     }
 
     func testFirstSetLoggedBucketsTimeSinceWorkoutStart() {

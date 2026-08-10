@@ -58,10 +58,13 @@ struct ChartsTabView: View {
         // Reported once the first load resolves rather than on appear, so an
         // in-flight load isn't miscounted as an empty state. "Opened Charts and
         // found nothing" is a prime suspect for a silent first-session bounce.
+        // Only the empty case is reported — `ContentView` owns `$screen` for the
+        // tabs, and a screen call here would double-count Charts traffic.
         .onChange(of: viewModel.breakdownHasData) { _, hasData in
             guard let hasData, !hasReportedChartsData else { return }
             hasReportedChartsData = true
-            services.analyticsService.screenViewed(.charts, hasData: hasData)
+            guard !hasData else { return }
+            services.analyticsService.emptyStateShown(screen: .charts)
         }
         .onChange(of: services.unitPreference) { _, newValue in
             viewModel.updateUnitPreference(newValue)
