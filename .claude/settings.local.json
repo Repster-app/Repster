@@ -153,7 +153,20 @@
       "Bash(plutil -p __CMDSUB_OUTPUT__/Library/Preferences/*.plist)",
       "Bash(awk 'NR>=700 && NR<=745' Repster.xcodeproj/project.pbxproj)",
       "Bash(awk 'NR>=840 && NR<=880' Repster.xcodeproj/project.pbxproj)",
-      "Bash(awk 'NR>=855 && NR<=875' Repster.xcodeproj/project.pbxproj)"
+      "Bash(awk 'NR>=855 && NR<=875' Repster.xcodeproj/project.pbxproj)",
+      "Bash(C=/Users/nikolettkiraly/Library/Developer/CoreSimulator/Devices/FDB6AF7A-084C-44EF-A79A-3F3A6FF44F8E/data/Containers/Data/Application/97CD35EC-B1C9-467E-8371-B82AF9CCB699; find \"$C\" -name \"*.store\" -o -name \"*.sqlite\" | head; )",
+      "Bash(sqlite3 '/Users/nikolettkiraly/Library/Developer/CoreSimulator/Devices/FDB6AF7A-084C-44EF-A79A-3F3A6FF44F8E/data/Containers/Data/Application/97CD35EC-B1C9-467E-8371-B82AF9CCB699/Library/Application Support/default.store' 'select name from sqlite_master where type='\\\\''table'\\\\'' and name like '\\\\''Z%'\\\\'';')",
+      "Bash(sqlite3 '/Users/nikolettkiraly/Library/Developer/CoreSimulator/Devices/FDB6AF7A-084C-44EF-A79A-3F3A6FF44F8E/data/Containers/Data/Application/97CD35EC-B1C9-467E-8371-B82AF9CCB699/Library/Application Support/default.store' '.schema ZWORKOUTSET')",
+      "Bash(sqlite3 '/Users/nikolettkiraly/Library/Developer/CoreSimulator/Devices/FDB6AF7A-084C-44EF-A79A-3F3A6FF44F8E/data/Containers/Data/Application/97CD35EC-B1C9-467E-8371-B82AF9CCB699/Library/Application Support/default.store' 'select hex\\(ZEXERCISEID\\)||'\\\\''|'\\\\''||ZTOTALWORKOUTS from ZEXERCISESTATS where ZTOTALWORKOUTS > 0 order by 1;')",
+      "Bash(sqlite3 '/Users/nikolettkiraly/Library/Developer/CoreSimulator/Devices/FDB6AF7A-084C-44EF-A79A-3F3A6FF44F8E/data/Containers/Data/Application/97CD35EC-B1C9-467E-8371-B82AF9CCB699/Library/Application Support/default.store' ' *)",
+      "Bash(find ~/Library/Developer/Xcode/DerivedData -maxdepth 6 -name \"Repster.app\" -path \"*iphonesimulator*\" 2>/dev/null | head -5)",
+      "mcp__d3822463-f03c-4fcc-8a07-1b765a06051a__exec",
+      "WebFetch(domain:itunes.apple.com)",
+      "WebSearch",
+      "Bash(ls -lt ~/Library/Logs/DiagnosticReports/ 2>/dev/null | head -30; echo \"=== SIM ===\"; find ~/Library/Logs/DiagnosticReports -name \"*Repster*\" -o -name \"*.ips\" -newermt \"2026-08-10\" 2>/dev/null | head -30)",
+      "Bash(ls -lt ~/Library/Logs/CrashReporter/MobileDevice/*/ 2>/dev/null | head -30; echo \"=== XCODE DEVICE LOGS ===\"; find ~/Library/Developer/Xcode -iname \"*.ips\" -newermt \"2026-08-09\" 2>/dev/null | head -20; echo \"=== SIM CONTAINER LOGS ===\"; find ~/Library/Logs -iname \"*repster*\" 2>/dev/null | head -20)",
+      "Bash(find ~/Library/Logs/CoreSimulator -iname \"*.ips\" -newermt \"2026-08-09\" 2>/dev/null | head -20; echo \"=== ALL RECENT IPS ANYWHERE ===\"; find ~/Library -iname \"*.ips\" -newermt \"2026-08-10\" 2>/dev/null | head -40)",
+      "Bash(awk -F: '{print $1}')"
     ]
   }
 }

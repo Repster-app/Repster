@@ -227,6 +227,21 @@ struct MuscleBalanceInsightRule: InsightRule {
 
         guard let worst = neglected.first else { return [] }
 
+        // The comparison groups, stated as the range they actually span. Saying
+        // "got \(median)+ each" claimed a floor the median doesn't provide — a
+        // card reading "7+ each" beside a shoulders row showing 5 is just wrong.
+        let neglectedGroups = Set(neglected.map(\.group))
+        let comparisonCounts = trainedGroups
+            .filter { !neglectedGroups.contains($0) }
+            .map { recentSets[$0] ?? 0 }
+            .sorted()
+        let comparisonSummary: String = {
+            guard let low = comparisonCounts.first, let high = comparisonCounts.last else {
+                return "\(median)"
+            }
+            return low == high ? "\(low)" : "\(low)–\(high)"
+        }()
+
         let sortedGroups = trainedGroups.sorted {
             (recentSets[$0] ?? 0) > (recentSets[$1] ?? 0)
         }
@@ -239,7 +254,7 @@ struct MuscleBalanceInsightRule: InsightRule {
                 ? "\(worst.group.capitalized) has gone quiet"
                 : "\(worst.group.capitalized) is falling behind",
             detailText: worst.count == 0
-                ? "No \(worst.group) sets in the last \(Self.recentWindowDays) days, while your other muscle groups got \(median)+ each. One focused session closes the gap."
+                ? "No \(worst.group) sets in the last \(Self.recentWindowDays) days, while your other muscle groups got \(comparisonSummary). One focused session closes the gap."
                 : "Only \(worst.count) \(worst.group) sets in the last \(Self.recentWindowDays) days versus ~\(median) for your other groups. Worth a few extra sets this week.",
             methodologyText: "Working sets per muscle group, last \(Self.recentWindowDays) days",
             chartKind: .ranking,

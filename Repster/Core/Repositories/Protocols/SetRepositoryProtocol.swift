@@ -68,8 +68,10 @@ protocol SetRepositoryProtocol: Sendable {
         excludePartial: Bool
     ) async throws -> SetAggregateResult
 
-    /// Count distinct workouts containing sets for a given exercise.
-    func fetchWorkoutCount(for exerciseId: UUID) async throws -> Int
+    /// Count distinct workouts in which the exercise was actually performed —
+    /// i.e. workouts holding at least one completed set that contributes to stats.
+    /// Placeholder rows, partials and (unless included) warmups don't count.
+    func fetchWorkoutCount(for exerciseId: UUID, excludeWarmups: Bool) async throws -> Int
 
     /// Fetch the best e1RM value for an exercise.
     /// Uses sort DESC + fetchLimit(1) — database-level MAX equivalent.

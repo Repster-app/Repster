@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Insight charts — current state</title>
+<style>
+  :root {
+    --bg:          #111113;
+    --bg-card:     #1B1B1F;
+    --bg-subtle:   #262630;
+    --border:      rgba(255,255,255,0.06);
+    --text-1:      #EAEAEF;
+    --text-2:      #9999A8;
+    --text-3:      #5C5C6E;
+    --accent:      #5B8DEF;
+    --success:     #5EC269;
+    --gold:        #D4A23A;
+    --danger:      #E05555;
+    --stale:       #94A3B8;
+    --orange:      #E89B3E;
+    --chart5:      #A87EE6;
+    --chart7:      #4ECDC4;
+    /* MuscleGroupColors */
+    --m-chest:     #5B8DEF;
+    --m-back:      #5EC269;
+    --m-abs:       #E08850;
+    --m-legs:      #E05555;
+    --m-shoulders: #D4A23A;
+    --m-biceps:    #9B7FE6;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 32px 20px 80px;
+    background: var(--bg);
+    color: var(--text-1);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page { max-width: 1180px; margin: 0 auto; }
+
+  h1 { font-size: 26px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.3px; }
+  .sub { color: var(--text-2); font-size: 14px; margin: 0 0 8px; max-width: 760px; line-height: 1.55; }
+  .rule {
+    margin: 18px 0 30px; padding: 12px 14px; max-width: 760px;
+    border-left: 2px solid var(--accent); background: rgba(91,141,239,0.07);
+    border-radius: 0 8px 8px 0; font-size: 13.5px; line-height: 1.55; color: var(--text-2);
+  }
+  .rule strong { color: var(--text-1); font-weight: 600; }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin: 0 0 26px; font-size: 12px; color: var(--text-2); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .dot.ok   { background: var(--success); }
+  .dot.bad  { background: var(--danger); }
+  .dot.dead { background: var(--text-3); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 26px; }
+
+  .slot { display: flex; flex-direction: column; gap: 9px; }
+
+  .kindbar { display: flex; align-items: baseline; gap: 8px; }
+  .kind { font-size: 11px; font-weight: 700; letter-spacing: 0.9px; text-transform: uppercase; color: var(--text-2); }
+  .uses { font-size: 11px; color: var(--text-3); }
+
+  /* ---- the card, matching InsightCardView ---- */
+  .card {
+    background: var(--bg-card); border-radius: 14px; padding: 14px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .card-head { display: flex; align-items: center; gap: 8px; }
+  .pill {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase;
+    padding: 4px 8px; border-radius: 6px;
+  }
+  .subject { font-size: 11px; font-weight: 500; color: var(--text-3); }
+  .ellipsis { margin-left: auto; color: var(--text-3); font-size: 14px; letter-spacing: 1px; }
+  .headline { font-size: 16px; font-weight: 600; color: var(--text-1); line-height: 1.3; }
+  .detail {
+    font-size: 13px; font-weight: 500; color: var(--text-2); line-height: 1.42;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+
+  /* ---- verdict caption under each card ---- */
+  .verdict { font-size: 12px; line-height: 1.5; display: flex; gap: 7px; align-items: flex-start; }
+  .verdict .dot { margin-top: 4px; flex: none; }
+  .verdict-text { color: var(--text-2); }
+  .verdict-text b { color: var(--text-1); font-weight: 600; }
+
+  /* ---- chart primitives ---- */
+  .chart { width: 100%; }
+  svg { display: block; overflow: visible; }
+
+  /* ranking rows */
+  .rank-row { display: flex; align-items: center; gap: 9px; margin-bottom: 7px; }
+  .rank-row:last-child { margin-bottom: 0; }
+  .rank-name { width: 62px; font-size: 11.5px; flex: none; white-space: nowrap; overflow: hidden; }
+  .rank-name.subj { font-weight: 600; color: var(--text-1); }
+  .rank-name.ctx  { font-weight: 500; color: var(--text-2); }
+  .rank-track { flex: 1; height: 8px; border-radius: 99px; background: var(--bg-subtle); position: relative; }
+  .rank-fill  { position: absolute; inset: 0 auto 0 0; height: 8px; border-radius: 99px; }
+  .rank-val { width: 24px; text-align: right; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; flex: none; }
+  .rank-val.subj { color: var(--text-1); }
+  .rank-val.ctx  { color: var(--text-3); }
+
+  /* proportion key */
+  .prop-bar { height: 12px; border-radius: 99px; overflow: hidden; display: flex; }
+  .prop-key { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+  .prop-key span { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 500; color: var(--text-3); }
+  .swatch { width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
+
+  /* comparison */
+  .cmp { display: flex; gap: 12px; }
+  .cmp-col { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+  .cmp-fig { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-1); }
+  .cmp-track { height: 6px; border-radius: 99px; background: var(--bg-subtle); position: relative; }
+  .cmp-fill { position: absolute; inset: 0 auto 0 0; height: 6px; border-radius: 99px; }
+  .cmp-lbl { font-size: 10px; font-weight: 500; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-3); }
+
+  /* range lanes */
+  .lane { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; }
+  .lane:last-child { margin-bottom: 0; }
+  .lane-lbl { width: 38px; font-size: 10px; font-weight: 600; color: var(--text-3); flex: none; text-transform: uppercase; }
+  .lane-track { flex: 1; height: 9px; border-radius: 99px; background: var(--bg-subtle); position: relative; }
+  .lane-fill { position: absolute; top: 0; height: 9px; border-radius: 99px; }
+  .lane-val { width: 42px; text-align: right; font-size: 10.5px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-2); flex: none; }
+
+  .foot { margin-top: 42px; color: var(--text-3); font-size: 12px; line-height: 1.6; max-width: 760px; }
+  .foot code { color: var(--text-2); }
+
+  /* ================= speculative section ================= */
+  .divider { margin: 64px 0 0; border-top: 1px solid var(--border); padding-top: 34px; }
+  h2 { font-size: 21px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.2px; }
+  .warn {
+    margin: 16px 0 30px; padding: 12px 14px; max-width: 760px;
+    border-left: 2px solid var(--gold); background: rgba(212,162,58,0.07);
+    border-radius: 0 8px 8px 0; font-size: 13.5px; line-height: 1.55; color: var(--text-2);
+  }
+  .warn strong { color: var(--text-1); font-weight: 600; }
+
+  .card.spec { border: 1px dashed rgba(255,255,255,0.10); }
+  .cost { font-size: 12px; line-height: 1.5; color: var(--text-3); display: flex; gap: 7px; align-items: flex-start; }
+  .cost .tag {
+    flex: none; font-size: 9.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+    padding: 2px 6px; border-radius: 4px; margin-top: 1px;
+  }
+  .tag.cheap { color: var(--success); background: rgba(94,194,105,0.12); }
+  .tag.newdata { color: var(--gold);   background: rgba(212,162,58,0.12); }
+  .cost b { color: var(--text-2); font-weight: 600; }
+
+  /* week grid */
+  .weekgrid { display: flex; gap: 3px; }
+  .weekcol { display: flex; flex-direction: column; gap: 3px; }
+  .day { width: 11px; height: 11px; border-radius: 3px; background: var(--bg-subtle); }
+  .day.on { background: var(--accent); }
+  .day.on.dim { background: var(--accent); opacity: .45; }
+  .gridcap { display: flex; justify-content: space-between; margin-top: 7px; font-size: 10px; color: var(--text-3); }
+
+  /* figure row used by several */
+  .figrow { display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px; }
+  .fig { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-1); }
+  .figlbl { font-size: 11px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-3); }
+  .figside { margin-left: auto; font-size: 11.5px; font-weight: 500; color: var(--text-2); font-variant-numeric: tabular-nums; }
+
+  /* dot matrix */
+  .matrix { display: grid; grid-template-columns: repeat(20, 1fr); gap: 3px; }
+  .cell { aspect-ratio: 1; border-radius: 2px; }
+
+  /* mirrored */
+  .mirror-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .mirror-lbl { width: 52px; font-size: 11px; color: var(--text-2); flex: none; }
+  .mirror-bars { flex: 1; display: flex; align-items: center; height: 12px; position: relative; }
+  .mirror-half { flex: 1; height: 10px; display: flex; }
+  .mirror-half.l { justify-content: flex-end; }
+  .mirror-half .b { height: 10px; border-radius: 3px; }
+  .mirror-axis { width: 1px; height: 16px; background: var(--text-3); flex: none; }
+  .mirror-val { width: 34px; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--text-2); flex: none; }
+  .mirror-val.l { text-align: right; }
+
+  /* sparkline rows */
+  .spark-row { display: flex; align-items: center; gap: 9px; margin-bottom: 6px; }
+  .spark-name { width: 54px; font-size: 11px; color: var(--text-2); flex: none; }
+  .spark-name.subj { color: var(--text-1); font-weight: 600; }
+  .spark-svg { flex: 1; }
+  .spark-val { width: 22px; text-align: right; font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-3); flex: none; }
+  .spark-val.subj { color: var(--text-1); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Insight charts — what ships today</h1>
+  <p class="sub">
+    All seven <code>chartKind</code> values as they currently render, drawn from
+    <code>InsightChartViews.swift</code> at the app's real sizes and design tokens, each inside
+    the card that carries it. Detail text is clamped to two lines because that is what
+    <code>InsightCardView</code> does while collapsed — the state these are read in.
+  </p>
+
+  <div class="rule">
+    <strong>The rule from §7.1:</strong> every insight chart names its subject and prints the
+    figure the headline is about. The captions below mark each chart against it. The standing
+    objection — “the card's text carries the numbers” — is what the two-line clamp defeats.
+  </div>
+
+  <div class="legend">
+    <span><i class="dot ok"></i> carries names and figures</span>
+    <span><i class="dot bad"></i> shape only — nothing to read</span>
+    <span><i class="dot dead"></i> no shipped rule uses it</span>
+  </div>
+
+  <div class="grid">
+
+    <!-- ============ RANKING ============ -->
+    <div class="slot">
+      <div class="kindbar"><span class="kind">ranking</span><span class="uses">muscleBalance · rebuilt 11 Aug</span></div>
+      <div class="card">
+        <div class="card-head">
+          <span class="pill" style="color:var(--chart7); background:rgba(78,205,196,0.12)">Muscle balance</span>
+          <span class="subject">legs</span>
+          <span class="ellipsis">•••</span>
+        </div>
+        <div class="headline">Legs has gone quiet</div>
+        <div class="chart">
+          <div class="rank-row">
+            <span class="rank-name ctx">Chest</span>
+            <span class="rank-track"><i class="rank-fill" style="width:100%; background:var(--m-chest); opacity:.55"></i></span>
+            <span class="rank-val ctx">12</span>
+          </div>
+          <div class="rank-row">
+            <span class="rank-name ctx">Back</span>
+            <span class="rank-track"><i class="rank-fill" style="width:83%; background:var(--m-back); opacity:.55"></i></span>
+            <span class="rank-val ctx">10</span>
+          </div>
+          <div class="rank-row">
+            <span class="rank-name ctx">Abs</span>
+            <span class="rank-track"><i class="rank-fill" style="width:58%; background:var(--m-abs); opacity:.55"></i></span>
+            <span class="rank-val ctx">7</span>
+          </div>
+          <div class="rank-row">
+            <span class="rank-name subj">Legs</span>
+            <span class="rank-track"><i class="rank-fill" style="width:3px; background:var(--m-legs)"></i></span>
+            <span class="rank-val subj">0</span>
+          </div>
+        </div>
+        <div class="detail">No legs sets in the last 14 days, while your other muscle groups got 7+ each. One focused session closes the gap.</div>
+      </div>
+      <div class="verdict"><i class="dot ok"></i><span class="verdict-text">
+        <b>Reference implementation.</b> Names every row, prints every figure, and the subject
+        is the one thing at full strength. Zero gets a 3px nub instead of vanishing.
+      </span></div>
+    </div>
+
+    <!-- ============ COLUMN — consistency ============ -->
+    <div class="slot">
+      <div class="kindbar"><span class="kind">column</span><span class="uses">consistency</span></div>
+      <div class="card">
+        <div class="card-head">
+          <span class="pill" style="color:var(--accent); background:rgba(91,141,239,0.12)">Consistency</span>
+          <span class="ellipsis">•••</span>
+        </div>
+        <div class="headline">Five weeks at four sessions or more</div>
+        <div class="chart">
+          <svg viewBox="0 0 300 46" width="100%" height="46" preserveAspectRatio="none">
+            <rect x="0"   y="18.4" width="33" height="27.6" rx="2" fill="#5B8DEF" opacity=".35"/>
+            <rect x="36.6" y="18.4" width="33" height="27.6" rx="2" fill="#5B8DEF" opacity=".35"/>
+            <rect x="73.2" y="9.2"  width="33" height="36.8" rx="2" fill="#5B8DEF" opacity=".35"/>
+            <rect x="109.8" y="18.4" width="33" height="27.6" rx="2" fill="#5B8DEF" opacity=".35"/>
+            <rect x="146.4" y="9.2"  width="33" height="36.8" rx="2" fill="#5B8DEF" opacity=".35"/>
+            <rect x="183"  y="9.2"  width="33" height="36.8" rx="2" fill="#5B8DEF" opacity=".35"/>
+            <rect x="219.6" y="9.2"  width="33" height="36.8" rx="2" fill="#5B8DEF" opacity=".35"/>
+            <rect x="256.2" y="0"    width="33" height="46"   rx="2" fill="#5B8DEF"/>
+          </svg>
+        </div>
+        <div class="detail">You've trained at least four times a week for five weeks running, against a median of three earlier in the year. That's your longest stretch so far.</div>
+      </div>
+      <div class="verdict"><i class="dot bad"></i><span class="verdict-text">
+        No period labels, no figures, no median line. Eight bars that could be any span at any
+        scale — “four times a week” and “median of three” are both invisible.
+      </span></div>
+    </div>
+
+    <!-- ============ COLUMN — volumeRamp ============ -->
+    <div class="slot">
+      <div class="kindbar"><span class="kind">column</span><span class="uses">volumeRamp</span></div>
+      <div class="card">
+        <div class="card-head">
+          <span class="pill" style="color:var(--chart5); background:rgba(168,126,230,0.12)">Volume ramp</span>
+          <span class="ellipsis">•••</span>
+        </div>
+        <div class="headline">Your weekly volume is climbing fast</div>
+        <div class="chart">
+          <svg viewBox="0 0 300 46" width="100%" height="46" preserveAspectRatio="none">
+            <rect x="0"     y="19.9" width="38" height="26.1" rx="2" fill="#A87EE6" opacity=".35"/>
+            <rect x="43.7"  y="18.0" width="38" height="28.0" rx="2" fill="#A87EE6" opacity=".35"/>
+            <rect x="87.4"  y="16.2" width="38" height="29.8" rx="2" fill="#A87EE6" opacity=".35"/>
+            <rect x="131.1" y="13.7" width="38" height="32.3" rx="2" fill="#A87EE6" opacity=".35"/>
+            <rect x="174.8" y="8.1"  width="38" height="37.9" rx="2" fill="#A87EE6" opacity=".35"/>
+            <rect x="218.5" y="3.7"  width="38" height="42.3" rx="2" fill="#A87EE6" opacity=".35"/>
+            <rect x="262.2" y="0"    width="38" height="46"   rx="2" fill="#A87EE6"/>
+          </svg>
+        </div>
+        <div class="detail">Your working sets are up from about 42 a week to 74 over seven weeks — a 76% climb. Worth holding here for a week before adding more.</div>
+      </div>
+      <div class="verdict"><i class="dot bad"></i><span class="verdict-text">
+        Identical treatment to consistency above, for entirely different data. 42→74 is the
+        finding and neither number appears; the slope is flattened by scaling to the max.
+      </span></div>
+    </div>
+
+    <!-- ============ SERIES — strengthTrend ============ -->
+    <div class="slot">
+      <div class="kindbar"><span class="kind">series</span><span class="uses">strengthTrend</span></div>
+      <div class="card">
+        <div class="card-head">
+          <span class="pill" style="color:var(--success); background:rgba(94,194,105,0.12)">Strength trend</span>
+          <span class="subject">Bench Press</span>
+          <span class="ellipsis">•••</span>
+        </div>
+        <div class="headline">Bench Press is trending up</div>
+        <div class="chart">
+          <svg viewBox="0 0 300 52" width="100%" height="52" preserveAspectRatio="none">
+            <path d="M0,42.1 L42.9,36.0 L85.7,39.1 L128.6,26.8 L171.4,29.8 L214.3,17.5 L257.1,11.4 L300,5.0 L300,52 L0,52 Z" fill="#5EC269" opacity="0.13"/>
+            <path d="M0,42.1 L42.9,36.0 L85.7,39.1 L128.6,26.8 L171.4,29.8 L214.3,17.5 L257.1,11.4 L300,5.0"
+                  fill="none" stroke="#5EC269" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="297" cy="5.0" r="3.5" fill="#5EC269"/>
+          </svg>
+        </div>
+        <div class="detail">Your estimated 1RM has gone from 102 kg to 115 kg across nine weeks, projecting about +4% over the next eight if it holds.</div>
+      </div>
+      <div class="verdict"><i class="dot bad"></i><span class="verdict-text">
+        Shape without scale. 102→115 kg is the whole claim and neither endpoint is printed, so
+        the line is equally consistent with a 2 kg drift. The clamp cuts the prose at “about”.
+      </span></div>
+    </div>
+
+    <!-- ============ SIGNED SERIES — deloadReadiness ============ -->
+    <div class="slot">
+      <div class="kindbar"><span class="kind">series (signed)</span><span class="uses">deloadReadiness</span></div>
+      <div class="card">
+        <div class="card-head">
+          <span class="pill" style="color:var(--danger); background:rgba(224,85,85,0.12)">Deload readiness</span>
+          <span class="ellipsis">•••</span>
+        </div>
+        <div class="headline">Your sessions are landing under your usual output</div>
+        <div class="chart">
+          <svg viewBox="0 0 300 52" width="100%" height="52" preserveAspectRatio="none">
+            <rect x="0" y="25.5" width="300" height="1" fill="rgba(255,255,255,0.06)"/>
+            <rect x="0"     y="18.4" width="34.5" height="7.1"  rx="2" fill="#5EC269"/>
+            <rect x="36.9"  y="26.5" width="34.5" height="3.6"  rx="2" fill="#E05555"/>
+            <rect x="73.8"  y="26.5" width="34.5" height="10.7" rx="2" fill="#E05555"/>
+            <rect x="110.7" y="26.5" width="34.5" height="17.8" rx="2" fill="#E05555"/>
+            <rect x="147.6" y="26.5" width="34.5" height="14.3" rx="2" fill="#E05555"/>
+            <rect x="184.5" y="26.5" width="34.5" height="21.4" rx="2" fill="#E05555"/>
+            <rect x="221.4" y="26.5" width="34.5" height="17.8" rx="2" fill="#E05555"/>
+            <rect x="258.3" y="26.5" width="34.5" height="25.0" rx="2" fill="#E05555"/>
+          </svg>
+        </div>
+        <div class="detail">Session-best estimated 1RM has sat below your prior four weeks across seven of the last eight sessions, with effort ratings up a point. A lighter week often resets this.</div>
+      </div>
+      <div class="verdict"><i class="dot bad"></i><span class="verdict-text">
+        <b>Two problems.</b> Green/red grades training the user chose — the colouring dropped
+        from the status card on 10 Aug. And “7 of 8 below expectation” is computed here, spoken
+        to VoiceOver, and shown to no one.
+      </span></div>
+    </div>
+
+    <!-- ============ SIGNED SERIES — rirCalibration ============ -->
+    <div class="slot">
+      <div class="kindbar"><span class="kind">series (signed)</span><span class="uses">rirCalibration</span></div>
+      <div class="card">
+        <div class="card-head">
+          <span class="pill" style="color:var(--chart5); background:rgba(168,126,230,0.12)">RIR calibration</span>
+          <span class="ellipsis">•••</span>
+        </div>
+        <div class="headline">You're calling sets harder than they finish</div>
+        <div class="chart">
+          <svg viewBox="0 0 300 52" width="100%" height="52" preserveAspectRatio="none">
+            <rect x="0" y="25.5" width="300" height="1" fill="rgba(255,255,255,0.06)"/>
+            <rect x="0"     y="19.1" width="34.5" height="6.4"  rx="2" fill="#5EC269"/>
+            <rect x="36.9"  y="26.5" width="34.5" height="12.8" rx="2" fill="#E05555"/>
+            <rect x="73.8"  y="19.1" width="34.5" height="6.4"  rx="2" fill="#5EC269"/>
+            <rect x="110.7" y="26.5" width="34.5" height="19.1" rx="2" fill="#E05555"/>
+            <rect x="147.6" y="26.5" width="34.5" height="12.8" rx="2" fill="#E05555"/>
+            <rect x="184.5" y="26.5" width="34.5" height="25.5" rx="2" fill="#E05555"/>
+            <rect x="221.4" y="26.5" width="34.5" height="12.8" rx="2" fill="#E05555"/>
+            <rect x="258.3" y="26.5" width="34.5" height="19.1" rx="2" fill="#E05555"/>
+          </svg>
+        </div>
+        <div class="detail">Across your last eight rated sets you had about 1.5 more reps left than you logged. Your RIR 2 sets are finishing closer to RIR 3.5.</div>
+      </div>
+      <div class="verdict"><i class="dot bad"></i><span class="verdict-text">
+        Same widget, opposite meaning: here red means “you had more in the tank”, which is not
+        bad news at all. Nothing marks what the zero line represents.
+      </span></div>
+    </div>
+
+    <!-- ============ TIMELINE — droppedExercise ============ -->
+    <div class="slot">
+      <div class="kindbar"><span class="kind">timeline</span><span class="uses">droppedExercise</span></div>
+      <div class="card">
+        <div class="card-head">
+          <span class="pill" style="color:var(--orange); background:rgba(232,155,62,0.12)">Dropped exercise</span>
+          <span class="subject">Barbell Row</span>
+          <span class="ellipsis">•••</span>
+        </div>
+        <div class="headline">You've stopped doing Barbell Row</div>
+        <div class="chart">
+          <svg viewBox="0 0 300 22" width="100%" height="22">
+            <rect x="0" y="10" width="300" height="2" fill="#262630"/>
+            <circle cx="4"     cy="11" r="4" fill="#E89B3E"/>
+            <circle cx="52.3"  cy="11" r="4" fill="#E89B3E"/>
+            <circle cx="107.5" cy="11" r="4" fill="#E89B3E"/>
+            <circle cx="152.3" cy="11" r="4" fill="#E89B3E"/>
+            <circle cx="203.9" cy="11" r="4" fill="#E89B3E"/>
+            <circle cx="252.8" cy="11" r="4" fill="#E89B3E"/>
+            <circle cx="296"   cy="11" r="4" fill="#E89B3E"/>
+          </svg>
+        </div>
+        <div class="detail">You did Barbell Row 14 times over four months, then stopped 94 days ago. Your usual gap between sessions was about 12 days.</div>
+      </div>
+      <div class="verdict"><i class="dot bad"></i><span class="verdict-text">
+        <b>The axis ends at the last dot,</b> so the 94-day drought — the entire finding — is
+        the one interval not drawn. It reads as regular training. No dates anywhere.
+      </span></div>
+    </div>
+
+    <!-- ============ TIMELINE — prPace ============ -->
+    <div class="slot">
+      <div class="kindbar"><span class="kind">timeline</span><span class="uses">prPace</span></div>
+      <div class="card">
+        <div class="card-head">
+          <span class="pill" style="color:var(--gold); background:rgba(212,162,58,0.12)">PR pace</span>
+          <span class="ellipsis">•••</span>
+        </div>
+        <div class="headline">You're setting PRs faster than usual</div>
+        <div class="chart">
+          <svg viewBox="0 0 300 22" width="100%" height="22">
+            <rect x="0" y="10" width="300" height="2" fill="#262630"/>
+            <circle cx="4"     cy="11" r="4" fill="#D4A23A"/>
+            <circle cx="68.2"  cy="11" r="4" fill="#D4A23A"/>
+            <circle cx="141.6" cy="11" r="4" fill="#D4A23A"/>
+            <circle cx="212.4" cy="11" r="4" fill="#D4A23A"/>
+            <circle cx="248.9" cy="11" r="4" fill="#D4A23A"/>
+            <circle cx="272.1" cy="11" r="4" fill="#D4A23A"/>
+            <circle cx="296"   cy="11" r="4" fill="#D4A23A"/>
+          </svg>
+        </div>
+        <div class="detail">Seven PRs in the last five weeks against a typical gap of about 18 days. Whatever you changed recently is working.</div>
+      </div>
+      <div class="verdict"><i class="dot bad"></i><span class="verdict-text">
+        The tightening gaps are genuinely visible here — the one case where bare dots almost
+        work. Still no dates and no cadence figure, so “faster than usual” can't be checked.
+      </span></div>
+    </div>
+
+    <!-- ============ PROPORTION ============ -->
+    <div class="slot">
+      <div class="kindbar"><span class="kind">proportion</span><span class="uses">targetAdherence</span></div>
+      <div class="card">
+        <div class="card-head">
+          <span class="pill" style="color:var(--accent); background:rgba(91,141,239,0.12)">Target adherence</span>
+          <span class="ellipsis">•••</span>
+        </div>
+        <div class="headline">Most of your sets land in range</div>
+        <div class="chart">
+          <div class="prop-bar">
+            <i style="width:22%; background:var(--danger)"></i>
+            <i style="width:58%; background:var(--success)"></i>
+            <i style="width:20%; background:var(--stale)"></i>
+          </div>
+          <div class="prop-key">
+            <span><i class="swatch" style="background:var(--danger)"></i>Below 22%</span>
+            <span><i class="swatch" style="background:var(--success)"></i>In range 58%</span>
+            <span><i class="swatch" style="background:var(--stale)"></i>Above 20%</span>
+          </div>
+        </div>
+        <div class="detail">58% of your working sets finished inside their target rep range over the last 30 days, with the misses split fairly evenly either side.</div>
+      </div>
+      <div class="verdict"><i class="dot ok"></i><span class="verdict-text">
+        Compliant — the key names every segment and prints its share. Worth checking whether
+        red-for-below survives the no-verdict-colour rule.
+      </span></div>
+    </div>
+
+    <!-- ============ COMPARISON ============ -->
+    <div class="slot">
+      <div class="kindbar"><span class="kind">comparison</span><span class="uses">restSweetSpot</span></div>
+      <div class="card">
+        <div class="card-head">
+          <span class="pill" style="color:var(--orange); background:rgba(232,155,62,0.12)">Rest sweet spot</span>
+          <span class="subject">Squat</span>
+          <span class="ellipsis">•••</span>
+        </div>
+        <div class="headline">Longer rests are landing better on Squat</div>
+        <div class="chart">
+          <div class="cmp">
+            <div class="cmp-col">
+              <span class="cmp-fig">118</span>
+              <span class="cmp-track"><i class="cmp-fill" style="width:100%; background:var(--text-3)"></i></span>
+              <span class="cmp-lbl">Longer rest</span>
+            </div>
+            <div class="cmp-col">
+              <span class="cmp-fig">94</span>
+              <span class="cmp-track"><i class="cmp-fill" style="width:79.7%; background:var(--orange)"></i></span>
+              <span class="cmp-lbl">Shorter rest</span>
+            </div>
+          </div>
+        </div>
+        <div class="detail">Sets after roughly two minutes' rest averaged 118 kg estimated 1RM against 94 kg after shorter breaks, across 40 logged sets.</div>
+      </div>
+      <div class="verdict"><i class="dot ok"></i><span class="verdict-text">
+        Compliant — figure above, label below, bars proportional. The clearest card in the set,
+        and the least chart-like, which is the point.
+      </span></div>
+    </div>
+
+    <!-- ============ RANGE ============ -->
+    <div class="slot">
+      <div class="kindbar"><span class="kind">range</span><span class="uses">no shipped rule</span></div>
+      <div class="card">
+        <div class="card-head">
+          <span class="pill" style="color:var(--stale); background:rgba(148,163,184,0.12)">Rep range drift</span>
+          <span class="subject">not built</span>
+          <span class="ellipsis">•••</span>
+        </div>
+        <div class="headline">Your working reps have crept down</div>
+        <div class="chart">
+          <div class="lane">
+            <span class="lane-lbl">Was</span>
+            <span class="lane-track"><i class="lane-fill" style="left:42.9%; width:57.1%; background:var(--text-3)"></i></span>
+            <span class="lane-val">8–12</span>
+          </div>
+          <div class="lane">
+            <span class="lane-lbl">Now</span>
+            <span class="lane-track"><i class="lane-fill" style="left:0%; width:42.9%; background:var(--accent)"></i></span>
+            <span class="lane-val">5–8</span>
+          </div>
+        </div>
+        <div class="detail">Your median working set has moved from 8–12 reps to 5–8 over the last two months, with weights up to match.</div>
+      </div>
+      <div class="verdict"><i class="dot dead"></i><span class="verdict-text">
+        <b>Speculative.</b> No shipped rule emits this kind — <code>repRangeDrift</code> was
+        specified in §5 and never built, so this is the spec rendered, not the app.
+      </span></div>
+    </div>
+
+  </div>
+
+  <!-- ==================================================================== -->
+  <!-- ========================== SPECULATIVE ============================= -->
+  <!-- ==================================================================== -->
+
+  <div class="divider">
+    <h2>Potential directions</h2>
+    <p class="sub">
+      Eight shapes the current seven can't make. Each is aimed at a specific failure above
+      rather than at variety — the note under every card says which rule it would serve, what it
+      fixes, and what it costs.
+    </p>
+    <div class="warn">
+      <strong>None of these are built or agreed.</strong> Two need data the engine doesn't
+      currently produce: nothing computes baseline <em>spread</em>, and no rule emits per-week
+      or per-set distributions — <code>chartValues</code> carries aggregates only. Those are
+      marked. The rest run on data that already exists.
+    </div>
+
+    <div class="grid">
+
+      <!-- ============ 1. WEEK GRID ============ -->
+      <div class="slot">
+        <div class="kindbar"><span class="kind">week grid</span><span class="uses">would serve: consistency</span></div>
+        <div class="card spec">
+          <div class="card-head">
+            <span class="pill" style="color:var(--accent); background:rgba(91,141,239,0.12)">Consistency</span>
+            <span class="ellipsis">•••</span>
+          </div>
+          <div class="headline">Five weeks at four sessions or more</div>
+          <div class="chart">
+            <div class="figrow">
+              <span class="fig">4.2</span><span class="figlbl">sessions / wk</span>
+              <span class="figside">was 3.0</span>
+            </div>
+            <div class="weekgrid">
+              <div class="weekcol"><i class="day on dim"></i><i class="day"></i><i class="day on dim"></i><i class="day"></i><i class="day on dim"></i><i class="day"></i><i class="day"></i></div>
+              <div class="weekcol"><i class="day on dim"></i><i class="day"></i><i class="day on dim"></i><i class="day"></i><i class="day"></i><i class="day on dim"></i><i class="day"></i></div>
+              <div class="weekcol"><i class="day on dim"></i><i class="day"></i><i class="day on dim"></i><i class="day"></i><i class="day on dim"></i><i class="day"></i><i class="day"></i></div>
+              <div class="weekcol"><i class="day"></i><i class="day on dim"></i><i class="day"></i><i class="day on dim"></i><i class="day"></i><i class="day on dim"></i><i class="day"></i></div>
+              <div class="weekcol"><i class="day on"></i><i class="day"></i><i class="day on"></i><i class="day"></i><i class="day on"></i><i class="day on"></i><i class="day"></i></div>
+              <div class="weekcol"><i class="day on"></i><i class="day"></i><i class="day on"></i><i class="day on"></i><i class="day"></i><i class="day on"></i><i class="day"></i></div>
+              <div class="weekcol"><i class="day on"></i><i class="day on"></i><i class="day"></i><i class="day on"></i><i class="day"></i><i class="day on"></i><i class="day"></i></div>
+              <div class="weekcol"><i class="day on"></i><i class="day"></i><i class="day on"></i><i class="day"></i><i class="day on"></i><i class="day on"></i><i class="day"></i></div>
+              <div class="weekcol"><i class="day on"></i><i class="day on"></i><i class="day"></i><i class="day on"></i><i class="day on"></i><i class="day"></i><i class="day"></i></div>
+            </div>
+            <div class="gridcap"><span>9 weeks ago</span><span>this week</span></div>
+          </div>
+          <div class="detail">You've trained at least four times a week for five weeks running, against a median of three earlier in the year.</div>
+        </div>
+        <div class="cost"><span class="tag cheap">free</span><span>
+          <b>Fixes:</b> bars can't show <em>when</em>. The grid shows the pattern — that the
+          streak is real and that rest days are consistent — and the shift to denser columns is
+          visible without reading a number. Workout dates only, which is all this rule has.
+          <b>Cost:</b> ~70pt tall, the tallest thing in the feed.
+        </span></div>
+      </div>
+
+      <!-- ============ 2. GAP RIBBON ============ -->
+      <div class="slot">
+        <div class="kindbar"><span class="kind">gap ribbon</span><span class="uses">would serve: droppedExercise</span></div>
+        <div class="card spec">
+          <div class="card-head">
+            <span class="pill" style="color:var(--orange); background:rgba(232,155,62,0.12)">Dropped exercise</span>
+            <span class="subject">Barbell Row</span>
+            <span class="ellipsis">•••</span>
+          </div>
+          <div class="headline">You've stopped doing Barbell Row</div>
+          <div class="chart">
+            <div class="figrow">
+              <span class="fig">94</span><span class="figlbl">days since</span>
+              <span class="figside">usual gap 12</span>
+            </div>
+            <svg viewBox="0 0 300 30" width="100%" height="30">
+              <rect x="0" y="9" width="300" height="8" rx="4" fill="#262630"/>
+              <rect x="0" y="9" width="168" height="8" rx="4" fill="#E89B3E" opacity=".5"/>
+              <g fill="#E89B3E">
+                <circle cx="6" cy="13" r="3"/><circle cx="29" cy="13" r="3"/><circle cx="52" cy="13" r="3"/>
+                <circle cx="76" cy="13" r="3"/><circle cx="99" cy="13" r="3"/><circle cx="122" cy="13" r="3"/>
+                <circle cx="145" cy="13" r="3"/><circle cx="166" cy="13" r="3"/>
+              </g>
+              <line x1="168" y1="4" x2="168" y2="22" stroke="#E89B3E" stroke-width="1.5"/>
+              <line x1="296" y1="2" x2="296" y2="24" stroke="#EAEAEF" stroke-width="1.5"/>
+              <line x1="172" y1="13" x2="292" y2="13" stroke="#5C5C6E" stroke-width="1" stroke-dasharray="3 3"/>
+              <text x="230" y="28" fill="#9999A8" font-size="9.5" text-anchor="middle" font-family="inherit">94 days</text>
+              <text x="296" y="28" fill="#EAEAEF" font-size="9.5" text-anchor="end" font-family="inherit">today</text>
+            </svg>
+          </div>
+          <div class="detail">You did Barbell Row 14 times over four months, then stopped 94 days ago. Your usual gap was about 12 days.</div>
+        </div>
+        <div class="cost"><span class="tag cheap">free</span><span>
+          <b>Fixes the worst bug in the set.</b> Anchoring the axis to <em>today</em> rather than
+          to the last event makes the drought the largest thing on the card instead of the one
+          interval not drawn. Same data as the current timeline.
+        </span></div>
+      </div>
+
+      <!-- ============ 3. SLOPE ============ -->
+      <div class="slot">
+        <div class="kindbar"><span class="kind">slope</span><span class="uses">would serve: strengthTrend, repRangeDrift</span></div>
+        <div class="card spec">
+          <div class="card-head">
+            <span class="pill" style="color:var(--success); background:rgba(94,194,105,0.12)">Strength trend</span>
+            <span class="subject">Bench Press</span>
+            <span class="ellipsis">•••</span>
+          </div>
+          <div class="headline">Bench Press is trending up</div>
+          <div class="chart">
+            <svg viewBox="0 0 300 62" width="100%" height="62">
+              <text x="0" y="12" fill="#5C5C6E" font-size="9.5" font-family="inherit">9 WEEKS AGO</text>
+              <text x="300" y="12" fill="#5C5C6E" font-size="9.5" text-anchor="end" font-family="inherit">NOW</text>
+              <line x1="30" y1="44" x2="262" y2="26" stroke="#5EC269" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="30" cy="44" r="4.5" fill="#5EC269" opacity=".5"/>
+              <circle cx="262" cy="26" r="5" fill="#5EC269"/>
+              <text x="0" y="48" fill="#EAEAEF" font-size="15" font-weight="700" font-family="inherit">102</text>
+              <text x="300" y="30" fill="#EAEAEF" font-size="15" font-weight="700" text-anchor="end" font-family="inherit">115</text>
+              <text x="150" y="59" fill="#5EC269" font-size="10.5" font-weight="600" text-anchor="middle" font-family="inherit">+13 kg</text>
+            </svg>
+          </div>
+          <div class="detail">Your estimated 1RM has gone from 102 kg to 115 kg across nine weeks, projecting about +4% over the next eight.</div>
+        </div>
+        <div class="cost"><span class="tag cheap">free</span><span>
+          <b>Cannot fail the rule</b> — both figures are structural, not decoration bolted on.
+          <b>Trade:</b> throws away the intermediate shape, so a trend that wobbled hard looks
+          identical to a clean climb. Best where the claim <em>is</em> the endpoints.
+        </span></div>
+      </div>
+
+      <!-- ============ 4. NORMAL BAND ============ -->
+      <div class="slot">
+        <div class="kindbar"><span class="kind">normal band</span><span class="uses">would serve: deloadReadiness, volumeRamp, status</span></div>
+        <div class="card spec">
+          <div class="card-head">
+            <span class="pill" style="color:var(--danger); background:rgba(224,85,85,0.12)">Deload readiness</span>
+            <span class="ellipsis">•••</span>
+          </div>
+          <div class="headline">Your sessions are landing under your usual output</div>
+          <div class="chart">
+            <div class="figrow">
+              <span class="fig">−4.2%</span><span class="figlbl">vs your range</span>
+              <span class="figside">7 of 8 sessions</span>
+            </div>
+            <svg viewBox="0 0 300 40" width="100%" height="40">
+              <rect x="0" y="12" width="300" height="14" rx="7" fill="#262630"/>
+              <rect x="96" y="12" width="132" height="14" rx="7" fill="#94A3B8" opacity=".28"/>
+              <text x="162" y="37" fill="#5C5C6E" font-size="9.5" text-anchor="middle" font-family="inherit">your usual range</text>
+              <g fill="#9999A8">
+                <circle cx="182" cy="19" r="3"/><circle cx="140" cy="19" r="3"/><circle cx="120" cy="19" r="3"/>
+                <circle cx="150" cy="19" r="3"/><circle cx="104" cy="19" r="3"/><circle cx="88" cy="19" r="3"/>
+                <circle cx="72" cy="19" r="3"/>
+              </g>
+              <circle cx="46" cy="19" r="5" fill="#EAEAEF"/>
+              <text x="46" y="9" fill="#EAEAEF" font-size="9.5" font-weight="600" text-anchor="middle" font-family="inherit">latest</text>
+            </svg>
+          </div>
+          <div class="detail">Session-best estimated 1RM has sat below your prior four weeks across seven of the last eight sessions, with effort ratings up a point.</div>
+        </div>
+        <div class="cost"><span class="tag newdata">needs data</span><span>
+          <b>Fixes:</b> a bar against a single average implies your norm is a line. It's a range,
+          and "below usual" only means something relative to how much you normally vary.
+          <b>Cost:</b> nothing computes baseline spread today — <code>InsightsService</code>
+          produces means only. Needs a standard deviation or an interquartile range.
+        </span></div>
+      </div>
+
+      <!-- ============ 5. DOT MATRIX ============ -->
+      <div class="slot">
+        <div class="kindbar"><span class="kind">dot matrix</span><span class="uses">would serve: targetAdherence</span></div>
+        <div class="card spec">
+          <div class="card-head">
+            <span class="pill" style="color:var(--accent); background:rgba(91,141,239,0.12)">Target adherence</span>
+            <span class="ellipsis">•••</span>
+          </div>
+          <div class="headline">Most of your sets land in range</div>
+          <div class="chart">
+            <div class="figrow">
+              <span class="fig">58</span><span class="figlbl">of 100 sets in range</span>
+            </div>
+            <div class="matrix" id="matrix"></div>
+            <div class="prop-key" style="margin-top:9px">
+              <span><i class="swatch" style="background:var(--accent)"></i>In range 58</span>
+              <span><i class="swatch" style="background:#3A3A46"></i>Below 22</span>
+              <span><i class="swatch" style="background:#5C5C6E"></i>Above 20</span>
+            </div>
+          </div>
+          <div class="detail">58% of your working sets finished inside their target rep range over the last 30 days, with the misses split fairly evenly either side.</div>
+        </div>
+        <div class="cost"><span class="tag cheap">free</span><span>
+          <b>Fixes:</b> a stacked bar makes you read percentages; a matrix is countable, and
+          "58 of 100 sets" is a fact about your training rather than a ratio.
+          <b>Bonus:</b> encodes the miss direction by <em>shade</em>, dropping the red-for-below
+          that arguably breaks the no-verdict-colour rule.
+        </span></div>
+      </div>
+
+      <!-- ============ 6. DISTRIBUTION ============ -->
+      <div class="slot">
+        <div class="kindbar"><span class="kind">distribution</span><span class="uses">would serve: restSweetSpot, rirCalibration</span></div>
+        <div class="card spec">
+          <div class="card-head">
+            <span class="pill" style="color:var(--orange); background:rgba(232,155,62,0.12)">Rest sweet spot</span>
+            <span class="subject">Squat</span>
+            <span class="ellipsis">•••</span>
+          </div>
+          <div class="headline">Longer rests are landing better on Squat</div>
+          <div class="chart">
+            <div class="figrow">
+              <span class="fig">2:00</span><span class="figlbl">+ rest works best</span>
+              <span class="figside">40 sets</span>
+            </div>
+            <svg viewBox="0 0 300 48" width="100%" height="48">
+              <rect x="186" y="0" width="82" height="36" rx="3" fill="#E89B3E" opacity=".13"/>
+              <g fill="#5C5C6E">
+                <rect x="2"   y="26" width="20" height="10" rx="2"/>
+                <rect x="25"  y="18" width="20" height="18" rx="2"/>
+                <rect x="48"  y="10" width="20" height="26" rx="2"/>
+                <rect x="71"  y="14" width="20" height="22" rx="2"/>
+                <rect x="94"  y="20" width="20" height="16" rx="2"/>
+                <rect x="117" y="24" width="20" height="12" rx="2"/>
+                <rect x="140" y="28" width="20" height="8"  rx="2"/>
+                <rect x="163" y="30" width="20" height="6"  rx="2"/>
+              </g>
+              <g fill="#E89B3E">
+                <rect x="189" y="16" width="20" height="20" rx="2"/>
+                <rect x="212" y="6"  width="20" height="30" rx="2"/>
+                <rect x="235" y="12" width="20" height="24" rx="2"/>
+                <rect x="258" y="22" width="20" height="14" rx="2"/>
+              </g>
+              <text x="2"   y="46" fill="#5C5C6E" font-size="9.5" font-family="inherit">0:30</text>
+              <text x="227" y="46" fill="#E89B3E" font-size="9.5" text-anchor="middle" font-family="inherit">best zone</text>
+              <text x="300" y="46" fill="#5C5C6E" font-size="9.5" text-anchor="end" font-family="inherit">3:30</text>
+            </svg>
+          </div>
+          <div class="detail">Sets after roughly two minutes' rest averaged 118 kg estimated 1RM against 94 kg after shorter breaks, across 40 logged sets.</div>
+        </div>
+        <div class="cost"><span class="tag newdata">needs data</span><span>
+          <b>Fixes:</b> two bars hide the spread, so a 24 kg gap built from four outlier sets
+          looks identical to one built from forty. The shape shows whether to believe it.
+          <b>Cost:</b> rules emit aggregates; this needs binned per-set values through
+          <code>chartValues</code>. Also exposes the rest-capture sampling bias honestly.
+        </span></div>
+      </div>
+
+      <!-- ============ 7. MIRROR ============ -->
+      <div class="slot">
+        <div class="kindbar"><span class="kind">mirror</span><span class="uses">would serve: lateralAsymmetry (unbuilt)</span></div>
+        <div class="card spec">
+          <div class="card-head">
+            <span class="pill" style="color:var(--chart5); background:rgba(168,126,230,0.12)">Lateral asymmetry</span>
+            <span class="subject">Split Squat</span>
+            <span class="ellipsis">•••</span>
+          </div>
+          <div class="headline">Your right side is doing more of the work</div>
+          <div class="chart">
+            <div class="figrow">
+              <span class="fig">11%</span><span class="figlbl">gap</span>
+              <span class="figside">widening</span>
+            </div>
+            <div class="mirror-row">
+              <span class="mirror-lbl">Reps</span>
+              <span class="mirror-val l">7.1</span>
+              <span class="mirror-bars">
+                <span class="mirror-half l"><i class="b" style="width:74%; background:var(--chart5); opacity:.5"></i></span>
+                <span class="mirror-axis"></span>
+                <span class="mirror-half"><i class="b" style="width:83%; background:var(--chart5)"></i></span>
+              </span>
+              <span class="mirror-val">8.0</span>
+            </div>
+            <div class="mirror-row">
+              <span class="mirror-lbl">Est. 1RM</span>
+              <span class="mirror-val l">42</span>
+              <span class="mirror-bars">
+                <span class="mirror-half l"><i class="b" style="width:79%; background:var(--chart5); opacity:.5"></i></span>
+                <span class="mirror-axis"></span>
+                <span class="mirror-half"><i class="b" style="width:88%; background:var(--chart5)"></i></span>
+              </span>
+              <span class="mirror-val">47</span>
+            </div>
+            <div class="gridcap"><span>left</span><span>right</span></div>
+          </div>
+          <div class="detail">Across 11 sessions with both sides logged, your right side has averaged 11% more — and the gap has widened rather than settled.</div>
+        </div>
+        <div class="cost"><span class="tag cheap">free</span><span>
+          <b>The asymmetry is physically the shape of the chart</b>, which no other kind here can
+          do. <code>leftReps</code>/<code>rightReps</code>/<code>leftRIR</code>/<code>rightRIR</code>
+          already exist on <code>WorkoutSet</code>. <b>Cost:</b> the rule itself is Tier 2 and
+          unbuilt, so this is a reason to build it rather than a fix for something shipping.
+        </span></div>
+      </div>
+
+      <!-- ============ 8. SPARK MULTIPLES ============ -->
+      <div class="slot">
+        <div class="kindbar"><span class="kind">spark multiples</span><span class="uses">would serve: muscleBalance</span></div>
+        <div class="card spec">
+          <div class="card-head">
+            <span class="pill" style="color:var(--chart7); background:rgba(78,205,196,0.12)">Muscle balance</span>
+            <span class="subject">legs</span>
+            <span class="ellipsis">•••</span>
+          </div>
+          <div class="headline">Legs has gone quiet</div>
+          <div class="chart">
+            <div class="spark-row">
+              <span class="spark-name">Chest</span>
+              <svg class="spark-svg" viewBox="0 0 120 16" height="16" preserveAspectRatio="none"><polyline points="0,11 20,8 40,10 60,5 80,7 100,3 120,4" fill="none" stroke="#5B8DEF" stroke-opacity=".55" stroke-width="1.6"/></svg>
+              <span class="spark-val">12</span>
+            </div>
+            <div class="spark-row">
+              <span class="spark-name">Back</span>
+              <svg class="spark-svg" viewBox="0 0 120 16" height="16" preserveAspectRatio="none"><polyline points="0,8 20,11 40,6 60,9 80,4 100,8 120,6" fill="none" stroke="#5EC269" stroke-opacity=".55" stroke-width="1.6"/></svg>
+              <span class="spark-val">10</span>
+            </div>
+            <div class="spark-row">
+              <span class="spark-name">Abs</span>
+              <svg class="spark-svg" viewBox="0 0 120 16" height="16" preserveAspectRatio="none"><polyline points="0,12 20,9 40,13 60,8 80,11 100,9 120,10" fill="none" stroke="#E08850" stroke-opacity=".55" stroke-width="1.6"/></svg>
+              <span class="spark-val">7</span>
+            </div>
+            <div class="spark-row">
+              <span class="spark-name subj">Legs</span>
+              <svg class="spark-svg" viewBox="0 0 120 16" height="16" preserveAspectRatio="none"><polyline points="0,5 20,2 40,6 60,3 80,10 100,15 120,15.5" fill="none" stroke="#E05555" stroke-width="2"/></svg>
+              <span class="spark-val subj">0</span>
+            </div>
+            <div class="gridcap"><span>8 weeks ago</span><span>this week</span></div>
+          </div>
+          <div class="detail">No legs sets in the last 14 days, while your other muscle groups got 7+ each. One focused session closes the gap.</div>
+        </div>
+        <div class="cost"><span class="tag newdata">needs data</span><span>
+          <b>Fixes:</b> the ranking answers "how much" but never "since when" — and legs falling
+          off a cliff three weeks ago is a different finding from legs always being small.
+          <b>Cost:</b> needs weekly buckets per group; the status aggregation currently produces
+          only a current total and one baseline mean.
+        </span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // 100 cells: 58 in range, 22 below, 20 above — interleaved so the block
+    // reads as a sample rather than three sorted stripes.
+    (function () {
+      const host = document.getElementById('matrix');
+      if (!host) return;
+      const cells = []
+        .concat(Array(58).fill('var(--accent)'))
+        .concat(Array(22).fill('#3A3A46'))
+        .concat(Array(20).fill('#5C5C6E'));
+      // Deterministic shuffle so the picture is stable between reloads.
+      let seed = 7;
+      for (let i = cells.length - 1; i > 0; i--) {
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        const j = seed % (i + 1);
+        [cells[i], cells[j]] = [cells[j], cells[i]];
+      }
+      host.innerHTML = cells.map(c => `<i class="cell" style="background:${c}"></i>`).join('');
+    })();
+  </script>
+
+  <p class="foot">
+    Sizes, weights, spacings and colours are taken from <code>InsightChartViews.swift</code>,
+    <code>InsightCardView.swift</code>, <code>DesignTokens.swift</code> and
+    <code>MuscleGroupColors.swift</code>. Data is representative rather than real — the
+    simulator has no workouts inside any rule's window, which is task&nbsp;#1.
+    Five of the ten shipped rules currently render a chart with nothing to read.
+    <br><br>
+    Coaching and model-transparency tiles were moved out on 11&nbsp;Aug to keep this file to
+    insights — see <code>prototype-coaching-tiles.html</code> and
+    <code>COACHING_TILES_EXPLORATION.md</code>.
+  </p>
+
+</div>
+</body>
+</html>

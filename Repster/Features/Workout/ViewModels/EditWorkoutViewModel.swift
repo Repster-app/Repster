@@ -32,9 +32,11 @@ final class EditWorkoutViewModel {
 
     // MARK: - Internal Tracking
 
-    /// IDs of sets added during this edit session.
-    /// Used by completeSet() to choose save() vs edit().
-    private var newSetIds: Set<UUID> = []
+    /// IDs of sets whose contribution is not currently in ExerciseStats — sets added
+    /// during this session, and sets uncompleted here. Persisting one of these has to
+    /// go through save() (which adds the contribution); everything else goes through
+    /// edit() (which applies a delta), and an id leaves the set once save() has counted it.
+    private var uncountedSetIds: Set<UUID> = []
 
     /// IDs of sets whose text fields have been edited but not yet persisted.
     private var dirtySetIds: Set<UUID> = []
@@ -121,8 +123,8 @@ final class EditWorkoutViewModel {
 
     /// Complete or update a set with the given values.
     ///
-    /// For new sets (added during this edit session): calls setService.save().
-    /// For existing sets: calls setService.edit().
+    /// For sets whose contribution isn't in stats yet (added or uncompleted during this
+    /// session): calls setService.save(). For everything else: calls setService.edit().
     func completeSet(_ set: WorkoutSet, input: SetCompletionInput) async {
         // Update set values
         applyCompletionInput(input, to: set)
@@ -133,11 +135,12 @@ final class EditWorkoutViewModel {
         do {
             let result: SetSaveResult
 
-            if newSetIds.contains(set.id) {
-                // New set added during this edit session → save()
+            if uncountedSetIds.contains(set.id) {
+                // Contribution not in stats yet → save() adds it, once.
                 result = try await setService.save(set)
+                uncountedSetIds.remove(set.id)
             } else {
-                // Existing set being edited → edit()
+                // Already counted → edit() applies the delta.
                 result = try await setService.edit(set)
             }
 
@@ -186,6 +189,9 @@ final class EditWorkoutViewModel {
             // cleared set.prStatus = nil on the same @Model reference.
             applyAffectedSets(result.prResult.affectedSetIds)
 
+            // Contribution removed — re-completing has to go through save() again.
+            uncountedSetIds.insert(set.id)
+
             // Reassign array to trigger @Observable update
             if let sets = setsByExercise[exerciseId] {
                 setsByExercise[exerciseId] = sets
@@ -218,7 +224,7 @@ final class EditWorkoutViewModel {
 
         do {
             _ = try await setService.save(newSet)
-            newSetIds.insert(newSet.id)
+            uncountedSetIds.insert(newSet.id)
             setsByExercise[exerciseId, default: []].append(newSet)
         } catch {
             #if DEBUG
@@ -247,7 +253,7 @@ final class EditWorkoutViewModel {
 
         do {
             _ = try await setService.save(newSet)
-            newSetIds.insert(newSet.id)
+            uncountedSetIds.insert(newSet.id)
 
             // Insert before the first non-warmup set and reindex
             var sets = setsByExercise[exerciseId] ?? []
@@ -282,8 +288,8 @@ final class EditWorkoutViewModel {
                 setsByExercise[exerciseId] = sets
             }
 
-            // Remove from newSetIds if it was added during this session
-            newSetIds.remove(set.id)
+            // Remove from uncountedSetIds if it was added during this session
+            uncountedSetIds.remove(set.id)
 
         } catch {
             #if DEBUG
@@ -363,7 +369,7 @@ final class EditWorkoutViewModel {
         for set in exerciseSets {
             do {
                 try await setService.delete(set)
-                newSetIds.remove(set.id)
+                uncountedSetIds.remove(set.id)
             } catch {
                 #if DEBUG
                 dbg("[EditWorkoutViewModel] delete set during removeExercise failed: \(error)")
@@ -479,8 +485,9 @@ final class EditWorkoutViewModel {
             set.updatedAt = Date()
             do {
                 let result: SetSaveResult
-                if newSetIds.contains(set.id) {
+                if uncountedSetIds.contains(set.id) {
                     result = try await setService.save(set)
+                    uncountedSetIds.remove(set.id)
                 } else {
                     result = try await setService.edit(set)
                 }
@@ -584,8 +591,9 @@ extension EditWorkoutViewModel: SetTableDataSource {
 
         do {
             let result: SetSaveResult
-            if newSetIds.contains(set.id) {
+            if uncountedSetIds.contains(set.id) {
                 result = try await setService.save(set)
+                uncountedSetIds.remove(set.id)
             } else {
                 result = try await setService.edit(set)
             }

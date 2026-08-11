@@ -132,6 +132,25 @@ struct TrainingStatus: Sendable, Equatable {
     }
 }
 
+/// What the muscle panel counts. Sets is the default because it's what the
+/// status card above the panel compares; the other two answer different
+/// questions about the same week.
+enum MuscleMetric: String, CaseIterable, Identifiable, Sendable {
+    case sets
+    case reps
+    case volume
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .sets:   return "Sets"
+        case .reps:   return "Reps"
+        case .volume: return "Volume"
+        }
+    }
+}
+
 /// One muscle group's trailing-week volume against its own baseline.
 struct MuscleVolumeRow: Sendable, Equatable, Identifiable {
     /// Normalized group value, e.g. "chest". Derived from the user's own
@@ -141,6 +160,13 @@ struct MuscleVolumeRow: Sendable, Equatable, Identifiable {
     let currentSets: Int
     /// Mean 7-day sets for this group over the baseline window.
     let baselineSets: Double?
+    let currentReps: Int
+    /// Mean 7-day reps for this group over the baseline window.
+    let baselineReps: Double?
+    /// Always kg. Converted once at the display edge, like everywhere else.
+    let currentVolume: Double
+    /// Mean 7-day volume in kg for this group over the baseline window.
+    let baselineVolume: Double?
 
     var id: String { group }
 
@@ -152,16 +178,58 @@ struct MuscleVolumeRow: Sendable, Equatable, Identifiable {
 
     /// A group the user normally trains that got nothing this week. The one
     /// case worth colouring — it's factual, not a verdict on volume.
+    ///
+    /// Deliberately defined on sets whatever metric is on screen: it means the
+    /// group went untrained, which is a fact about training rather than about
+    /// weight moved. Keyed to volume it would flag a group trained hard with
+    /// bodyweight only.
     var isAbsent: Bool {
         guard let baselineSets else { return false }
         return currentSets == 0 && baselineSets >= 1
+    }
+
+    // MARK: - Metric access
+
+    func current(for metric: MuscleMetric) -> Double {
+        switch metric {
+        case .sets:   return Double(currentSets)
+        case .reps:   return Double(currentReps)
+        case .volume: return currentVolume
+        }
+    }
+
+    func baseline(for metric: MuscleMetric) -> Double? {
+        switch metric {
+        case .sets:   return baselineSets
+        case .reps:   return baselineReps
+        case .volume: return baselineVolume
+        }
+    }
+
+    /// Difference against baseline in the metric's own units. Nil during cold
+    /// start, matching `delta`.
+    func delta(for metric: MuscleMetric) -> Double? {
+        guard let baseline = baseline(for: metric) else { return nil }
+        return current(for: metric) - baseline
+    }
+
+    /// The group was trained but carries no weight — bodyweight-only work. Worth
+    /// distinguishing from a genuine zero when the volume view is on screen.
+    var hasVolumeGap: Bool {
+        currentSets > 0 && currentVolume == 0
     }
 }
 
 protocol InsightsServiceProtocol: Sendable {
     /// Re-runs the analysis if workout data changed since the last run.
     /// Cheap when nothing changed — safe to call on every Home appearance.
-    func refreshIfNeeded() async throws
+    ///
+    /// Returns true when the analysis actually re-ran. Callers holding an
+    /// already-loaded status or feed use this to skip re-fetching values that
+    /// cannot have changed; re-deriving the status is the single most expensive
+    /// call on the service.
+    @discardableResult
+    func refreshIfNeeded() async throws -> Bool
 
     /// Trailing-week training status. Always returns a value; `hasData` is false
     /// for a user who hasn't logged anything yet.

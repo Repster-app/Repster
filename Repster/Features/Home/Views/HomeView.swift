@@ -87,11 +87,18 @@ struct HomeView: View {
                 )
             }
             .navigationDestination(for: InsightsRoute.self) { _ in
-                InsightsView(insightsService: services.insightsService)
+                // Home already derived this status for the hook card, and
+                // re-deriving it is the slowest call on the service — hand it
+                // over so the destination opens drawn rather than empty.
+                InsightsView(
+                    insightsService: services.insightsService,
+                    initialStatus: viewModel.trainingStatus
+                )
                     .onDisappear {
-                        // Reading the feed clears the badge; reload so the
-                        // teaser card reflects it.
-                        Task { await viewModel.loadInsightsSummary() }
+                        // Reading the feed clears the badge; reload it so the
+                        // hook card reflects that. Only the badge — nothing on
+                        // the Insights screen can move the training status.
+                        Task { await viewModel.refreshInsightBadge() }
                     }
             }
         }

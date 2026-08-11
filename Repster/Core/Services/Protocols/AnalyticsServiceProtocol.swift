@@ -475,6 +475,15 @@ extension AnalyticsServiceProtocol {
             .source: .string(source.rawValue)
         ])
     }
+
+    /// Fires once per version, when the update sheet auto-presents on launch. Reopening
+    /// it from Settings is deliberately untracked — it's a different intent and would
+    /// otherwise inflate the denominator of the Apple Health prompt funnel.
+    func whatsNewShown(version: String) {
+        track(.whatsNewShown, properties: [
+            .appVersion: .string(version)
+        ])
+    }
 }
 
 /// Where Repster offered the Apple Health integration. Keep the raw values
@@ -568,6 +577,7 @@ enum AnalyticsEvent: String, CaseIterable {
     case appleHealthPromptShown = "apple health prompt shown"
     case appleHealthPromptAnswered = "apple health prompt answered"
     case appleHealthDisabled = "apple health disabled"
+    case whatsNewShown = "whats new shown"
 }
 
 enum AnalyticsPropertyKey: String, CaseIterable {

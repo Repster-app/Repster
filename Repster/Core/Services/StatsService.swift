@@ -33,26 +33,27 @@ actor StatsService: StatsServiceProtocol {
         let includeWarmups = profile.includeWarmupsInVolume
 
         switch event {
-        case .save(let reps, let effectiveWeight, let setType, let hasData, let date, let workoutId):
+        case .save(let setId, let reps, let effectiveWeight, let setType, let hasData, let date, let workoutId):
             try await handleSave(
-                exerciseId: exerciseId, reps: reps, effectiveWeight: effectiveWeight,
+                exerciseId: exerciseId, setId: setId, reps: reps, effectiveWeight: effectiveWeight,
                 setType: setType, hasData: hasData, date: date, workoutId: workoutId,
                 includeWarmups: includeWarmups
             )
 
-        case .edit(let oldReps, let oldEW, let oldSetType, let oldHasData,
+        case .edit(let setId,
+                   let oldReps, let oldEW, let oldSetType, let oldHasData,
                    let newReps, let newEW, let newSetType, let newHasData,
                    let date, let workoutId):
             try await handleEdit(
-                exerciseId: exerciseId,
+                exerciseId: exerciseId, setId: setId,
                 oldReps: oldReps, oldEffectiveWeight: oldEW, oldSetType: oldSetType, oldHasData: oldHasData,
                 newReps: newReps, newEffectiveWeight: newEW, newSetType: newSetType, newHasData: newHasData,
                 date: date, workoutId: workoutId, includeWarmups: includeWarmups
             )
 
-        case .delete(let reps, let effectiveWeight, let setType, let hasData, let date, let workoutId):
+        case .delete(let setId, let reps, let effectiveWeight, let setType, let hasData, let date, let workoutId):
             try await handleDelete(
-                exerciseId: exerciseId, reps: reps, effectiveWeight: effectiveWeight,
+                exerciseId: exerciseId, setId: setId, reps: reps, effectiveWeight: effectiveWeight,
                 setType: setType, hasData: hasData, date: date, workoutId: workoutId,
                 includeWarmups: includeWarmups
             )
@@ -83,7 +84,10 @@ actor StatsService: StatsServiceProtocol {
         )
 
         // 3. Get additional stats not covered by basic aggregation
-        let workoutCount = try await setRepo.fetchWorkoutCount(for: exerciseId)
+        let workoutCount = try await setRepo.fetchWorkoutCount(
+            for: exerciseId,
+            excludeWarmups: excludeWarmups
+        )
         let bestE1RM = try await setRepo.fetchBestE1RM(for: exerciseId)
 
         // 4. Get most recent PR date from PerformanceRecords
@@ -179,10 +183,51 @@ actor StatsService: StatsServiceProtocol {
         return true
     }
 
+    // MARK: - Workout membership (totalWorkouts)
+
+    /// Whether a persisted set makes its workout count toward `totalWorkouts`.
+    ///
+    /// Same eligibility rule as the running totals, plus `completed`: uncompleting a set
+    /// removes its contribution (SetService.uncomplete emits a `.delete` event), so an
+    /// uncompleted row must not keep the workout counted either.
+    private func establishesWorkoutMembership(_ set: WorkoutSet, includeWarmups: Bool) -> Bool {
+        guard set.completed else { return false }
+        return shouldCountForStats(
+            setType: set.setType,
+            hasData: set.hasData,
+            includeWarmupsInVolume: includeWarmups
+        )
+    }
+
+    /// Membership state of one workout for one exercise, split by the set being written.
+    ///
+    /// Reads the persisted rows of a single workout — bounded by the sets in that session,
+    /// so this stays cheap on the save path. `subject` reflects the row as it stands after
+    /// the write; `others` is what the workout's remaining rows say on their own.
+    private func workoutMembership(
+        exerciseId: UUID,
+        workoutId: UUID,
+        subjectSetId: UUID,
+        includeWarmups: Bool
+    ) async throws -> (subject: Bool, others: Bool) {
+        let workoutSets = try await setRepo.fetchSets(for: workoutId)
+        var subject = false
+        var others = false
+        for set in workoutSets where set.exerciseId == exerciseId {
+            guard establishesWorkoutMembership(set, includeWarmups: includeWarmups) else { continue }
+            if set.id == subjectSetId {
+                subject = true
+            } else {
+                others = true
+            }
+        }
+        return (subject, others)
+    }
+
     // MARK: - Save (T013)
 
     private func handleSave(
-        exerciseId: UUID, reps: Int, effectiveWeight: Double,
+        exerciseId: UUID, setId: UUID, reps: Int, effectiveWeight: Double,
         setType: SetType, hasData: Bool, date: Date, workoutId: UUID,
         includeWarmups: Bool
     ) async throws {
@@ -222,10 +267,18 @@ actor StatsService: StatsServiceProtocol {
             stats.lastPerformedDate = date
         }
 
-        // 6. Update totalWorkouts — check if first set for this exercise in this workout
-        let workoutSets = try await setRepo.fetchSets(for: workoutId)
-        let exerciseSetsInWorkout = workoutSets.filter { $0.exerciseId == exerciseId }
-        if exerciseSetsInWorkout.count <= 1 {
+        // 6. Update totalWorkouts — a workout counts once, from the first set that
+        //    contributes to stats. Rows that contribute nothing (the empty placeholder
+        //    row added with the exercise, warmups while they're excluded, partials) must
+        //    neither establish membership nor block the first real set from doing so —
+        //    hence an eligibility check rather than a row count.
+        let membership = try await workoutMembership(
+            exerciseId: exerciseId,
+            workoutId: workoutId,
+            subjectSetId: setId,
+            includeWarmups: includeWarmups
+        )
+        if membership.subject && !membership.others {
             stats.totalWorkouts += 1
         }
 
@@ -237,7 +290,7 @@ actor StatsService: StatsServiceProtocol {
     // MARK: - Edit (T014)
 
     private func handleEdit(
-        exerciseId: UUID,
+        exerciseId: UUID, setId: UUID,
         oldReps: Int, oldEffectiveWeight: Double, oldSetType: SetType, oldHasData: Bool,
         newReps: Int, newEffectiveWeight: Double, newSetType: SetType, newHasData: Bool,
         date: Date, workoutId: UUID, includeWarmups: Bool
@@ -278,6 +331,25 @@ actor StatsService: StatsServiceProtocol {
         }
         // Neither counted — no change
 
+        // An edit that flips eligibility can also flip whether this workout counts —
+        // e.g. clearing the only working set's reps, or turning a warmup into a working
+        // set. Only the workout's own rows are read, so this stays off the slow path.
+        if oldCounted != newCounted {
+            let membership = try await workoutMembership(
+                exerciseId: exerciseId,
+                workoutId: workoutId,
+                subjectSetId: setId,
+                includeWarmups: includeWarmups
+            )
+            if !membership.others {
+                if membership.subject && !oldCounted {
+                    stats.totalWorkouts += 1
+                } else if !membership.subject && oldCounted {
+                    stats.totalWorkouts = max(0, stats.totalWorkouts - 1)
+                }
+            }
+        }
+
         stats.updatedAt = Date()
         try await exerciseStatsRepo.save(stats)
     }
@@ -285,7 +357,7 @@ actor StatsService: StatsServiceProtocol {
     // MARK: - Delete (T015)
 
     private func handleDelete(
-        exerciseId: UUID, reps: Int, effectiveWeight: Double,
+        exerciseId: UUID, setId: UUID, reps: Int, effectiveWeight: Double,
         setType: SetType, hasData: Bool, date: Date, workoutId: UUID,
         includeWarmups: Bool
     ) async throws {
@@ -303,11 +375,20 @@ actor StatsService: StatsServiceProtocol {
             }
         }
 
-        // Check if this was the last set for the exercise in this workout
-        let workoutSets = try await setRepo.fetchSets(for: workoutId)
-        let remainingExerciseSets = workoutSets.filter { $0.exerciseId == exerciseId }
-        if remainingExerciseSets.isEmpty {
-            stats.totalWorkouts = max(0, stats.totalWorkouts - 1)
+        // Drop the workout from totalWorkouts once nothing in it contributes to stats
+        // any more. Leftover rows that never counted (placeholders, excluded warmups)
+        // must not keep the workout on the books; this also covers `uncomplete`, where
+        // the row survives but stops contributing.
+        if wasCounted {
+            let membership = try await workoutMembership(
+                exerciseId: exerciseId,
+                workoutId: workoutId,
+                subjectSetId: setId,
+                includeWarmups: includeWarmups
+            )
+            if !membership.subject && !membership.others {
+                stats.totalWorkouts = max(0, stats.totalWorkouts - 1)
+            }
         }
 
         stats.updatedAt = Date()

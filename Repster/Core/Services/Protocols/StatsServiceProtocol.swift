@@ -10,6 +10,7 @@ import Foundation
 enum StatsUpdateEvent: Sendable {
     /// A new set was saved.
     case save(
+        setId: UUID,
         reps: Int,
         effectiveWeight: Double,
         setType: SetType,
@@ -20,6 +21,7 @@ enum StatsUpdateEvent: Sendable {
 
     /// A set was edited. Carries old and new values for delta computation.
     case edit(
+        setId: UUID,
         oldReps: Int, oldEffectiveWeight: Double, oldSetType: SetType, oldHasData: Bool,
         newReps: Int, newEffectiveWeight: Double, newSetType: SetType, newHasData: Bool,
         date: Date, workoutId: UUID
@@ -27,6 +29,7 @@ enum StatsUpdateEvent: Sendable {
 
     /// A set was deleted.
     case delete(
+        setId: UUID,
         reps: Int,
         effectiveWeight: Double,
         setType: SetType,

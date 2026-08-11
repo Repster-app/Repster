@@ -395,9 +395,12 @@ struct VolumeRampInsightRule: InsightRule {
             headline: climbing
                 ? "Your weekly sets are up \(percent)%"
                 : "Your weekly sets are down \(percent)%",
+            // Names both windows rather than saying "from about N a week",
+            // which read as a claim about the user's normal and collided with
+            // the status card — the one surface that owns "your usual".
             detailText: climbing
-                ? "From about \(Int(priorMean.rounded())) sets a week to \(Int(recentMean.rounded())). Fast ramps are where niggles usually start — holding here for a week before adding more is rarely wasted."
-                : "From about \(Int(priorMean.rounded())) sets a week to \(Int(recentMean.rounded())). If that wasn't deliberate, it's the kind of drift that's easier to correct early.",
+                ? "The last \(recent.count) weeks averaged \(Int(recentMean.rounded())) sets against \(Int(priorMean.rounded())) over the \(prior.count) before. Fast ramps are where niggles usually start — holding here for a week before adding more is rarely wasted."
+                : "The last \(recent.count) weeks averaged \(Int(recentMean.rounded())) sets against \(Int(priorMean.rounded())) over the \(prior.count) before. If that wasn't deliberate, it's the kind of drift that's easier to correct early.",
             methodologyText: "Working sets per week, last \(complete.count) weeks",
             chartKind: .column,
             chartLabels: complete.map { _ in "" },

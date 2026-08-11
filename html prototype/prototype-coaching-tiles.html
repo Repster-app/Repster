@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coaching tiles — exploration</title>
+<style>
+  :root {
+    --bg:          #111113;
+    --bg-card:     #1B1B1F;
+    --bg-subtle:   #262630;
+    --border:      rgba(255,255,255,0.06);
+    --text-1:      #EAEAEF;
+    --text-2:      #9999A8;
+    --text-3:      #5C5C6E;
+    --accent:      #5B8DEF;
+    --success:     #5EC269;
+    --gold:        #D4A23A;
+    --danger:      #E05555;
+    --stale:       #94A3B8;
+    --orange:      #E89B3E;
+    --chart5:      #A87EE6;
+    --chart7:      #4ECDC4;
+    /* MuscleGroupColors */
+    --m-chest:     #5B8DEF;
+    --m-back:      #5EC269;
+    --m-abs:       #E08850;
+    --m-legs:      #E05555;
+    --m-shoulders: #D4A23A;
+    --m-biceps:    #9B7FE6;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 32px 20px 80px;
+    background: var(--bg);
+    color: var(--text-1);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page { max-width: 1180px; margin: 0 auto; }
+
+  h1 { font-size: 26px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.3px; }
+  .sub { color: var(--text-2); font-size: 14px; margin: 0 0 8px; max-width: 760px; line-height: 1.55; }
+  .rule {
+    margin: 18px 0 30px; padding: 12px 14px; max-width: 760px;
+    border-left: 2px solid var(--accent); background: rgba(91,141,239,0.07);
+    border-radius: 0 8px 8px 0; font-size: 13.5px; line-height: 1.55; color: var(--text-2);
+  }
+  .rule strong { color: var(--text-1); font-weight: 600; }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin: 0 0 26px; font-size: 12px; color: var(--text-2); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .dot.ok   { background: var(--success); }
+  .dot.bad  { background: var(--danger); }
+  .dot.dead { background: var(--text-3); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 26px; }
+
+  .slot { display: flex; flex-direction: column; gap: 9px; }
+
+  .kindbar { display: flex; align-items: baseline; gap: 8px; }
+  .kind { font-size: 11px; font-weight: 700; letter-spacing: 0.9px; text-transform: uppercase; color: var(--text-2); }
+  .uses { font-size: 11px; color: var(--text-3); }
+
+  /* ---- the card, matching InsightCardView ---- */
+  .card {
+    background: var(--bg-card); border-radius: 14px; padding: 14px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .card-head { display: flex; align-items: center; gap: 8px; }
+  .pill {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase;
+    padding: 4px 8px; border-radius: 6px;
+  }
+  .subject { font-size: 11px; font-weight: 500; color: var(--text-3); }
+  .ellipsis { margin-left: auto; color: var(--text-3); font-size: 14px; letter-spacing: 1px; }
+  .headline { font-size: 16px; font-weight: 600; color: var(--text-1); line-height: 1.3; }
+  .detail {
+    font-size: 13px; font-weight: 500; color: var(--text-2); line-height: 1.42;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+
+  /* ---- verdict caption under each card ---- */
+  .verdict { font-size: 12px; line-height: 1.5; display: flex; gap: 7px; align-items: flex-start; }
+  .verdict .dot { margin-top: 4px; flex: none; }
+  .verdict-text { color: var(--text-2); }
+  .verdict-text b { color: var(--text-1); font-weight: 600; }
+
+  /* ---- chart primitives ---- */
+  .chart { width: 100%; }
+  svg { display: block; overflow: visible; }
+
+  /* ranking rows */
+  .rank-row { display: flex; align-items: center; gap: 9px; margin-bottom: 7px; }
+  .rank-row:last-child { margin-bottom: 0; }
+  .rank-name { width: 62px; font-size: 11.5px; flex: none; white-space: nowrap; overflow: hidden; }
+  .rank-name.subj { font-weight: 600; color: var(--text-1); }
+  .rank-name.ctx  { font-weight: 500; color: var(--text-2); }
+  .rank-track { flex: 1; height: 8px; border-radius: 99px; background: var(--bg-subtle); position: relative; }
+  .rank-fill  { position: absolute; inset: 0 auto 0 0; height: 8px; border-radius: 99px; }
+  .rank-val { width: 24px; text-align: right; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; flex: none; }
+  .rank-val.subj { color: var(--text-1); }
+  .rank-val.ctx  { color: var(--text-3); }
+
+  /* proportion key */
+  .prop-bar { height: 12px; border-radius: 99px; overflow: hidden; display: flex; }
+  .prop-key { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+  .prop-key span { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 500; color: var(--text-3); }
+  .swatch { width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
+
+  /* comparison */
+  .cmp { display: flex; gap: 12px; }
+  .cmp-col { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+  .cmp-fig { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-1); }
+  .cmp-track { height: 6px; border-radius: 99px; background: var(--bg-subtle); position: relative; }
+  .cmp-fill { position: absolute; inset: 0 auto 0 0; height: 6px; border-radius: 99px; }
+  .cmp-lbl { font-size: 10px; font-weight: 500; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-3); }
+
+  /* range lanes */
+  .lane { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; }
+  .lane:last-child { margin-bottom: 0; }
+  .lane-lbl { width: 38px; font-size: 10px; font-weight: 600; color: var(--text-3); flex: none; text-transform: uppercase; }
+  .lane-track { flex: 1; height: 9px; border-radius: 99px; background: var(--bg-subtle); position: relative; }
+  .lane-fill { position: absolute; top: 0; height: 9px; border-radius: 99px; }
+  .lane-val { width: 42px; text-align: right; font-size: 10.5px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-2); flex: none; }
+
+  .foot { margin-top: 42px; color: var(--text-3); font-size: 12px; line-height: 1.6; max-width: 760px; }
+  .foot code { color: var(--text-2); }
+
+  /* ================= speculative section ================= */
+  .divider { margin: 64px 0 0; border-top: 1px solid var(--border); padding-top: 34px; }
+  h2 { font-size: 21px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.2px; }
+  .warn {
+    margin: 16px 0 30px; padding: 12px 14px; max-width: 760px;
+    border-left: 2px solid var(--gold); background: rgba(212,162,58,0.07);
+    border-radius: 0 8px 8px 0; font-size: 13.5px; line-height: 1.55; color: var(--text-2);
+  }
+  .warn strong { color: var(--text-1); font-weight: 600; }
+
+  .card.spec { border: 1px dashed rgba(255,255,255,0.10); }
+  .cost { font-size: 12px; line-height: 1.5; color: var(--text-3); display: flex; gap: 7px; align-items: flex-start; }
+  .cost .tag {
+    flex: none; font-size: 9.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+    padding: 2px 6px; border-radius: 4px; margin-top: 1px;
+  }
+  .tag.cheap { color: var(--success); background: rgba(94,194,105,0.12); }
+  .tag.newdata { color: var(--gold);   background: rgba(212,162,58,0.12); }
+  .cost b { color: var(--text-2); font-weight: 600; }
+
+  /* week grid */
+  .weekgrid { display: flex; gap: 3px; }
+  .weekcol { display: flex; flex-direction: column; gap: 3px; }
+  .day { width: 11px; height: 11px; border-radius: 3px; background: var(--bg-subtle); }
+  .day.on { background: var(--accent); }
+  .day.on.dim { background: var(--accent); opacity: .45; }
+  .gridcap { display: flex; justify-content: space-between; margin-top: 7px; font-size: 10px; color: var(--text-3); }
+
+  /* figure row used by several */
+  .figrow { display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px; }
+  .fig { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-1); }
+  .figlbl { font-size: 11px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-3); }
+  .figside { margin-left: auto; font-size: 11.5px; font-weight: 500; color: var(--text-2); font-variant-numeric: tabular-nums; }
+
+  /* dot matrix */
+  .matrix { display: grid; grid-template-columns: repeat(20, 1fr); gap: 3px; }
+  .cell { aspect-ratio: 1; border-radius: 2px; }
+
+  /* mirrored */
+  .mirror-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .mirror-lbl { width: 52px; font-size: 11px; color: var(--text-2); flex: none; }
+  .mirror-bars { flex: 1; display: flex; align-items: center; height: 12px; position: relative; }
+  .mirror-half { flex: 1; height: 10px; display: flex; }
+  .mirror-half.l { justify-content: flex-end; }
+  .mirror-half .b { height: 10px; border-radius: 3px; }
+  .mirror-axis { width: 1px; height: 16px; background: var(--text-3); flex: none; }
+  .mirror-val { width: 34px; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--text-2); flex: none; }
+  .mirror-val.l { text-align: right; }
+
+  /* mini table */
+  .tbl { width: 100%; border-collapse: collapse; }
+  .tbl th {
+    font-size: 9.5px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;
+    color: var(--text-3); text-align: right; padding: 0 0 6px; font-family: inherit;
+  }
+  .tbl th:first-child { text-align: left; }
+  .tbl td {
+    font-size: 12px; padding: 5px 0; border-top: 1px solid var(--border);
+    text-align: right; font-variant-numeric: tabular-nums; color: var(--text-2);
+  }
+  .tbl td:first-child { text-align: left; color: var(--text-1); font-weight: 500; }
+  .tbl td.gap { font-weight: 600; }
+  .tbl td.hi { color: var(--text-1); }
+  .tbl tr.lead td { color: var(--text-1); }
+
+  /* fatigue ranking */
+  .fat-row { display: flex; align-items: center; gap: 9px; margin-bottom: 7px; }
+  .fat-name { width: 84px; font-size: 11.5px; color: var(--text-2); flex: none; white-space: nowrap; overflow: hidden; }
+  .fat-name.top { color: var(--text-1); font-weight: 600; }
+  .fat-track { flex: 1; height: 8px; border-radius: 99px; background: var(--bg-subtle); position: relative; }
+  .fat-fill { position: absolute; inset: 0 auto 0 0; height: 8px; border-radius: 99px; background: var(--chart5); opacity: .55; }
+  .fat-fill.top { opacity: 1; }
+  .fat-val { width: 42px; text-align: right; font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-3); flex: none; }
+  .fat-val.top { color: var(--text-1); }
+
+  /* coach tile */
+  .coach-plan { background: rgba(255,255,255,0.03); border-radius: 10px; padding: 10px 12px; }
+  .coach-line { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; color: var(--text-2); }
+  .coach-line b { color: var(--text-1); font-weight: 600; }
+  .coach-cta {
+    margin-top: 10px; display: inline-block; font-size: 12px; font-weight: 600;
+    color: var(--accent); background: rgba(91,141,239,0.12); padding: 7px 12px; border-radius: 8px;
+  }
+  .register { font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--text-3); margin-bottom: 2px; }
+
+  /* session order slots */
+  .order { display: flex; gap: 5px; align-items: flex-end; }
+  .oslot { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .obar { width: 100%; border-radius: 3px 3px 0 0; background: var(--chart5); opacity: .45; }
+  .obar.hot { opacity: 1; }
+  .onum {
+    font-size: 9px; font-weight: 700; color: var(--text-3);
+    width: 15px; height: 15px; line-height: 15px; text-align: center;
+    border-radius: 50%; background: var(--bg-subtle);
+  }
+  .onum.hot { color: var(--bg); background: var(--chart5); }
+  .oname { font-size: 9px; color: var(--text-3); text-align: center; line-height: 1.2; }
+  .oname.hot { color: var(--text-1); font-weight: 600; }
+
+  /* frequency dots */
+  .freq-row { display: flex; align-items: center; gap: 9px; margin-bottom: 7px; }
+  .freq-name { width: 60px; font-size: 11.5px; color: var(--text-2); flex: none; }
+  .freq-name.low { color: var(--text-1); font-weight: 600; }
+  .freq-dots { flex: 1; display: flex; gap: 4px; }
+  .fdot { width: 9px; height: 9px; border-radius: 50%; background: var(--bg-subtle); }
+  .fdot.on { background: var(--chart7); }
+  .fdot.on.low { background: var(--gold); }
+  .freq-val { width: 40px; text-align: right; font-size: 11px; color: var(--text-3); flex: none; font-variant-numeric: tabular-nums; }
+  .freq-val.low { color: var(--text-1); font-weight: 600; }
+
+  /* rep range segments */
+  .seg { display: flex; height: 26px; border-radius: 6px; overflow: hidden; }
+  .seg i { display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: var(--bg); }
+  .seg-lbls { display: flex; margin-top: 6px; font-size: 9.5px; color: var(--text-3); }
+
+  /* balance scale */
+  .bal { display: flex; align-items: center; gap: 0; height: 30px; }
+  .bal-side { height: 14px; display: flex; align-items: center; }
+  .bal-side.l { justify-content: flex-end; }
+  .bal-b { height: 14px; }
+  .bal-mid { width: 2px; height: 24px; background: var(--text-2); flex: none; }
+
+  /* sparkline rows */
+  .spark-row { display: flex; align-items: center; gap: 9px; margin-bottom: 6px; }
+  .spark-name { width: 54px; font-size: 11px; color: var(--text-2); flex: none; }
+  .spark-name.subj { color: var(--text-1); font-weight: 600; }
+  .spark-svg { flex: 1; }
+  .spark-val { width: 22px; text-align: right; font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-3); flex: none; }
+  .spark-val.subj { color: var(--text-1); }
+
+  /* this file opens straight into the section, so no leading rule */
+  .divider { margin-top: 0; border-top: 0; padding-top: 0; }
+  h2 { font-size: 26px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="divider">
+    <h2>Model transparency &amp; coaching</h2>
+    <p class="sub">
+      Ten sketches: two on model transparency, then eight coaching tiles across the domains a
+      coach actually covers — what to train, load progression, session structure, scheduling,
+      goals, stimulus variety and balance. Every one runs on data the app already stores. The
+      constraints under each are the part worth arguing with.
+    </p>
+    <div class="warn">
+      <strong>The category is mostly a re-frame, not new machinery.</strong> Much of what ships
+      is already coaching-adjacent — <code>deloadReadiness</code>, <code>muscleBalance</code> and
+      <code>restSweetSpot</code> all imply an action without naming one. The line that would
+      define a coaching tile is whether it <em>names the next step</em>. That makes this a
+      grouping and copy-register decision first and an engine decision second.
+      <br><br>
+      <strong>Two separate gates.</strong> <em>Coverage:</em> the first two tiles read
+      <code>FatigueObservation</code>, which only exists where Smart Suggestions produced a
+      prediction — blank for anyone not using the wand, so neither can be Tier 1.
+      <em>Stance:</em> four of the coaching tiles are marked “stance needed” because the finding
+      is safe but the recommendation is an opinion the app has never yet asserted.
+    </div>
+
+    <div class="grid">
+
+      <!-- ============ A. SUGGESTED VS ACTUAL ============ -->
+      <div class="slot">
+        <div class="kindbar"><span class="kind">table</span><span class="uses">suggested vs actual</span></div>
+        <div class="card spec">
+          <div class="card-head">
+            <span class="pill" style="color:var(--chart7); background:rgba(78,205,196,0.12)">Model check</span>
+            <span class="ellipsis">•••</span>
+          </div>
+          <div class="headline">The wand is running light on your pressing</div>
+          <div class="chart">
+            <table class="tbl">
+              <thead>
+                <tr><th>Exercise</th><th>Suggested</th><th>You did</th><th>Gap</th></tr>
+              </thead>
+              <tbody>
+                <tr class="lead"><td>Bench Press</td><td>82.5</td><td>87.5</td><td class="gap hi">+6%</td></tr>
+                <tr><td>Overhead Press</td><td>47.5</td><td>50.0</td><td class="gap hi">+5%</td></tr>
+                <tr><td>Squat</td><td>140</td><td>140</td><td class="gap">0%</td></tr>
+                <tr><td>Deadlift</td><td>165</td><td>160</td><td class="gap">−3%</td></tr>
+                <tr><td>Barbell Row</td><td>75</td><td>75</td><td class="gap">0%</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="detail">Across 34 suggested sets in the last 30 days you went heavier than proposed on both pressing lifts and matched or undershot everywhere else.</div>
+        </div>
+        <div class="cost"><span class="tag cheap">mostly built</span><span>
+          <b>Data exists and is already aggregated.</b> <code>FatigueObservation</code> carries
+          <code>prescribedWeight</code>, <code>actualWeight</code>, <code>predictedEffectiveE1RM</code>,
+          <code>actualE1RM</code> and <code>normalizedError</code> per set;
+          <code>FatigueLearningService.diagnosticsExercises()</code> and
+          <code>recentSessionSummaries()</code> already roll it up, and
+          <code>FatigueLearningAdminView</code> renders a version of this today. The work is
+          surfacing it in user language, not computing it.
+          <b>Watch:</b> a table saying the model was wrong invites "so why trust it" — the
+          framing has to be that it learns from this, which it does.
+        </span></div>
+      </div>
+
+      <!-- ============ B. FATIGUE COST ============ -->
+      <div class="slot">
+        <div class="kindbar"><span class="kind">ranking</span><span class="uses">fatigue cost per exercise</span></div>
+        <div class="card spec">
+          <div class="card-head">
+            <span class="pill" style="color:var(--chart5); background:rgba(168,126,230,0.12)">Fatigue cost</span>
+            <span class="ellipsis">•••</span>
+          </div>
+          <div class="headline">Squat takes the most out of you per set</div>
+          <div class="chart">
+            <div class="figrow">
+              <span class="fig">−4.6%</span><span class="figlbl">per set on squat</span>
+              <span class="figside">your median −2.1%</span>
+            </div>
+            <div class="fat-row">
+              <span class="fat-name top">Squat</span>
+              <span class="fat-track"><i class="fat-fill top" style="width:100%"></i></span>
+              <span class="fat-val top">−4.6%</span>
+            </div>
+            <div class="fat-row">
+              <span class="fat-name">Deadlift</span>
+              <span class="fat-track"><i class="fat-fill" style="width:87%"></i></span>
+              <span class="fat-val">−4.0%</span>
+            </div>
+            <div class="fat-row">
+              <span class="fat-name">Bench Press</span>
+              <span class="fat-track"><i class="fat-fill" style="width:52%"></i></span>
+              <span class="fat-val">−2.4%</span>
+            </div>
+            <div class="fat-row">
+              <span class="fat-name">Lat Pulldown</span>
+              <span class="fat-track"><i class="fat-fill" style="width:33%"></i></span>
+              <span class="fat-val">−1.5%</span>
+            </div>
+            <div class="fat-row">
+              <span class="fat-name">Leg Extension</span>
+              <span class="fat-track"><i class="fat-fill" style="width:20%"></i></span>
+              <span class="fat-val">−0.9%</span>
+            </div>
+          </div>
+          <div class="detail">Your estimated 1RM drops about 4.6% per set on Squat against a 2.1% median across your lifts — worth putting it first in the session.</div>
+        </div>
+        <div class="cost"><span class="tag cheap">free</span><span>
+          <b>Already a first-class concept.</b>
+          <code>FatigueLearningService.appliedFatigueRate(for:)</code> returns
+          <code>AppliedFatigueRateInfo { rate, source, localInfluence }</code> — a learned
+          per-exercise rate, which is exactly this ranking.
+          <b>The trap:</b> <code>appliedFatigueRateInfo(for:profile:)</code> also returns a
+          <em>default</em> rate when nothing has been learned. Ranking defaults would show the
+          user the model's priors dressed up as a fact about their training. Gate on
+          <code>source</code> and <code>hasAuditHistory</code>, and show only learned rows.
+        </span></div>
+      </div>
+
+      <!-- ============ C. COACH — DESCRIPTIVE REGISTER ============ -->
+      <div class="slot">
+        <div class="kindbar"><span class="kind">coach</span><span class="uses">register A — states, offers</span></div>
+        <div class="card spec">
+          <div class="card-head">
+            <span class="pill" style="color:var(--success); background:rgba(94,194,105,0.12)">Today</span>
+            <span class="ellipsis">•••</span>
+          </div>
+          <div class="register">Register A — descriptive</div>
+          <div class="headline">Legs is your freshest group</div>
+          <div class="chart">
+            <div class="coach-plan">
+              <div class="coach-line"><span>Last legs session</span><b>16 days ago</b></div>
+              <div class="coach-line"><span>Your usual gap</span><b>5 days</b></div>
+              <div class="coach-line"><span>Sets this week</span><b>0 of ~14</b></div>
+            </div>
+            <span class="coach-cta">Start a legs session</span>
+          </div>
+          <div class="detail">Everything else has been trained in the last four days. If you're picking one thing today, this is the group with the most room.</div>
+        </div>
+        <div class="cost"><span class="tag cheap">free</span><span>
+          <b>Stays inside the locked stance.</b> §"The organising idea" already assigns findings
+          the prescribing role, so a coaching category is not a departure — but this register
+          keeps the facts on the card and leaves the call to the user, which is what
+          <code>deloadReadiness</code>'s "never say take a deload week" rule is protecting.
+        </span></div>
+      </div>
+
+      <!-- ============ D. COACH — PRESCRIPTIVE REGISTER ============ -->
+      <div class="slot">
+        <div class="kindbar"><span class="kind">coach</span><span class="uses">register B — tells you</span></div>
+        <div class="card spec">
+          <div class="card-head">
+            <span class="pill" style="color:var(--gold); background:rgba(212,162,58,0.12)">Coach</span>
+            <span class="ellipsis">•••</span>
+          </div>
+          <div class="register">Register B — prescriptive</div>
+          <div class="headline">Train legs today — 4 sets of squats to start</div>
+          <div class="chart">
+            <div class="coach-plan">
+              <div class="coach-line"><span>Squat</span><b>4 × 5 @ 140 kg</b></div>
+              <div class="coach-line"><span>Romanian Deadlift</span><b>3 × 8 @ 100 kg</b></div>
+              <div class="coach-line"><span>Leg Extension</span><b>3 × 12 @ 45 kg</b></div>
+            </div>
+            <span class="coach-cta" style="color:var(--gold); background:rgba(212,162,58,0.12)">Load this session</span>
+          </div>
+          <div class="detail">Built from your usual legs session, with squat first because it costs you the most per set.</div>
+        </div>
+        <div class="cost"><span class="tag newdata">decide first</span><span>
+          <b>Two collisions to settle before this.</b> §2 locks the name — "Suggestions" belongs
+          to Smart Suggestions, and a second feature prescribing weights would read as the same
+          thing said twice. And §12 defers deep-links from findings into editors, so
+          "Load this session" is out of scope as written.
+          <b>Also:</b> curation (§6) keeps findings occasional; a coach tile users expect daily
+          is a different contract from a feed allowed to say nothing.
+        </span></div>
+      </div>
+
+      <!-- ============ E. PLATEAU ============ -->
+      <div class="slot">
+        <div class="kindbar"><span class="kind">coach</span><span class="uses">load progression</span></div>
+        <div class="card spec">
+          <div class="card-head">
+            <span class="pill" style="color:var(--gold); background:rgba(212,162,58,0.12)">Stalled</span>
+            <span class="subject">Bench Press</span>
+            <span class="ellipsis">•••</span>
+          </div>
+          <div class="headline">Bench Press hasn't moved in seven sessions</div>
+          <div class="chart">
+            <div class="figrow">
+              <span class="fig">100</span><span class="figlbl">kg · 7 sessions</span>
+              <span class="figside">last gain 9 wks ago</span>
+            </div>
+            <svg viewBox="0 0 300 44" width="100%" height="44">
+              <rect x="126" y="0" width="174" height="34" rx="4" fill="#D4A23A" opacity=".10"/>
+              <polyline points="8,30 38,26 68,22 98,18 128,17 158,17.5 188,17 218,18 248,17 278,17.5"
+                        fill="none" stroke="#D4A23A" stroke-width="2" stroke-linecap="round"/>
+              <g fill="#D4A23A">
+                <circle cx="8" cy="30" r="2.5"/><circle cx="38" cy="26" r="2.5"/><circle cx="68" cy="22" r="2.5"/>
+                <circle cx="98" cy="18" r="2.5"/><circle cx="128" cy="17" r="2.5"/><circle cx="158" cy="17.5" r="2.5"/>
+                <circle cx="188" cy="17" r="2.5"/><circle cx="218" cy="18" r="2.5"/><circle cx="248" cy="17" r="2.5"/>
+                <circle cx="278" cy="17.5" r="3.5"/>
+              </g>
+              <text x="213" y="42" fill="#D4A23A" font-size="9.5" text-anchor="middle" font-family="inherit">flat since June</text>
+            </svg>
+          </div>
+          <div class="detail">You added weight steadily through spring, then settled at 100 kg for seven sessions. Your reps at that weight have been climbing, which usually means it's time to add load.</div>
+        </div>
+        <div class="cost"><span class="tag cheap">free</span><span>
+          <b>The most coach-like thing the data supports.</b> Per-session weight and
+          <code>e1RM</code> already sit on <code>WorkoutSet</code>; a stall is a flat run with
+          rising reps. <b>Note:</b> "flat" is not automatically bad — an intentional maintenance
+          block looks identical, so this needs the reps-rising corroboration to fire at all.
+        </span></div>
+      </div>
+
+      <!-- ============ F. SESSION ORDER ============ -->
+      <div class="slot">
+        <div class="kindbar"><span class="kind">coach</span><span class="uses">session structure</span></div>
+        <div class="card spec">
+          <div class="card-head">
+            <span class="pill" style="color:var(--chart5); background:rgba(168,126,230,0.12)">Session order</span>
+            <span class="ellipsis">•••</span>
+          </div>
+          <div class="headline">You're squatting last, and it costs you most</div>
+          <div class="chart">
+            <div class="order">
+              <div class="oslot"><i class="obar" style="height:14px"></i><span class="onum">1</span><span class="oname">Lat<br>Pulldown</span></div>
+              <div class="oslot"><i class="obar" style="height:10px"></i><span class="onum">2</span><span class="oname">Leg<br>Ext</span></div>
+              <div class="oslot"><i class="obar" style="height:24px"></i><span class="onum">3</span><span class="oname">Bench</span></div>
+              <div class="oslot"><i class="obar hot" style="height:44px"></i><span class="onum hot">4</span><span class="oname hot">Squat</span></div>
+            </div>
+            <div class="gridcap"><span>bar height = e1RM lost per set</span><span>typical legs day</span></div>
+          </div>
+          <div class="detail">Squat drops you about 4.6% per set — twice anything else in the session — and you've run it fourth in nine of your last ten legs days.</div>
+        </div>
+        <div class="cost"><span class="tag cheap">free</span><span>
+          <b>Two existing fields, no new model.</b> <code>orderInWorkout</code> gives position;
+          set-to-set <code>e1RM</code> decay within a session gives cost — and computing decay
+          directly from <code>WorkoutSet</code> rather than from
+          <code>appliedFatigueRate</code> sidesteps the Smart Suggestions gate entirely, so this
+          works for every user.
+        </span></div>
+      </div>
+
+      <!-- ============ G. FREQUENCY ============ -->
+      <div class="slot">
+        <div class="kindbar"><span class="kind">coach</span><span class="uses">scheduling</span></div>
+        <div class="card spec">
+          <div class="card-head">
+            <span class="pill" style="color:var(--chart7); background:rgba(78,205,196,0.12)">Frequency</span>
+            <span class="ellipsis">•••</span>
+          </div>
+          <div class="headline">Chest gets all its work in one day</div>
+          <div class="chart">
+            <div class="freq-row">
+              <span class="freq-name">Back</span>
+              <span class="freq-dots"><i class="fdot on"></i><i class="fdot on"></i><i class="fdot on"></i><i class="fdot"></i></span>
+              <span class="freq-val">3× / wk</span>
+            </div>
+            <div class="freq-row">
+              <span class="freq-name">Legs</span>
+              <span class="freq-dots"><i class="fdot on"></i><i class="fdot on"></i><i class="fdot"></i><i class="fdot"></i></span>
+              <span class="freq-val">2× / wk</span>
+            </div>
+            <div class="freq-row">
+              <span class="freq-name">Shoulders</span>
+              <span class="freq-dots"><i class="fdot on"></i><i class="fdot on"></i><i class="fdot"></i><i class="fdot"></i></span>
+              <span class="freq-val">2× / wk</span>
+            </div>
+            <div class="freq-row">
+              <span class="freq-name low">Chest</span>
+              <span class="freq-dots"><i class="fdot on low"></i><i class="fdot"></i><i class="fdot"></i><i class="fdot"></i></span>
+              <span class="freq-val low">1× / wk</span>
+            </div>
+          </div>
+          <div class="detail">Chest gets 16 sets a week, all in one session, while everything else you train is spread across two or three days.</div>
+        </div>
+        <div class="cost"><span class="tag cheap">free</span><span>
+          <b>Different question from the muscle panel.</b> That one asks how much; this asks how
+          it's distributed — and 16 sets in one day is a different stimulus from 16 across three.
+          Workout dates plus <code>primaryMuscle</code>, both already aggregated.
+          <b>Stance needed:</b> saying spread is <em>better</em> is a claim about training, not
+          about the user's data. Stating the distribution is safe; recommending isn't.
+        </span></div>
+      </div>
+
+      <!-- ============ H. PROJECTION ============ -->
+      <div class="slot">
+        <div class="kindbar"><span class="kind">coach</span><span class="uses">goal / pace</span></div>
+        <div class="card spec">
+          <div class="card-head">
+            <span class="pill" style="color:var(--success); background:rgba(94,194,105,0.12)">On pace</span>
+            <span class="subject">Deadlift</span>
+            <span class="ellipsis">•••</span>
+          </div>
+          <div class="headline">On pace for 200 kg around mid-October</div>
+          <div class="chart">
+            <svg viewBox="0 0 300 52" width="100%" height="52">
+              <polyline points="4,42 40,39 76,35 112,33 148,28 184,26" fill="none" stroke="#5EC269" stroke-width="2" stroke-linecap="round"/>
+              <polyline points="184,26 220,20 256,14 292,8" fill="none" stroke="#5EC269" stroke-width="2" stroke-dasharray="4 4" stroke-opacity=".55" stroke-linecap="round"/>
+              <circle cx="184" cy="26" r="4" fill="#5EC269"/>
+              <line x1="292" y1="2" x2="292" y2="34" stroke="#EAEAEF" stroke-width="1.5"/>
+              <circle cx="292" cy="8" r="4" fill="none" stroke="#EAEAEF" stroke-width="1.5"/>
+              <text x="184" y="40" fill="#9999A8" font-size="9.5" text-anchor="middle" font-family="inherit">now 186</text>
+              <text x="292" y="47" fill="#EAEAEF" font-size="9.5" text-anchor="end" font-family="inherit">200 · 12 Oct</text>
+            </svg>
+          </div>
+          <div class="detail">Your deadlift estimated 1RM has risen about 1.6 kg a fortnight since June. Held, that reaches 200 kg in roughly nine weeks.</div>
+        </div>
+        <div class="cost"><span class="tag cheap">free</span><span>
+          <b>The slope already exists</b> — <code>StatsService.computeE1RMTrendSlope</code>
+          feeds <code>strengthTrend</code> today. This is the same number pointed forward.
+          <b>Watch:</b> a dashed line is a promise. Linear extrapolation of strength is wrong
+          over any real horizon, so it needs a visible hedge and a short window, or it becomes
+          the most disappointing card in the app.
+        </span></div>
+      </div>
+
+      <!-- ============ I. REP RANGE MIX ============ -->
+      <div class="slot">
+        <div class="kindbar"><span class="kind">coach</span><span class="uses">stimulus variety</span></div>
+        <div class="card spec">
+          <div class="card-head">
+            <span class="pill" style="color:var(--orange); background:rgba(232,155,62,0.12)">Rep mix</span>
+            <span class="ellipsis">•••</span>
+          </div>
+          <div class="headline">Nearly all your work sits in one rep range</div>
+          <div class="chart">
+            <div class="figrow">
+              <span class="fig">84%</span><span class="figlbl">of sets at 8–12</span>
+              <span class="figside">312 sets</span>
+            </div>
+            <div class="seg">
+              <i style="width:5%;  background:#3A3A46"></i>
+              <i style="width:8%;  background:#5C5C6E"></i>
+              <i style="width:84%; background:var(--orange)">8–12</i>
+              <i style="width:3%;  background:#5C5C6E"></i>
+            </div>
+            <div class="seg-lbls">
+              <span style="width:5%">1–5</span><span style="width:8%">6–7</span>
+              <span style="width:84%">&nbsp;</span><span style="width:3%; text-align:right">13+</span>
+            </div>
+          </div>
+          <div class="detail">Across 312 working sets in the last 60 days, 84% finished between 8 and 12 reps, with almost nothing heavy.</div>
+        </div>
+        <div class="cost"><span class="tag cheap">free</span><span>
+          <b>Reps are on every set</b> — this is a histogram of data you already have, and it's
+          the one thing here a lifter can act on the same day.
+          <b>Stance needed, again:</b> whether narrow is a problem depends on the goal, which
+          the app doesn't know. Safest framing states the concentration and stops.
+        </span></div>
+      </div>
+
+      <!-- ============ J. PUSH / PULL ============ -->
+      <div class="slot">
+        <div class="kindbar"><span class="kind">coach</span><span class="uses">structural balance</span></div>
+        <div class="card spec">
+          <div class="card-head">
+            <span class="pill" style="color:var(--accent); background:rgba(91,141,239,0.12)">Balance</span>
+            <span class="ellipsis">•••</span>
+          </div>
+          <div class="headline">You press about twice as much as you pull</div>
+          <div class="chart">
+            <div class="figrow">
+              <span class="fig">1.9:1</span><span class="figlbl">push : pull</span>
+              <span class="figside">last 30 days</span>
+            </div>
+            <div class="bal">
+              <span class="bal-side l" style="flex:1"><i class="bal-b" style="width:66%; background:var(--accent); border-radius:7px 0 0 7px"></i></span>
+              <span class="bal-mid"></span>
+              <span class="bal-side" style="flex:1"><i class="bal-b" style="width:35%; background:var(--accent); opacity:.45; border-radius:0 7px 7px 0"></i></span>
+            </div>
+            <div class="gridcap"><span>push 94 sets</span><span>pull 49 sets</span></div>
+          </div>
+          <div class="detail">94 pressing sets against 49 pulling over the last 30 days. Most programmes keep these closer to even.</div>
+        </div>
+        <div class="cost"><span class="tag newdata">needs a mapping</span><span>
+          <b>Not a data problem, a taxonomy one.</b> <code>Exercise</code> has
+          <code>primaryMuscle</code> and <code>equipmentType</code> but no movement pattern, so
+          push/pull needs a static classification — and custom exercises would fall outside it
+          unless the user tags them. <b>And</b> "most programmes keep these even" is the app
+          asserting an opinion, which nothing else in Insights currently does.
+        </span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <p class="foot">
+    Parked 11&nbsp;Aug 2026 to keep the insights work focused. Nothing here is built or agreed.
+    Written up in <code>COACHING_TILES_EXPLORATION.md</code>; the insights charts these were
+    split out of are in <code>prototype-insight-charts.html</code>.
+    Sizes and colours follow <code>DesignTokens.swift</code> and <code>InsightCardView.swift</code>;
+    data is representative rather than real.
+  </p>
+
+</div>
+</body>
+</html>

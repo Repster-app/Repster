@@ -81,6 +81,32 @@ final class InsightsServiceTests: XCTestCase {
         Calendar.current.date(byAdding: .day, value: -days, to: reference)!
     }
 
+    /// Sets with no weight at all — `effectiveWeight` nil, which is what makes
+    /// `WorkoutSet.volume` nil rather than zero.
+    @MainActor
+    private func seedBodyweightWorkout(
+        date: Date,
+        exercise: Exercise,
+        setCount: Int,
+        reps: Int
+    ) throws {
+        let workout = Workout(date: date, startTime: date, status: .completed)
+        let sets = (0..<setCount).map { index in
+            WorkoutSet(
+                workoutId: workout.id,
+                exerciseId: exercise.id,
+                date: date,
+                completedAt: date,
+                reps: reps,
+                setType: .working,
+                orderInWorkout: index,
+                orderInExercise: index,
+                completed: true
+            )
+        }
+        try seed([workout] + sets)
+    }
+
     private func makeBiasedObservations(
         exerciseId: UUID,
         bias: Double,
@@ -426,6 +452,157 @@ final class InsightsServiceTests: XCTestCase {
         XCTAssertFalse(status.muscles.first?.isAbsent ?? true)
     }
 
+    // MARK: - Muscle panel metrics
+
+    @MainActor
+    func testMuscleRowsCountRepsAndVolumeAlongsideSets() async throws {
+        let service = makeService()
+        let now = Date()
+        let bench = makeExercise(name: "Bench Press", primaryMuscle: "chest")
+        try seed([bench])
+
+        // 4 sets this week at 80kg x 8 = 32 reps, 2560kg.
+        try seedWorkout(date: daysAgo(2, from: now), sets: (0..<4).map { _ in (bench, 80.0, 8, 120, nil) })
+
+        let status = try await service.trainingStatus(referenceDate: now)
+        let chest = try XCTUnwrap(status.muscles.first { $0.group == "chest" })
+
+        XCTAssertEqual(chest.currentSets, 4)
+        XCTAssertEqual(chest.currentReps, 32)
+        XCTAssertEqual(chest.currentVolume, 2_560, accuracy: 0.001)
+    }
+
+    @MainActor
+    func testMuscleRowBaselinesAreAveragedPerMetric() async throws {
+        let service = makeService()
+        let now = Date()
+        let bench = makeExercise(name: "Bench Press", primaryMuscle: "chest")
+        try seed([bench])
+
+        // 8 baseline weeks of 10 sets at 80kg x 8: 80 reps and 6400kg a week.
+        try seedWeekly(exercise: bench, weeks: 8, setsPerWeek: 10, from: now, startingWeeksAgo: 9)
+        try seedWorkout(date: daysAgo(2, from: now), sets: (0..<4).map { _ in (bench, 80.0, 8, 120, nil) })
+
+        let status = try await service.trainingStatus(referenceDate: now)
+        let chest = try XCTUnwrap(status.muscles.first { $0.group == "chest" })
+
+        XCTAssertEqual(try XCTUnwrap(chest.baselineReps), 80, accuracy: 12)
+        XCTAssertEqual(try XCTUnwrap(chest.baselineVolume), 6_400, accuracy: 960)
+        // All three metrics must agree on direction — this week ran light.
+        for metric in MuscleMetric.allCases {
+            let delta = try XCTUnwrap(chest.delta(for: metric), "\(metric) delta")
+            XCTAssertLessThan(delta, 0, "\(metric) should read below baseline")
+        }
+    }
+
+    /// Bodyweight work carries no weight, so it has sets and reps but no volume.
+    /// The volume view must not mistake that for a skipped group.
+    @MainActor
+    func testBodyweightSetsCountForRepsButContributeNoVolume() async throws {
+        let service = makeService()
+        let now = Date()
+        let pullup = makeExercise(name: "Pull Up", primaryMuscle: "back")
+        try seed([pullup])
+        try seedBodyweightWorkout(date: daysAgo(2, from: now), exercise: pullup, setCount: 5, reps: 10)
+
+        let status = try await service.trainingStatus(referenceDate: now)
+        let back = try XCTUnwrap(status.muscles.first { $0.group == "back" })
+
+        XCTAssertEqual(back.currentSets, 5)
+        XCTAssertEqual(back.currentReps, 50)
+        XCTAssertEqual(back.currentVolume, 0)
+        XCTAssertTrue(back.hasVolumeGap, "Trained with no weight is not the same as untrained")
+        XCTAssertFalse(back.isAbsent, "The group was trained — absent must stay defined on sets")
+    }
+
+    /// Unilateral sets record each side separately; reps must count both.
+    @MainActor
+    func testUnilateralSetsCountBothSidesInReps() async throws {
+        let service = makeService()
+        let now = Date()
+        let split = makeExercise(name: "Split Squat", primaryMuscle: "quads")
+        let date = daysAgo(2, from: now)
+        let workout = Workout(date: date, startTime: date, status: .completed)
+        let sets = (0..<3).map { index in
+            WorkoutSet(
+                workoutId: workout.id,
+                exerciseId: split.id,
+                date: date,
+                completedAt: date,
+                weight: 40,
+                effectiveWeight: 40,
+                leftReps: 8,
+                rightReps: 8,
+                setType: .working,
+                orderInWorkout: index,
+                orderInExercise: index,
+                completed: true
+            )
+        }
+        try seed([split, workout] + sets)
+
+        let status = try await service.trainingStatus(referenceDate: now)
+        let quads = try XCTUnwrap(status.muscles.first { $0.group == "quads" })
+
+        XCTAssertEqual(quads.currentSets, 3)
+        XCTAssertEqual(quads.currentReps, 48, "8 + 8 per set across 3 sets")
+        XCTAssertEqual(quads.currentVolume, 40 * 48, accuracy: 0.001)
+    }
+
+    @MainActor
+    func testColdStartLeavesEveryMetricWithoutABaseline() async throws {
+        let service = makeService()
+        let now = Date()
+        let bench = makeExercise(name: "Bench Press", primaryMuscle: "chest")
+        try seed([bench])
+        try seedWorkout(date: daysAgo(2, from: now), sets: (0..<5).map { _ in (bench, 80.0, 8, 120, nil) })
+
+        let status = try await service.trainingStatus(referenceDate: now)
+        let chest = try XCTUnwrap(status.muscles.first)
+
+        for metric in MuscleMetric.allCases {
+            XCTAssertNil(chest.baseline(for: metric), "\(metric) baseline")
+            XCTAssertNil(chest.delta(for: metric), "\(metric) delta")
+        }
+    }
+
+    /// The status fetch only reaches back as far as the baseline window, but how
+    /// much history exists before that is what decides whether there's a
+    /// baseline at all. A user coming back after a long break must not be
+    /// mistaken for one who has never trained.
+    @MainActor
+    func testStatusAccountsForHistoryOlderThanTheWindow() async throws {
+        let service = makeService()
+        let now = Date()
+        let bench = makeExercise(name: "Bench Press", primaryMuscle: "chest")
+        try seed([bench])
+
+        // Twelve weeks of training that ended long before the nine-week window,
+        // then one session this week.
+        try seedWeekly(exercise: bench, weeks: 12, setsPerWeek: 10, from: now, startingWeeksAgo: 34)
+        try seedWorkout(date: daysAgo(2, from: now), sets: (0..<5).map { _ in (bench, 80.0, 8, 120, nil) })
+
+        let status = try await service.trainingStatus(referenceDate: now)
+
+        XCTAssertTrue(status.hasData)
+        XCTAssertEqual(status.currentSets, 5)
+        XCTAssertEqual(
+            status.baselineSets ?? -1, 0, accuracy: 0.001,
+            "Eight baseline weeks are available and empty — that isn't the same as having none"
+        )
+    }
+
+    @MainActor
+    func testStatusReportsNoDataForAnUntouchedStore() async throws {
+        let service = makeService()
+        let status = try await service.trainingStatus(referenceDate: Date())
+
+        XCTAssertFalse(status.hasData)
+        XCTAssertEqual(status.currentSets, 0)
+        XCTAssertNil(status.baselineSets)
+        XCTAssertTrue(status.muscles.isEmpty)
+    }
+
     @MainActor
     func testStatusExcludesCardioAndFullBody() async throws {
         let service = makeService()
@@ -645,6 +822,109 @@ final class InsightsServiceTests: XCTestCase {
         let balance = insights.first { $0.ruleId == "muscleBalance" }
         XCTAssertNotNil(balance, "Back dropped to zero recent sets should fire muscle balance")
         XCTAssertEqual(balance?.subjectName, "back")
+    }
+
+    /// The copy used to say the other groups got "\(median)+ each", which claims
+    /// a floor a median doesn't provide — a card reading "7+ each" beside a
+    /// shoulders row showing 5.
+    @MainActor
+    func testMuscleBalanceDoesNotOverstateTheComparisonGroups() async throws {
+        let service = makeService()
+        let now = Date()
+        let bench = makeExercise(name: "Bench Press", primaryMuscle: "chest")
+        let row = makeExercise(name: "Row", primaryMuscle: "back")
+        let press = makeExercise(name: "Overhead Press", primaryMuscle: "shoulders")
+        let squat = makeExercise(name: "Squat", primaryMuscle: "quads")
+        try seed([bench, row, press, squat])
+
+        // Build history for all four, then a trailing fortnight where the other
+        // groups land on clearly different counts and quads gets nothing.
+        try seedWeekly(exercise: bench, weeks: 6, setsPerWeek: 8, from: now, startingWeeksAgo: 8)
+        try seedWeekly(exercise: row, weeks: 6, setsPerWeek: 8, from: now, startingWeeksAgo: 8)
+        try seedWeekly(exercise: press, weeks: 6, setsPerWeek: 6, from: now, startingWeeksAgo: 8)
+        try seedWeekly(exercise: squat, weeks: 6, setsPerWeek: 8, from: now, startingWeeksAgo: 8)
+
+        try seedWorkout(date: daysAgo(3, from: now), sets: (0..<8).map { _ in (row, 60.0, 10, nil, nil) })
+        try seedWorkout(date: daysAgo(4, from: now), sets: (0..<7).map { _ in (bench, 80.0, 8, nil, nil) })
+        try seedWorkout(date: daysAgo(5, from: now), sets: (0..<5).map { _ in (press, 40.0, 8, nil, nil) })
+
+        try await service.runAnalysis(referenceDate: now)
+        let active = try await service.fetchActiveInsights()
+        let balance = try XCTUnwrap(active.first { $0.ruleId == "muscleBalance" })
+
+        XCTAssertFalse(
+            balance.detailText.contains("+ each"),
+            "Median is not a floor: \(balance.detailText)"
+        )
+
+        // Every comparison group's count should be inside whatever the copy claims.
+        let others = balance.chartValues.filter { $0 > 0 }
+        let low = Int(others.min() ?? 0)
+        let high = Int(others.max() ?? 0)
+        XCTAssertTrue(
+            balance.detailText.contains("\(low)–\(high)") || balance.detailText.contains("\(low)"),
+            "Copy should span the real range \(low)–\(high): \(balance.detailText)"
+        )
+    }
+
+    /// Rules with a nil subjectId reuse one record across subjects, so a rerun
+    /// that names a different group has to carry the new name with it. Stale, it
+    /// put the old group's name in the card header beside the new group's
+    /// headline.
+    @MainActor
+    func testMuscleBalanceSubjectNameFollowsTheNewWorstGroup() async throws {
+        let service = makeService()
+        let now = Date()
+        let bench = makeExercise(name: "Bench Press", primaryMuscle: "chest")
+        let squat = makeExercise(name: "Squat", primaryMuscle: "quads")
+        let row = makeExercise(name: "Row", primaryMuscle: "back")
+        let curl = makeExercise(name: "Curl", primaryMuscle: "biceps")
+        try seed([bench, squat, row, curl])
+
+        // Back is the neglected group as of `now`: everything else keeps getting
+        // sets through the trailing two weeks, back stops before them.
+        for sessionIndex in 0..<12 {
+            let date = daysAgo(56 - sessionIndex * 5, from: now)
+            var sets: [(Exercise, Double, Int, Int?, CachedPRStatus?)] = []
+            for _ in 0..<4 {
+                sets.append((bench, 80, 8, nil, nil))
+                sets.append((squat, 100, 8, nil, nil))
+                sets.append((curl, 20, 10, nil, nil))
+            }
+            if date < daysAgo(14, from: now) {
+                for _ in 0..<4 { sets.append((row, 60, 10, nil, nil)) }
+            }
+            try seedWorkout(date: date, sets: sets)
+        }
+
+        try await service.runAnalysis(referenceDate: now)
+        let first = try await service.fetchActiveInsights().first { $0.ruleId == "muscleBalance" }
+        XCTAssertEqual(first?.subjectName, "back")
+
+        // Two weeks on, back has been trained throughout and biceps is the one
+        // that stopped — the same record, a different subject.
+        let later = Calendar.current.date(byAdding: .day, value: 14, to: now)!
+        for sessionIndex in 0..<3 {
+            let date = daysAgo(12 - sessionIndex * 5, from: later)
+            var sets: [(Exercise, Double, Int, Int?, CachedPRStatus?)] = []
+            for _ in 0..<4 {
+                sets.append((bench, 80, 8, nil, nil))
+                sets.append((squat, 100, 8, nil, nil))
+                sets.append((row, 60, 10, nil, nil))
+            }
+            try seedWorkout(date: date, sets: sets)
+        }
+
+        InsightsService.resetPersistedAnalysisState()
+        try await service.runAnalysis(referenceDate: later)
+        let updated = try await service.fetchActiveInsights().first { $0.ruleId == "muscleBalance" }
+
+        let subject = try XCTUnwrap(updated?.subjectName)
+        let headline = try XCTUnwrap(updated?.headline)
+        XCTAssertTrue(
+            headline.lowercased().hasPrefix(subject.lowercased()),
+            "Header subject '\(subject)' must match the headline '\(headline)'"
+        )
     }
 
     // MARK: - Lifecycle

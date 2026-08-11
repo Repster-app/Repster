@@ -17,8 +17,15 @@ final class InsightsViewModel {
 
     private let insightsService: any InsightsServiceProtocol
 
-    init(insightsService: any InsightsServiceProtocol) {
+    /// `initialStatus` is the status Home already computed for the hook card.
+    /// Handing it over means the screen the user just tapped into opens with
+    /// its top half already drawn, instead of an empty scroll view.
+    init(
+        insightsService: any InsightsServiceProtocol,
+        initialStatus: TrainingStatus? = nil
+    ) {
         self.insightsService = insightsService
+        self.status = initialStatus
     }
 
     /// New insights stay visually marked from the captured snapshot even
@@ -27,20 +34,48 @@ final class InsightsViewModel {
         insights.filter(\.isNew)
     }
 
+    /// Ordered so the screen is complete before the push animation finishes.
+    ///
+    /// Reading the persisted feed costs a couple of milliseconds; re-analysing
+    /// and re-deriving the status cost hundreds, because both walk the entire
+    /// set history. Doing the cheap reads first — and skipping the status
+    /// entirely when Home already handed one over — is the difference between
+    /// content appearing with the screen and appearing half a second into it.
     func load() async {
         isLoading = true
-        defer {
-            isLoading = false
-            hasLoaded = true
-        }
+        defer { isLoading = false }
 
         do {
-            try await insightsService.refreshIfNeeded()
-            status = try await insightsService.fetchTrainingStatus()
-            insights = try await insightsService.fetchActiveInsights()
+            let persisted = try await insightsService.fetchActiveInsights()
+            let resolvedStatus: TrainingStatus
+            if let status {
+                resolvedStatus = status
+            } else {
+                resolvedStatus = try await insightsService.fetchTrainingStatus()
+            }
+
+            // One assignment pass, so the feed lands in a single layout rather
+            // than popping in section by section.
+            status = resolvedStatus
+            insights = persisted
+            hasLoaded = true
+
+            // Only re-read what a re-analysis could actually have changed.
+            if try await insightsService.refreshIfNeeded() {
+                let freshStatus = try await insightsService.fetchTrainingStatus()
+                let freshInsights = try await insightsService.fetchActiveInsights()
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    status = freshStatus
+                    insights = freshInsights
+                }
+            }
+
+            // Last: marking seen clears `isNew` on the records, so anything
+            // fetched after this point would lose its NEW marker mid-screen.
             try await insightsService.markAllSeen()
         } catch {
             dbg("[InsightsViewModel] Failed to load insights: \(error)")
+            hasLoaded = true
         }
     }
 

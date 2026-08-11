@@ -96,6 +96,7 @@ final class SetService: SetServiceProtocol {
         try await statsService.updateStats(
             for: set.exerciseId,
             event: .save(
+                setId: set.id,
                 reps: set.statsReps,
                 effectiveWeight: effectiveWeight ?? 0,
                 setType: set.setType,
@@ -206,6 +207,7 @@ final class SetService: SetServiceProtocol {
         try await statsService.updateStats(
             for: set.exerciseId,
             event: .edit(
+                setId: set.id,
                 oldReps: oldContribution.statsReps,
                 oldEffectiveWeight: oldContribution.effectiveWeight,
                 oldSetType: oldContribution.setType,
@@ -274,6 +276,7 @@ final class SetService: SetServiceProtocol {
         try await statsService.updateStats(
             for: oldContribution.exerciseId,
             event: .delete(
+                setId: oldContribution.setId,
                 reps: oldContribution.statsReps,
                 effectiveWeight: oldContribution.effectiveWeight,
                 setType: oldContribution.setType,
@@ -323,6 +326,7 @@ final class SetService: SetServiceProtocol {
         try await statsService.updateStats(
             for: exerciseId,
             event: .delete(
+                setId: setId,
                 reps: reps,
                 effectiveWeight: effectiveWeight,
                 setType: setType,

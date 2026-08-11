@@ -46,6 +46,7 @@ struct SettingsView: View {
 
     @State private var viewModel: SettingsViewModel
     @State private var pendingMuscleAssignmentCount: Int = 0
+    @State private var showWhatsNew = false
     @Environment(ServiceContainer.self) private var services
 
     // Read only for the On/Off summary on the row; the integration itself is managed in
@@ -141,6 +142,18 @@ struct SettingsView: View {
                 Button("OK") {}
             } message: {
                 Text(viewModel.errorMessage)
+            }
+            // No `whats new shown` event here: opening it deliberately is a different
+            // intent from meeting it on launch, and mixing the two would make the
+            // auto-presentation rate unreadable.
+            .sheet(isPresented: $showWhatsNew) {
+                if let release = WhatsNewRelease.current {
+                    WhatsNewSheet(
+                        release: release,
+                        healthKitService: services.healthKitService,
+                        analyticsService: analyticsService
+                    )
+                }
             }
         }
     }
@@ -314,6 +327,24 @@ struct SettingsView: View {
                     )
                 }
             }
+
+            // Shares the Smart Suggestions admin flag rather than adding a
+            // second one: it's the established "show me the diagnostics"
+            // switch, and a user who has found it wants all of them.
+            if viewModel.smartSuggestionsAdminModeEnabled {
+                NavigationLink {
+                    InsightGalleryView(
+                        unitPreference: viewModel.profile?.unitPreference ?? .metric
+                    )
+                } label: {
+                    SettingsNavigationRow(
+                        title: "Insight Gallery",
+                        systemImage: "chart.bar.doc.horizontal",
+                        summary: "Admin",
+                        showChevron: false
+                    )
+                }
+            }
         }
     }
 
@@ -327,6 +358,19 @@ struct SettingsView: View {
                 Spacer()
                 Text(viewModel.appVersion)
                     .foregroundStyle(Color.textSecondary)
+            }
+
+            // Hidden when this release has nothing to say, rather than opening an empty
+            // sheet — `WhatsNewRelease.current` being nil is a supported state.
+            if WhatsNewRelease.current != nil {
+                Button {
+                    showWhatsNew = true
+                } label: {
+                    SettingsNavigationRow(
+                        title: "What's New",
+                        systemImage: "sparkles"
+                    )
+                }
             }
 
             Button {

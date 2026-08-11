@@ -156,6 +156,10 @@
 		AM0003 /* SeedExerciseDTO+Mapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = BM0003 /* SeedExerciseDTO+Mapping.swift */; };
 		AM0004 /* SeedService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BM0004 /* SeedService.swift */; };
 		AM0005 /* GhostSetRepsBackfillMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BM0005 /* GhostSetRepsBackfillMigration.swift */; };
+		AM0006 /* ExerciseWorkoutCountBackfillMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BM0006 /* ExerciseWorkoutCountBackfillMigration.swift */; };
+		WN0001 /* WhatsNewRelease.swift in Sources */ = {isa = PBXBuildFile; fileRef = WN1001 /* WhatsNewRelease.swift */; };
+		WN0002 /* WhatsNewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = WN1002 /* WhatsNewSheet.swift */; };
+		WN0003 /* InsightsSectionPromotionMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = WN1003 /* InsightsSectionPromotionMigration.swift */; };
 		AN0001 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0001 /* HomeViewModel.swift */; };
 		AN0002 /* WeekStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0002 /* WeekStripView.swift */; };
 		AN0003 /* StartWorkoutCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0003 /* StartWorkoutCardView.swift */; };
@@ -200,20 +204,25 @@
 		HK0001 /* HealthKitServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = HK1001 /* HealthKitServiceProtocol.swift */; };
 		HK0002 /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = HK1002 /* HealthKitService.swift */; };
 		HK0003 /* HealthKitEnergyEstimateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = HK1003 /* HealthKitEnergyEstimateTests.swift */; };
+		HLTH01 /* AppleHealthConnectionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = HLTH11 /* AppleHealthConnectionModel.swift */; };
+		HLTH02 /* AppleHealthPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HLTH12 /* AppleHealthPromptView.swift */; };
+		HLTH03 /* AppleHealthSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HLTH13 /* AppleHealthSettingsView.swift */; };
 		IN0001 /* InsightRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1001 /* InsightRecord.swift */; };
 		IN0002 /* InsightsServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1002 /* InsightsServiceProtocol.swift */; };
 		IN0003 /* InsightsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1003 /* InsightsService.swift */; };
 		IN0004 /* InsightRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1004 /* InsightRules.swift */; };
 		IN0005 /* InsightsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1005 /* InsightsViewModel.swift */; };
-		HLTH01 /* AppleHealthConnectionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = HLTH11 /* AppleHealthConnectionModel.swift */; };
-		HLTH02 /* AppleHealthPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HLTH12 /* AppleHealthPromptView.swift */; };
-		HLTH03 /* AppleHealthSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HLTH13 /* AppleHealthSettingsView.swift */; };
 		IN0006 /* InsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1006 /* InsightsView.swift */; };
 		IN0007 /* InsightCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1007 /* InsightCardView.swift */; };
 		IN0008 /* TrainingInsightsHookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1008 /* TrainingInsightsHookView.swift */; };
 		IN0009 /* InsightsServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1009 /* InsightsServiceTests.swift */; };
+		IN0031 /* ExerciseWorkoutCountTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1031 /* ExerciseWorkoutCountTests.swift */; };
+		IN0033 /* BaselineMeterGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1033 /* BaselineMeterGeometryTests.swift */; };
+		WN0004 /* WhatsNewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WN1004 /* WhatsNewTests.swift */; };
 		IN0010 /* TrainingStatusCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1010 /* TrainingStatusCardView.swift */; };
 		IN0011 /* MuscleVolumePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1011 /* MuscleVolumePanelView.swift */; };
+		IN0032 /* BaselineMeterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1032 /* BaselineMeterView.swift */; };
+		IN0034 /* InsightGalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1034 /* InsightGalleryView.swift */; };
 		IN0012 /* InsightChartViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1012 /* InsightChartViews.swift */; };
 		IN0013 /* InsightRules+Progress.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1013 /* InsightRules+Progress.swift */; };
 		IN0014 /* InsightRules+Readiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1014 /* InsightRules+Readiness.swift */; };
@@ -439,6 +448,10 @@
 		BM0003 /* SeedExerciseDTO+Mapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SeedExerciseDTO+Mapping.swift"; sourceTree = "<group>"; };
 		BM0004 /* SeedService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedService.swift; sourceTree = "<group>"; };
 		BM0005 /* GhostSetRepsBackfillMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhostSetRepsBackfillMigration.swift; sourceTree = "<group>"; };
+		BM0006 /* ExerciseWorkoutCountBackfillMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseWorkoutCountBackfillMigration.swift; sourceTree = "<group>"; };
+		WN1001 /* WhatsNewRelease.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNewRelease.swift; sourceTree = "<group>"; };
+		WN1002 /* WhatsNewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNewSheet.swift; sourceTree = "<group>"; };
+		WN1003 /* InsightsSectionPromotionMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsSectionPromotionMigration.swift; sourceTree = "<group>"; };
 		BN0001 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
 		BN0002 /* WeekStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekStripView.swift; sourceTree = "<group>"; };
 		BN0003 /* StartWorkoutCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartWorkoutCardView.swift; sourceTree = "<group>"; };
@@ -483,20 +496,25 @@
 		HK1001 /* HealthKitServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitServiceProtocol.swift; sourceTree = "<group>"; };
 		HK1002 /* HealthKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitService.swift; sourceTree = "<group>"; };
 		HK1003 /* HealthKitEnergyEstimateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitEnergyEstimateTests.swift; sourceTree = "<group>"; };
+		HLTH11 /* AppleHealthConnectionModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleHealthConnectionModel.swift; sourceTree = "<group>"; };
+		HLTH12 /* AppleHealthPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleHealthPromptView.swift; sourceTree = "<group>"; };
+		HLTH13 /* AppleHealthSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleHealthSettingsView.swift; sourceTree = "<group>"; };
 		IN1001 /* InsightRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightRecord.swift; sourceTree = "<group>"; };
 		IN1002 /* InsightsServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsServiceProtocol.swift; sourceTree = "<group>"; };
 		IN1003 /* InsightsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsService.swift; sourceTree = "<group>"; };
 		IN1004 /* InsightRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightRules.swift; sourceTree = "<group>"; };
 		IN1005 /* InsightsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsViewModel.swift; sourceTree = "<group>"; };
-		HLTH11 /* AppleHealthConnectionModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleHealthConnectionModel.swift; sourceTree = "<group>"; };
-		HLTH12 /* AppleHealthPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleHealthPromptView.swift; sourceTree = "<group>"; };
-		HLTH13 /* AppleHealthSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleHealthSettingsView.swift; sourceTree = "<group>"; };
 		IN1006 /* InsightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsView.swift; sourceTree = "<group>"; };
 		IN1007 /* InsightCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightCardView.swift; sourceTree = "<group>"; };
 		IN1008 /* TrainingInsightsHookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingInsightsHookView.swift; sourceTree = "<group>"; };
 		IN1009 /* InsightsServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsServiceTests.swift; sourceTree = "<group>"; };
+		IN1031 /* ExerciseWorkoutCountTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseWorkoutCountTests.swift; sourceTree = "<group>"; };
+		IN1033 /* BaselineMeterGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaselineMeterGeometryTests.swift; sourceTree = "<group>"; };
+		WN1004 /* WhatsNewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNewTests.swift; sourceTree = "<group>"; };
 		IN1010 /* TrainingStatusCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingStatusCardView.swift; sourceTree = "<group>"; };
 		IN1011 /* MuscleVolumePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuscleVolumePanelView.swift; sourceTree = "<group>"; };
+		IN1032 /* BaselineMeterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaselineMeterView.swift; sourceTree = "<group>"; };
+		IN1034 /* InsightGalleryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightGalleryView.swift; sourceTree = "<group>"; };
 		IN1012 /* InsightChartViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightChartViews.swift; sourceTree = "<group>"; };
 		IN1013 /* InsightRules+Progress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InsightRules+Progress.swift"; sourceTree = "<group>"; };
 		IN1014 /* InsightRules+Readiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InsightRules+Readiness.swift"; sourceTree = "<group>"; };
@@ -642,6 +660,7 @@
 				DT0001 /* Templates */,
 				IN2001 /* Insights */,
 				HLTH21 /* Health */,
+				WN2001 /* WhatsNew */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -724,15 +743,6 @@
 				D30010 /* ViewModels */,
 			);
 			path = Settings;
-			sourceTree = "<group>";
-		};
-		HLTH21 /* Health */ = {
-			isa = PBXGroup;
-			children = (
-				HLTH11 /* AppleHealthConnectionModel.swift */,
-				HLTH12 /* AppleHealthPromptView.swift */,
-			);
-			path = Health;
 			sourceTree = "<group>";
 		};
 		D20006 /* Calendar */ = {
@@ -1052,6 +1062,8 @@
 				B70003 /* ServiceContainer.swift */,
 				BM0004 /* SeedService.swift */,
 				BM0005 /* GhostSetRepsBackfillMigration.swift */,
+				BM0006 /* ExerciseWorkoutCountBackfillMigration.swift */,
+				WN1003 /* InsightsSectionPromotionMigration.swift */,
 				BT0007 /* TemplateService.swift */,
 				FL1004 /* FatigueLearningService.swift */,
 				IN1003 /* InsightsService.swift */,
@@ -1310,6 +1322,24 @@
 			path = Components;
 			sourceTree = "<group>";
 		};
+		HLTH21 /* Health */ = {
+			isa = PBXGroup;
+			children = (
+				HLTH11 /* AppleHealthConnectionModel.swift */,
+				HLTH12 /* AppleHealthPromptView.swift */,
+			);
+			path = Health;
+			sourceTree = "<group>";
+		};
+		WN2001 /* WhatsNew */ = {
+			isa = PBXGroup;
+			children = (
+				WN1001 /* WhatsNewRelease.swift */,
+				WN1002 /* WhatsNewSheet.swift */,
+			);
+			path = WhatsNew;
+			sourceTree = "<group>";
+		};
 		IN2001 /* Insights */ = {
 			isa = PBXGroup;
 			children = (
@@ -1335,6 +1365,8 @@
 				IN1010 /* TrainingStatusCardView.swift */,
 				IN1011 /* MuscleVolumePanelView.swift */,
 				IN1012 /* InsightChartViews.swift */,
+				IN1032 /* BaselineMeterView.swift */,
+				IN1034 /* InsightGalleryView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -1353,6 +1385,9 @@
 				TT2010 /* AnalyticsServiceTests.swift */,
 				FL1005 /* FatigueLearningServiceTests.swift */,
 				IN1009 /* InsightsServiceTests.swift */,
+				IN1031 /* ExerciseWorkoutCountTests.swift */,
+				IN1033 /* BaselineMeterGeometryTests.swift */,
+				WN1004 /* WhatsNewTests.swift */,
 			);
 			path = RepsterTests;
 			sourceTree = "<group>";
@@ -1721,6 +1756,10 @@
 				AM0003 /* SeedExerciseDTO+Mapping.swift in Sources */,
 				AM0004 /* SeedService.swift in Sources */,
 				AM0005 /* GhostSetRepsBackfillMigration.swift in Sources */,
+				AM0006 /* ExerciseWorkoutCountBackfillMigration.swift in Sources */,
+				WN0001 /* WhatsNewRelease.swift in Sources */,
+				WN0002 /* WhatsNewSheet.swift in Sources */,
+				WN0003 /* InsightsSectionPromotionMigration.swift in Sources */,
 				AC0015 /* ExerciseInfoData.swift in Sources */,
 				AC0016 /* ExerciseInfoProvider.swift in Sources */,
 				AC0017 /* E1RMCardView.swift in Sources */,
@@ -1753,6 +1792,8 @@
 				HLTH03 /* AppleHealthSettingsView.swift in Sources */,
 				IN0010 /* TrainingStatusCardView.swift in Sources */,
 				IN0011 /* MuscleVolumePanelView.swift in Sources */,
+				IN0032 /* BaselineMeterView.swift in Sources */,
+				IN0034 /* InsightGalleryView.swift in Sources */,
 				IN0012 /* InsightChartViews.swift in Sources */,
 				IN0013 /* InsightRules+Progress.swift in Sources */,
 				IN0014 /* InsightRules+Readiness.swift in Sources */,
@@ -1771,6 +1812,9 @@
 				HK0003 /* HealthKitEnergyEstimateTests.swift in Sources */,
 				TT0001 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift in Sources */,
 				IN0009 /* InsightsServiceTests.swift in Sources */,
+				IN0031 /* ExerciseWorkoutCountTests.swift in Sources */,
+				IN0033 /* BaselineMeterGeometryTests.swift in Sources */,
+				WN0004 /* WhatsNewTests.swift in Sources */,
 				TT0003 /* ChartDataServiceTests.swift in Sources */,
 				TT0004 /* WorkoutHistoryBackupTests.swift in Sources */,
 				TT0005 /* SetServiceTests.swift in Sources */,
@@ -1804,7 +1848,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = WorkoutLiveActivity/Info.plist;
@@ -1817,7 +1861,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 1.3;
+				MARKETING_VERSION = 1.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.Repster.WorkoutLiveActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1837,7 +1881,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = WorkoutLiveActivity/Info.plist;
@@ -1850,7 +1894,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 1.3;
+				MARKETING_VERSION = 1.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.Repster.WorkoutLiveActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1987,7 +2031,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Repster/Repster.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				ENABLE_PREVIEWS = YES;
@@ -2019,7 +2063,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Repster/Repster.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 8HPA5639FW;
 				ENABLE_PREVIEWS = YES;

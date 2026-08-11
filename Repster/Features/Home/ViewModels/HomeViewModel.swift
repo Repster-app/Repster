@@ -147,6 +147,19 @@ final class HomeViewModel {
         }
     }
 
+    /// Badge only, for coming back from the Insights feed. Reading the feed
+    /// marks findings seen but can't change the training status, and re-deriving
+    /// the status is the most expensive call the service has.
+    func refreshInsightBadge() async {
+        guard let insightsService else { return }
+        do {
+            newInsightCount = try await insightsService.newInsightCount()
+        } catch {
+            dbg("[HomeViewModel] Failed to refresh insight badge: \(error)")
+            newInsightCount = 0
+        }
+    }
+
     func checkActiveWorkout() async {
         do {
             let active = try await workoutService.getActiveWorkout()

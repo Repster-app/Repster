@@ -14,7 +14,12 @@ struct TrainingStatusCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
-            if status.baselineSets != nil {
+            // Gate on the band, not on baselineSets being non-nil: a baseline
+            // of 0 is non-nil but useless, and comparing against it produced a
+            // "8-week avg 0" reading under copy that says the baseline is still
+            // being built. Band is nil in exactly the cases with nothing to
+            // compare against.
+            if status.band != nil {
                 comparison
             } else {
                 coldStartFigure
@@ -67,15 +72,14 @@ struct TrainingStatusCardView: View {
         return "Last 7 days"
     }
 
-    /// Calm by default. The mark reflects distance from the user's norm in
-    /// either direction; it never implies that more volume is better.
+    /// Calm by default, and the same for every band. Tinting by direction reads
+    /// as a verdict however it's meant — green for "normal" and amber for
+    /// anything else says a light week went wrong. The headline states where the
+    /// week sits; the mark only says whether there's a baseline to sit against.
     private var mark: (symbol: String, tint: Color) {
-        switch status.band {
-        case .normal:                 return ("circle.righthalf.filled", .success)
-        case .wellBelow, .wellAbove:  return ("circle.lefthalf.filled", .gold)
-        case .below, .above:          return ("circle.righthalf.filled", .gold)
-        case nil:                     return ("circle.dashed", .stale)
-        }
+        status.band == nil
+            ? ("circle.dashed", .stale)
+            : ("circle.righthalf.filled", .accent)
     }
 
     // MARK: - Comparison
@@ -100,48 +104,16 @@ struct TrainingStatusCardView: View {
                     .foregroundStyle(Color.textSecondary)
             }
 
-            meter
-
-            HStack {
-                Text("this week")
-                Spacer()
-                Text("your baseline")
-            }
-            .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(Color.textTertiary)
+            BaselineMeter(
+                current: status.currentSets,
+                baseline: status.baselineSets ?? 0,
+                showsCaption: true
+            )
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             "\(status.currentSets) sets in the last 7 days, against a baseline of \(Int((status.baselineSets ?? 0).rounded()))"
         )
-    }
-
-    private var meter: some View {
-        GeometryReader { geo in
-            let baseline = status.baselineSets ?? 0
-            // The baseline tick sits at 74% so there's headroom to render a week
-            // that ran above it without the bar pinning at full width.
-            let tickFraction = 0.74
-            let scale = baseline > 0 ? tickFraction / baseline : 0
-            let fillFraction = min(1.0, Double(status.currentSets) * scale)
-
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color.bgSubtle)
-                    .frame(height: 7)
-
-                Capsule()
-                    .fill(mark.tint)
-                    .frame(width: max(4, geo.size.width * fillFraction), height: 7)
-
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(Color.textSecondary)
-                    .frame(width: 2, height: 13)
-                    .offset(x: geo.size.width * tickFraction)
-            }
-            .frame(height: 13)
-        }
-        .frame(height: 13)
     }
 
     // MARK: - Cold start
@@ -161,4 +133,32 @@ struct TrainingStatusCardView: View {
             Spacer(minLength: 0)
         }
     }
+}
+
+// MARK: - Previews
+
+/// Ratios chosen to cover the range the meter has to survive, including the
+/// ones the old fixed-anchor version drew identically.
+#Preview("Status card — range") {
+    func status(_ current: Int, _ baseline: Double?) -> TrainingStatus {
+        TrainingStatus(
+            currentSets: current,
+            baselineSets: baseline,
+            muscles: [],
+            hasData: true
+        )
+    }
+
+    return ScrollView {
+        VStack(spacing: 12) {
+            TrainingStatusCardView(status: status(24, 6))    // 4.0x
+            TrainingStatusCardView(status: status(24, 12))   // 2.0x — the reported screen
+            TrainingStatusCardView(status: status(12, 12))   // 1.0x
+            TrainingStatusCardView(status: status(5, 12))    // 0.4x
+            TrainingStatusCardView(status: status(0, 12))    // nothing logged
+            TrainingStatusCardView(status: status(9, nil))   // no baseline yet
+        }
+        .padding(16)
+    }
+    .background(Color.bg)
 }

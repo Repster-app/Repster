@@ -248,13 +248,20 @@ actor SetRepository: SetRepositoryProtocol {
         )
     }
 
-    func fetchWorkoutCount(for exerciseId: UUID) throws -> Int {
+    func fetchWorkoutCount(for exerciseId: UUID, excludeWarmups: Bool) throws -> Int {
         let descriptor = FetchDescriptor<WorkoutSet>(
             predicate: #Predicate { $0.exerciseId == exerciseId }
         )
         let sets = try modelContext.fetch(descriptor)
-        let uniqueWorkoutIds = Set(sets.map(\.workoutId))
-        return uniqueWorkoutIds.count
+        let performedIn = sets.lazy
+            .filter { set in
+                guard set.completed, set.hasData else { return false }
+                if set.setType == .partial { return false }
+                if excludeWarmups && set.setType == .warmup { return false }
+                return true
+            }
+            .map(\.workoutId)
+        return Set(performedIn).count
     }
 
     func fetchBestE1RM(for exerciseId: UUID) throws -> Double? {

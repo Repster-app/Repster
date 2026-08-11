@@ -7,8 +7,18 @@ struct InsightsView: View {
     @State private var viewModel: InsightsViewModel
     @Environment(ServiceContainer.self) private var services
 
-    init(insightsService: any InsightsServiceProtocol) {
-        _viewModel = State(initialValue: InsightsViewModel(insightsService: insightsService))
+    /// Sticky between visits: someone who reads this panel in volume wants it in
+    /// volume next time, and the choice is cheap to persist.
+    @AppStorage("insightsMuscleMetric") private var muscleMetric: MuscleMetric = .sets
+
+    init(
+        insightsService: any InsightsServiceProtocol,
+        initialStatus: TrainingStatus? = nil
+    ) {
+        _viewModel = State(initialValue: InsightsViewModel(
+            insightsService: insightsService,
+            initialStatus: initialStatus
+        ))
     }
 
     var body: some View {
@@ -23,7 +33,9 @@ struct InsightsView: View {
                     if !status.muscles.isEmpty {
                         MuscleVolumePanelView(
                             rows: status.muscles,
-                            isExpanded: $viewModel.musclePanelExpanded
+                            isExpanded: $viewModel.musclePanelExpanded,
+                            metric: $muscleMetric,
+                            unitPreference: services.unitPreference
                         )
                         .onChange(of: viewModel.musclePanelExpanded) { _, expanded in
                             if expanded {
@@ -72,6 +84,7 @@ struct InsightsView: View {
                 ForEach(viewModel.insights) { insight in
                     InsightCardView(
                         insight: insight,
+                        unitPreference: services.unitPreference,
                         onSnooze: {
                             services.analyticsService.insightSnoozed(
                                 ruleId: insight.ruleId, ageDays: viewModel.ageInDays(of: insight)

@@ -177,14 +177,16 @@ actor InsightsService: InsightsServiceProtocol {
 
     // MARK: - InsightsServiceProtocol
 
-    func refreshIfNeeded() async throws {
+    @discardableResult
+    func refreshIfNeeded() async throws -> Bool {
         let now = Date()
         let signature = try currentDataSignature(referenceDate: now)
         let stored = UserDefaults.standard.string(forKey: Self.lastAnalysisSignatureKey)
-        guard signature != stored else { return }
+        guard signature != stored else { return false }
 
         try runAnalysis(referenceDate: now)
         UserDefaults.standard.set(signature, forKey: Self.lastAnalysisSignatureKey)
+        return true
     }
 
     func fetchActiveInsights() async throws -> [InsightItem] {
@@ -331,6 +333,12 @@ actor InsightsService: InsightsServiceProtocol {
             if let match {
                 // Snoozed insights stay hidden even when re-detected.
                 match.score = entry.score
+                // Rules with a nil subjectId (muscle balance, for one) match the
+                // same record whatever the subject now is, so this has to be
+                // refreshed with the rest. Left stale it showed the previous
+                // subject's name beside the new subject's headline — "abs" on a
+                // card reading "Legs has gone quiet".
+                match.subjectName = finding.subjectName
                 match.headline = finding.headline
                 match.detailText = finding.detailText
                 match.methodologyText = finding.methodologyText
@@ -388,26 +396,49 @@ actor InsightsService: InsightsServiceProtocol {
     /// means nothing.
     static let statusExcludedGroups: Set<String> = ["cardio", "full body"]
 
-    /// Internal so tests can drive it with a fixed reference date.
-    func trainingStatus(referenceDate: Date) throws -> TrainingStatus {
-        let context = try buildContext(referenceDate: referenceDate)
-        return Self.trainingStatus(from: context)
+    /// Oldest date the status layer reads. History before this affects only how
+    /// many baseline weeks are available, which `historyStart` answers on its own.
+    static func statusWindowStart(for referenceDate: Date) -> Date? {
+        Calendar.current.date(
+            byAdding: .day,
+            value: -statusWindowDays - statusBaselineWeeks * 7,
+            to: referenceDate
+        )
     }
 
-    static func trainingStatus(from context: InsightAnalysisContext) -> TrainingStatus {
+    /// Internal so tests can drive it with a fixed reference date.
+    func trainingStatus(referenceDate: Date) throws -> TrainingStatus {
+        guard let windowStart = Self.statusWindowStart(for: referenceDate) else {
+            return TrainingStatus(currentSets: 0, baselineSets: nil, muscles: [], hasData: false)
+        }
+        let context = try buildStatusContext(referenceDate: referenceDate, windowStart: windowStart)
+        return Self.trainingStatus(from: context, historyStart: try earliestLoggedSetDate())
+    }
+
+    /// `historyStart` is when the user first logged anything, supplied by callers
+    /// whose context is windowed and therefore can't see back that far. Nil means
+    /// the context carries the full history and the date is derived from it.
+    static func trainingStatus(
+        from context: InsightAnalysisContext,
+        historyStart: Date? = nil
+    ) -> TrainingStatus {
         let calendar = Calendar.current
         let reference = context.referenceDate
 
         guard let currentStart = calendar.date(
             byAdding: .day, value: -statusWindowDays, to: reference
-        ), let baselineStart = calendar.date(
-            byAdding: .day, value: -statusWindowDays - statusBaselineWeeks * 7, to: reference
-        ) else {
+        ), let baselineStart = statusWindowStart(for: reference) else {
             return TrainingStatus(currentSets: 0, baselineSets: nil, muscles: [], hasData: false)
         }
 
         var currentByGroup: [String: Int] = [:]
         var baselineByGroup: [String: Int] = [:]
+        // Reps and volume ride along in the same pass — the loop already visits
+        // every eligible set, so the extra metrics cost accumulators, not work.
+        var currentRepsByGroup: [String: Int] = [:]
+        var baselineRepsByGroup: [String: Int] = [:]
+        var currentVolumeByGroup: [String: Double] = [:]
+        var baselineVolumeByGroup: [String: Double] = [:]
         var currentTotal = 0
         var baselineTotal = 0
         var sawAnySet = false
@@ -424,17 +455,26 @@ actor InsightsService: InsightsServiceProtocol {
             sawAnySet = true
             earliestSetDate = min(earliestSetDate ?? set.date, set.date)
 
+            // Volume is nil for sets carrying no weight (bodyweight work), which
+            // contributes zero here rather than dropping the set from the other
+            // two metrics.
+            let volume = set.volume ?? 0
+
             if set.date >= currentStart {
                 currentByGroup[group, default: 0] += 1
+                currentRepsByGroup[group, default: 0] += set.totalReps
+                currentVolumeByGroup[group, default: 0] += volume
                 currentTotal += 1
             } else if set.date >= baselineStart {
                 baselineByGroup[group, default: 0] += 1
+                baselineRepsByGroup[group, default: 0] += set.totalReps
+                baselineVolumeByGroup[group, default: 0] += volume
                 baselineTotal += 1
             }
         }
 
         let baselineWeeks = Self.availableBaselineWeeks(
-            earliestSetDate: earliestSetDate,
+            earliestSetDate: historyStart ?? earliestSetDate,
             currentStart: currentStart,
             baselineStart: baselineStart
         )
@@ -448,7 +488,11 @@ actor InsightsService: InsightsServiceProtocol {
                 group: group,
                 displayName: ExercisePrimaryGroup.displayName(for: group),
                 currentSets: currentByGroup[group] ?? 0,
-                baselineSets: baselineWeeks.map { Double(baselineByGroup[group] ?? 0) / $0 }
+                baselineSets: baselineWeeks.map { Double(baselineByGroup[group] ?? 0) / $0 },
+                currentReps: currentRepsByGroup[group] ?? 0,
+                baselineReps: baselineWeeks.map { Double(baselineRepsByGroup[group] ?? 0) / $0 },
+                currentVolume: currentVolumeByGroup[group] ?? 0,
+                baselineVolume: baselineWeeks.map { (baselineVolumeByGroup[group] ?? 0) / $0 }
             )
         }
         // Rank by baseline, not by current volume: sorting by this week pushes
@@ -466,7 +510,9 @@ actor InsightsService: InsightsServiceProtocol {
             currentSets: currentTotal,
             baselineSets: baselineWeeks.map { Double(baselineTotal) / $0 },
             muscles: rows,
-            hasData: sawAnySet
+            // A lapsed user has data even when the window is empty, and a
+            // windowed context can't tell the difference on its own.
+            hasData: historyStart != nil || sawAnySet
         )
     }
 
@@ -486,6 +532,55 @@ actor InsightsService: InsightsServiceProtocol {
         let weeks = days / 7
         guard weeks >= minimumBaselineWeeks else { return nil }
         return weeks
+    }
+
+    /// Context narrowed to the nine weeks the status layer actually reads.
+    ///
+    /// Only valid as input to `trainingStatus(from:historyStart:)` — it holds no
+    /// observations and no history before `windowStart`, so rules evaluated
+    /// against it would silently see a truncated store.
+    ///
+    /// The narrowing is the whole point: fetching every set ever logged cost
+    /// more than everything else the Home screen does put together, and grew
+    /// with every month the user kept training.
+    private func buildStatusContext(
+        referenceDate: Date,
+        windowStart: Date
+    ) throws -> InsightAnalysisContext {
+        let workouts = try modelContext.fetch(FetchDescriptor<Workout>(
+            predicate: #Predicate { $0.date >= windowStart },
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )).filter { $0.status == .completed }
+        let workoutIds = Set(workouts.map(\.id))
+
+        // Unsorted: the status counts sets and never reads their order.
+        let sets = try modelContext.fetch(FetchDescriptor<WorkoutSet>(
+            predicate: #Predicate { $0.completed == true && $0.date >= windowStart }
+        )).filter { $0.hasData && workoutIds.contains($0.workoutId) }
+
+        let exercises = try modelContext.fetch(FetchDescriptor<Exercise>())
+        let profile = try modelContext.fetch(FetchDescriptor<HealthProfile>()).first
+
+        return InsightAnalysisContext(
+            workouts: workouts,
+            setsByWorkout: Dictionary(grouping: sets, by: \.workoutId),
+            exercisesById: Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0) }),
+            observations: [],
+            referenceDate: referenceDate,
+            unitPreference: profile?.unitPreference ?? .metric
+        )
+    }
+
+    /// When the user first logged a set. Cheap (one indexed row) and needed
+    /// separately because the windowed status context cannot see past its own
+    /// window, while how much history exists decides the baseline average.
+    private func earliestLoggedSetDate() throws -> Date? {
+        var descriptor = FetchDescriptor<WorkoutSet>(
+            predicate: #Predicate { $0.completed == true },
+            sortBy: [SortDescriptor(\.date, order: .forward)]
+        )
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first?.date
     }
 
     private func buildContext(referenceDate: Date) throws -> InsightAnalysisContext {

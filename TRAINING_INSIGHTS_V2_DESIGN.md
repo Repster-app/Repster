@@ -272,19 +272,109 @@ per `(ruleId, subjectId)` and suppress within the interval.
 ### 7.1 `InsightRecord.chartKind`
 
 New non-optional `String` with a default of `"ranking"` so existing rows
-lightweight-migrate. Seven kinds:
+lightweight-migrate. Existing `chartLabels` / `chartValues` stay as-is.
 
-| Kind | Shape |
-|---|---|
-| `series` | something over time, possibly signed — line with emphasised endpoint, or bars around a zero line |
-| `column` | discrete periods, current emphasised |
-| `ranking` | ordered categories in subject colours |
-| `proportion` | parts of a whole, one stacked bar with a key |
-| `comparison` | two groups, or a value against a mark |
-| `range` | an interval that moved — two segments on a shared axis |
-| `timeline` | events and the gaps between them |
+**Revised 2026-08-11.** The original version of this section specified each kind
+in one line — a shape, not a design. The outcome split exactly along that line:
+the three whose one-liner happened to mention a key or figures (`proportion`,
+`comparison`, `range`) were built with names and numbers and read fine. The four
+that described only a shape (`ranking`, `column`, `timeline`, `series`) were built
+as pure shape — coloured blocks with nothing to read — and that covers five of the
+ten shipped rules. `ranking` was rebuilt on 2026-08-11 and is the reference
+implementation below.
 
-Existing `chartLabels` / `chartValues` stay as-is.
+#### The rule
+
+> **Every insight chart names its subject and prints the figure the headline is
+> about.**
+
+A chart that carries neither is decoration. The tempting objection — "the card's
+text carries the numbers", written into `InsightSeriesChart` today — does not
+hold: `InsightCardView` truncates `detailText` to two lines while collapsed, which
+is how most of these are read. A finding whose chart shows no figure and whose
+prose is cut mid-sentence has told the reader nothing.
+
+Supporting constraints, all learned from shipped bugs:
+
+1. **No verdict colour.** Hue may carry identity (a muscle group's own colour) or
+   emphasis (subject vs. context), never judgement. Green-for-good/amber-for-bad
+   was removed from the status card on 2026-08-10 for the same reason it should
+   leave `series (signed)`: it reads as a grade on training the user chose.
+2. **Never clamp a value into a lie.** Scale to the data. A bar that pins at full
+   width stops distinguishing the cases where the finding is most extreme — the
+   fixed-anchor meter bug, fixed 2026-08-10.
+3. **Zero renders as a visible nub, never as nothing.** An empty slot reads as a
+   rendering fault; a 3pt stub reads as "almost none", which is the fact.
+4. **When trimming rows or points, keep the subject.** In a ranking the subject is
+   last by definition, so a naive `prefix` drops the only row the card is about.
+5. **Anything worth putting in an accessibility label is worth rendering.**
+   `InsightSignedSeriesChart` computes "N of M below expectation" and speaks it to
+   VoiceOver while showing it to nobody else.
+
+#### Per-kind specs
+
+**`ranking`** — ordered categories, one row each. *Reference implementation:
+`InsightRankingChart`.*
+Row is `name (62pt) | bar | figure (24pt, trailing)`. Bar fills in the category's
+own `MuscleGroupColors` tint: subject at full strength, context rows at 55%
+opacity. Subject's name and figure in `textPrimary`/semibold, context rows in
+`textSecondary`/`textTertiary`. Max 5 rows; if the subject falls outside them,
+drop the last leader and append it. Scale = largest value across rows.
+Used by: `muscleBalance`.
+
+**`column`** — discrete consecutive periods, latest emphasised.
+Bars bottom-aligned, latest at full tint and the rest at 35%. **Must add:** the
+latest period's figure printed at 12pt semibold, and first/last period labels
+("8 wks ago" … "this week") at 10pt `textTertiary`. Where the rule has a reference
+level (a median week), draw it as a 1pt dashed rule across the bars with its value
+labelled at the right edge — the comparison is the finding in both rules that use
+this kind.
+Used by: `consistency`, `volumeRamp`.
+
+**`timeline`** — events and the gaps between them.
+Dots positioned by real elapsed time on a 2pt axis, last dot emphasised. **Must
+add:** short dates under the first and last dots, and the gap that constitutes the
+finding printed as a caption over the final interval ("94 days"). For `prPace` the
+caption is current gap against median cadence, since the finding is the change in
+rhythm rather than any one date.
+Used by: `droppedExercise`, `prPace`.
+
+**`series`** (unsigned) — a trend line with an emphasised endpoint.
+Keep the line and the fill. **Must add:** the start and current values printed at
+each end at 12pt semibold, plus the signed change between them. The y-axis stays
+unlabelled — with both endpoints printed, the two figures *are* the axis, and the
+headline's claim ("up 4%") becomes checkable against the picture.
+Used by: `strengthTrend`.
+
+**`series` (signed)** — bars around a zero line, where the sign is the finding.
+**Must change:** drop `.success`/`.danger` for a neutral pair (`accent` above the
+line, `stale` below) per constraint 1 — above and below are already distinguished
+by position, so hue is doing nothing but grading. **Must add:** the zero line
+labelled with what zero means for the rule ("expected"), and the count currently
+hidden in the accessibility label rendered as a figure.
+Used by: `deloadReadiness`, `rirCalibration`.
+
+**`proportion`** — parts of a whole: one stacked bar plus a key.
+Already compliant. Key entries carry both label and percentage; segments sum to
+the full width so the reader can see they are parts of one thing.
+Used by: `targetAdherence`.
+
+**`comparison`** — two groups, or a value against a mark.
+Already compliant. Each side prints its figure above a proportional bar with its
+label beneath.
+Used by: `restSweetSpot`.
+
+**`range`** — an interval that moved: two segments on a shared axis.
+Already compliant — lanes are labelled and each prints its bounds. **Note: no
+shipped rule uses this kind**; it was specified for `repRangeDrift`, which is not
+built. Verify against a real finding before trusting it.
+Used by: nothing yet.
+
+#### Consistency
+
+Chart heights currently range from 22pt to 52pt with no rationale, which makes the
+feed read as unrelated widgets. Pick one body height for the shape-based kinds and
+let the row-based kinds size to their content.
 
 ### 7.2 ✅ Analysis signature was date-blind
 

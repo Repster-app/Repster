@@ -5,6 +5,8 @@ import SwiftUI
 
 struct InsightCardView: View {
     let insight: InsightItem
+    /// Charts print figures now, and the series values are weights.
+    let unitPreference: UnitPreference
     let onSnooze: () -> Void
     var onExpand: (() -> Void)? = nil
     var onRate: ((Bool) -> Void)? = nil
@@ -21,7 +23,11 @@ struct InsightCardView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             if !insight.chartValues.isEmpty {
-                InsightChartView(insight: insight, color: insight.category.accentColor)
+                InsightChartView(
+                    insight: insight,
+                    color: insight.category.accentColor,
+                    unitPreference: unitPreference
+                )
             }
 
             Text(insight.detailText)

@@ -105,6 +105,9 @@ struct ContentView: View {
     /// Whether the RevenueCat paywall is presented.
     @State private var showPaywall = false
 
+    /// Whether the What's New sheet is presented.
+    @State private var showWhatsNew = false
+
     // MARK: - Tab Selection
 
     /// Custom binding that detects re-selecting the home tab to pop its navigation to root.
@@ -281,11 +284,31 @@ struct ContentView: View {
             if hasActiveWorkout {
                 services.analyticsService.workoutResumed(setCount: inFlightSetCount)
                 showActiveWorkout = true
+            } else if WhatsNewPreferences.shouldPresent(), let release = WhatsNewRelease.current {
+                // Only when nothing else is claiming the screen. A resumed workout takes
+                // the fullScreenCover, and two modals racing on launch is how one of them
+                // gets dismissed unread.
+                services.analyticsService.whatsNewShown(version: release.version)
+                // Same reasoning as the paywall: a sheet asking for attention followed by
+                // a rating request in one session is how you earn one star.
+                reviewPrompt.suppressForThisSession()
+                showWhatsNew = true
             }
             trackScreen(for: selectedTab)
         }
         .onAppear {
             configureTabBarAppearance()
+        }
+        // Marked seen on any dismissal, swipe included: a sheet that returns every launch
+        // until it's formally acknowledged is worse than one that was ignored once.
+        .sheet(isPresented: $showWhatsNew, onDismiss: { WhatsNewPreferences.markSeen() }) {
+            if let release = WhatsNewRelease.current {
+                WhatsNewSheet(
+                    release: release,
+                    healthKitService: services.healthKitService,
+                    analyticsService: services.analyticsService
+                )
+            }
         }
         .sheet(isPresented: $showStartWorkoutSheet, onDismiss: {
             if pendingTemplateFlow {

@@ -29,6 +29,13 @@ struct RepsterApp: App {
             // Recover sets persisted with reps=nil from the empty-checkmark bug (one-shot).
             GhostSetRepsBackfillMigration.runIfNeeded(modelContext: seedContext)
 
+            // Runs here rather than in ContentView because HomeViewModel reads the section
+            // config as it builds — a migration scheduled after that lands a launch late.
+            InsightsSectionPromotionMigration.runIfNeeded()
+
+            // Repair exercise workout counts left wrong by the old row-count rule (one-shot).
+            ExerciseWorkoutCountBackfillMigration.runIfNeeded(modelContext: seedContext)
+
             let repoContainer = RepositoryContainer(modelContainer: container)
             self.repositories = repoContainer
             let analyticsService = AnalyticsServiceFactory.makeService()
@@ -61,6 +68,11 @@ struct RepsterApp: App {
                     analyticsService: services.analyticsService,
                     healthKitService: services.healthKitService,
                     onComplete: {
+                        // A fresh install starts caught up, so What's New never greets
+                        // someone with news about the only version they have ever run.
+                        // This is also what makes an empty `lastSeenWhatsNewVersion`
+                        // unambiguously mean "upgraded from a build before it existed".
+                        WhatsNewPreferences.markSeen()
                         hasCompletedOnboarding = true
                     }
                 )

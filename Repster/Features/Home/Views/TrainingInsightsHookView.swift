@@ -66,7 +66,7 @@ struct TrainingInsightsHookView: View {
                 }
 
                 if let baseline = status?.baselineSets, baseline > 0 {
-                    meter(current: Double(status?.currentSets ?? 0), baseline: baseline)
+                    BaselineMeter(current: status?.currentSets ?? 0, baseline: baseline)
                 }
             }
             .padding(14)
@@ -91,34 +91,11 @@ struct TrainingInsightsHookView: View {
         return "\(sets) · you average \(Int(baseline.rounded()))"
     }
 
+    /// Matches TrainingStatusCardView: one calm tint for every band, so neither
+    /// surface implies a light week went wrong. See the note there.
     private var mark: (symbol: String, tint: Color) {
-        switch status?.band {
-        case .normal:                 return ("circle.righthalf.filled", .success)
-        case .wellBelow, .wellAbove:  return ("circle.lefthalf.filled", .gold)
-        case .below, .above:          return ("circle.righthalf.filled", .gold)
-        case nil:                     return ("circle.dashed", .stale)
-        }
-    }
-
-    private func meter(current: Double, baseline: Double) -> some View {
-        GeometryReader { geo in
-            // The tick sits at 74% so a week that ran above baseline still has
-            // somewhere to go rather than pinning at full width.
-            let tickFraction = 0.74
-            let fill = min(1.0, current * (tickFraction / baseline))
-
-            ZStack(alignment: .leading) {
-                Capsule().fill(Color.bgSubtle).frame(height: 7)
-                Capsule()
-                    .fill(mark.tint)
-                    .frame(width: max(4, geo.size.width * fill), height: 7)
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(Color.textSecondary)
-                    .frame(width: 2, height: 13)
-                    .offset(x: geo.size.width * tickFraction)
-            }
-            .frame(height: 13)
-        }
-        .frame(height: 13)
+        status?.band == nil
+            ? ("circle.dashed", .stale)
+            : ("circle.righthalf.filled", .accent)
     }
 }

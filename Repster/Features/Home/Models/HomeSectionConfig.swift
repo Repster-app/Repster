@@ -88,8 +88,8 @@ struct HomeSectionConfig: Equatable {
 
     static let `default` = HomeSectionConfig(
         sections: [
-            HomeSectionEntry(sectionId: .monthlyStats, visible: true),
             HomeSectionEntry(sectionId: .insights, visible: true),
+            HomeSectionEntry(sectionId: .monthlyStats, visible: true),
             HomeSectionEntry(sectionId: .recentPRs, visible: true),
             HomeSectionEntry(sectionId: .recentWorkouts, visible: true),
         ],
@@ -125,7 +125,7 @@ struct HomeSectionConfig: Equatable {
     }
 
     private func sanitized() -> HomeSectionConfig {
-        let supportedOrder: [HomeSectionId] = [.monthlyStats, .insights, .recentPRs, .recentWorkouts]
+        let supportedOrder: [HomeSectionId] = [.insights, .monthlyStats, .recentPRs, .recentWorkouts]
         var seen = Set<HomeSectionId>()
         var sanitizedSections: [HomeSectionEntry] = []
 
