@@ -25,4 +25,8 @@ protocol ExerciseStatsRepositoryProtocol: Sendable {
 
     /// Fetch chart-safe exercise stats snapshots.
     func fetchAllChartExerciseStats() async throws -> [ChartExerciseStatsData]
+
+    /// Fetch a chart-safe exercise stats snapshot for one exercise.
+    /// Used by the workout-detail screens.
+    func fetchChartExerciseStats(for exerciseId: UUID) async throws -> ChartExerciseStatsData?
 }

@@ -6,14 +6,17 @@ import SwiftUI
 
 // MARK: - Supporting Types
 
-struct ExerciseGroup {
-    let exercise: Exercise
-    let sets: [WorkoutSet]
-    let stats: ExerciseStats?
+/// Snapshot types, not live SwiftData models. Both are parked in main-actor state for the
+/// session (`workoutDetails` here and in `WorkoutDetailFromHomeView`), so holding live models
+/// meant the UI could fault them through a background context at any later moment.
+struct ExerciseGroup: Sendable {
+    let exercise: ChartExerciseData
+    let sets: [ChartSetData]
+    let stats: ChartExerciseStatsData?
 }
 
-struct WorkoutDetail {
-    let workout: Workout
+struct WorkoutDetail: Sendable {
+    let workout: WorkoutSnapshot
     let exerciseGroups: [ExerciseGroup]
     let primaryMetric: WorkoutPrimaryMetric?
     let exerciseCount: Int
@@ -30,7 +33,7 @@ final class CalendarViewModel {
 
     var selectedDate: Date?
     var calendarDotData: [Date: [String]] = [:]
-    var workoutsByDate: [Date: [Workout]] = [:]
+    var workoutsByDate: [Date: [WorkoutSnapshot]] = [:]
     var workoutDetails: [UUID: WorkoutDetail] = [:]
     var isLoadingDots: Bool = false
     var isLoadingDetail: Bool = false
@@ -41,7 +44,8 @@ final class CalendarViewModel {
 
     // MARK: - Cache
 
-    private var exerciseCache: [UUID: Exercise] = [:]
+    /// Snapshots — same hazard as `HomeViewModel.exerciseCache`.
+    private var exerciseCache: [UUID: ChartExerciseData] = [:]
     private var hasLoadedDots: Bool = false
 
     // MARK: - Dependencies
@@ -77,7 +81,7 @@ final class CalendarViewModel {
 
         do {
             // 1. Fetch all workouts (single DB query, returns Workout objects only — not sets)
-            let workouts = try await workoutService.fetchAllWorkouts(limit: nil, offset: nil)
+            let workouts = try await workoutService.fetchAllWorkoutSummaries(limit: nil, offset: nil)
 
             // 1b. Determine earliest workout date to extend the calendar range
             if let earliest = workouts.last?.date {
@@ -85,7 +89,7 @@ final class CalendarViewModel {
             }
 
             // 2. Group workouts by normalized date
-            var dateWorkouts: [Date: [Workout]] = [:]
+            var dateWorkouts: [Date: [WorkoutSnapshot]] = [:]
             for workout in workouts {
                 let key = Self.normalizeDate(workout.date)
                 dateWorkouts[key, default: []].append(workout)
@@ -124,7 +128,7 @@ final class CalendarViewModel {
     }
 
     /// Build muscle-group dot data for a subset of date→workout entries.
-    private func buildDots(for dateWorkouts: [Date: [Workout]]) async throws -> [Date: [String]] {
+    private func buildDots(for dateWorkouts: [Date: [WorkoutSnapshot]]) async throws -> [Date: [String]] {
         var dotData: [Date: [String]] = [:]
         for (date, dateWorkoutList) in dateWorkouts {
             var muscleGroups: [String] = []
@@ -178,24 +182,24 @@ final class CalendarViewModel {
             var details: [UUID: WorkoutDetail] = [:]
 
             for workout in workouts {
-                let sets = try await setService.fetchSets(for: workout.id)
+                let sets = try await setService.fetchSetSnapshots(for: workout.id)
 
                 // Group sets by exerciseId
-                var exerciseSetMap: [UUID: [WorkoutSet]] = [:]
+                var exerciseSetMap: [UUID: [ChartSetData]] = [:]
                 for set in sets {
                     exerciseSetMap[set.exerciseId, default: []].append(set)
                 }
 
                 // Build exercise groups ordered by position in workout
                 var exerciseGroups: [ExerciseGroup] = []
-                var exerciseLookup: [UUID: Exercise] = [:]
+                var exerciseLookup: [UUID: ChartExerciseData] = [:]
                 for (exerciseId, exerciseSets) in exerciseSetMap {
                     let exercise = try await cachedExercise(exerciseId)
                     guard let exercise else { continue }
                     exerciseLookup[exerciseId] = exercise
 
                     let sortedSets = exerciseSets.sorted { $0.orderInExercise < $1.orderInExercise }
-                    let stats = try? await statsService.fetchStats(for: exerciseId)
+                    let stats = try? await statsService.fetchStatsSnapshot(for: exerciseId)
 
                     exerciseGroups.append(ExerciseGroup(
                         exercise: exercise,
@@ -248,11 +252,11 @@ final class CalendarViewModel {
         Calendar.current.startOfDay(for: date)
     }
 
-    private func cachedExercise(_ id: UUID) async throws -> Exercise? {
+    private func cachedExercise(_ id: UUID) async throws -> ChartExerciseData? {
         if let cached = exerciseCache[id] {
             return cached
         }
-        let exercise = try await exerciseService.fetchExercise(id)
+        let exercise = try await exerciseService.fetchExerciseSnapshot(id)
         if let exercise {
             exerciseCache[id] = exercise
         }

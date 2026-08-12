@@ -78,7 +78,7 @@ struct ExerciseDetailView: View {
         // Edit sheet (T034)
         .sheet(isPresented: $showEditSheet) {
             CreateEditExerciseSheet(
-                exercise: viewModel.exercise,
+                exercise: viewModel.exercise.map(ChartExerciseData.init(from:)),
                 services: services,
                 onSave: {
                     Task {
@@ -184,7 +184,9 @@ struct ExerciseDetailView: View {
         case .history:
             ExerciseHistoryView(
                 historyWorkouts: viewModel.historyWorkouts,
-                exercise: viewModel.exercise,
+                // Boundary conversion: this screen still holds a live model (it is on
+                // Stage 2's later list), but the view it feeds must not.
+                exercise: viewModel.exercise.map(ChartExerciseData.init(from:)),
                 unitPreference: services.unitPreference
             )
         case .prs:

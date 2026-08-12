@@ -11,9 +11,9 @@ struct CalendarView: View {
     @Environment(ServiceContainer.self) private var services
     @State private var viewModel: CalendarViewModel
     @State private var navigationPath = NavigationPath()
-    @State private var workoutToSaveAsTemplate: Workout? = nil
+    @State private var workoutToSaveAsTemplate: WorkoutSnapshot? = nil
     @State private var workoutToEditId: UUID?
-    @State private var workoutToDelete: Workout? = nil
+    @State private var workoutToDelete: WorkoutSnapshot? = nil
     @State private var isDeletingWorkout = false
     @State private var saveAsTemplateController = SaveWorkoutAsTemplateController()
     @State private var templateFeedback: TemplateSaveFeedback? = nil
@@ -214,7 +214,7 @@ struct CalendarView: View {
 
     // MARK: - Delete
 
-    private func deleteWorkout(_ workout: Workout) async {
+    private func deleteWorkout(_ workout: WorkoutSnapshot) async {
         isDeletingWorkout = true
         do {
             try await services.workoutService.deleteWorkout(workout.id)

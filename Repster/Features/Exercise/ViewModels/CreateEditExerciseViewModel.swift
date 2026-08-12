@@ -14,7 +14,9 @@ final class CreateEditExerciseViewModel {
     private let exerciseService: any ExerciseServiceProtocol
     private let settingsService: any SettingsServiceProtocol
     private let analyticsService: any AnalyticsServiceProtocol
-    private let existingExercise: Exercise?
+    /// Snapshot, never a live model: mutating the very `Exercise` the active-workout
+    /// set table renders, then saving it on the repository actor, was crash B.
+    private let existingExercise: ChartExerciseData?
 
     // MARK: - Form Fields
 
@@ -84,7 +86,7 @@ final class CreateEditExerciseViewModel {
     // MARK: - Init
 
     init(
-        exercise: Exercise?,
+        exercise: ChartExerciseData?,
         exerciseService: any ExerciseServiceProtocol,
         settingsService: any SettingsServiceProtocol,
         analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService()
@@ -141,41 +143,30 @@ final class CreateEditExerciseViewModel {
             ? unilateralRepTargetMode
             : .perSide
 
-        if isEditing, let existing = existingExercise {
-            let original = ExerciseMetadataSnapshot(from: existing)
-            existing.name = trimmedName
-            existing.equipmentType = equipmentType
-            if !isTrackingTypeLocked {
-                existing.trackingType = trackingType
-            }
-            existing.primaryMuscle = muscle
-            existing.secondaryMuscles = secondaryMuscles
-            existing.movementPattern = movementPattern
-            existing.unilateral = resolvedUnilateral
-            existing.unilateralRepTargetMode = resolvedUnilateralRepTargetMode
-            existing.bilateralLoadFactor = bilateralLoadFactor
-            existing.bodyweightFactor = bodyweightFactor
-            existing.weightIncrement = weightIncrement
-            existing.defaultRestTime = defaultRestTime
-            existing.updatedAt = Date()
+        // Seed from the existing snapshot so fields this form doesn't expose survive the
+        // edit, then overwrite exactly what the form owns. Preserves the previous
+        // behaviour of mutating the live model field by field.
+        var fields = existingExercise.map(ExerciseEditableFields.init(from:))
+            ?? ExerciseEditableFields(name: trimmedName, equipmentType: equipmentType, trackingType: trackingType)
+        fields.name = trimmedName
+        fields.equipmentType = equipmentType
+        if !isTrackingTypeLocked {
+            fields.trackingType = trackingType
+        }
+        fields.primaryMuscle = muscle
+        fields.secondaryMuscles = secondaryMuscles
+        fields.movementPattern = movementPattern
+        fields.unilateral = resolvedUnilateral
+        fields.unilateralRepTargetMode = resolvedUnilateralRepTargetMode
+        fields.bilateralLoadFactor = bilateralLoadFactor
+        fields.bodyweightFactor = bodyweightFactor
+        fields.weightIncrement = weightIncrement
+        fields.defaultRestTime = defaultRestTime
 
-            try await exerciseService.updateExercise(existing, original: original)
+        if isEditing, let existing = existingExercise {
+            try await exerciseService.updateExercise(id: existing.id, fields: fields)
         } else {
-            let exercise = Exercise(
-                name: trimmedName,
-                equipmentType: equipmentType,
-                trackingType: trackingType,
-                primaryMuscle: muscle,
-                secondaryMuscles: secondaryMuscles,
-                movementPattern: movementPattern,
-                unilateral: resolvedUnilateral,
-                unilateralRepTargetMode: resolvedUnilateralRepTargetMode,
-                bilateralLoadFactor: bilateralLoadFactor,
-                bodyweightFactor: bodyweightFactor,
-                weightIncrement: weightIncrement,
-                defaultRestTime: defaultRestTime
-            )
-            try await exerciseService.createExercise(exercise)
+            try await exerciseService.createExercise(fields: fields)
             // Creating a custom exercise is one of the strongest activation
             // signals available: it means the seeded library didn't cover what
             // the user trains, and they cared enough to fix that.

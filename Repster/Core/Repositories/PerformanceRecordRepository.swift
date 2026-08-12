@@ -60,6 +60,17 @@ actor PerformanceRecordRepository: PerformanceRecordRepositoryProtocol {
         return try modelContext.fetch(descriptor).filter { $0.recordType == .repMax }
     }
 
+    /// Snapshot equivalent of `fetchRecentRepMaxRecords(since:)`.
+    /// Used by Home's Recent PRs card so live records never leave this actor.
+    func fetchRecentRepMaxRecordSummaries(since: Date) throws -> [PerformanceRecordSummaryData] {
+        try fetchRecentRepMaxRecords(since: since).map(PerformanceRecordSummaryData.init(from:))
+    }
+
+    /// Snapshot equivalent of `fetchAll(for:recordType:)`.
+    func fetchAllSummaries(for exerciseId: UUID, recordType: RecordType) throws -> [PerformanceRecordSummaryData] {
+        try fetchAll(for: exerciseId, recordType: recordType).map(PerformanceRecordSummaryData.init(from:))
+    }
+
     // MARK: - Cascade Deletion (FR-011)
 
     func deleteAll(for exerciseId: UUID) throws {

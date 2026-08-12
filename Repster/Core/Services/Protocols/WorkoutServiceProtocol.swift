@@ -80,6 +80,9 @@ protocol WorkoutServiceProtocol: Sendable {
     /// Returns nil if no workout is in progress.
     func getActiveWorkout() async throws -> Workout?
 
+    /// Snapshot equivalent of `getActiveWorkout()`, for main-actor callers.
+    func getActiveWorkoutSummary() async throws -> WorkoutSnapshot?
+
     // MARK: - CRUD
 
     /// Fetch a workout by ID.
@@ -90,6 +93,20 @@ protocol WorkoutServiceProtocol: Sendable {
 
     /// Fetch all workouts with optional pagination.
     func fetchAllWorkouts(limit: Int?, offset: Int?) async throws -> [Workout]
+
+    // MARK: - Snapshot Reads
+    //
+    // Read-only UI must use these. A live `Workout` handed to the main actor faults its
+    // properties through a background ModelContext — the EXC_BAD_ACCESS crash class.
+
+    /// Snapshot of a single workout.
+    func fetchWorkoutSummary(_ workoutId: UUID) async throws -> WorkoutSnapshot?
+
+    /// Snapshots of workouts within a date range, ordered by date DESC.
+    func fetchWorkoutSummaries(for dateRange: ClosedRange<Date>) async throws -> [WorkoutSnapshot]
+
+    /// Snapshots of all workouts with optional pagination.
+    func fetchAllWorkoutSummaries(limit: Int?, offset: Int?) async throws -> [WorkoutSnapshot]
 
     // MARK: - Metadata Update (FR-009)
 

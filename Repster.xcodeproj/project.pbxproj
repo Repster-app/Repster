@@ -238,6 +238,7 @@
 		TT0003 /* ChartDataServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2004 /* ChartDataServiceTests.swift */; };
 		TT0004 /* WorkoutHistoryBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2005 /* WorkoutHistoryBackupTests.swift */; };
 		TT0005 /* SetServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2006 /* SetServiceTests.swift */; };
+		TT0099 /* ScreenDataGoldenMasterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2099 /* ScreenDataGoldenMasterTests.swift */; };
 		TT0006 /* WorkoutSetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2007 /* WorkoutSetTests.swift */; };
 		TT0007 /* SeedExerciseLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2008 /* SeedExerciseLibraryTests.swift */; };
 		TT0008 /* MonetizationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2009 /* MonetizationServiceTests.swift */; };
@@ -528,6 +529,7 @@
 		TT2004 /* ChartDataServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartDataServiceTests.swift; sourceTree = "<group>"; };
 		TT2005 /* WorkoutHistoryBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutHistoryBackupTests.swift; sourceTree = "<group>"; };
 		TT2006 /* SetServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetServiceTests.swift; sourceTree = "<group>"; };
+		TT2099 /* ScreenDataGoldenMasterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenDataGoldenMasterTests.swift; sourceTree = "<group>"; };
 		TT2007 /* WorkoutSetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSetTests.swift; sourceTree = "<group>"; };
 		TT2008 /* SeedExerciseLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedExerciseLibraryTests.swift; sourceTree = "<group>"; };
 		TT2009 /* MonetizationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonetizationServiceTests.swift; sourceTree = "<group>"; };
@@ -1379,6 +1381,7 @@
 				TT2004 /* ChartDataServiceTests.swift */,
 				TT2005 /* WorkoutHistoryBackupTests.swift */,
 				TT2006 /* SetServiceTests.swift */,
+				TT2099 /* ScreenDataGoldenMasterTests.swift */,
 				TT2008 /* SeedExerciseLibraryTests.swift */,
 				TT2007 /* WorkoutSetTests.swift */,
 				TT2009 /* MonetizationServiceTests.swift */,
@@ -1818,6 +1821,7 @@
 				TT0003 /* ChartDataServiceTests.swift in Sources */,
 				TT0004 /* WorkoutHistoryBackupTests.swift in Sources */,
 				TT0005 /* SetServiceTests.swift in Sources */,
+				TT0099 /* ScreenDataGoldenMasterTests.swift in Sources */,
 				TT0007 /* SeedExerciseLibraryTests.swift in Sources */,
 				TT0006 /* WorkoutSetTests.swift in Sources */,
 				TT0008 /* MonetizationServiceTests.swift in Sources */,

@@ -8,7 +8,7 @@ enum ExerciseInfoProvider {
 
     static func compute(
         currentSets: [WorkoutSet],
-        exercise: Exercise,
+        exercise: ChartExerciseData,
         exerciseId: UUID,
         currentWorkoutId: UUID,
         trackingType: TrackingType,
@@ -180,7 +180,7 @@ enum ExerciseInfoProvider {
 
     private static func computeLastWorkout(
         historicalSets: [WorkoutSet],
-        exercise: Exercise,
+        exercise: ChartExerciseData,
         unitPreference: UnitPreference
     ) -> LastWorkoutInfo? {
         let grouped = Dictionary(grouping: historicalSets) { $0.workoutId }
@@ -266,7 +266,7 @@ enum ExerciseInfoProvider {
 
     private static func formatTopSetLabel(
         _ set: WorkoutSet,
-        exercise: Exercise,
+        exercise: ChartExerciseData,
         unitPreference: UnitPreference
     ) -> String {
         WorkoutSetPerformanceFormatter.performanceLabel(

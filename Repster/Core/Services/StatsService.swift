@@ -119,6 +119,10 @@ actor StatsService: StatsServiceProtocol {
         try await exerciseStatsRepo.fetch(for: exerciseId)
     }
 
+    func fetchStatsSnapshot(for exerciseId: UUID) async throws -> ChartExerciseStatsData? {
+        try await exerciseStatsRepo.fetchChartExerciseStats(for: exerciseId)
+    }
+
     func fetchAllStats() async throws -> [UUID: ExerciseStats] {
         let allStats = try await exerciseStatsRepo.fetchAll()
         return Dictionary(uniqueKeysWithValues: allStats.map { ($0.exerciseId, $0) })
@@ -126,17 +130,17 @@ actor StatsService: StatsServiceProtocol {
 
     // MARK: - Recent PRs (Home Screen)
 
-    func fetchRecentPRs(since: Date, limit: Int, scope: RecentPRScope) async throws -> [PerformanceRecord] {
-        let records = try await performanceRecordRepo.fetchRecentRepMaxRecords(since: since)
+    func fetchRecentPRs(since: Date, limit: Int, scope: RecentPRScope) async throws -> [PerformanceRecordSummaryData] {
+        let records = try await performanceRecordRepo.fetchRecentRepMaxRecordSummaries(since: since)
 
         // Resolve the user's e1RM formula once (only used for .e1RMOnly scope)
         let profile = try await healthProfileRepo.fetchOrCreate()
         let formula = E1RMFormula(rawValue: profile.e1RMFormula) ?? .epley
 
         var seen = Set<UUID>()
-        var result: [PerformanceRecord] = []
+        var result: [PerformanceRecordSummaryData] = []
         for record in records {
-            guard let exercise = try await exerciseRepo.fetch(byId: record.exerciseId),
+            guard let exercise = try await exerciseRepo.fetchChartExercise(byId: record.exerciseId),
                   exercise.trackingType.supportsRepPRs,
                   let recordReps = record.reps,
                   recordReps > 0 else {
@@ -146,7 +150,7 @@ actor StatsService: StatsServiceProtocol {
 
             if scope == .e1RMOnly {
                 // Only include the record if its e1RM is the best across all rep buckets
-                let allRepMaxes = try await performanceRecordRepo.fetchAll(
+                let allRepMaxes = try await performanceRecordRepo.fetchAllSummaries(
                     for: record.exerciseId,
                     recordType: .repMax
                 )

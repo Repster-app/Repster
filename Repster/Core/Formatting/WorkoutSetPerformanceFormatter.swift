@@ -46,9 +46,9 @@ enum WorkoutSetPerformanceFormatter {
             rightReps: set.rightReps,
             durationSeconds: set.durationSeconds,
             distanceMeters: set.distanceMeters,
-            rir: nil,
-            leftRIR: nil,
-            rightRIR: nil,
+            rir: set.rir,
+            leftRIR: set.leftRIR,
+            rightRIR: set.rightRIR,
             isBodyweightStyle: exercise?.isBodyweightStyleExercise == true,
             unitPreference: unitPreference
         )
@@ -68,6 +68,58 @@ enum WorkoutSetPerformanceFormatter {
         unitPreference: UnitPreference
     ) -> String? {
         display(for: set, exercise: exercise, unitPreference: unitPreference).performanceLabel
+    }
+
+    // MARK: - Transitional mixed overloads
+    //
+    // Stage 2 converts exercises to snapshots before sets, so for one step there are call
+    // sites holding a live `WorkoutSet` and a snapshot `ChartExerciseData`. Only
+    // `isBodyweightStyle` is read off the exercise, so these are exact — they delegate to
+    // the same body as every other overload. DELETE once sets are snapshots too.
+
+    static func display(
+        for set: WorkoutSet,
+        exercise: ChartExerciseData?,
+        unitPreference: UnitPreference
+    ) -> WorkoutSetDisplayText {
+        display(
+            weight: set.weight,
+            reps: set.reps,
+            leftReps: set.leftReps,
+            rightReps: set.rightReps,
+            durationSeconds: set.durationSeconds,
+            distanceMeters: set.distanceMeters,
+            rir: set.rir,
+            leftRIR: set.leftRIR,
+            rightRIR: set.rightRIR,
+            isBodyweightStyle: exercise?.isBodyweightStyleExercise == true,
+            unitPreference: unitPreference
+        )
+    }
+
+    static func performanceLabel(
+        for set: WorkoutSet,
+        exercise: ChartExerciseData?,
+        unitPreference: UnitPreference
+    ) -> String? {
+        display(for: set, exercise: exercise, unitPreference: unitPreference).performanceLabel
+    }
+
+    static func fieldDisplay(
+        for field: WorkoutSetReadOnlyField,
+        set: WorkoutSet,
+        exercise: ChartExerciseData?,
+        unitPreference: UnitPreference
+    ) -> WorkoutSetReadOnlyCellDisplay {
+        fieldDisplay(
+            for: field,
+            display: display(for: set, exercise: exercise, unitPreference: unitPreference),
+            resolvedWeight: set.effectiveWeight ?? set.weight,
+            distanceMeters: set.distanceMeters,
+            durationSeconds: set.durationSeconds,
+            isBodyweightStyle: isBodyweightStyleExercise(exercise),
+            unitPreference: unitPreference
+        )
     }
 
     static func repsLabel(for set: WorkoutSet) -> String? {
@@ -112,15 +164,55 @@ enum WorkoutSetPerformanceFormatter {
         exercise: Exercise?,
         unitPreference: UnitPreference
     ) -> WorkoutSetReadOnlyCellDisplay {
-        let display = display(for: set, exercise: exercise, unitPreference: unitPreference)
+        fieldDisplay(
+            for: field,
+            display: display(for: set, exercise: exercise, unitPreference: unitPreference),
+            resolvedWeight: set.effectiveWeight ?? set.weight,
+            distanceMeters: set.distanceMeters,
+            durationSeconds: set.durationSeconds,
+            isBodyweightStyle: isBodyweightStyleExercise(exercise),
+            unitPreference: unitPreference
+        )
+    }
 
+    static func fieldDisplay(
+        for field: WorkoutSetReadOnlyField,
+        set: ChartSetData,
+        exercise: ChartExerciseData?,
+        unitPreference: UnitPreference
+    ) -> WorkoutSetReadOnlyCellDisplay {
+        fieldDisplay(
+            for: field,
+            display: display(for: set, exercise: exercise, unitPreference: unitPreference),
+            resolvedWeight: set.effectiveWeight ?? set.weight,
+            distanceMeters: set.distanceMeters,
+            durationSeconds: set.durationSeconds,
+            isBodyweightStyle: isBodyweightStyleExercise(exercise),
+            unitPreference: unitPreference
+        )
+    }
+
+    /// Shared body for both `fieldDisplay` overloads — the live-model one and the
+    /// snapshot one must render identically, so neither owns the switch.
+    private static func fieldDisplay(
+        for field: WorkoutSetReadOnlyField,
+        display: WorkoutSetDisplayText,
+        resolvedWeight: Double?,
+        distanceMeters: Double?,
+        durationSeconds: Int?,
+        isBodyweightStyle: Bool,
+        unitPreference: UnitPreference
+    ) -> WorkoutSetReadOnlyCellDisplay {
         switch field {
         case .weight:
-            let resolvedWeight = set.effectiveWeight ?? set.weight
             guard let resolvedWeight else { return .placeholder }
-            if resolvedWeight > 0 || isBodyweightStyleExercise(exercise) {
+            if resolvedWeight > 0 || isBodyweightStyle {
                 return WorkoutSetReadOnlyCellDisplay(
-                    text: weightLabel(for: resolvedWeight, exercise: exercise, unitPreference: unitPreference)
+                    text: weightLabel(
+                        for: resolvedWeight,
+                        isBodyweightStyle: isBodyweightStyle,
+                        unitPreference: unitPreference
+                    )
                 )
             }
             return .placeholder
@@ -132,11 +224,11 @@ enum WorkoutSetPerformanceFormatter {
             return WorkoutSetReadOnlyCellDisplay(text: display.repsLabel ?? "—")
 
         case .distance:
-            guard let distanceMeters = set.distanceMeters, distanceMeters > 0 else { return .placeholder }
+            guard let distanceMeters, distanceMeters > 0 else { return .placeholder }
             return WorkoutSetReadOnlyCellDisplay(text: formatDistance(distanceMeters, unitPreference: unitPreference))
 
         case .time:
-            guard let durationSeconds = set.durationSeconds, durationSeconds > 0 else { return .placeholder }
+            guard let durationSeconds, durationSeconds > 0 else { return .placeholder }
             return WorkoutSetReadOnlyCellDisplay(text: UnitConversion.formatDuration(durationSeconds))
 
         case .rir:
@@ -465,6 +557,22 @@ struct WorkoutAggregateSummary: Sendable, Equatable {
     static func summarize(
         sets: [WorkoutSet],
         exercisesById: [UUID: Exercise]
+    ) -> WorkoutAggregateSummary {
+        summarize(
+            sets: sets,
+            exerciseId: { $0.exerciseId },
+            exerciseLookup: { exercisesById[$0]?.trackingType },
+            volumeValue: { $0.volume ?? 0 },
+            distanceValue: { $0.distanceMeters ?? 0 },
+            durationValue: { $0.durationSeconds ?? 0 }
+        )
+    }
+
+    /// Transitional overload — live sets with snapshot exercises. Only `trackingType` is
+    /// read off the exercise, so this is exact. DELETE once sets are snapshots too.
+    static func summarize(
+        sets: [WorkoutSet],
+        exercisesById: [UUID: ChartExerciseData]
     ) -> WorkoutAggregateSummary {
         summarize(
             sets: sets,

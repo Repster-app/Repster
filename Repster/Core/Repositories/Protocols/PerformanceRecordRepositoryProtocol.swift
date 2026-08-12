@@ -38,6 +38,10 @@ protocol PerformanceRecordRepositoryProtocol: Sendable {
     /// sorted by date descending. Used by Home screen Recent PRs card.
     func fetchRecentRepMaxRecords(since: Date) async throws -> [PerformanceRecord]
 
+    /// Snapshot equivalents, mapped inside the owning actor.
+    func fetchRecentRepMaxRecordSummaries(since: Date) async throws -> [PerformanceRecordSummaryData]
+    func fetchAllSummaries(for exerciseId: UUID, recordType: RecordType) async throws -> [PerformanceRecordSummaryData]
+
     // MARK: - Cascade Deletion (FR-011)
 
     /// Delete all PerformanceRecords for an exercise.

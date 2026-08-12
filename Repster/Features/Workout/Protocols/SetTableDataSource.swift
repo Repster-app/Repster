@@ -59,7 +59,12 @@ protocol SetTableDataSource: AnyObject, Observable {
     // MARK: - State
 
     /// All exercises in the current workout, ordered by display position.
-    var exercises: [Exercise] { get }
+    ///
+    /// Snapshots, not live models: these are read on the main actor during layout, and a
+    /// live `Exercise` faults its properties back through the repository's background
+    /// context — that is crash B (`SetTableView.inputHeaders` faulting `trackingType`
+    /// while `ExerciseRepository.save` ran).
+    var exercises: [ChartExerciseData] { get }
 
     /// Index of the currently selected exercise in the tab strip.
     var selectedExerciseIndex: Int { get set }
@@ -67,7 +72,7 @@ protocol SetTableDataSource: AnyObject, Observable {
     // MARK: - Computed
 
     /// The currently selected exercise, or nil if no exercises exist.
-    var currentExercise: Exercise? { get }
+    var currentExercise: ChartExerciseData? { get }
 
     /// Sets for the currently selected exercise, ordered by orderInExercise.
     var currentSets: [WorkoutSet] { get }

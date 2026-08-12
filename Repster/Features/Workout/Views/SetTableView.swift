@@ -178,7 +178,7 @@ struct SetTableView: View {
     /// Labels: SET | input column labels | RIR | PR | ✓
     /// Font: 11pt semibold, uppercase, textTertiary color.
     @ViewBuilder
-    private func headerRow(for exercise: Exercise) -> some View {
+    private func headerRow(for exercise: ChartExerciseData) -> some View {
         HStack(spacing: 4) {
             // Set column header
             Text("SET")
@@ -215,7 +215,7 @@ struct SetTableView: View {
     }
 
     @ViewBuilder
-    private func inputHeaders(for exercise: Exercise) -> some View {
+    private func inputHeaders(for exercise: ChartExerciseData) -> some View {
         switch exercise.trackingType {
         case .weightReps:
             if isUnilateralLogging(for: exercise) {
@@ -306,7 +306,7 @@ struct SetTableView: View {
         }
     }
 
-    private func isUnilateralLogging(for exercise: Exercise) -> Bool {
+    private func isUnilateralLogging(for exercise: ChartExerciseData) -> Bool {
         exercise.unilateral && exercise.supportsUnilateralLogging
     }
 
@@ -365,7 +365,7 @@ struct SetTableView: View {
 /// and converts back to model types when the checkbox is tapped.
 private struct SetRowWrapper: View {
     let set: WorkoutSet
-    let exercise: Exercise?
+    let exercise: ChartExerciseData?
     let setNumber: Int
     let siblingsSets: [WorkoutSet]
     var dataSource: any SetTableDataSource
@@ -400,7 +400,7 @@ private struct SetRowWrapper: View {
 
     init(
         set: WorkoutSet,
-        exercise: Exercise?,
+        exercise: ChartExerciseData?,
         setNumber: Int,
         siblingsSets: [WorkoutSet] = [],
         dataSource: any SetTableDataSource,
@@ -435,7 +435,7 @@ private struct SetRowWrapper: View {
         }
     }
 
-    private func configuredRow(for exercise: Exercise) -> AnyView {
+    private func configuredRow(for exercise: ChartExerciseData) -> AnyView {
         let unilateralTargetPresentation = SetTableView.unilateralTargetPresentation(for: set, exercise: exercise)
         let prStatusOverride = CachedPRStatus.effectiveStatus(for: set, among: siblingsSets)
         let row = rowContent(
@@ -448,7 +448,7 @@ private struct SetRowWrapper: View {
     }
 
     private func rowContent(
-        for exercise: Exercise,
+        for exercise: ChartExerciseData,
         presentation: UnilateralTargetPresentation,
         prStatusOverride: CachedPRStatus?
     ) -> AnyView {
@@ -494,7 +494,7 @@ private struct SetRowWrapper: View {
         )
     }
 
-    private func applyingFieldChangeHandlers(to content: AnyView, exercise: Exercise) -> AnyView {
+    private func applyingFieldChangeHandlers(to content: AnyView, exercise: ChartExerciseData) -> AnyView {
         AnyView(
             content
                 .onChange(of: weightText) { _, newValue in
@@ -549,7 +549,7 @@ private struct SetRowWrapper: View {
     /// that by computing the Bool here (inside an onChange handler, where `self`
     /// is current and reads live @State) and stashing a fresh trivial closure
     /// returning that snapshot.
-    private func refreshCustomKeyboardIfOwned(for exercise: Exercise) {
+    private func refreshCustomKeyboardIfOwned(for exercise: ChartExerciseData) {
         guard let keyboardManager else { return }
         guard let context = keyboardManager.context, context.ownerSetID == set.id else { return }
         let canComplete = completionInput(for: exercise) != nil
@@ -576,7 +576,7 @@ private struct SetRowWrapper: View {
         )
     }
 
-    private func completeOrToggleSet(for exercise: Exercise) {
+    private func completeOrToggleSet(for exercise: ChartExerciseData) {
         Task {
             if set.completed {
                 await dataSource.uncompleteSet(set)
@@ -600,7 +600,7 @@ private struct SetRowWrapper: View {
     /// from a single-value rep target (e.g. `6-6`) so the saved set carries that
     /// value. Range or absent targets are left untouched — `completionInput`
     /// returns nil in that case so completion is blocked.
-    private func attemptAutoFillRepsFromTarget(for exercise: Exercise) {
+    private func attemptAutoFillRepsFromTarget(for exercise: ChartExerciseData) {
         let bounds = set.preferredTargetRepBounds
         guard let lo = bounds.min, let hi = bounds.max, lo == hi, lo > 0 else { return }
 
@@ -663,7 +663,7 @@ private struct SetRowWrapper: View {
         applyParsedRepsInput(RepsTargetInputParser.parse(newValue))
     }
 
-    private func handleLeftRepsChange(_ newValue: String, exercise: Exercise) {
+    private func handleLeftRepsChange(_ newValue: String, exercise: ChartExerciseData) {
         showsCompletionError = false
         handleFieldEdit(field: .reps) {
             set.leftReps = Self.singleRepsValue(from: newValue)
@@ -671,7 +671,7 @@ private struct SetRowWrapper: View {
         }
     }
 
-    private func handleRightRepsChange(_ newValue: String, exercise: Exercise) {
+    private func handleRightRepsChange(_ newValue: String, exercise: ChartExerciseData) {
         showsCompletionError = false
         handleFieldEdit(field: .reps) {
             set.rightReps = Self.singleRepsValue(from: newValue)
@@ -697,14 +697,14 @@ private struct SetRowWrapper: View {
         }
     }
 
-    private func handleLeftRIRChange(_ newValue: Double?, exercise: Exercise) {
+    private func handleLeftRIRChange(_ newValue: Double?, exercise: ChartExerciseData) {
         handleFieldEdit(field: .rir) {
             set.leftRIR = newValue
             syncDerivedSetFields(for: exercise)
         }
     }
 
-    private func handleRightRIRChange(_ newValue: Double?, exercise: Exercise) {
+    private func handleRightRIRChange(_ newValue: Double?, exercise: ChartExerciseData) {
         handleFieldEdit(field: .rir) {
             set.rightRIR = newValue
             syncDerivedSetFields(for: exercise)
@@ -801,7 +801,7 @@ private struct SetRowWrapper: View {
         }
     }
 
-    private func completionInput(for exercise: Exercise) -> SetCompletionInput? {
+    private func completionInput(for exercise: ChartExerciseData) -> SetCompletionInput? {
         if exercise.supportsUnilateralLogging, exercise.unilateral {
             let leftReps = Self.singleRepsValue(from: leftRepsText)
             let rightReps = Self.singleRepsValue(from: rightRepsText)
@@ -859,7 +859,7 @@ private struct SetRowWrapper: View {
         )
     }
 
-    private func syncDerivedSetFields(for exercise: Exercise) {
+    private func syncDerivedSetFields(for exercise: ChartExerciseData) {
         guard exercise.supportsUnilateralLogging, exercise.unilateral else { return }
         set.syncDerivedPerformanceFields(for: exercise)
     }
@@ -963,7 +963,7 @@ private struct SetRowWrapper: View {
 extension SetTableView {
     static func unilateralTargetPresentation(
         for set: WorkoutSet,
-        exercise: Exercise
+        exercise: ChartExerciseData
     ) -> UnilateralTargetPresentation {
         let defaultPlaceholder = SetRowWrapper.repsPlaceholder(for: set)
         guard exercise.usesTotalAcrossSidesRepTargets else {
@@ -1947,11 +1947,11 @@ struct SetEntryKeyboardOverlay: View {
                     orderInWorkout: 1,
                     orderInExercise: 1
                 ),
-                exercise: Exercise(
+                exercise: ChartExerciseData(from: Exercise(
                     name: "Bench Press",
                     equipmentType: .barbell,
                     trackingType: .weightReps
-                ),
+                )),
                 setNumber: 1,
                 weightText: .constant("40"),
                 repsText: .constant("10"),
@@ -1978,11 +1978,11 @@ struct SetEntryKeyboardOverlay: View {
                     completed: true,
                     cachedPRStatus: .current
                 ),
-                exercise: Exercise(
+                exercise: ChartExerciseData(from: Exercise(
                     name: "Bench Press",
                     equipmentType: .barbell,
                     trackingType: .weightReps
-                ),
+                )),
                 setNumber: 1,
                 weightText: .constant("80"),
                 repsText: .constant("8"),
@@ -2007,11 +2007,11 @@ struct SetEntryKeyboardOverlay: View {
                     orderInWorkout: 3,
                     orderInExercise: 3
                 ),
-                exercise: Exercise(
+                exercise: ChartExerciseData(from: Exercise(
                     name: "Bench Press",
                     equipmentType: .barbell,
                     trackingType: .weightReps
-                ),
+                )),
                 setNumber: 2,
                 weightText: .constant(""),
                 repsText: .constant(""),

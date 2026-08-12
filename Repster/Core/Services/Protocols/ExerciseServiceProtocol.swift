@@ -32,10 +32,12 @@ protocol ExerciseServiceProtocol: Sendable {
 
     // MARK: - CRUD
 
-    /// Create a new exercise.
+    /// Create a new exercise from plain values.
     ///
-    /// - Parameter exercise: The Exercise to persist.
-    func createExercise(_ exercise: Exercise) async throws
+    /// - Parameter fields: The user-editable values to persist.
+    /// - Returns: The new exercise's id.
+    @discardableResult
+    func createExercise(fields: ExerciseEditableFields) async throws -> UUID
 
     /// Update an existing exercise with metadata mutability enforcement.
     ///
@@ -50,17 +52,23 @@ protocol ExerciseServiceProtocol: Sendable {
     /// IMPORTANT: Rebuild uses existing stored effectiveWeight values on sets.
     /// Historical effectiveWeight is never recalculated retroactively (specdoc S5.4).
     ///
-    /// - Parameter exercise: The Exercise with updated values.
-    /// - Parameter originalTrackingType: The trackingType before edit, for immutability check.
-    /// Persist an edited exercise.
+    /// Persist an edited exercise from plain values.
     ///
-    /// `original` must be captured before the caller mutates `exercise` — it is
-    /// the only record of the pre-edit values, and drives both trackingType
-    /// immutability and PR/stats rebuild detection.
-    func updateExercise(_ exercise: Exercise, original: ExerciseMetadataSnapshot) async throws
+    /// Takes values rather than a live `Exercise` deliberately: handing over the same
+    /// instance the active-workout set table was rendering, then saving it on the
+    /// repository actor, is the write half of the 1.4 crash B. The pre-edit state is
+    /// read from the store inside the service, so no caller-side ordering is required.
+    ///
+    /// - Parameters:
+    ///   - id: The exercise to update.
+    ///   - fields: The complete set of user-editable values to persist.
+    func updateExercise(id: UUID, fields: ExerciseEditableFields) async throws
 
     /// Fetch an exercise by ID.
     func fetchExercise(_ exerciseId: UUID) async throws -> Exercise?
+
+    /// Fetch a snapshot of an exercise by ID, for read-only main-actor callers.
+    func fetchExerciseSnapshot(_ exerciseId: UUID) async throws -> ChartExerciseData?
 
     /// Fetch all exercises, ordered by name.
     func fetchAllExercises() async throws -> [Exercise]

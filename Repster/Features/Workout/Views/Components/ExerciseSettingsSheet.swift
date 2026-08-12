@@ -16,7 +16,9 @@ struct ExerciseSettingsSheet: View {
 
     // MARK: - State
 
-    let exercise: Exercise
+    /// Snapshot, not a live model — this sheet is presented from the active workout while
+    /// the set table is rendering the same exercise (crash B's exact path).
+    @State private var exercise: ChartExerciseData
     let services: ServiceContainer
     let onSave: (() -> Void)?
 
@@ -43,11 +45,11 @@ struct ExerciseSettingsSheet: View {
     // MARK: - Init
 
     init(
-        exercise: Exercise,
+        exercise: ChartExerciseData,
         services: ServiceContainer,
         onSave: (() -> Void)? = nil
     ) {
-        self.exercise = exercise
+        _exercise = State(initialValue: exercise)
         self.services = services
         self.onSave = onSave
         _restTimeSeconds = State(initialValue: exercise.defaultRestTime)
@@ -139,14 +141,17 @@ struct ExerciseSettingsSheet: View {
         isSaving = true
         defer { isSaving = false }
 
-        // Update exercise model directly
-        let original = ExerciseMetadataSnapshot(from: exercise)
-        exercise.defaultRestTime = restTimeSeconds
-        exercise.weightIncrement = weightIncrement
-        exercise.updatedAt = Date()
+        // Send values; the mutation happens inside the repository actor. Seeding from the
+        // snapshot keeps every field this sheet doesn't edit exactly as it was.
+        var fields = ExerciseEditableFields(from: exercise)
+        fields.defaultRestTime = restTimeSeconds
+        fields.weightIncrement = weightIncrement
 
         do {
-            try await services.exerciseService.updateExercise(exercise, original: original)
+            try await services.exerciseService.updateExercise(id: exercise.id, fields: fields)
+            if let refreshed = try await services.exerciseService.fetchExerciseSnapshot(exercise.id) {
+                exercise = refreshed
+            }
         } catch {
             dbg("[ExerciseSettingsSheet] Failed to save: \(error)")
         }
@@ -155,10 +160,20 @@ struct ExerciseSettingsSheet: View {
         dismiss()
     }
 
+    /// Re-read after the nested full-settings sheet saved.
+    ///
+    /// This used to read straight off the live `Exercise`, which reflected the nested
+    /// sheet's write for free. A snapshot is frozen, so the refresh has to be explicit —
+    /// without it the rest-time and increment rows would silently show pre-edit values.
     private func handleNestedExerciseSave() {
-        restTimeSeconds = exercise.defaultRestTime
-        weightIncrement = exercise.weightIncrement
-        onSave?()
+        Task {
+            if let refreshed = try? await services.exerciseService.fetchExerciseSnapshot(exercise.id) {
+                exercise = refreshed
+                restTimeSeconds = refreshed.defaultRestTime
+                weightIncrement = refreshed.weightIncrement
+            }
+            onSave?()
+        }
     }
 
     private func loadDefaults() async {

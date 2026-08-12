@@ -112,7 +112,7 @@ struct ExerciseTabStripView: View {
     }
 
     /// Check if all sets for an exercise are completed.
-    private func isExerciseCompleted(_ exercise: Exercise) -> Bool {
+    private func isExerciseCompleted(_ exercise: ChartExerciseData) -> Bool {
         guard let sets = dataSource.setsByExercise[exercise.id], !sets.isEmpty else { return false }
         return sets.allSatisfy { $0.completed }
     }

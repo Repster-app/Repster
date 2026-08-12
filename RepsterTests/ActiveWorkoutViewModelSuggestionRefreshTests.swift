@@ -59,6 +59,100 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         XCTAssertNil(mode)
     }
 
+    // MARK: - Reindexing is one batched write, not N pipeline runs (Stage 2 step 4)
+    //
+    // Adding or deleting a set used to persist each reindexed set through
+    // `SetService.edit()` — the full effectiveWeight → PR → stats → fatigue pipeline — in its
+    // own unawaited `Task`. That is the concurrent writer from §5.3 of the crash analysis.
+    // These pin both halves of the replacement: one batch, and the same resulting order.
+
+    @MainActor
+    private func makeOrderingViewModel(
+        setService: SetServiceStub
+    ) -> ActiveWorkoutViewModel {
+        let profile = HealthProfile()
+        return ActiveWorkoutViewModel(
+            workoutService: WorkoutServiceStub(),
+            setService: setService,
+            exerciseService: ExerciseServiceStub(),
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            analyticsService: AnalyticsServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+    }
+
+    func testAddingWarmupSetReindexesInOneBatchAndPutsWarmupFirst() async throws {
+        let setService = SetServiceStub()
+        let viewModel = makeOrderingViewModel(setService: setService)
+
+        let exercise = makeExercise(name: "Back Squat")
+        let workoutId = UUID()
+        viewModel.workout = Workout(id: workoutId, date: Date(), status: .inProgress)
+        viewModel.exercises = [ChartExerciseData(from: exercise)]
+
+        let working1 = makeSet(exerciseId: exercise.id, order: 1, reps: 5)
+        let working2 = makeSet(exerciseId: exercise.id, order: 2, reps: 5)
+        working2.orderInWorkout = 2
+        viewModel.setsByExercise = [exercise.id: [working1, working2]]
+
+        await viewModel.addWarmupSet(for: exercise.id)
+
+        // The warmup lands ahead of both working sets, and orderInExercise is contiguous.
+        let sets = try XCTUnwrap(viewModel.setsByExercise[exercise.id])
+        XCTAssertEqual(sets.count, 3)
+        XCTAssertEqual(sets.map(\.setType), [.warmup, .working, .working])
+        XCTAssertEqual(sets.map(\.orderInExercise), [1, 2, 3])
+
+        // The whole reindex is persisted as batches, not one write per changed set. The old
+        // code issued an unawaited edit() per set; anything above a couple of batches means
+        // the fan-out is back.
+        XCTAssertFalse(setService.orderingBatches.isEmpty, "ordering was never persisted")
+        XCTAssertLessThanOrEqual(
+            setService.orderingBatches.count,
+            2,
+            "reindex should batch, not issue one write per set"
+        )
+        XCTAssertTrue(
+            setService.editedSetIds.isEmpty,
+            "ordering must not run the PR/stats/fatigue pipeline via edit()"
+        )
+    }
+
+    func testDeletingSetReindexesRemainingSetsContiguouslyInOneBatch() async throws {
+        let setService = SetServiceStub()
+        let viewModel = makeOrderingViewModel(setService: setService)
+
+        let exercise = makeExercise(name: "Bench Press")
+        viewModel.workout = Workout(id: UUID(), date: Date(), status: .inProgress)
+        viewModel.exercises = [ChartExerciseData(from: exercise)]
+
+        let set1 = makeSet(exerciseId: exercise.id, order: 1, reps: 5)
+        let set2 = makeSet(exerciseId: exercise.id, order: 2, reps: 5)
+        let set3 = makeSet(exerciseId: exercise.id, order: 3, reps: 5)
+        viewModel.setsByExercise = [exercise.id: [set1, set2, set3]]
+
+        await viewModel.deleteSet(set2)
+
+        let sets = try XCTUnwrap(viewModel.setsByExercise[exercise.id])
+        XCTAssertEqual(sets.map(\.id), [set1.id, set3.id])
+        XCTAssertEqual(sets.map(\.orderInExercise), [1, 2], "orders must close the gap")
+        XCTAssertEqual(setService.deletedSetIds, [set2.id])
+        XCTAssertEqual(
+            setService.orderingBatches.count,
+            1,
+            "one reindex should be one batched write"
+        )
+        XCTAssertEqual(
+            setService.orderingBatches.first?.count,
+            1,
+            "only the set whose order actually changed should be written"
+        )
+    }
+
     func testBackgroundRestTimerNotificationUsesSystemSoundForVibrationMode() {
         XCTAssertTrue(
             ActiveWorkoutViewModel.restTimerBackgroundNotificationUsesSystemSound(for: "vibration")
@@ -95,7 +189,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             startTime: Date().addingTimeInterval(-900),
             status: .inProgress
         )
-        viewModel.exercises = [makeExercise(name: "Back Squat")]
+        viewModel.exercises = [ChartExerciseData(from: makeExercise(name: "Back Squat"))]
         let completedSet = makeSet(exerciseId: viewModel.exercises[0].id, order: 1, reps: 5)
         completedSet.completed = true
         viewModel.setsByExercise = [viewModel.exercises[0].id: [completedSet]]
@@ -711,7 +805,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
 
         try await viewModel.save()
 
-        let createdExercise = try XCTUnwrap(exerciseService.createdExercises.last)
+        let createdExercise = try XCTUnwrap(exerciseService.createdExerciseFields.last)
         XCTAssertEqual(createdExercise.primaryMuscle, "full body")
         XCTAssertEqual(createdExercise.secondaryMuscles, [])
     }
@@ -727,7 +821,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             unilateral: false
         )
         let viewModel = CreateEditExerciseViewModel(
-            exercise: existingExercise,
+            exercise: ChartExerciseData(from: existingExercise),
             exerciseService: exerciseService,
             settingsService: SettingsServiceStub(profile: HealthProfile())
         )
@@ -737,7 +831,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
 
         try await viewModel.save()
 
-        let updatedExercise = try XCTUnwrap(exerciseService.updatedExercises.last)
+        let updatedExercise = try XCTUnwrap(exerciseService.updatedExerciseFields.last?.fields)
         XCTAssertEqual(updatedExercise.primaryMuscle, "full body")
         XCTAssertEqual(updatedExercise.secondaryMuscles, ["shoulders", "triceps"])
         XCTAssertEqual(existingExercise.secondaryMuscles, ["shoulders", "triceps"])
@@ -745,12 +839,12 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
 
     func testCreateEditExerciseViewModelKeepsLegacyPrimaryGroupSelectableDuringEdit() {
         let viewModel = CreateEditExerciseViewModel(
-            exercise: Exercise(
+            exercise: ChartExerciseData(from: Exercise(
                 name: "Hammer Curl",
                 equipmentType: .dumbbell,
                 trackingType: .weightReps,
                 primaryMuscle: "arms"
-            ),
+            )),
             exerciseService: ExerciseServiceStub(),
             settingsService: SettingsServiceStub(profile: HealthProfile())
         )
@@ -766,11 +860,11 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         exerciseService.hasLoggedSetData = false
 
         let viewModel = CreateEditExerciseViewModel(
-            exercise: Exercise(
+            exercise: ChartExerciseData(from: Exercise(
                 name: "Run",
                 equipmentType: .bodyweight,
                 trackingType: .duration
-            ),
+            )),
             exerciseService: exerciseService,
             settingsService: SettingsServiceStub(profile: HealthProfile())
         )
@@ -785,11 +879,11 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         exerciseService.hasLoggedSetData = true
 
         let viewModel = CreateEditExerciseViewModel(
-            exercise: Exercise(
+            exercise: ChartExerciseData(from: Exercise(
                 name: "Run",
                 equipmentType: .bodyweight,
                 trackingType: .durationDistance
-            ),
+            )),
             exerciseService: exerciseService,
             settingsService: SettingsServiceStub(profile: HealthProfile())
         )
@@ -963,7 +1057,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         )
 
         viewModel.workout = workout
-        viewModel.exercises = [existingExercise]
+        viewModel.exercises = [ChartExerciseData(from: existingExercise)]
         viewModel.selectedExerciseIndex = 0
         viewModel.setsByExercise = [
             existingExercise.id: [makeSet(exerciseId: existingExercise.id, order: 1, reps: 8)]
@@ -1046,7 +1140,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             completed: false
         )
 
-        viewModel.exercises = [exerciseA, exerciseB, exerciseC]
+        viewModel.exercises = [ChartExerciseData(from: exerciseA), ChartExerciseData(from: exerciseB), ChartExerciseData(from: exerciseC)]
         viewModel.selectedExerciseIndex = 1
         viewModel.setsByExercise = [
             exerciseA.id: [aWarmup, aWorking],
@@ -1344,7 +1438,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             fatigueLearningService: makeStubFatigueLearningService()
         )
         viewModel.workout = workout
-        viewModel.exercises = [exercise]
+        viewModel.exercises = [ChartExerciseData(from: exercise)]
         viewModel.setsByExercise = [exercise.id: [uncompletedSet, deletedSet, typeChangedSet]]
 
         await viewModel.uncompleteSet(uncompletedSet)
@@ -1382,7 +1476,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             fatigueLearningService: makeStubFatigueLearningService()
         )
 
-        viewModel.exercises = [exercise]
+        viewModel.exercises = [ChartExerciseData(from: exercise)]
         viewModel.selectedExerciseIndex = 0
         viewModel.setsByExercise = [exercise.id: [pendingSet]]
 
@@ -1390,7 +1484,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         if exerciseCount > 1 {
             let otherExercise = makeExercise(name: "Exercise 2")
             let otherSet = makeSet(exerciseId: otherExercise.id, order: 1, reps: secondExerciseReps)
-            viewModel.exercises.append(otherExercise)
+            viewModel.exercises.append(ChartExerciseData(from: otherExercise))
             viewModel.setsByExercise[otherExercise.id] = [otherSet]
             loadPrescriptionService.exerciseNames[otherExercise.id] = otherExercise.name
             secondExercise = otherExercise
@@ -1583,7 +1677,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         let profile = HealthProfile()
 
         let preparation = SuggestionCoordinator.prepare(
-            exercise: exercise,
+            exercise: ChartExerciseData(from: exercise),
             sets: [set],
             profile: profile
         )
@@ -1767,7 +1861,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         let profile = HealthProfile()
 
         let preparation = SuggestionCoordinator.prepare(
-            exercise: exercise,
+            exercise: ChartExerciseData(from: exercise),
             sets: [set],
             profile: profile
         )
@@ -1797,7 +1891,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         let profile = HealthProfile()
 
         let preparation = SuggestionCoordinator.prepare(
-            exercise: exercise,
+            exercise: ChartExerciseData(from: exercise),
             sets: [set],
             profile: profile
         )
@@ -1829,7 +1923,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         let profile = HealthProfile()
 
         let preparation = SuggestionCoordinator.prepare(
-            exercise: exercise,
+            exercise: ChartExerciseData(from: exercise),
             sets: [set],
             profile: profile
         )
@@ -1861,7 +1955,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         let profile = HealthProfile()
 
         let preparation = SuggestionCoordinator.prepare(
-            exercise: exercise,
+            exercise: ChartExerciseData(from: exercise),
             sets: [set],
             profile: profile
         )
@@ -1951,7 +2045,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         set.targetRepMin = 20
         set.targetRepMax = 20
 
-        let presentation = SetTableView.unilateralTargetPresentation(for: set, exercise: exercise)
+        let presentation = SetTableView.unilateralTargetPresentation(for: set, exercise: ChartExerciseData(from: exercise))
 
         XCTAssertEqual(presentation.leftPlaceholder, "0")
         XCTAssertEqual(presentation.rightPlaceholder, "0")
@@ -1976,7 +2070,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         profile.prescriptionDefaultTargetRIR = nil
 
         let preparation = SuggestionCoordinator.prepare(
-            exercise: exercise,
+            exercise: ChartExerciseData(from: exercise),
             sets: [set],
             profile: profile
         )
@@ -2013,13 +2107,13 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         )
 
         let included = SuggestionCoordinator.prepare(
-            exercise: exercise,
+            exercise: ChartExerciseData(from: exercise),
             workout: includedWorkout,
             sets: [set],
             profile: profile
         )
         let excluded = SuggestionCoordinator.prepare(
-            exercise: exercise,
+            exercise: ChartExerciseData(from: exercise),
             workout: excludedWorkout,
             sets: [set],
             profile: profile
@@ -2067,13 +2161,13 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         let profile = HealthProfile()
 
         let excluded = SuggestionCoordinator.prepare(
-            exercise: excludedExercise,
+            exercise: ChartExerciseData(from: excludedExercise),
             workout: workout,
             sets: [excludedSet],
             profile: profile
         )
         let allowed = SuggestionCoordinator.prepare(
-            exercise: allowedExercise,
+            exercise: ChartExerciseData(from: allowedExercise),
             workout: workout,
             sets: [allowedSet],
             profile: profile
@@ -2295,10 +2389,10 @@ final class ExerciseRebuildDetectionTests: XCTestCase {
         try await context.exerciseRepo.save(exercise)
         try await context.setRepo.save(makeLoggedSet(for: exercise.id))
 
-        let original = ExerciseMetadataSnapshot(from: exercise)
-        exercise.equipmentType = .bodyweight
+        var fields = ExerciseEditableFields(from: exercise)
+        fields.equipmentType = .bodyweight
 
-        try await context.service.updateExercise(exercise, original: original)
+        try await context.service.updateExercise(id: exercise.id, fields: fields)
 
         XCTAssertEqual(context.prService.rebuiltExerciseIds, [exercise.id])
         XCTAssertEqual(context.statsService.rebuiltExerciseIds, [exercise.id])
@@ -2314,11 +2408,11 @@ final class ExerciseRebuildDetectionTests: XCTestCase {
         try await context.exerciseRepo.save(exercise)
         try await context.setRepo.save(makeLoggedSet(for: exercise.id))
 
-        let original = ExerciseMetadataSnapshot(from: exercise)
-        exercise.unilateral = !exercise.unilateral
-        exercise.bodyweightFactor = 0.65
+        var fields = ExerciseEditableFields(from: exercise)
+        fields.unilateral = !fields.unilateral
+        fields.bodyweightFactor = 0.65
 
-        try await context.service.updateExercise(exercise, original: original)
+        try await context.service.updateExercise(id: exercise.id, fields: fields)
 
         XCTAssertEqual(context.prService.rebuiltExerciseIds, [exercise.id])
         XCTAssertEqual(context.statsService.rebuiltExerciseIds, [exercise.id])
@@ -2334,14 +2428,187 @@ final class ExerciseRebuildDetectionTests: XCTestCase {
         try await context.exerciseRepo.save(exercise)
         try await context.setRepo.save(makeLoggedSet(for: exercise.id))
 
-        let original = ExerciseMetadataSnapshot(from: exercise)
-        exercise.defaultRestTime = 180
-        exercise.primaryMuscle = "Shoulders"
+        var fields = ExerciseEditableFields(from: exercise)
+        fields.defaultRestTime = 180
+        fields.primaryMuscle = "Shoulders"
 
-        try await context.service.updateExercise(exercise, original: original)
+        try await context.service.updateExercise(id: exercise.id, fields: fields)
 
         XCTAssertTrue(context.prService.rebuiltExerciseIds.isEmpty)
         XCTAssertTrue(context.statsService.rebuiltExerciseIds.isEmpty)
+    }
+
+    // MARK: - Value-based exercise editing (Stage 2 step 1)
+    //
+    // `updateExercise` used to take the live `Exercise` the UI was rendering and save it on
+    // the repository actor — the write half of crash B. It now takes plain values and the
+    // mutation happens inside the owning actor. These pin the behaviour that has to survive.
+
+    func testUpdateExercisePersistsEveryEditableField() async throws {
+        let context = try makeExerciseRebuildServiceContext()
+        let exercise = Exercise(
+            name: "Old Name",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest",
+            secondaryMuscles: ["triceps"],
+            movementPattern: .press,
+            unilateral: false,
+            bilateralLoadFactor: 1.0,
+            bodyweightFactor: 0,
+            weightIncrement: 2.5,
+            defaultRestTime: 60
+        )
+        try await context.exerciseRepo.save(exercise)
+
+        var fields = ExerciseEditableFields(from: exercise)
+        fields.name = "New Name"
+        fields.equipmentType = .dumbbell
+        fields.trackingType = .weightRepsDuration
+        fields.primaryMuscle = "shoulders"
+        fields.secondaryMuscles = ["chest", "core"]
+        fields.movementPattern = .squat
+        fields.unilateral = true
+        fields.unilateralRepTargetMode = .totalAcrossSides
+        fields.bilateralLoadFactor = 2.0
+        fields.bodyweightFactor = 0.4
+        fields.weightIncrement = 1.25
+        fields.defaultRestTime = 150
+
+        try await context.service.updateExercise(id: exercise.id, fields: fields)
+
+        let persistedFetched = try await context.exerciseRepo.fetchChartExercise(byId: exercise.id)
+        let persisted = try XCTUnwrap(persistedFetched)
+        XCTAssertEqual(persisted.name, "New Name")
+        XCTAssertEqual(persisted.equipmentType, .dumbbell)
+        XCTAssertEqual(persisted.trackingType, .weightRepsDuration)
+        XCTAssertEqual(persisted.primaryMuscle, "shoulders")
+        XCTAssertEqual(persisted.secondaryMuscles, ["chest", "core"])
+        XCTAssertEqual(persisted.movementPattern, .squat)
+        XCTAssertTrue(persisted.unilateral)
+        XCTAssertEqual(persisted.unilateralRepTargetMode, .totalAcrossSides)
+        XCTAssertEqual(persisted.bilateralLoadFactor, 2.0)
+        XCTAssertEqual(persisted.bodyweightFactor, 0.4)
+        XCTAssertEqual(persisted.weightIncrement, 1.25)
+        XCTAssertEqual(persisted.defaultRestTime, 150)
+    }
+
+    /// A metadata edit must not wipe the adaptive-fatigue state, which is owned by
+    /// FatigueLearningService and deliberately absent from `ExerciseEditableFields`.
+    func testUpdateExercisePreservesFatigueLearningState() async throws {
+        let context = try makeExerciseRebuildServiceContext()
+        let exercise = Exercise(
+            name: "Chest Press",
+            equipmentType: .machinePin,
+            trackingType: .weightReps,
+            fatigueRate: 0.026,
+            fatigueRateSourceRawValue: ExerciseFatigueRateSource.learned.rawValue,
+            recoveryConstant: 240,
+            fatigueLearningSessionCount: 5,
+            fatigueLearningCumulativeError: -0.031
+        )
+        try await context.exerciseRepo.save(exercise)
+        let createdAt = exercise.createdAt
+
+        var fields = ExerciseEditableFields(from: exercise)
+        fields.name = "Chest Press (Machine)"
+        try await context.service.updateExercise(id: exercise.id, fields: fields)
+
+        let persistedFetched = try await context.exerciseRepo.fetchChartExercise(byId: exercise.id)
+        let persisted = try XCTUnwrap(persistedFetched)
+        XCTAssertEqual(persisted.name, "Chest Press (Machine)")
+        XCTAssertEqual(persisted.fatigueRate, 0.026)
+        XCTAssertEqual(persisted.fatigueRateSourceRawValue, ExerciseFatigueRateSource.learned.rawValue)
+        XCTAssertEqual(persisted.recoveryConstant, 240)
+        XCTAssertEqual(persisted.fatigueLearningSessionCount, 5)
+        XCTAssertEqual(persisted.fatigueLearningCumulativeError, -0.031)
+        XCTAssertEqual(persisted.createdAt, createdAt, "createdAt must not be rewritten by an edit")
+        XCTAssertGreaterThanOrEqual(persisted.updatedAt, createdAt)
+    }
+
+    /// An edit that changes one field must leave every other field alone. This is what the
+    /// old code got for free by mutating the model field by field.
+    func testUpdateExerciseLeavesUntouchedFieldsAlone() async throws {
+        let context = try makeExerciseRebuildServiceContext()
+        let exercise = Exercise(
+            name: "Incline Dumbbell Press",
+            equipmentType: .dumbbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest",
+            secondaryMuscles: ["shoulders", "triceps"],
+            movementPattern: .press,
+            unilateral: true,
+            unilateralRepTargetMode: .totalAcrossSides,
+            bilateralLoadFactor: 1.75,
+            bodyweightFactor: 0.15,
+            weightIncrement: 1.25,
+            defaultRestTime: 105
+        )
+        try await context.exerciseRepo.save(exercise)
+        let beforeFetched = try await context.exerciseRepo.fetchChartExercise(byId: exercise.id)
+        let before = try XCTUnwrap(beforeFetched)
+
+        var fields = ExerciseEditableFields(from: before)
+        fields.primaryMuscle = "full body"
+        try await context.service.updateExercise(id: exercise.id, fields: fields)
+
+        let afterFetched = try await context.exerciseRepo.fetchChartExercise(byId: exercise.id)
+        let after = try XCTUnwrap(afterFetched)
+        XCTAssertEqual(after.primaryMuscle, "full body")
+        XCTAssertEqual(after.secondaryMuscles, before.secondaryMuscles)
+        XCTAssertEqual(after.movementPattern, before.movementPattern)
+        XCTAssertEqual(after.unilateralRepTargetMode, before.unilateralRepTargetMode)
+        XCTAssertEqual(after.bilateralLoadFactor, before.bilateralLoadFactor)
+        XCTAssertEqual(after.bodyweightFactor, before.bodyweightFactor)
+        XCTAssertEqual(after.weightIncrement, before.weightIncrement)
+        XCTAssertEqual(after.defaultRestTime, before.defaultRestTime)
+        XCTAssertEqual(after.name, before.name)
+        XCTAssertEqual(after.equipmentType, before.equipmentType)
+        XCTAssertEqual(after.trackingType, before.trackingType)
+    }
+
+    func testCreateExercisePersistsEveryField() async throws {
+        let context = try makeExerciseRebuildServiceContext()
+
+        let fields = ExerciseEditableFields(
+            name: "Cable Fly",
+            equipmentType: .cable,
+            trackingType: .weightReps,
+            primaryMuscle: "chest",
+            secondaryMuscles: ["shoulders"],
+            movementPattern: .press,
+            unilateral: true,
+            unilateralRepTargetMode: .totalAcrossSides,
+            bilateralLoadFactor: 1.5,
+            bodyweightFactor: 0.1,
+            weightIncrement: 2.5,
+            defaultRestTime: 75
+        )
+        let id = try await context.service.createExercise(fields: fields)
+
+        let persistedFetched = try await context.exerciseRepo.fetchChartExercise(byId: id)
+        let persisted = try XCTUnwrap(persistedFetched)
+        XCTAssertEqual(ExerciseEditableFields(from: persisted), fields)
+    }
+
+    /// The pre-edit state is now read from the store rather than supplied by the caller.
+    /// Editing an id that no longer exists must fail loudly rather than silently no-op.
+    func testUpdateExerciseThrowsWhenExerciseIsMissing() async throws {
+        let context = try makeExerciseRebuildServiceContext()
+        let fields = ExerciseEditableFields(
+            name: "Ghost",
+            equipmentType: .barbell,
+            trackingType: .weightReps
+        )
+
+        do {
+            try await context.service.updateExercise(id: UUID(), fields: fields)
+            XCTFail("Expected updateExercise to throw for a missing exercise")
+        } catch let error as ExerciseServiceError {
+            guard case .exerciseNotFound = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
     }
 
     func testEquipmentTypeChangeDoesNotRebuildWithoutLoggedSetData() async throws {
@@ -2353,10 +2620,10 @@ final class ExerciseRebuildDetectionTests: XCTestCase {
         )
         try await context.exerciseRepo.save(exercise)
 
-        let original = ExerciseMetadataSnapshot(from: exercise)
-        exercise.equipmentType = .machinePin
+        var fields = ExerciseEditableFields(from: exercise)
+        fields.equipmentType = .machinePin
 
-        try await context.service.updateExercise(exercise, original: original)
+        try await context.service.updateExercise(id: exercise.id, fields: fields)
 
         XCTAssertTrue(context.prService.rebuiltExerciseIds.isEmpty)
         XCTAssertTrue(context.statsService.rebuiltExerciseIds.isEmpty)
@@ -2373,10 +2640,10 @@ final class ExerciseTrackingTypeTests: XCTestCase {
         )
         try await context.exerciseRepo.save(exercise)
 
-        let original = ExerciseMetadataSnapshot(from: exercise)
-        exercise.trackingType = .durationDistance
+        var fields = ExerciseEditableFields(from: exercise)
+        fields.trackingType = .durationDistance
 
-        try await context.service.updateExercise(exercise, original: original)
+        try await context.service.updateExercise(id: exercise.id, fields: fields)
 
         let persisted = try await context.exerciseRepo.fetch(byId: exercise.id)
         XCTAssertEqual(persisted?.trackingType, .durationDistance)
@@ -2400,10 +2667,10 @@ final class ExerciseTrackingTypeTests: XCTestCase {
             )
         )
 
-        let original = ExerciseMetadataSnapshot(from: exercise)
-        exercise.trackingType = .durationDistance
+        var fields = ExerciseEditableFields(from: exercise)
+        fields.trackingType = .durationDistance
 
-        try await context.service.updateExercise(exercise, original: original)
+        try await context.service.updateExercise(id: exercise.id, fields: fields)
 
         let persisted = try await context.exerciseRepo.fetch(byId: exercise.id)
         XCTAssertEqual(persisted?.trackingType, .durationDistance)
@@ -2429,11 +2696,11 @@ final class ExerciseTrackingTypeTests: XCTestCase {
             )
         )
 
-        let original = ExerciseMetadataSnapshot(from: exercise)
-        exercise.trackingType = .durationDistance
+        var fields = ExerciseEditableFields(from: exercise)
+        fields.trackingType = .durationDistance
 
         do {
-            try await context.service.updateExercise(exercise, original: original)
+            try await context.service.updateExercise(id: exercise.id, fields: fields)
             XCTFail("Expected tracking type change to be rejected once logged data exists")
         } catch let error as ExerciseServiceError {
             guard case .trackingTypeImmutable(let exerciseId) = error else {
@@ -3847,6 +4114,8 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
     var workoutSets: [UUID: [WorkoutSet]] = [:]
     var exerciseSets: [UUID: [WorkoutSet]] = [:]
     var fetchSetsForExerciseCallCount = 0
+    /// One entry per `applyOrdering` call — reindexing must issue a single batch, not N.
+    var orderingBatches: [[SetOrderUpdate]] = []
 
     func save(_ set: WorkoutSet) async throws -> SetSaveResult {
         SetSaveResult(
@@ -3906,6 +4175,20 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
         workoutSets[workoutId] ?? []
     }
 
+    func fetchSetSnapshots(for workoutId: UUID) async throws -> [ChartSetData] {
+        (workoutSets[workoutId] ?? []).map(ChartSetData.init(from:))
+    }
+
+    func applyOrdering(_ updates: [SetOrderUpdate]) async throws {
+        orderingBatches.append(updates)
+        for update in updates {
+            guard let set = workoutSets.values.flatMap({ $0 }).first(where: { $0.id == update.setId })
+            else { continue }
+            if let orderInExercise = update.orderInExercise { set.orderInExercise = orderInExercise }
+            if let orderInWorkout = update.orderInWorkout { set.orderInWorkout = orderInWorkout }
+        }
+    }
+
     func fetchExerciseIds(for workoutId: UUID) async throws -> Set<UUID> {
         Set((workoutSets[workoutId] ?? []).map(\.exerciseId))
     }
@@ -3952,6 +4235,9 @@ private final class WorkoutServiceStub: @unchecked Sendable, WorkoutServiceProto
         lastFinishDurationSecondsOverride = durationSecondsOverride
     }
     func getActiveWorkout() async throws -> Workout? { activeWorkout }
+    func getActiveWorkoutSummary() async throws -> WorkoutSnapshot? {
+        activeWorkout.map(WorkoutSnapshot.init(from:))
+    }
     func fetchWorkout(_ workoutId: UUID) async throws -> Workout? {
         let _ = workoutId
         return nil
@@ -3961,6 +4247,19 @@ private final class WorkoutServiceStub: @unchecked Sendable, WorkoutServiceProto
         return []
     }
     func fetchAllWorkouts(limit: Int?, offset: Int?) async throws -> [Workout] {
+        let _ = limit
+        let _ = offset
+        return []
+    }
+    func fetchWorkoutSummary(_ workoutId: UUID) async throws -> WorkoutSnapshot? {
+        let _ = workoutId
+        return nil
+    }
+    func fetchWorkoutSummaries(for dateRange: ClosedRange<Date>) async throws -> [WorkoutSnapshot] {
+        let _ = dateRange
+        return []
+    }
+    func fetchAllWorkoutSummaries(limit: Int?, offset: Int?) async throws -> [WorkoutSnapshot] {
         let _ = limit
         let _ = offset
         return []
@@ -4006,21 +4305,25 @@ private final class AnalyticsServiceSpy: AnalyticsServiceProtocol {
 }
 
 private final class ExerciseServiceStub: @unchecked Sendable, ExerciseServiceProtocol {
-    var createdExercises: [Exercise] = []
-    var updatedExercises: [Exercise] = []
+    var createdExerciseFields: [ExerciseEditableFields] = []
+    var updatedExerciseFields: [(id: UUID, fields: ExerciseEditableFields)] = []
     var fetchedExercises: [UUID: Exercise] = [:]
     var hasSets = false
     var hasLoggedSetData = false
 
-    func createExercise(_ exercise: Exercise) async throws {
-        createdExercises.append(exercise)
+    @discardableResult
+    func createExercise(fields: ExerciseEditableFields) async throws -> UUID {
+        createdExerciseFields.append(fields)
+        return UUID()
     }
-    func updateExercise(_ exercise: Exercise, original: ExerciseMetadataSnapshot) async throws {
-        updatedExercises.append(exercise)
-        let _ = original
+    func updateExercise(id: UUID, fields: ExerciseEditableFields) async throws {
+        updatedExerciseFields.append((id, fields))
     }
     func fetchExercise(_ exerciseId: UUID) async throws -> Exercise? {
         fetchedExercises[exerciseId]
+    }
+    func fetchExerciseSnapshot(_ exerciseId: UUID) async throws -> ChartExerciseData? {
+        fetchedExercises[exerciseId].map(ChartExerciseData.init(from:))
     }
     func fetchAllExercises() async throws -> [Exercise] { [] }
     func searchExercises(name query: String) async throws -> [Exercise] {
@@ -4054,8 +4357,12 @@ private final class StatsServiceStub: @unchecked Sendable, StatsServiceProtocol 
         let _ = exerciseId
         return nil
     }
+    func fetchStatsSnapshot(for exerciseId: UUID) async throws -> ChartExerciseStatsData? {
+        let _ = exerciseId
+        return nil
+    }
     func fetchAllStats() async throws -> [UUID: ExerciseStats] { [:] }
-    func fetchRecentPRs(since: Date, limit: Int, scope: RecentPRScope) async throws -> [PerformanceRecord] {
+    func fetchRecentPRs(since: Date, limit: Int, scope: RecentPRScope) async throws -> [PerformanceRecordSummaryData] {
         let _ = since
         let _ = limit
         let _ = scope
@@ -4495,6 +4802,22 @@ private final class ImportExerciseRepositoryStub: @unchecked Sendable, ExerciseR
     }
     func fetchAll() async throws -> [Exercise] { [] }
     func fetchAllChartExercises() async throws -> [ChartExerciseData] { [] }
+    func fetchChartExercise(byId id: UUID) async throws -> ChartExerciseData? {
+        let _ = id
+        return nil
+    }
+    func fetchMetadataSnapshot(byId id: UUID) async throws -> ExerciseMetadataSnapshot? {
+        let _ = id
+        return nil
+    }
+    func applyEdit(id: UUID, fields: ExerciseEditableFields) async throws {
+        let _ = id
+        let _ = fields
+    }
+    func create(fields: ExerciseEditableFields) async throws -> UUID {
+        let _ = fields
+        return UUID()
+    }
     func search(name: String) async throws -> [Exercise] {
         let _ = name
         return []
@@ -4531,6 +4854,24 @@ private final class ImportWorkoutRepositoryStub: @unchecked Sendable, WorkoutRep
         return []
     }
     func fetchEarliestCompletedWorkoutDate() async throws -> Date? { nil }
+    func fetchWorkoutSummary(byId id: UUID) async throws -> WorkoutSnapshot? {
+        let _ = id
+        return nil
+    }
+    func fetchInProgressSummary() async throws -> WorkoutSnapshot? { nil }
+    func fetchWorkoutSummaries(for dateRange: ClosedRange<Date>) async throws -> [WorkoutSnapshot] {
+        let _ = dateRange
+        return []
+    }
+    func fetchAllWorkoutSummaries(limit: Int?, offset: Int?) async throws -> [WorkoutSnapshot] {
+        let _ = limit
+        let _ = offset
+        return []
+    }
+    func setHealthKitUUID(_ uuid: UUID, forWorkoutId id: UUID) async throws {
+        let _ = uuid
+        let _ = id
+    }
 }
 
 private final class ImportBodyweightRepositoryStub: @unchecked Sendable, BodyweightEntryRepositoryProtocol {

@@ -41,73 +41,84 @@ final class SetService: SetServiceProtocol {
     // MARK: - SetServiceProtocol
 
     func save(_ set: WorkoutSet) async throws -> SetSaveResult {
-        let exercise = try await exerciseRepo.fetch(byId: set.exerciseId)
-        set.syncDerivedPerformanceFields(for: exercise)
+        let exercise = try await exerciseRepo.fetchChartExercise(byId: set.exerciseId)
+
+        // Unilateral derivation, applied inside the repository actor. No insert or save yet —
+        // the single commit is `persist` below, matching the original `setRepo.save(set)`.
+        let synced = try await setRepo.syncDerivedFields(on: set, exercise: exercise)
 
         // 1. Compute effectiveWeight (specdoc S5.4)
         let effectiveWeight = try await computeEffectiveWeight(
-            weight: set.weight,
-            exerciseId: set.exerciseId,
-            date: set.date
+            weight: synced.weight,
+            exerciseId: synced.exerciseId,
+            date: synced.date
         )
-        set.effectiveWeight = effectiveWeight
 
-        // 1b. Compute e1RM so charts reflect this set immediately
-        if let ew = effectiveWeight, ew > 0, let reps = set.reps, reps > 0 {
+        // 1b. Compute e1RM so charts reflect this set immediately. Reps come from the
+        // post-derivation snapshot, since the derivation can rewrite them for per-side sets.
+        // `.leaveAlone` when it doesn't qualify — save() has no else branch and never cleared
+        // a previously stored estimate.
+        var e1RMUpdate: E1RMUpdate = .leaveAlone
+        if let ew = effectiveWeight, ew > 0, let reps = synced.reps, reps > 0 {
             let profile = try await healthProfileRepo.fetch()
             let formula = E1RMFormula(rawValue: profile?.e1RMFormula ?? "") ?? .epley
-            set.e1RM = formula.calculate(weight: ew, reps: reps)
-            set.e1RMFormulaVersion = formula.rawValue
+            e1RMUpdate = .set(
+                value: formula.calculate(weight: ew, reps: reps),
+                formulaVersion: formula.rawValue
+            )
         }
 
         // 2. Persist immediately (FR-012)
-        if !supportsRepPRs(for: exercise) {
-            set.prStatus = nil
-        }
-        try await setRepo.save(set)
+        let persisted = try await setRepo.persist(
+            set,
+            effectiveWeight: effectiveWeight,
+            e1RM: e1RMUpdate,
+            clearPRStatus: !supportsRepPRs(for: exercise),
+            touchUpdatedAt: false
+        )
         set.markFatigueLearningSnapshotPersisted(effectiveWeightOverride: effectiveWeight)
 
         // 3. PR evaluation (FR-002)
         let prResult: PREvaluationResult
         if supportsRepPRs(for: exercise) {
             prResult = try await prService.evaluate(
-                setId: set.id,
-                exerciseId: set.exerciseId,
-                reps: set.prReps,
+                setId: persisted.id,
+                exerciseId: persisted.exerciseId,
+                reps: persisted.prReps,
                 effectiveWeight: effectiveWeight ?? 0,
-                workoutId: set.workoutId,
-                setType: set.setType,
-                hasData: set.hasData,
-                excludeFromPRs: set.excludeFromPRs ?? false,
-                date: set.date
+                workoutId: persisted.workoutId,
+                setType: persisted.setType,
+                hasData: persisted.hasData,
+                excludeFromPRs: persisted.excludeFromPRs,
+                date: persisted.date
             )
         } else {
-            prResult = emptyPRResult(for: set.id)
+            prResult = emptyPRResult(for: persisted.id)
         }
 
         // PRService skips writing PR status on the evaluated set itself
-        // (it's returned via prResult.newStatus) — write it here.
-        if supportsRepPRs(for: exercise), set.prStatus != prResult.newStatus {
-            set.prStatus = prResult.newStatus
-            try await setRepo.save(set)
+        // (it's returned via prResult.newStatus) — write it here, inside the repository
+        // actor rather than on this @MainActor service.
+        if supportsRepPRs(for: exercise) {
+            try await setRepo.applyPRStatus(setId: persisted.id, status: prResult.newStatus)
         }
 
         // 4. Stats update (FR-003)
         try await statsService.updateStats(
-            for: set.exerciseId,
+            for: persisted.exerciseId,
             event: .save(
-                setId: set.id,
-                reps: set.statsReps,
+                setId: persisted.id,
+                reps: persisted.statsReps,
                 effectiveWeight: effectiveWeight ?? 0,
-                setType: set.setType,
-                hasData: set.hasData,
-                date: set.date,
-                workoutId: set.workoutId
+                setType: persisted.setType,
+                hasData: persisted.hasData,
+                date: persisted.date,
+                workoutId: persisted.workoutId
             )
         )
 
         return SetSaveResult(
-            setId: set.id,
+            setId: persisted.id,
             effectiveWeight: effectiveWeight ?? 0,
             prResult: prResult
         )
@@ -117,8 +128,17 @@ final class SetService: SetServiceProtocol {
         _ set: WorkoutSet,
         previousContribution: SetContributionSnapshot? = nil
     ) async throws -> SetSaveResult {
-        let exercise = try await exerciseRepo.fetch(byId: set.exerciseId)
-        set.syncDerivedPerformanceFields(for: exercise)
+        let exercise = try await exerciseRepo.fetchChartExercise(byId: set.exerciseId)
+
+        // Kept ahead of the old-contribution capture, where `set.syncDerivedPerformanceFields`
+        // used to sit.
+        //
+        // As it happens the order cannot change `SetContributionSnapshot` today: the derivation
+        // only writes `reps`/`rir`/`side`, while the snapshot's `statsReps` and `prReps` read
+        // `leftReps`/`rightReps` whenever both are set, and fall back to `reps` only in the case
+        // where the derivation writes it back unchanged. The original order is preserved anyway,
+        // so this stays correct if that snapshot ever grows a field that does depend on it.
+        let synced = try await setRepo.syncDerivedFields(on: set, exercise: exercise)
 
         // 1. Capture old values BEFORE changes (for stats delta)
         guard let oldSet = try await setRepo.fetch(byId: set.id) else {
@@ -133,29 +153,34 @@ final class SetService: SetServiceProtocol {
             exerciseId: set.exerciseId,
             date: set.date
         )
-        set.effectiveWeight = newEffectiveWeight
-        set.updatedAt = Date()
 
-        // 2b. Recompute e1RM with updated values
-        if let ew = newEffectiveWeight, ew > 0, let reps = set.reps, reps > 0 {
+        // 2b. Recompute e1RM with updated values. Reps come from the post-derivation snapshot,
+        // since the derivation above can rewrite them for per-side sets.
+        // `.clear` rather than `.leaveAlone` when it no longer qualifies: edit() has an else
+        // branch that nils the estimate while keeping the formula version that produced it.
+        var e1RMUpdate: E1RMUpdate = .clear
+        if let ew = newEffectiveWeight, ew > 0, let reps = synced.reps, reps > 0 {
             let profile = try await healthProfileRepo.fetch()
             let formula = E1RMFormula(rawValue: profile?.e1RMFormula ?? "") ?? .epley
-            set.e1RM = formula.calculate(weight: ew, reps: reps)
-            set.e1RMFormulaVersion = formula.rawValue
-        } else {
-            set.e1RM = nil
+            e1RMUpdate = .set(
+                value: formula.calculate(weight: ew, reps: reps),
+                formulaVersion: formula.rawValue
+            )
         }
 
-        // 3. Persist updated set
-        if !supportsRepPRs(for: exercise) {
-            set.prStatus = nil
-        }
-        try await setRepo.save(set)
+        // 3. Persist — mutation happens inside the repository actor, which owns the context.
+        let updated = try await setRepo.persist(
+            set,
+            effectiveWeight: newEffectiveWeight,
+            e1RM: e1RMUpdate,
+            clearPRStatus: !supportsRepPRs(for: exercise),
+            touchUpdatedAt: true
+        )
 
         // 4. PR re-evaluation (FR-004)
         let prResult: PREvaluationResult
         if supportsRepPRs(for: exercise) {
-            if oldContribution.prReps != set.prReps {
+            if oldContribution.prReps != updated.prReps {
                 let deletionResult = try await prService.handleDeletion(
                     setId: oldContribution.setId,
                     exerciseId: oldContribution.exerciseId,
@@ -163,33 +188,33 @@ final class SetService: SetServiceProtocol {
                     cachedPRStatus: oldContribution.cachedPRStatus
                 )
                 let evaluationResult = try await prService.evaluate(
-                    setId: set.id,
-                    exerciseId: set.exerciseId,
-                    reps: set.prReps,
+                    setId: updated.id,
+                    exerciseId: updated.exerciseId,
+                    reps: updated.prReps,
                     effectiveWeight: newEffectiveWeight ?? 0,
-                    workoutId: set.workoutId,
-                    setType: set.setType,
-                    hasData: set.hasData,
-                    excludeFromPRs: set.excludeFromPRs ?? false,
-                    date: set.date
+                    workoutId: updated.workoutId,
+                    setType: updated.setType,
+                    hasData: updated.hasData,
+                    excludeFromPRs: updated.excludeFromPRs,
+                    date: updated.date
                 )
                 prResult = mergedPRResult(
-                    setId: set.id,
+                    setId: updated.id,
                     deletionResult: deletionResult,
                     evaluationResult: evaluationResult
                 )
             } else {
                 prResult = try await prService.evaluateAfterEdit(
-                    setId: set.id,
-                    exerciseId: set.exerciseId,
-                    reps: set.prReps,
+                    setId: updated.id,
+                    exerciseId: updated.exerciseId,
+                    reps: updated.prReps,
                     effectiveWeight: newEffectiveWeight ?? 0,
-                    workoutId: set.workoutId,
-                    setType: set.setType,
-                    hasData: set.hasData,
-                    excludeFromPRs: set.excludeFromPRs ?? false,
+                    workoutId: updated.workoutId,
+                    setType: updated.setType,
+                    hasData: updated.hasData,
+                    excludeFromPRs: updated.excludeFromPRs,
                     previousCachedPRStatus: oldContribution.cachedPRStatus,
-                    date: set.date
+                    date: updated.date
                 )
             }
         } else {
@@ -197,35 +222,35 @@ final class SetService: SetServiceProtocol {
         }
 
         // PRService skips writing PR status on the evaluated set itself
-        // (it's returned via prResult.newStatus) — write it here.
-        if supportsRepPRs(for: exercise), set.prStatus != prResult.newStatus {
-            set.prStatus = prResult.newStatus
-            try await setRepo.save(set)
+        // (it's returned via prResult.newStatus) — write it here, inside the repository
+        // actor rather than on this @MainActor service.
+        if supportsRepPRs(for: exercise) {
+            try await setRepo.applyPRStatus(setId: updated.id, status: prResult.newStatus)
         }
 
         // 5. Stats update with edit delta
         try await statsService.updateStats(
-            for: set.exerciseId,
+            for: updated.exerciseId,
             event: .edit(
-                setId: set.id,
+                setId: updated.id,
                 oldReps: oldContribution.statsReps,
                 oldEffectiveWeight: oldContribution.effectiveWeight,
                 oldSetType: oldContribution.setType,
                 oldHasData: oldContribution.hasData,
-                newReps: set.statsReps,
+                newReps: updated.statsReps,
                 newEffectiveWeight: newEffectiveWeight ?? 0,
-                newSetType: set.setType,
-                newHasData: set.hasData,
-                date: set.date,
-                workoutId: set.workoutId
+                newSetType: updated.setType,
+                newHasData: updated.hasData,
+                date: updated.date,
+                workoutId: updated.workoutId
             )
         )
 
         let currentFatigueSnapshot = set.fatigueLearningSnapshot(effectiveWeightOverride: newEffectiveWeight)
         if try await fatigueLearningService.capturedSetDataNeedsInvalidation(
-            setId: set.id,
-            workoutId: set.workoutId,
-            exerciseId: set.exerciseId,
+            setId: updated.id,
+            workoutId: updated.workoutId,
+            exerciseId: updated.exerciseId,
             previous: previousFatigueSnapshot,
             current: currentFatigueSnapshot
         ) {
@@ -234,7 +259,7 @@ final class SetService: SetServiceProtocol {
         set.persistedFatigueSnapshot = currentFatigueSnapshot
 
         return SetSaveResult(
-            setId: set.id,
+            setId: updated.id,
             effectiveWeight: newEffectiveWeight ?? 0,
             prResult: prResult
         )
@@ -247,14 +272,10 @@ final class SetService: SetServiceProtocol {
         // 1. Capture old values BEFORE mutation (same pattern as delete)
         let oldContribution = previousContribution ?? SetContributionSnapshot(set: set)
 
-        // 2. Mutate the set — mark as uncompleted, clear PR status
-        set.completed = false
-        set.completedAt = nil
-        set.prStatus = nil
-        set.updatedAt = Date()
-
-        // 3. Persist (flat save — no PR/stats pipeline)
-        try await setRepo.save(set)
+        // 2/3. Mutate and persist inside the repository actor (flat write — no PR/stats
+        // pipeline). The ViewModel holds the same @Model reference, so the cleared
+        // completion and PR status are still visible to it immediately.
+        try await setRepo.applyUncomplete(setId: set.id)
         set.markFatigueLearningSnapshotPersisted(effectiveWeightOverride: oldContribution.effectiveWeight)
 
         // 4. PR demotion — same as delete path
@@ -344,21 +365,21 @@ final class SetService: SetServiceProtocol {
         min: Int?,
         max: Int?
     ) async throws {
-        guard let set = try await setRepo.fetch(byId: setId) else {
-            throw SetServiceError.setNotFound(setId)
-        }
-
-        set.overrideTargetRepMin = min
-        set.overrideTargetRepMax = max
-        set.updatedAt = Date()
-
-        try await setRepo.save(set)
+        try await setRepo.applyTargetRepOverride(setId: setId, min: min, max: max)
     }
 
     // MARK: - Fetch (006: Active Workout Screen)
 
     func fetchSets(for workoutId: UUID) async throws -> [WorkoutSet] {
         try await setRepo.fetchSets(for: workoutId)
+    }
+
+    func fetchSetSnapshots(for workoutId: UUID) async throws -> [ChartSetData] {
+        try await setRepo.fetchChartSets(for: workoutId)
+    }
+
+    func applyOrdering(_ updates: [SetOrderUpdate]) async throws {
+        try await setRepo.applyOrdering(updates)
     }
 
     func fetchExerciseIds(for workoutId: UUID) async throws -> Swift.Set<UUID> {
@@ -406,6 +427,10 @@ final class SetService: SetServiceProtocol {
     }
 
     private func supportsRepPRs(for exercise: Exercise?) -> Bool {
+        exercise?.trackingType.supportsRepPRs == true
+    }
+
+    private func supportsRepPRs(for exercise: ChartExerciseData?) -> Bool {
         exercise?.trackingType.supportsRepPRs == true
     }
 

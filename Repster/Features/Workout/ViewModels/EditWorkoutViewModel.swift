@@ -21,7 +21,7 @@ final class EditWorkoutViewModel {
     // MARK: - State
 
     var workout: Workout?
-    var exercises: [Exercise] = []
+    var exercises: [ChartExerciseData] = []
     var selectedExerciseIndex: Int = 0
     var setsByExercise: [UUID: [WorkoutSet]] = [:]
     var notesText: String = ""
@@ -92,9 +92,9 @@ final class EditWorkoutViewModel {
             }
 
             // 4. Fetch each unique exercise and sort sets within each group
-            var loadedExercises: [(exercise: Exercise, firstOrder: Int)] = []
+            var loadedExercises: [(exercise: ChartExerciseData, firstOrder: Int)] = []
             for (exerciseId, exerciseSets) in exerciseSetMap {
-                guard let exercise = try await exerciseService.fetchExercise(exerciseId) else {
+                guard let exercise = try await exerciseService.fetchExerciseSnapshot(exerciseId) else {
                     continue
                 }
                 let sorted = exerciseSets.sorted { $0.orderInExercise < $1.orderInExercise }
@@ -321,7 +321,7 @@ final class EditWorkoutViewModel {
     func addExercises(_ exerciseIds: [UUID]) async {
         for exerciseId in exerciseIds {
             do {
-                guard let exercise = try await exerciseService.fetchExercise(exerciseId) else {
+                guard let exercise = try await exerciseService.fetchExerciseSnapshot(exerciseId) else {
                     continue
                 }
                 exercises.append(exercise)
@@ -505,7 +505,7 @@ final class EditWorkoutViewModel {
 
     // MARK: - Computed
 
-    var currentExercise: Exercise? {
+    var currentExercise: ChartExerciseData? {
         guard selectedExerciseIndex >= 0,
               selectedExerciseIndex < exercises.count else { return nil }
         return exercises[selectedExerciseIndex]

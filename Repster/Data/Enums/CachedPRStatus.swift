@@ -21,13 +21,40 @@ extension CachedPRStatus {
     /// Returns the effective display status for a set, suppressing `.matched` when
     /// another set in the same workout dominates it (same/higher weight, more reps).
     static func effectiveStatus(for set: WorkoutSet, among siblings: [WorkoutSet]) -> CachedPRStatus? {
-        guard set.prStatus == .matched,
-              let weight = set.weight,
-              let reps = set.reps else {
-            return set.prStatus
+        effectiveStatus(
+            status: set.prStatus,
+            id: set.id,
+            weight: set.weight,
+            reps: set.reps,
+            siblings: siblings.map { (id: $0.id, weight: $0.weight, reps: $0.reps) }
+        )
+    }
+
+    /// Snapshot overload — same rule, on value types that carry no `ModelContext`.
+    static func effectiveStatus(for set: ChartSetData, among siblings: [ChartSetData]) -> CachedPRStatus? {
+        effectiveStatus(
+            status: set.prStatus,
+            id: set.id,
+            weight: set.weight,
+            reps: set.reps,
+            siblings: siblings.map { (id: $0.id, weight: $0.weight, reps: $0.reps) }
+        )
+    }
+
+    private static func effectiveStatus(
+        status: CachedPRStatus?,
+        id: UUID,
+        weight: Double?,
+        reps: Int?,
+        siblings: [(id: UUID, weight: Double?, reps: Int?)]
+    ) -> CachedPRStatus? {
+        guard status == .matched,
+              let weight,
+              let reps else {
+            return status
         }
         let dominated = siblings.contains { sibling in
-            sibling.id != set.id &&
+            sibling.id != id &&
             (sibling.weight ?? 0) >= weight &&
             (sibling.reps ?? 0) > reps
         }

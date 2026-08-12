@@ -2,7 +2,7 @@ import SwiftUI
 
 struct WorkoutProgressionSheet: View {
     let workout: Workout
-    let exercises: [Exercise]
+    let exercises: [ChartExerciseData]
     let showsExerciseOverrides: Bool
     let onSave: @Sendable (Bool, Set<UUID>) async throws -> Void
 
@@ -15,7 +15,7 @@ struct WorkoutProgressionSheet: View {
 
     init(
         workout: Workout,
-        exercises: [Exercise],
+        exercises: [ChartExerciseData],
         showsExerciseOverrides: Bool = true,
         onSave: @escaping @Sendable (Bool, Set<UUID>) async throws -> Void
     ) {

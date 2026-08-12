@@ -110,6 +110,9 @@ protocol StatsServiceProtocol: Sendable {
     /// - Returns: The ExerciseStats, or nil if no stats exist yet.
     func fetchStats(for exerciseId: UUID) async throws -> ExerciseStats?
 
+    /// Snapshot equivalent of `fetchStats(for:)`, for read-only main-actor callers.
+    func fetchStatsSnapshot(for exerciseId: UUID) async throws -> ChartExerciseStatsData?
+
     /// Fetch all ExerciseStats for display in exercise lists.
     /// Returns stats keyed by exerciseId for O(1) lookup.
     ///
@@ -121,5 +124,7 @@ protocol StatsServiceProtocol: Sendable {
     /// Fetch recent repMax PerformanceRecords across all exercises since a given date.
     /// Returns records sorted by date descending, keeping only the most recent per exercise.
     /// When `scope` is `.e1RMOnly`, only records whose e1RM is the exercise's best are returned.
-    func fetchRecentPRs(since: Date, limit: Int, scope: RecentPRScope) async throws -> [PerformanceRecord]
+    ///
+    /// Returns snapshots, not live models: Home reads these on the main actor.
+    func fetchRecentPRs(since: Date, limit: Int, scope: RecentPRScope) async throws -> [PerformanceRecordSummaryData]
 }

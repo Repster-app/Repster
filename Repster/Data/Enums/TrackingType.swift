@@ -24,4 +24,13 @@ enum TrackingType: String, Codable, CaseIterable {
     var supportsRepPRs: Bool {
         self == .weightReps
     }
+
+    /// Whether per-side logging is offered for exercises with this tracking type.
+    ///
+    /// Lives here rather than on `Exercise` because it is derived purely from the
+    /// tracking type, and both `Exercise` and `ChartExerciseData` need it — two
+    /// copies of the rule would be free to drift.
+    var supportsUnilateralLogging: Bool {
+        self == .weightReps || self == .weightRepsDuration
+    }
 }

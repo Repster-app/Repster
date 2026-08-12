@@ -156,7 +156,22 @@ final class WorkoutSet {
     }
 
     func syncDerivedPerformanceFields(for exercise: Exercise?) {
-        guard exercise?.supportsUnilateralLogging == true, exercise?.unilateral == true else { return }
+        syncDerivedPerformanceFields(
+            supportsUnilateralLogging: exercise?.supportsUnilateralLogging == true,
+            unilateral: exercise?.unilateral == true
+        )
+    }
+
+    /// Snapshot overload. Shares the body below so the live and snapshot paths cannot drift.
+    func syncDerivedPerformanceFields(for exercise: ChartExerciseData?) {
+        syncDerivedPerformanceFields(
+            supportsUnilateralLogging: exercise?.supportsUnilateralLogging == true,
+            unilateral: exercise?.unilateral == true
+        )
+    }
+
+    private func syncDerivedPerformanceFields(supportsUnilateralLogging: Bool, unilateral: Bool) {
+        guard supportsUnilateralLogging, unilateral else { return }
 
         let resolvedPRReps = prReps
         reps = resolvedPRReps > 0 ? resolvedPRReps : nil

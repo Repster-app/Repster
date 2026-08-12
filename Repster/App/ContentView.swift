@@ -395,7 +395,7 @@ struct ContentView: View {
     /// Refresh whether an active workout exists. Called on launch and when covers dismiss.
     @MainActor
     private func refreshActiveWorkoutState() async {
-        hasActiveWorkout = (try? await services.workoutService.getActiveWorkout()) != nil
+        hasActiveWorkout = (try? await services.workoutService.getActiveWorkoutSummary()) != nil
     }
 
     @MainActor
@@ -530,21 +530,21 @@ struct ContentView: View {
     @MainActor
     private func loadCopyPreviousWorkouts() async {
         do {
-            let allWorkouts = try await services.workoutService.fetchAllWorkouts(limit: nil, offset: nil)
+            let allWorkouts = try await services.workoutService.fetchAllWorkoutSummaries(limit: nil, offset: nil)
             let completed = allWorkouts
                 .filter { $0.status == .completed }
                 .sorted { $0.date > $1.date }
 
             var items: [CopyPreviousWorkout] = []
             for workout in completed {
-                let sets = try await services.setService.fetchSets(for: workout.id)
+                let sets = try await services.setService.fetchSetSnapshots(for: workout.id)
                 let workingSetsWithData = sets.filter { $0.setType == .working && $0.hasData }
                 let exerciseIds = Set(sets.map(\.exerciseId))
 
-                var exerciseLookup: [UUID: Exercise] = [:]
+                var exerciseLookup: [UUID: ChartExerciseData] = [:]
                 var muscleGroups: [String] = []
                 for exerciseId in exerciseIds {
-                    if let exercise = try await services.exerciseService.fetchExercise(exerciseId) {
+                    if let exercise = try await services.exerciseService.fetchExerciseSnapshot(exerciseId) {
                         exerciseLookup[exerciseId] = exercise
                         if let muscle = ExercisePrimaryGroup.normalizedValue(exercise.primaryMuscle),
                            !muscleGroups.contains(muscle) {
@@ -559,7 +559,6 @@ struct ContentView: View {
 
                 items.append(CopyPreviousWorkout(
                     id: workout.id,
-                    workout: workout,
                     displayTitle: workout.displayTitle,
                     date: workout.date,
                     exerciseCount: exerciseIds.count,
@@ -578,7 +577,7 @@ struct ContentView: View {
     /// Copy a past workout. If an active workout exists, triggers confirmation dialog.
     private func copyWorkout(_ workoutId: UUID) async {
         do {
-            let activeWorkout = try await services.workoutService.getActiveWorkout()
+            let activeWorkout = try await services.workoutService.getActiveWorkoutSummary()
             if activeWorkout != nil {
                 pendingCopyWorkoutId = workoutId
                 showDiscardConfirmation = true
@@ -594,8 +593,8 @@ struct ContentView: View {
     private func discardActiveAndCopy() async {
         guard let pendingId = pendingCopyWorkoutId else { return }
         do {
-            if let activeWorkout = try await services.workoutService.getActiveWorkout() {
-                let activeSets = try await services.setService.fetchSets(for: activeWorkout.id)
+            if let activeWorkout = try await services.workoutService.getActiveWorkoutSummary() {
+                let activeSets = try await services.setService.fetchSetSnapshots(for: activeWorkout.id)
                 let priorContext = WorkoutStartContextStore.recall()
                 services.analyticsService.workoutDiscarded(
                     durationSeconds: Date().timeIntervalSince(activeWorkout.startTime ?? activeWorkout.date),
@@ -617,7 +616,7 @@ struct ContentView: View {
 
     /// Perform the actual copy of a source workout, then show active workout.
     private func performCopy(_ sourceWorkoutId: UUID) async throws {
-        let sourceSets = try await services.setService.fetchSets(for: sourceWorkoutId)
+        let sourceSets = try await services.setService.fetchSetSnapshots(for: sourceWorkoutId)
         let workingSets = sourceSets
             .filter { $0.setType == .working }
             .sorted { ($0.orderInWorkout, $0.orderInExercise) < ($1.orderInWorkout, $1.orderInExercise) }

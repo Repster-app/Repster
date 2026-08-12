@@ -9,7 +9,7 @@ import SwiftUI
 struct ExerciseHistoryView: View {
 
     let historyWorkouts: [WorkoutHistoryGroup]
-    let exercise: Exercise?
+    let exercise: ChartExerciseData?
     let unitPreference: UnitPreference
 
     // MARK: - Body

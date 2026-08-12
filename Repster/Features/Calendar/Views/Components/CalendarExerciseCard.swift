@@ -5,13 +5,13 @@
 import SwiftUI
 
 struct CalendarExerciseCard: View {
-    let exercise: Exercise
-    let sets: [WorkoutSet]
-    let stats: ExerciseStats?
+    let exercise: ChartExerciseData
+    let sets: [ChartSetData]
+    let stats: ChartExerciseStatsData?
     let unitPreference: UnitPreference
     let onTapped: () -> Void
 
-    private var displaySets: [WorkoutSet] {
+    private var displaySets: [ChartSetData] {
         sets.filter { $0.hasData }
             .sorted { $0.orderInExercise < $1.orderInExercise }
     }
@@ -78,52 +78,48 @@ struct CalendarExerciseCard: View {
         }
     }
 
-    @ViewBuilder
-    private func setRow(index: Int, workoutSet: WorkoutSet) -> some View {
-        // Guard against deleted/detached SwiftData objects to prevent crashes
-        if workoutSet.modelContext == nil {
-            EmptyView()
-        } else {
-            let isWarmup = workoutSet.setType == .warmup
-            let hasNote = workoutSet.notes != nil && !(workoutSet.notes?.isEmpty ?? true)
+    // The `workoutSet.modelContext == nil` guard that used to wrap this row is gone: it
+    // existed to swallow crashes from live models detaching mid-render, and a snapshot
+    // has no context to detach from.
+    private func setRow(index: Int, workoutSet: ChartSetData) -> some View {
+        let isWarmup = workoutSet.setType == .warmup
 
-            HStack {
-                ZStack(alignment: .topTrailing) {
-                    Text("\(index)")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.textSecondary)
+        return HStack {
+            ZStack(alignment: .topTrailing) {
+                Text("\(index)")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.textSecondary)
 
-                    if hasNote {
-                        Circle()
-                            .fill(Color.orange)
-                            .frame(width: 5, height: 5)
-                            .offset(x: 4, y: -2)
-                    }
+                if workoutSet.hasNote {
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 5, height: 5)
+                        .offset(x: 4, y: -2)
                 }
-                .frame(width: 32, alignment: .leading)
-
-                ForEach(readOnlyFields) { field in
-                    fieldView(
-                        WorkoutSetPerformanceFormatter.fieldDisplay(
-                            for: field,
-                            set: workoutSet,
-                            exercise: exercise,
-                            unitPreference: unitPreference
-                        ),
-                        field: field,
-                        set: workoutSet
-                    )
-                }
-
-                Color.clear
-                    .frame(width: 44, height: 1)
-                    .overlay(alignment: .trailing) {
-                        PRBadgeView(status: CachedPRStatus.effectiveStatus(for: workoutSet, among: displaySets))
-                    }
             }
-            .padding(.vertical, 4)
-            .opacity(isWarmup ? 0.45 : 1.0)
+            .frame(width: 32, alignment: .leading)
+
+            ForEach(readOnlyFields) { field in
+                fieldView(
+                    WorkoutSetPerformanceFormatter.fieldDisplay(
+                        for: field,
+                        set: workoutSet,
+                        exercise: exercise,
+                        unitPreference: unitPreference
+                    ),
+                    field: field,
+                    set: workoutSet
+                )
+            }
+
+            Color.clear
+                .frame(width: 44, height: 1)
+                .overlay(alignment: .trailing) {
+                    PRBadgeView(status: CachedPRStatus.effectiveStatus(for: workoutSet, among: displaySets))
+                }
         }
+        .padding(.vertical, 4)
+        .opacity(isWarmup ? 0.45 : 1.0)
     }
 
     private func headerCell(for field: WorkoutSetReadOnlyField) -> some View {
@@ -135,7 +131,7 @@ struct CalendarExerciseCard: View {
     private func fieldView(
         _ display: WorkoutSetReadOnlyCellDisplay,
         field: WorkoutSetReadOnlyField,
-        set: WorkoutSet
+        set: ChartSetData
     ) -> some View {
         if !display.stackedLabels.isEmpty {
             VStack(spacing: 1) {
@@ -165,7 +161,7 @@ struct CalendarExerciseCard: View {
         }
     }
 
-    private func color(for field: WorkoutSetReadOnlyField, text: String, set: WorkoutSet) -> Color {
+    private func color(for field: WorkoutSetReadOnlyField, text: String, set: ChartSetData) -> Color {
         guard field == .rir else { return .textPrimary }
         return text == "—" ? .textSecondary : Color.rirColor(for: set.rir)
     }

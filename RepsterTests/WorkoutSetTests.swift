@@ -1,4 +1,5 @@
 import XCTest
+import SwiftData
 @testable import Repster
 
 final class WorkoutSetTests: XCTestCase {
@@ -161,6 +162,527 @@ final class WorkoutSetTests: XCTestCase {
         XCTAssertEqual(chartSet.prReps, 12)
         XCTAssertEqual(chartSet.totalReps, 22)
         XCTAssertEqual(chartSet.volume, 24 * 22)
+    }
+
+    // MARK: - Snapshot parity with live models
+    //
+    // The detail cards render from ChartSetData, not WorkoutSet. Every field the card
+    // reads has to survive the snapshot, and a missing one fails silently — an RIR
+    // column that renders "—" for every set produces no crash and no error.
+    // See SWIFTDATA_CONCURRENCY_CRASH_ANALYSIS.md §8.1, §10, §11.
+
+    func testChartSetDataCarriesFieldsTheDetailCardsRender() {
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: UUID(),
+            weight: 100,
+            effectiveWeight: 100,
+            reps: 8,
+            rir: 2,
+            leftRIR: 1,
+            rightRIR: 3,
+            setType: .warmup,
+            notes: "felt heavy",
+            orderInWorkout: 7,
+            orderInExercise: 3,
+            completed: true
+        )
+
+        let snapshot = ChartSetData(from: set)
+
+        XCTAssertEqual(snapshot.rir, 2)
+        XCTAssertEqual(snapshot.leftRIR, 1)
+        XCTAssertEqual(snapshot.rightRIR, 3)
+        XCTAssertEqual(snapshot.notes, "felt heavy")
+        XCTAssertTrue(snapshot.hasNote)
+        XCTAssertEqual(snapshot.orderInWorkout, 7)
+        XCTAssertEqual(snapshot.orderInExercise, 3)
+        XCTAssertEqual(snapshot.setType, .warmup)
+        XCTAssertTrue(snapshot.completed)
+    }
+
+    /// The regression this guards: the snapshot `display` overload used to hardcode
+    /// `rir: nil`, so converting the detail cards would have blanked the RIR column
+    /// for `.weightReps` and `.custom` — the two most common tracking types.
+    func testRIRFieldDisplayMatchesBetweenLiveModelAndSnapshot() {
+        let exercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest"
+        )
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: exercise.id,
+            weight: 100,
+            effectiveWeight: 100,
+            reps: 8,
+            rir: 2,
+            orderInWorkout: 1,
+            orderInExercise: 1
+        )
+
+        let live = WorkoutSetPerformanceFormatter.fieldDisplay(
+            for: .rir,
+            set: set,
+            exercise: exercise,
+            unitPreference: .metric
+        )
+        let snapshot = WorkoutSetPerformanceFormatter.fieldDisplay(
+            for: .rir,
+            set: ChartSetData(from: set),
+            exercise: ChartExerciseData(from: exercise),
+            unitPreference: .metric
+        )
+
+        XCTAssertEqual(snapshot.text, "2")
+        XCTAssertEqual(snapshot, live)
+    }
+
+    func testPerSideRIRFieldDisplayMatchesBetweenLiveModelAndSnapshot() {
+        let exercise = Exercise(
+            name: "Split Squat",
+            equipmentType: .dumbbell,
+            trackingType: .weightReps,
+            primaryMuscle: "legs",
+            unilateral: true
+        )
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: exercise.id,
+            weight: 24,
+            effectiveWeight: 24,
+            leftReps: 12,
+            rightReps: 10,
+            leftRIR: 1,
+            rightRIR: 3,
+            orderInWorkout: 1,
+            orderInExercise: 1
+        )
+
+        for field in WorkoutSetPerformanceFormatter.readOnlyFields(for: exercise.trackingType) {
+            let live = WorkoutSetPerformanceFormatter.fieldDisplay(
+                for: field,
+                set: set,
+                exercise: exercise,
+                unitPreference: .metric
+            )
+            let snapshot = WorkoutSetPerformanceFormatter.fieldDisplay(
+                for: field,
+                set: ChartSetData(from: set),
+                exercise: ChartExerciseData(from: exercise),
+                unitPreference: .metric
+            )
+            XCTAssertEqual(snapshot, live, "field \(field.rawValue) differs between live and snapshot")
+        }
+
+        let snapshotRIR = WorkoutSetPerformanceFormatter.fieldDisplay(
+            for: .rir,
+            set: ChartSetData(from: set),
+            exercise: ChartExerciseData(from: exercise),
+            unitPreference: .metric
+        )
+        XCTAssertEqual(snapshotRIR.stackedLabels, ["L1", "R3"])
+    }
+
+    /// PR badges on the detail cards go through this overload.
+    func testEffectiveStatusMatchesBetweenLiveModelAndSnapshot() {
+        let exerciseId = UUID()
+        let workoutId = UUID()
+
+        func makeSet(weight: Double, reps: Int, status: CachedPRStatus?) -> WorkoutSet {
+            let set = WorkoutSet(
+                workoutId: workoutId,
+                exerciseId: exerciseId,
+                weight: weight,
+                effectiveWeight: weight,
+                reps: reps,
+                orderInWorkout: 1,
+                orderInExercise: 1
+            )
+            set.prStatus = status
+            return set
+        }
+
+        let matched = makeSet(weight: 100, reps: 5, status: .matched)
+        let dominator = makeSet(weight: 100, reps: 8, status: .current)
+        let siblings = [matched, dominator]
+        let snapshots = siblings.map(ChartSetData.init(from:))
+
+        // Dominated by a same-weight, higher-rep sibling → badge suppressed.
+        XCTAssertNil(CachedPRStatus.effectiveStatus(for: matched, among: siblings))
+        XCTAssertNil(CachedPRStatus.effectiveStatus(for: snapshots[0], among: snapshots))
+
+        // Undominated → badge shown, and the two overloads agree.
+        XCTAssertEqual(
+            CachedPRStatus.effectiveStatus(for: snapshots[0], among: [snapshots[0]]),
+            CachedPRStatus.effectiveStatus(for: matched, among: [matched])
+        )
+        XCTAssertEqual(CachedPRStatus.effectiveStatus(for: snapshots[0], among: [snapshots[0]]), .matched)
+    }
+
+    func testWorkoutSnapshotResolvesDisplayTitleAtSnapshotTime() {
+        let morning = Calendar.current.date(from: DateComponents(year: 2026, month: 8, day: 11, hour: 9))!
+        let untitled = Workout(date: morning, startTime: morning, status: .completed)
+        XCTAssertEqual(WorkoutSnapshot(from: untitled).displayTitle, "Morning Workout")
+
+        let titled = Workout(date: morning, title: "Push Day", startTime: morning, status: .completed)
+        let snapshot = WorkoutSnapshot(from: titled)
+        XCTAssertEqual(snapshot.displayTitle, "Push Day")
+        XCTAssertEqual(snapshot.status, .completed)
+        XCTAssertEqual(snapshot.id, titled.id)
+    }
+
+    // MARK: - ChartExerciseData is a faithful mirror of Exercise
+    //
+    // Stage 2 step 1 replaced live `Exercise` handles with `ChartExerciseData` throughout the
+    // active-workout surface. Anything the snapshot reports differently from the model is a
+    // silent behaviour change — `usesTotalAcrossSidesRepTargets` in particular decides whether
+    // rep targets are per-side or total, with no error if it flips.
+    // See STAGE2_WRITE_PATH_DESIGN.md §7 step 1.
+
+    /// Builds one exercise per interesting combination and asserts the snapshot agrees with
+    /// the model on every stored field and every computed property.
+    func testChartExerciseDataMirrorsEveryExerciseField() {
+        let exercises = [
+            Exercise(
+                name: "Bench Press",
+                equipmentType: .barbell,
+                trackingType: .weightReps,
+                primaryMuscle: "chest",
+                secondaryMuscles: ["triceps", "shoulders"],
+                movementPattern: .press,
+                unilateral: false,
+                bilateralLoadFactor: 1.5,
+                bodyweightFactor: 0,
+                weightIncrement: 2.5,
+                defaultRestTime: 120,
+                fatigueRate: 0.04,
+                fatigueRateSourceRawValue: ExerciseFatigueRateSource.manualOverride.rawValue,
+                recoveryConstant: 200,
+                fatigueLearningSessionCount: 3,
+                fatigueLearningCumulativeError: -0.02
+            ),
+            Exercise(
+                name: "Pull Up",
+                equipmentType: .bodyweight,
+                trackingType: .weightReps,
+                unilateral: false,
+                bodyweightFactor: 1.0
+            ),
+            Exercise(
+                name: "Split Squat",
+                equipmentType: .dumbbell,
+                trackingType: .weightReps,
+                unilateral: true,
+                unilateralRepTargetMode: .totalAcrossSides
+            ),
+            Exercise(
+                name: "Farmer Carry",
+                equipmentType: .dumbbell,
+                trackingType: .weightDistance,
+                unilateral: true
+            ),
+            Exercise(name: "Plank", equipmentType: .bodyweight, trackingType: .duration),
+        ]
+
+        for exercise in exercises {
+            let snapshot = ChartExerciseData(from: exercise)
+            let label = exercise.name
+
+            XCTAssertEqual(snapshot.id, exercise.id, label)
+            XCTAssertEqual(snapshot.name, exercise.name, label)
+            XCTAssertEqual(snapshot.equipmentType, exercise.equipmentType, label)
+            XCTAssertEqual(snapshot.trackingType, exercise.trackingType, label)
+            XCTAssertEqual(snapshot.primaryMuscle, exercise.primaryMuscle, label)
+            XCTAssertEqual(snapshot.secondaryMuscles, exercise.secondaryMuscles, label)
+            XCTAssertEqual(snapshot.movementPattern, exercise.movementPattern, label)
+            XCTAssertEqual(snapshot.unilateral, exercise.unilateral, label)
+            XCTAssertEqual(
+                snapshot.unilateralRepTargetModeRawValue,
+                exercise.unilateralRepTargetModeRawValue,
+                label
+            )
+            XCTAssertEqual(snapshot.bilateralLoadFactor, exercise.bilateralLoadFactor, label)
+            XCTAssertEqual(snapshot.bodyweightFactor, exercise.bodyweightFactor, label)
+            XCTAssertEqual(snapshot.weightIncrement, exercise.weightIncrement, label)
+            XCTAssertEqual(snapshot.defaultRestTime, exercise.defaultRestTime, label)
+            XCTAssertEqual(snapshot.fatigueRate, exercise.fatigueRate, label)
+            XCTAssertEqual(snapshot.fatigueRateSourceRawValue, exercise.fatigueRateSourceRawValue, label)
+            XCTAssertEqual(snapshot.recoveryConstant, exercise.recoveryConstant, label)
+            XCTAssertEqual(
+                snapshot.fatigueLearningSessionCount,
+                exercise.fatigueLearningSessionCount,
+                label
+            )
+            XCTAssertEqual(
+                snapshot.fatigueLearningCumulativeError,
+                exercise.fatigueLearningCumulativeError,
+                label
+            )
+            XCTAssertEqual(snapshot.createdAt, exercise.createdAt, label)
+            XCTAssertEqual(snapshot.updatedAt, exercise.updatedAt, label)
+
+            // Computed parity — the part that fails silently.
+            XCTAssertEqual(
+                snapshot.supportsUnilateralLogging,
+                exercise.supportsUnilateralLogging,
+                "supportsUnilateralLogging: \(label)"
+            )
+            XCTAssertEqual(
+                snapshot.unilateralRepTargetMode,
+                exercise.unilateralRepTargetMode,
+                "unilateralRepTargetMode: \(label)"
+            )
+            XCTAssertEqual(
+                snapshot.usesTotalAcrossSidesRepTargets,
+                exercise.usesTotalAcrossSidesRepTargets,
+                "usesTotalAcrossSidesRepTargets: \(label)"
+            )
+            XCTAssertEqual(
+                snapshot.resolvedFatigueRateSource,
+                exercise.resolvedFatigueRateSource,
+                "resolvedFatigueRateSource: \(label)"
+            )
+            XCTAssertEqual(
+                snapshot.isBodyweightStyleExercise,
+                exercise.isBodyweightStyleExercise,
+                "isBodyweightStyleExercise: \(label)"
+            )
+        }
+    }
+
+    /// `unilateralRepTargetMode` falls back on the exercise *name* when nothing is stored.
+    /// A second copy of that rule in the snapshot would change rep targets for exactly these
+    /// exercises and nothing else — the least likely thing to be noticed by hand.
+    func testUnilateralRepTargetModeNameFallbackMatchesBetweenModelAndSnapshot() {
+        let named = Exercise(
+            name: "Dumbbell Lunge",
+            equipmentType: .dumbbell,
+            trackingType: .weightReps,
+            unilateral: true
+        )
+        XCTAssertNil(named.unilateralRepTargetModeRawValue)
+        XCTAssertEqual(named.unilateralRepTargetMode, .totalAcrossSides)
+        XCTAssertEqual(ChartExerciseData(from: named).unilateralRepTargetMode, .totalAcrossSides)
+        XCTAssertTrue(ChartExerciseData(from: named).usesTotalAcrossSidesRepTargets)
+
+        // Case and surrounding whitespace are normalised by the same rule on both sides.
+        let padded = Exercise(
+            name: "  dumbbell LUNGE  ",
+            equipmentType: .dumbbell,
+            trackingType: .weightReps,
+            unilateral: true
+        )
+        XCTAssertEqual(
+            ChartExerciseData(from: padded).unilateralRepTargetMode,
+            padded.unilateralRepTargetMode
+        )
+        XCTAssertEqual(ChartExerciseData(from: padded).unilateralRepTargetMode, .totalAcrossSides)
+
+        // Not unilateral → fallback does not apply, on either side.
+        let bilateral = Exercise(
+            name: "Dumbbell Lunge",
+            equipmentType: .dumbbell,
+            trackingType: .weightReps,
+            unilateral: false
+        )
+        XCTAssertEqual(bilateral.unilateralRepTargetMode, .perSide)
+        XCTAssertEqual(ChartExerciseData(from: bilateral).unilateralRepTargetMode, .perSide)
+
+        // Tracking type without per-side logging → fallback does not apply either.
+        let unsupported = Exercise(
+            name: "Dumbbell Lunge",
+            equipmentType: .dumbbell,
+            trackingType: .duration,
+            unilateral: true
+        )
+        XCTAssertEqual(unsupported.unilateralRepTargetMode, .perSide)
+        XCTAssertEqual(ChartExerciseData(from: unsupported).unilateralRepTargetMode, .perSide)
+    }
+
+    /// Every tracking type, both directions, so a future case added to the enum can't quietly
+    /// disagree between model and snapshot.
+    func testSupportsUnilateralLoggingMatchesAcrossAllTrackingTypes() {
+        for trackingType in TrackingType.allCases {
+            let exercise = Exercise(name: "X", equipmentType: .dumbbell, trackingType: trackingType)
+            XCTAssertEqual(
+                ChartExerciseData(from: exercise).supportsUnilateralLogging,
+                exercise.supportsUnilateralLogging,
+                "\(trackingType)"
+            )
+            XCTAssertEqual(
+                trackingType.supportsUnilateralLogging,
+                exercise.supportsUnilateralLogging,
+                "\(trackingType)"
+            )
+        }
+    }
+
+    /// Seeding editable fields from a snapshot must reproduce the exercise exactly, or an edit
+    /// to one field would quietly reset the others.
+    func testExerciseEditableFieldsRoundTripPreservesEveryEditableField() {
+        let exercise = Exercise(
+            name: "Incline Dumbbell Press",
+            equipmentType: .dumbbell,
+            trackingType: .weightRepsDuration,
+            primaryMuscle: "chest",
+            secondaryMuscles: ["shoulders", "triceps"],
+            movementPattern: .press,
+            unilateral: true,
+            unilateralRepTargetMode: .totalAcrossSides,
+            bilateralLoadFactor: 2.0,
+            bodyweightFactor: 0.25,
+            weightIncrement: 1.25,
+            defaultRestTime: 90
+        )
+
+        let fields = ExerciseEditableFields(from: ChartExerciseData(from: exercise))
+
+        XCTAssertEqual(fields.name, exercise.name)
+        XCTAssertEqual(fields.equipmentType, exercise.equipmentType)
+        XCTAssertEqual(fields.trackingType, exercise.trackingType)
+        XCTAssertEqual(fields.primaryMuscle, exercise.primaryMuscle)
+        XCTAssertEqual(fields.secondaryMuscles, exercise.secondaryMuscles)
+        XCTAssertEqual(fields.movementPattern, exercise.movementPattern)
+        XCTAssertEqual(fields.unilateral, exercise.unilateral)
+        XCTAssertEqual(fields.unilateralRepTargetMode, exercise.unilateralRepTargetMode)
+        XCTAssertEqual(fields.bilateralLoadFactor, exercise.bilateralLoadFactor)
+        XCTAssertEqual(fields.bodyweightFactor, exercise.bodyweightFactor)
+        XCTAssertEqual(fields.weightIncrement, exercise.weightIncrement)
+        XCTAssertEqual(fields.defaultRestTime, exercise.defaultRestTime)
+
+        // Going straight from the live model must give the same thing.
+        XCTAssertEqual(ExerciseEditableFields(from: exercise), fields)
+    }
+
+    /// Fails when a stored property is added to `Exercise` and not to `ChartExerciseData`.
+    ///
+    /// The field-by-field test above can only check fields that exist on *both* types, so it
+    /// is blind to a newly added one. Reflection closes that gap: a new `Exercise` property
+    /// makes this fail immediately, with the missing name in the message, instead of the
+    /// snapshot quietly dropping data that some screen later needs.
+    func testChartExerciseDataCoversEveryStoredExerciseProperty() {
+        let exercise = Exercise(name: "X", equipmentType: .barbell, trackingType: .weightReps)
+
+        // SwiftData's macro storage shows up as `_name` plus `_$backingData` /
+        // `_$observationRegistrar`; strip the prefix and drop the macro internals.
+        let modelProperties = Set(
+            Mirror(reflecting: exercise).children
+                .compactMap(\.label)
+                .filter { !$0.hasPrefix("_$") }
+                .map { String($0.dropFirst()) }
+        )
+        let snapshotProperties = Set(
+            Mirror(reflecting: ChartExerciseData(from: exercise)).children.compactMap(\.label)
+        )
+
+        XCTAssertFalse(modelProperties.isEmpty, "Reflection returned nothing — the check is vacuous")
+        XCTAssertEqual(
+            modelProperties.subtracting(snapshotProperties),
+            [],
+            "Exercise gained stored properties that ChartExerciseData does not mirror"
+        )
+        XCTAssertEqual(
+            snapshotProperties.subtracting(modelProperties),
+            [],
+            "ChartExerciseData has stored properties Exercise does not — the mirror has drifted"
+        )
+    }
+
+    // MARK: - SetRepository.applyOrdering (Stage 2 step 4)
+
+    private func makeSetRepo() throws -> SetRepository {
+        let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(
+            for: Exercise.self, Workout.self, WorkoutSet.self, ExerciseStats.self,
+            PerformanceRecord.self, HealthProfile.self,
+            configurations: configuration
+        )
+        return SetRepository(modelContainer: container)
+    }
+
+    func testApplyOrderingWritesBothOrderFieldsAndSkipsUnknownIds() async throws {
+        let repo = try makeSetRepo()
+        let workoutId = UUID()
+        let exerciseId = UUID()
+
+        let a = WorkoutSet(workoutId: workoutId, exerciseId: exerciseId, orderInWorkout: 1, orderInExercise: 1)
+        let b = WorkoutSet(workoutId: workoutId, exerciseId: exerciseId, orderInWorkout: 2, orderInExercise: 2)
+        try await repo.save(a)
+        try await repo.save(b)
+
+        try await repo.applyOrdering([
+            SetOrderUpdate(setId: b.id, orderInExercise: 1, orderInWorkout: 1),
+            SetOrderUpdate(setId: a.id, orderInExercise: 2, orderInWorkout: 2),
+            // An id that no longer exists must be skipped, not throw.
+            SetOrderUpdate(setId: UUID(), orderInExercise: 9, orderInWorkout: 9),
+        ])
+
+        let persisted = try await repo.fetchChartSets(for: workoutId)
+        let byId = Dictionary(uniqueKeysWithValues: persisted.map { ($0.id, $0) })
+        XCTAssertEqual(byId[b.id]?.orderInExercise, 1)
+        XCTAssertEqual(byId[b.id]?.orderInWorkout, 1)
+        XCTAssertEqual(byId[a.id]?.orderInExercise, 2)
+        XCTAssertEqual(byId[a.id]?.orderInWorkout, 2)
+    }
+
+    /// A `nil` field means "leave alone" — reindexing within an exercise must not disturb
+    /// the workout-level ordering, and vice versa.
+    func testApplyOrderingLeavesNilFieldsUntouched() async throws {
+        let repo = try makeSetRepo()
+        let workoutId = UUID()
+        let set = WorkoutSet(
+            workoutId: workoutId,
+            exerciseId: UUID(),
+            orderInWorkout: 7,
+            orderInExercise: 3
+        )
+        try await repo.save(set)
+
+        try await repo.applyOrdering([SetOrderUpdate(setId: set.id, orderInExercise: 1)])
+
+        let persisted = try await repo.fetchChartSets(for: workoutId)
+        XCTAssertEqual(persisted.first?.orderInExercise, 1)
+        XCTAssertEqual(persisted.first?.orderInWorkout, 7, "orderInWorkout must be left alone")
+    }
+
+    /// `updatedAt` is a change marker; a set whose order did not move must not be touched.
+    func testApplyOrderingOnlyBumpsUpdatedAtForSetsThatActuallyMoved() async throws {
+        let repo = try makeSetRepo()
+        let workoutId = UUID()
+        let moved = WorkoutSet(workoutId: workoutId, exerciseId: UUID(), orderInWorkout: 1, orderInExercise: 1)
+        let unmoved = WorkoutSet(workoutId: workoutId, exerciseId: UUID(), orderInWorkout: 2, orderInExercise: 2)
+        try await repo.save(moved)
+        try await repo.save(unmoved)
+
+        let before = try await repo.fetchChartSets(for: workoutId)
+        let unmovedBefore = try await repo.fetch(byId: unmoved.id)
+        let unmovedUpdatedAtBefore = try XCTUnwrap(unmovedBefore?.updatedAt)
+        XCTAssertEqual(before.count, 2)
+
+        try await repo.applyOrdering([
+            SetOrderUpdate(setId: moved.id, orderInExercise: 5),
+            // Same value it already has → no write.
+            SetOrderUpdate(setId: unmoved.id, orderInExercise: 2),
+        ])
+
+        let movedFetched = try await repo.fetch(byId: moved.id)
+        let unmovedFetched = try await repo.fetch(byId: unmoved.id)
+        let movedAfter = try XCTUnwrap(movedFetched)
+        let unmovedAfter = try XCTUnwrap(unmovedFetched)
+        XCTAssertEqual(movedAfter.orderInExercise, 5)
+        XCTAssertEqual(unmovedAfter.orderInExercise, 2)
+        XCTAssertEqual(
+            unmovedAfter.updatedAt,
+            unmovedUpdatedAtBefore,
+            "a set whose order didn't change must not have updatedAt bumped"
+        )
+    }
+
+    func testApplyOrderingWithEmptyBatchIsANoOp() async throws {
+        let repo = try makeSetRepo()
+        try await repo.applyOrdering([])
     }
 
     func testReadOnlyFieldsMatchTrackingTypeVariants() {

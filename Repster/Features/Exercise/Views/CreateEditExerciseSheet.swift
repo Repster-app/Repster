@@ -23,7 +23,7 @@ struct CreateEditExerciseSheet: View {
     // MARK: - Init
 
     init(
-        exercise: Exercise?,
+        exercise: ChartExerciseData?,
         services: ServiceContainer,
         onSave: (() -> Void)? = nil
     ) {

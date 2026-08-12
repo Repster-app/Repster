@@ -166,7 +166,29 @@
       "Bash(ls -lt ~/Library/Logs/DiagnosticReports/ 2>/dev/null | head -30; echo \"=== SIM ===\"; find ~/Library/Logs/DiagnosticReports -name \"*Repster*\" -o -name \"*.ips\" -newermt \"2026-08-10\" 2>/dev/null | head -30)",
       "Bash(ls -lt ~/Library/Logs/CrashReporter/MobileDevice/*/ 2>/dev/null | head -30; echo \"=== XCODE DEVICE LOGS ===\"; find ~/Library/Developer/Xcode -iname \"*.ips\" -newermt \"2026-08-09\" 2>/dev/null | head -20; echo \"=== SIM CONTAINER LOGS ===\"; find ~/Library/Logs -iname \"*repster*\" 2>/dev/null | head -20)",
       "Bash(find ~/Library/Logs/CoreSimulator -iname \"*.ips\" -newermt \"2026-08-09\" 2>/dev/null | head -20; echo \"=== ALL RECENT IPS ANYWHERE ===\"; find ~/Library -iname \"*.ips\" -newermt \"2026-08-10\" 2>/dev/null | head -40)",
-      "Bash(awk -F: '{print $1}')"
+      "Bash(awk -F: '{print $1}')",
+      "Bash(ls -t ~/Library/Logs/DiagnosticReports/*.ips 2>/dev/null | head -5 *)",
+      "Bash(echo \"=== EditWorkout presentation from detail ===\" && grep -n \"EditWorkoutView\\\\|showEditWorkout\" Repster/Features/Home/Views/WorkoutDetailFromHomeView.swift Repster/Features/Calendar/Views/CalendarView.swift | head && echo \"=== EditWorkoutViewModel state ===\" && sed -n '18,30p;500,520p' Repster/Features/*/ViewModels/EditWorkoutViewModel.swift 2>/dev/null || find Repster -name \"EditWorkoutViewModel.swift\")",
+      "Bash(ls -la ~/Library/Logs/DiagnosticReports/ 2>/dev/null | grep -i repster | head -10; echo \"=== exit ===\"; ls ~/Library/Logs/DiagnosticReports/Repster-2026-08-11-211848.ips 2>&1 | head -2)",
+      "Bash(awk '/final class SwiftDataCrossContextRaceTests/,0' RepsterTests/HealthKitEnergyEstimateTests.swift)",
+      "Bash(TEST_RUNNER_RUN_RACE_REPRO=1 xcodebuild test -project Repster.xcodeproj -scheme Repster -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:RepsterTests/SwiftDataCrossContextRaceTests/testLiveModelReadRacesRepositorySave)",
+      "Bash(perl -pi -e 's/^import XCTest$/import XCTest\\\\nimport SwiftData/ if $. == 1' RepsterTests/HealthKitEnergyEstimateTests.swift)",
+      "Bash(tee /private/tmp/claude-501/-Users-nikolettkiraly-Downloads-NewWorkoutProject/ff16920b-d4f2-457c-b91c-67e1e057d7cf/scratchpad/tsan-snapshot.log)",
+      "Bash(tee /private/tmp/claude-501/-Users-nikolettkiraly-Downloads-NewWorkoutProject/ff16920b-d4f2-457c-b91c-67e1e057d7cf/scratchpad/tsan-live.log)",
+      "Bash(perl -pi -e 's/exercises: \\\\[Exercise\\\\]/exercises: [ChartExerciseData]/g' Repster/Features/Workout/Views/Components/WorkoutExclusionSheet.swift)",
+      "Bash(perl -pi -e 's/    let exercise: Exercise\\\\?/    let exercise: ChartExerciseData?/' Repster/Features/Exercise/Views/ExerciseHistoryView.swift)",
+      "Bash(perl -pi -e 's/^    let exercise: Exercise$/    let exercise: ChartExerciseData/' Repster/Features/Workout/Views/SetRowView.swift)",
+      "Bash(perl -pi -e 's/private func isExerciseCompleted\\\\\\(_ exercise: Exercise\\\\\\)/private func isExerciseCompleted\\(_ exercise: ChartExerciseData\\)/' Repster/Features/Workout/Views/ExerciseTabStripView.swift)",
+      "Bash(cd /Users/nikolettkiraly/Downloads/NewWorkoutProject *)",
+      "Bash(read f *)",
+      "Bash(awk '/private func reindexOrderInExercise/,/^    }$/' Repster/Features/Workout/ViewModels/ActiveWorkoutViewModel.swift)",
+      "Bash(awk '/private func reindexOrderInWorkout/,/^    }$/' Repster/Features/Workout/ViewModels/ActiveWorkoutViewModel.swift)",
+      "Bash(awk '{a+=$1; d+=$2} END {print \"views: +\"a\" -\"d}')",
+      "Bash(awk '{a+=$1; d+=$2} END {print \"core:  +\"a\" -\"d}')",
+      "Bash(awk '{a+=$1; d+=$2} END {print \"vms:   +\"a\" -\"d}')",
+      "Bash(sed -n '/init\\(set: WorkoutSet\\)/,/^    }/p' Repster/Core/Services/Protocols/SetServiceProtocol.swift)",
+      "Bash(sed -n '/private func syncDerivedPerformanceFields\\(supportsUnilateralLogging/,/^    }/p' Repster/Data/Models/WorkoutSet.swift)",
+      "Bash(sed -n '/var prReps: Int {/,/^    }/p;/var totalReps: Int {/,/^    }/p' Repster/Data/Models/WorkoutSet.swift)"
     ]
   }
 }

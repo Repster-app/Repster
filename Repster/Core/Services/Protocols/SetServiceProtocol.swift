@@ -144,6 +144,15 @@ protocol SetServiceProtocol: Sendable {
         max: Int?
     ) async throws
 
+    /// Persist a batch of set-ordering changes in one transaction, without invoking the
+    /// PR, stats, fatigue or effective-weight pipelines.
+    ///
+    /// Reindexing after an insert or delete used to call `edit(_:)` once per changed set,
+    /// each in its own unawaited `Task`. With unchanged values that pipeline run was a no-op,
+    /// but it produced N concurrent saves per routine action — the concurrent writer behind
+    /// the crash class (SWIFTDATA_CONCURRENCY_CRASH_ANALYSIS.md §5.3).
+    func applyOrdering(_ updates: [SetOrderUpdate]) async throws
+
     // MARK: - Fetch (006: Active Workout Screen)
 
     /// Fetch all sets belonging to a workout, ordered by orderInWorkout.
@@ -154,6 +163,13 @@ protocol SetServiceProtocol: Sendable {
     /// - Parameter workoutId: The workout whose sets to fetch.
     /// - Returns: All WorkoutSets for this workout, ordered by orderInWorkout.
     func fetchSets(for workoutId: UUID) async throws -> [WorkoutSet]
+
+    /// Fetch snapshots of all sets in a workout, ordered by orderInWorkout.
+    ///
+    /// Read-only screens (Home, Copy Previous, Calendar, workout detail) must use this
+    /// instead of `fetchSets(for:)` — a live `WorkoutSet` read on the main actor faults
+    /// through a background ModelContext.
+    func fetchSetSnapshots(for workoutId: UUID) async throws -> [ChartSetData]
 
     /// Fetch the unique exerciseIds for all sets in a workout.
     ///

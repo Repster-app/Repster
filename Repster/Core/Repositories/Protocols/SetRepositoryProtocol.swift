@@ -5,6 +5,45 @@
 
 import Foundation
 
+/// A single set's new position, as plain values.
+///
+/// Reindexing after an insert or delete changes only ordering, but the old code routed each
+/// changed set through `SetService.edit()` — the full effectiveWeight → PR → stats → fatigue
+/// pipeline — in **one unawaited `Task` per set**. That is what manufactured the concurrent
+/// writer behind the crash class (see SWIFTDATA_CONCURRENCY_CRASH_ANALYSIS.md §5.3): N
+/// main-actor tasks interleaving against a serialised stream of background saves, while the
+/// set table re-rendered off the same models.
+///
+/// A reindex is now one batched, awaited call applied inside the repository actor.
+/// `nil` means "leave this field alone".
+struct SetOrderUpdate: Sendable, Equatable {
+    let setId: UUID
+    let orderInExercise: Int?
+    let orderInWorkout: Int?
+
+    init(setId: UUID, orderInExercise: Int? = nil, orderInWorkout: Int? = nil) {
+        self.setId = setId
+        self.orderInExercise = orderInExercise
+        self.orderInWorkout = orderInWorkout
+    }
+}
+
+/// How a persist call should treat a set's stored e1RM estimate.
+///
+/// This used to be expressed as `e1RM: Double?` plus `e1RMFormulaVersion: String?` where a nil
+/// version meant "leave alone" — a convention nothing enforced and no test covered, which a
+/// mutation test caught on 2026-08-12. The three cases are now explicit:
+enum E1RMUpdate: Sendable, Equatable {
+    /// Leave both the estimate and the stored formula version untouched.
+    /// `save()` does this when a set doesn't qualify — it has no `else` branch.
+    case leaveAlone
+    /// Clear the estimate but keep the formula version that produced the last one.
+    /// `edit()` does this when a set stops qualifying.
+    case clear
+    /// Store a freshly computed estimate and the formula that produced it.
+    case set(value: Double, formulaVersion: String)
+}
+
 /// Repository protocol for WorkoutSet entity.
 /// Only the implementation imports SwiftData and touches ModelContext.
 protocol SetRepositoryProtocol: Sendable {
@@ -14,6 +53,45 @@ protocol SetRepositoryProtocol: Sendable {
     func save(_ set: WorkoutSet) async throws
     func delete(_ set: WorkoutSet) async throws
     func fetch(byId id: UUID) async throws -> WorkoutSet?
+
+    /// Apply set ordering changes inside the owning actor, in one transaction.
+    /// Unknown ids are skipped. No-op for an empty batch.
+    func applyOrdering(_ updates: [SetOrderUpdate]) async throws
+
+    // MARK: - Mutation
+    //
+    // These exist so `SetService` — which is `@MainActor` — never mutates a model this
+    // context owns from the main thread (§5.5 of the crash analysis).
+
+    /// Apply the unilateral derivation (`reps`/`rir`/`side` from the per-side values) and
+    /// return the resulting snapshot.
+    ///
+    /// Takes the model rather than an id because `save()` runs this on sets that are not in
+    /// the store yet. Does not insert and does not save — both pipelines commit once, in
+    /// `persist(_:applying:)`.
+    func syncDerivedFields(on set: WorkoutSet, exercise: ChartExerciseData?) async throws -> ChartSetData
+
+    /// Insert the set if it is new, apply the values the pipeline computed, and save —
+    /// the single commit point for both `save()` and `edit()`.
+    ///
+    /// - Parameter touchUpdatedAt: `edit()` stamps `updatedAt`; `save()` never did, and
+    ///   still doesn't.
+    func persist(
+        _ set: WorkoutSet,
+        effectiveWeight: Double?,
+        e1RM: E1RMUpdate,
+        clearPRStatus: Bool,
+        touchUpdatedAt: Bool
+    ) async throws -> ChartSetData
+
+    /// Clear a set's completion and PR status. Used by the uncomplete pipeline.
+    func applyUncomplete(setId: UUID) async throws
+
+    /// Write the PR status the PR pipeline returned for a set. No-op if unchanged.
+    func applyPRStatus(setId: UUID, status: CachedPRStatus?) async throws
+
+    /// Persist rep-target override guidance without touching any other field.
+    func applyTargetRepOverride(setId: UUID, min: Int?, max: Int?) async throws
 
     // MARK: - Workout Queries
 
@@ -34,6 +112,10 @@ protocol SetRepositoryProtocol: Sendable {
     /// Fetch sets within a date range.
     /// Used by overview charts (weekly volume, muscle group distribution).
     func fetchSets(from startDate: Date, to endDate: Date) async throws -> [WorkoutSet]
+
+    /// Fetch chart-safe set snapshots for a workout, ordered by orderInWorkout.
+    /// Used by Home, Calendar and the workout-detail screens.
+    func fetchChartSets(for workoutId: UUID) async throws -> [ChartSetData]
 
     /// Fetch chart-safe set snapshots within a date range.
     /// Used by Charts to avoid crossing live SwiftData models between actors.

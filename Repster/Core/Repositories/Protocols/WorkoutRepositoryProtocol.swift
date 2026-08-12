@@ -32,4 +32,18 @@ protocol WorkoutRepositoryProtocol: Sendable {
     /// Fetch the earliest completed workout date.
     /// Used by Charts to avoid sending live Workout models across actors.
     func fetchEarliestCompletedWorkoutDate() async throws -> Date?
+
+    // MARK: - Snapshot Queries
+
+    /// Snapshot equivalents of the fetches above. Used by every read-only workout screen
+    /// so live `Workout` handles never cross onto the main actor.
+    func fetchWorkoutSummary(byId id: UUID) async throws -> WorkoutSnapshot?
+    func fetchInProgressSummary() async throws -> WorkoutSnapshot?
+    func fetchWorkoutSummaries(for dateRange: ClosedRange<Date>) async throws -> [WorkoutSnapshot]
+    func fetchAllWorkoutSummaries(limit: Int?, offset: Int?) async throws -> [WorkoutSnapshot]
+
+    // MARK: - Mutation
+
+    /// Persist the mirrored Apple Health sample UUID inside the owning actor.
+    func setHealthKitUUID(_ uuid: UUID, forWorkoutId id: UUID) async throws
 }

@@ -107,7 +107,7 @@ final class ActiveWorkoutViewModel {
     var workout: Workout?
 
     /// Ordered list of exercises in this workout.
-    var exercises: [Exercise] = []
+    var exercises: [ChartExerciseData] = []
 
     /// Index of the currently selected exercise tab.
     var selectedExerciseIndex: Int = 0 {
@@ -246,7 +246,7 @@ final class ActiveWorkoutViewModel {
     // MARK: - Computed Properties
 
     /// The currently selected exercise (derived from selectedExerciseIndex).
-    var currentExercise: Exercise? {
+    var currentExercise: ChartExerciseData? {
         guard selectedExerciseIndex >= 0,
               selectedExerciseIndex < exercises.count else { return nil }
         return exercises[selectedExerciseIndex]
@@ -333,9 +333,9 @@ final class ActiveWorkoutViewModel {
 
             // 4. Discover unique exerciseIds and fetch Exercise objects
             let exerciseIds = try await setService.fetchExerciseIds(for: active.id)
-            var loadedExercises: [Exercise] = []
+            var loadedExercises: [ChartExerciseData] = []
             for exerciseId in exerciseIds {
-                if let exercise = try await exerciseService.fetchExercise(exerciseId) {
+                if let exercise = try await exerciseService.fetchExerciseSnapshot(exerciseId) {
                     loadedExercises.append(exercise)
                 }
             }
@@ -644,12 +644,13 @@ final class ActiveWorkoutViewModel {
 
             // Insert at correct position and reindex
             exerciseSets.insert(newSet, at: insertionIndex)
-            reindexOrderInExercise(&exerciseSets)
+            var orderingUpdates = reindexOrderInExercise(&exerciseSets)
             setsByExercise[exerciseId] = exerciseSets
 
             // Rewrite global orderInWorkout so the newly-inserted warmup isn't stranded
             // at the workout tail — keeps both order fields consistent.
-            reindexOrderInWorkout()
+            orderingUpdates += reindexOrderInWorkout()
+            await persistSetOrdering(orderingUpdates)
 
             // Invalidate and refresh suggestions for the currently visible exercise
             if currentExercise?.id == exerciseId {
@@ -675,8 +676,9 @@ final class ActiveWorkoutViewModel {
             // Remove from local state
             var sets = setsByExercise[exerciseId] ?? []
             sets.removeAll { $0.id == set.id }
-            reindexOrderInExercise(&sets)
+            let orderingUpdates = reindexOrderInExercise(&sets)
             setsByExercise[exerciseId] = sets
+            await persistSetOrdering(orderingUpdates)
 
             // Update Live Activity (total sets changed)
             updateLiveActivityState()
@@ -736,7 +738,7 @@ final class ActiveWorkoutViewModel {
 
         for exerciseId in exerciseIds {
             do {
-                guard let exercise = try await exerciseService.fetchExercise(exerciseId) else {
+                guard let exercise = try await exerciseService.fetchExerciseSnapshot(exerciseId) else {
                     continue
                 }
 
@@ -1010,7 +1012,7 @@ final class ActiveWorkoutViewModel {
         return exercises.count - 1
     }
 
-    private func exerciseHasPendingWork(_ exercise: Exercise) -> Bool {
+    private func exerciseHasPendingWork(_ exercise: ChartExerciseData) -> Bool {
         let sets = setsByExercise[exercise.id] ?? []
         return sets.isEmpty || sets.contains(where: { !$0.completed })
     }
@@ -1871,7 +1873,7 @@ final class ActiveWorkoutViewModel {
         var prsHit = 0
         var exerciseSummaries: [ExerciseSummary] = []
         var completedWorkoutSets: [WorkoutSet] = []
-        var exerciseLookup: [UUID: Exercise] = [:]
+        var exerciseLookup: [UUID: ChartExerciseData] = [:]
 
         for exercise in exercises {
             let sets = setsByExercise[exercise.id] ?? []
@@ -2098,31 +2100,39 @@ final class ActiveWorkoutViewModel {
         return rank(new) > rank(old)
     }
 
-    /// Reindex orderInExercise for a set array after insertion/deletion
-    /// and persist the updated order values.
-    private func reindexOrderInExercise(_ sets: inout [WorkoutSet]) {
+    // MARK: - Reindexing
+    //
+    // These update local state for immediate UI feedback and *return* the persistence work
+    // rather than doing it. Callers collect the updates and hand them to
+    // `persistSetOrdering` in one batch.
+    //
+    // Previously each changed set was persisted by its own unawaited
+    // `Task { setService.edit(set) }` — the full effectiveWeight → PR → stats → fatigue
+    // pipeline for what is only an ordering change. With unchanged values that pipeline was
+    // a no-op, so this loses no behaviour; what it removes is N concurrent saves per set
+    // insert or delete, which is the concurrent writer described in §5.3 of
+    // SWIFTDATA_CONCURRENCY_CRASH_ANALYSIS.md.
+
+    /// Reindex orderInExercise for a set array after insertion/deletion.
+    /// Returns the changes that still need persisting.
+    private func reindexOrderInExercise(_ sets: inout [WorkoutSet]) -> [SetOrderUpdate] {
+        var updates: [SetOrderUpdate] = []
         for (index, set) in sets.enumerated() {
             let newOrder = index + 1
             if set.orderInExercise != newOrder {
                 set.orderInExercise = newOrder
                 set.updatedAt = Date()
-                Task {
-                    do {
-                        _ = try await setService.edit(set)
-                    } catch {
-                        #if DEBUG
-                        dbg("[ActiveWorkoutViewModel] Failed to persist orderInExercise for set \(set.id): \(error)")
-                        #endif
-                    }
-                }
+                updates.append(SetOrderUpdate(setId: set.id, orderInExercise: newOrder))
             }
         }
+        return updates
     }
 
     /// Walk all exercises in their current order and reassign each set's orderInWorkout
     /// so it matches the visual (warmup-first) order inside every exercise.
-    /// Persists only sets whose value changed.
-    private func reindexOrderInWorkout() {
+    /// Returns the changes that still need persisting.
+    private func reindexOrderInWorkout() -> [SetOrderUpdate] {
+        var updates: [SetOrderUpdate] = []
         var global = 1
         for exercise in exercises {
             guard let sets = setsByExercise[exercise.id] else { continue }
@@ -2131,18 +2141,26 @@ final class ActiveWorkoutViewModel {
                 if set.orderInWorkout != global {
                     set.orderInWorkout = global
                     set.updatedAt = Date()
-                    Task {
-                        do {
-                            _ = try await setService.edit(set)
-                        } catch {
-                            #if DEBUG
-                            dbg("[ActiveWorkoutViewModel] Failed to persist orderInWorkout for set \(set.id): \(error)")
-                            #endif
-                        }
-                    }
+                    updates.append(SetOrderUpdate(setId: set.id, orderInWorkout: global))
                 }
                 global += 1
             }
+        }
+        return updates
+    }
+
+    /// Persist a reindex in one transaction.
+    ///
+    /// Swallows and logs, matching what the previous per-set `Task`s did — an ordering
+    /// write failing must not abort the caller's remaining work.
+    private func persistSetOrdering(_ updates: [SetOrderUpdate]) async {
+        guard !updates.isEmpty else { return }
+        do {
+            try await setService.applyOrdering(updates)
+        } catch {
+            #if DEBUG
+            dbg("[ActiveWorkoutViewModel] Failed to persist set ordering: \(error)")
+            #endif
         }
     }
 }

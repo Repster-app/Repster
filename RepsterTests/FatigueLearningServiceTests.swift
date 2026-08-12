@@ -796,6 +796,46 @@ private final class InMemoryExerciseRepo: @unchecked Sendable, ExerciseRepositor
     }
 
     func fetchAllChartExercises() async throws -> [ChartExerciseData] { [] }
+    func fetchChartExercise(byId id: UUID) async throws -> ChartExerciseData? {
+        exercises.first { $0.id == id }.map(ChartExerciseData.init(from:))
+    }
+    func fetchMetadataSnapshot(byId id: UUID) async throws -> ExerciseMetadataSnapshot? {
+        exercises.first { $0.id == id }.map(ExerciseMetadataSnapshot.init(from:))
+    }
+    func applyEdit(id: UUID, fields: ExerciseEditableFields) async throws {
+        guard let exercise = exercises.first(where: { $0.id == id }) else { return }
+        exercise.name = fields.name
+        exercise.equipmentType = fields.equipmentType
+        exercise.trackingType = fields.trackingType
+        exercise.primaryMuscle = fields.primaryMuscle
+        exercise.secondaryMuscles = fields.secondaryMuscles
+        exercise.movementPattern = fields.movementPattern
+        exercise.unilateral = fields.unilateral
+        exercise.unilateralRepTargetMode = fields.unilateralRepTargetMode
+        exercise.bilateralLoadFactor = fields.bilateralLoadFactor
+        exercise.bodyweightFactor = fields.bodyweightFactor
+        exercise.weightIncrement = fields.weightIncrement
+        exercise.defaultRestTime = fields.defaultRestTime
+        exercise.updatedAt = Date()
+    }
+    func create(fields: ExerciseEditableFields) async throws -> UUID {
+        let exercise = Exercise(
+            name: fields.name,
+            equipmentType: fields.equipmentType,
+            trackingType: fields.trackingType,
+            primaryMuscle: fields.primaryMuscle,
+            secondaryMuscles: fields.secondaryMuscles,
+            movementPattern: fields.movementPattern,
+            unilateral: fields.unilateral,
+            unilateralRepTargetMode: fields.unilateralRepTargetMode,
+            bilateralLoadFactor: fields.bilateralLoadFactor,
+            bodyweightFactor: fields.bodyweightFactor,
+            weightIncrement: fields.weightIncrement,
+            defaultRestTime: fields.defaultRestTime
+        )
+        exercises.append(exercise)
+        return exercise.id
+    }
     func search(name: String) async throws -> [Exercise] { [] }
     func hasAssociatedSets(_ exerciseId: UUID) async throws -> Bool { false }
     func hasLoggedSetData(_ exerciseId: UUID) async throws -> Bool { false }

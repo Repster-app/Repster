@@ -109,7 +109,7 @@ struct SetRowView: View {
     let set: WorkoutSet
 
     /// The exercise this set belongs to (determines which input columns to show).
-    let exercise: Exercise
+    let exercise: ChartExerciseData
 
     /// The display number for the set badge (1-indexed).
     let setNumber: Int
@@ -925,11 +925,11 @@ struct SetRowView: View {
                     completed: true,
                     cachedPRStatus: .current
                 ),
-                exercise: Exercise(
+                exercise: ChartExerciseData(from: Exercise(
                     name: "Bench Press",
                     equipmentType: .barbell,
                     trackingType: .weightReps
-                ),
+                )),
                 setNumber: 1,
                 weightText: .constant("85"),
                 repsText: .constant("8"),
@@ -955,11 +955,11 @@ struct SetRowView: View {
                     orderInExercise: 2,
                     completed: true
                 ),
-                exercise: Exercise(
+                exercise: ChartExerciseData(from: Exercise(
                     name: "Bench Press",
                     equipmentType: .barbell,
                     trackingType: .weightReps
-                ),
+                )),
                 setNumber: 2,
                 weightText: .constant("80"),
                 repsText: .constant("8"),
@@ -983,11 +983,11 @@ struct SetRowView: View {
                     orderInWorkout: 3,
                     orderInExercise: 3
                 ),
-                exercise: Exercise(
+                exercise: ChartExerciseData(from: Exercise(
                     name: "Bench Press",
                     equipmentType: .barbell,
                     trackingType: .weightReps
-                ),
+                )),
                 setNumber: 3,
                 weightText: .constant(""),
                 repsText: .constant(""),

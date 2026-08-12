@@ -263,7 +263,7 @@ struct SuggestionPreparation: Sendable {
 /// App-model gathering and cache-key helpers for Smart Suggestions.
 enum SuggestionCoordinator {
     static func prepare(
-        exercise: Exercise?,
+        exercise: ChartExerciseData?,
         workout: Workout? = nil,
         sets: [WorkoutSet],
         profile: HealthProfile?
@@ -322,7 +322,7 @@ enum SuggestionCoordinator {
             }
     }
 
-    private static func supportsSuggestions(for exercise: Exercise) -> Bool {
+    private static func supportsSuggestions(for exercise: ChartExerciseData) -> Bool {
         exercise.trackingType == .weightReps || exercise.trackingType == .weightRepsDuration
     }
 
@@ -335,7 +335,7 @@ enum SuggestionCoordinator {
     /// stable when a set transitions completed → pending or vice versa.
     private static func resolveWorkingSets(
         from sets: [WorkoutSet],
-        exercise: Exercise?,
+        exercise: ChartExerciseData?,
         profile: HealthProfile?
     ) -> (pending: [SuggestionSetResolution], completed: [CompletedSetSnapshot]) {
         var pending: [SuggestionSetResolution] = []
@@ -376,7 +376,7 @@ enum SuggestionCoordinator {
 
     private static func resolveTarget(
         for set: WorkoutSet,
-        exercise: Exercise?,
+        exercise: ChartExerciseData?,
         profile: HealthProfile?
     ) -> SuggestionEligibility {
         let repTargetMode = repTargetMode(for: exercise)
@@ -473,7 +473,7 @@ enum SuggestionCoordinator {
     }
 
     private static func cacheKey(
-        exercise: Exercise?,
+        exercise: ChartExerciseData?,
         workout: Workout?,
         completedWorking: [WorkoutSet],
         setResolutions: [SuggestionSetResolution],
@@ -587,7 +587,7 @@ enum SuggestionCoordinator {
 
     private static func workoutProgressionHistorySignature(
         workout: Workout?,
-        exercise: Exercise?
+        exercise: ChartExerciseData?
     ) -> String {
         guard let workout else { return "workout:none" }
         let excludedIds = (workout.excludedExerciseIdsFromProgressionHistory ?? [])
@@ -618,7 +618,7 @@ enum SuggestionCoordinator {
         return rir
     }
 
-    private static func repTargetMode(for exercise: Exercise?) -> UnilateralRepTargetMode? {
+    private static func repTargetMode(for exercise: ChartExerciseData?) -> UnilateralRepTargetMode? {
         guard let exercise,
               exercise.supportsUnilateralLogging,
               exercise.unilateral else {

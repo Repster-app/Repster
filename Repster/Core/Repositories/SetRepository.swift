@@ -11,6 +11,118 @@ actor SetRepository: SetRepositoryProtocol {
         try modelContext.save()
     }
 
+    // MARK: - Mutation
+    //
+    // Fetch, mutate and save inside the actor that owns the context. `SetService` is
+    // `@MainActor`, so every one of these assignments used to happen on the main thread
+    // against a model this context owns — the non-main cross-context write in §5.5 of
+    // SWIFTDATA_CONCURRENCY_CRASH_ANALYSIS.md.
+
+    /// Clear a set's completion and PR status. Used by the uncomplete pipeline.
+    func applyUncomplete(setId: UUID) throws {
+        guard let set = try fetch(byId: setId) else { return }
+        set.completed = false
+        set.completedAt = nil
+        set.prStatus = nil
+        set.updatedAt = Date()
+        try modelContext.save()
+    }
+
+    /// Apply the unilateral derivation and return the resulting snapshot.
+    ///
+    /// Deliberately does **not** insert or save. `save()` calls this on sets that are not in
+    /// the store yet, and both pipelines commit exactly once — in `persist(_:applying:)` —
+    /// which is the same single transaction the previous `setRepo.save(set)` produced.
+    func syncDerivedFields(on set: WorkoutSet, exercise: ChartExerciseData?) throws -> ChartSetData {
+        set.syncDerivedPerformanceFields(for: exercise)
+        return ChartSetData(from: set)
+    }
+
+    /// Insert if new, apply the pipeline's computed values, save, and return the snapshot.
+    func persist(
+        _ set: WorkoutSet,
+        effectiveWeight: Double?,
+        e1RM: E1RMUpdate,
+        clearPRStatus: Bool,
+        touchUpdatedAt: Bool
+    ) throws -> ChartSetData {
+        set.effectiveWeight = effectiveWeight
+
+        switch e1RM {
+        case .leaveAlone:
+            break
+        case .clear:
+            set.e1RM = nil
+        case let .set(value, formulaVersion):
+            set.e1RM = value
+            set.e1RMFormulaVersion = formulaVersion
+        }
+
+        if clearPRStatus {
+            set.prStatus = nil
+        }
+        if touchUpdatedAt {
+            set.updatedAt = Date()
+        }
+
+        // Inserting an object the context already owns is a no-op, so this covers both a
+        // brand-new set from `addSet` and an existing one being re-saved.
+        modelContext.insert(set)
+        try modelContext.save()
+        return ChartSetData(from: set)
+    }
+
+    /// Write the PR status the PR pipeline returned for a set.
+    func applyPRStatus(setId: UUID, status: CachedPRStatus?) throws {
+        guard let set = try fetch(byId: setId), set.prStatus != status else { return }
+        set.prStatus = status
+        try modelContext.save()
+    }
+
+    /// Persist rep-target override guidance without touching any other field.
+    func applyTargetRepOverride(setId: UUID, min: Int?, max: Int?) throws {
+        guard let set = try fetch(byId: setId) else {
+            throw SetServiceError.setNotFound(setId)
+        }
+        set.overrideTargetRepMin = min
+        set.overrideTargetRepMax = max
+        set.updatedAt = Date()
+        try modelContext.save()
+    }
+
+    /// Apply set ordering changes inside this actor, in a single transaction.
+    ///
+    /// Replaces the previous "one `SetService.edit()` per changed set, each in its own
+    /// unawaited `Task`" reindex. Ordering is not a PR/stats/fatigue concern, so this
+    /// deliberately does not run that pipeline — with identical values it was a no-op that
+    /// cost N saves and manufactured the overlap described in §5.3 of the crash analysis.
+    func applyOrdering(_ updates: [SetOrderUpdate]) throws {
+        guard !updates.isEmpty else { return }
+
+        var didChangeAny = false
+        for update in updates {
+            guard let set = try fetch(byId: update.setId) else { continue }
+
+            var didChangeThisSet = false
+            if let orderInExercise = update.orderInExercise, set.orderInExercise != orderInExercise {
+                set.orderInExercise = orderInExercise
+                didChangeThisSet = true
+            }
+            if let orderInWorkout = update.orderInWorkout, set.orderInWorkout != orderInWorkout {
+                set.orderInWorkout = orderInWorkout
+                didChangeThisSet = true
+            }
+
+            if didChangeThisSet {
+                set.updatedAt = Date()
+                didChangeAny = true
+            }
+        }
+
+        guard didChangeAny else { return }
+        try modelContext.save()
+    }
+
     func delete(_ set: WorkoutSet) throws {
         modelContext.delete(set)
         try modelContext.save()
@@ -109,6 +221,16 @@ actor SetRepository: SetRepositoryProtocol {
             sortBy: [SortDescriptor(\.date)]
         )
         return try modelContext.fetch(descriptor)
+    }
+
+    /// Snapshot equivalent of `fetchSets(for workoutId:)`, ordered by orderInWorkout.
+    /// Used by Home, Calendar and the workout-detail screens.
+    func fetchChartSets(for workoutId: UUID) throws -> [ChartSetData] {
+        let descriptor = FetchDescriptor<WorkoutSet>(
+            predicate: #Predicate { $0.workoutId == workoutId },
+            sortBy: [SortDescriptor(\.orderInWorkout)]
+        )
+        return try modelContext.fetch(descriptor).map(ChartSetData.init(from:))
     }
 
     func fetchChartSets(from startDate: Date, to endDate: Date) throws -> [ChartSetData] {

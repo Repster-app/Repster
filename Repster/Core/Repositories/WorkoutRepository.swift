@@ -63,6 +63,37 @@ actor WorkoutRepository: WorkoutRepositoryProtocol {
         return try modelContext.fetch(descriptor)
     }
 
+    // MARK: - Snapshot Queries
+    //
+    // Used by Home, Copy Previous, Calendar and the workout-detail screens to avoid
+    // sending live Workout models across actors. The `status` comparison happens in
+    // Swift, inside this actor, because #Predicate cannot capture custom enum values
+    // (see fetchInProgress above) — so these still read every row, exactly as the
+    // live-model fetches they replace do.
+
+    func fetchWorkoutSummary(byId id: UUID) throws -> WorkoutSnapshot? {
+        try fetch(byId: id).map(WorkoutSnapshot.init(from:))
+    }
+
+    func fetchInProgressSummary() throws -> WorkoutSnapshot? {
+        try fetchInProgress().map(WorkoutSnapshot.init(from:))
+    }
+
+    func fetchWorkoutSummaries(for dateRange: ClosedRange<Date>) throws -> [WorkoutSnapshot] {
+        try fetchWorkouts(for: dateRange).map(WorkoutSnapshot.init(from:))
+    }
+
+    func fetchAllWorkoutSummaries(limit: Int? = nil, offset: Int? = nil) throws -> [WorkoutSnapshot] {
+        try fetchAllWorkouts(limit: limit, offset: offset).map(WorkoutSnapshot.init(from:))
+    }
+
+    /// Persist the mirrored Apple Health sample UUID without handing the live model out.
+    func setHealthKitUUID(_ uuid: UUID, forWorkoutId id: UUID) throws {
+        guard let workout = try fetch(byId: id) else { return }
+        workout.healthKitWorkoutUUID = uuid
+        try modelContext.save()
+    }
+
     func fetchEarliestCompletedWorkoutDate() throws -> Date? {
         let descriptor = FetchDescriptor<Workout>(
             sortBy: [SortDescriptor(\.date, order: .forward)]

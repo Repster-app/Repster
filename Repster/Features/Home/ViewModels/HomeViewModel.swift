@@ -24,7 +24,6 @@ struct MonthlyStats {
 
 struct RecentWorkoutSummary: Identifiable {
     let id: UUID              // workout.id
-    let workout: Workout
     let displayTitle: String  // workout.displayTitle (user title or time-based default)
     let date: Date
     let exerciseCount: Int
@@ -36,7 +35,6 @@ struct RecentWorkoutSummary: Identifiable {
 
 struct CopyPreviousWorkout: Identifiable {
     let id: UUID
-    let workout: Workout
     let displayTitle: String
     let date: Date
     let exerciseCount: Int
@@ -94,7 +92,10 @@ final class HomeViewModel {
 
     // MARK: - Cache
 
-    private var exerciseCache: [UUID: Exercise] = [:]
+    /// Snapshots, not live models: a cached `Exercise` re-arms as a fault whenever a
+    /// background `save()` calls `reset()` on its context, so reading it later — mid-render,
+    /// long after the fetch — can land on freed memory.
+    private var exerciseCache: [UUID: ChartExerciseData] = [:]
     var lastLoadTime: Date?
 
     init(
@@ -162,12 +163,12 @@ final class HomeViewModel {
 
     func checkActiveWorkout() async {
         do {
-            let active = try await workoutService.getActiveWorkout()
+            let active = try await workoutService.getActiveWorkoutSummary()
             hasActiveWorkout = (active != nil)
 
             if let workout = active {
                 activeWorkoutStartTime = workout.startTime
-                let sets = try await setService.fetchSets(for: workout.id)
+                let sets = try await setService.fetchSetSnapshots(for: workout.id)
                 let exerciseIds = Set(sets.map(\.exerciseId))
                 activeWorkoutExerciseCount = exerciseIds.count
                 activeWorkoutSetCount = sets.filter { $0.completed && $0.hasData }.count
@@ -191,7 +192,7 @@ final class HomeViewModel {
         guard let weekRange = currentWeekRange() else { return }
 
         do {
-            let workouts = try await workoutService.fetchWorkouts(for: weekRange)
+            let workouts = try await workoutService.fetchWorkoutSummaries(for: weekRange)
             let completed = workouts.filter { $0.status == .completed }
 
             await buildWeekDays(from: completed, weekRange: weekRange)
@@ -216,12 +217,12 @@ final class HomeViewModel {
         return calendar.startOfDay(for: monday)...calendar.startOfDay(for: sunday).addingTimeInterval(86399)
     }
 
-    private func buildWeekDays(from completedWorkouts: [Workout], weekRange: ClosedRange<Date>) async {
+    private func buildWeekDays(from completedWorkouts: [WorkoutSnapshot], weekRange: ClosedRange<Date>) async {
         let calendar = Calendar.current
         let monday = calendar.startOfDay(for: weekRange.lowerBound)
 
         // Group workouts by day index
-        var workoutsByDay: [Int: [Workout]] = [:]
+        var workoutsByDay: [Int: [WorkoutSnapshot]] = [:]
         for workout in completedWorkouts {
             let weekday = calendar.component(.weekday, from: workout.date)
             let index = (weekday + 5) % 7
@@ -330,7 +331,7 @@ final class HomeViewModel {
 
     func loadRecentWorkouts() async {
         do {
-            let allWorkouts = try await workoutService.fetchAllWorkouts(limit: nil, offset: nil)
+            let allWorkouts = try await workoutService.fetchAllWorkoutSummaries(limit: nil, offset: nil)
             let completed = allWorkouts
                 .filter { $0.status == .completed }
                 .sorted { $0.date > $1.date }
@@ -338,11 +339,11 @@ final class HomeViewModel {
 
             var summaries: [RecentWorkoutSummary] = []
             for workout in completed {
-                let sets = try await setService.fetchSets(for: workout.id)
+                let sets = try await setService.fetchSetSnapshots(for: workout.id)
                 let workingSetsWithData = sets.filter { $0.setType == .working && $0.hasData }
                 let exerciseIds = Set(sets.map(\.exerciseId))
 
-                var exerciseLookup: [UUID: Exercise] = [:]
+                var exerciseLookup: [UUID: ChartExerciseData] = [:]
                 var muscleGroups: [String] = []
                 for exerciseId in exerciseIds {
                     guard let exercise = try await cachedExercise(exerciseId) else { continue }
@@ -359,7 +360,6 @@ final class HomeViewModel {
 
                 summaries.append(RecentWorkoutSummary(
                     id: workout.id,
-                    workout: workout,
                     displayTitle: workout.displayTitle,
                     date: workout.date,
                     exerciseCount: exerciseIds.count,
@@ -388,11 +388,11 @@ final class HomeViewModel {
 
     // MARK: - Cache Helper
 
-    private func cachedExercise(_ id: UUID) async throws -> Exercise? {
+    private func cachedExercise(_ id: UUID) async throws -> ChartExerciseData? {
         if let cached = exerciseCache[id] {
             return cached
         }
-        let exercise = try await exerciseService.fetchExercise(id)
+        let exercise = try await exerciseService.fetchExerciseSnapshot(id)
         if let exercise {
             exerciseCache[id] = exercise
         }

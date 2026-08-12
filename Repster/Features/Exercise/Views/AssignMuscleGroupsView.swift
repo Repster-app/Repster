@@ -215,20 +215,21 @@ struct AssignMuscleGroupsView: View {
 
     private func select(muscle: String, for exercise: Exercise) {
         let previous = assignments[exercise.id]
-        let original = ExerciseMetadataSnapshot(from: exercise)
-        assignments[exercise.id] = muscle
-        exercise.primaryMuscle = muscle
+        let exerciseId = exercise.id
+
+        // `assignments` is what the rows render, so the optimistic update and the revert
+        // both work off it. The live model is no longer mutated here — values go to the
+        // service and the mutation happens inside the repository actor.
+        var fields = ExerciseEditableFields(from: exercise)
+        fields.primaryMuscle = muscle
+        assignments[exerciseId] = muscle
 
         Task {
             do {
-                try await exerciseService.updateExercise(
-                    exercise,
-                    original: original
-                )
+                try await exerciseService.updateExercise(id: exerciseId, fields: fields)
             } catch {
                 await MainActor.run {
-                    assignments[exercise.id] = previous
-                    exercise.primaryMuscle = previous
+                    assignments[exerciseId] = previous
                 }
             }
         }

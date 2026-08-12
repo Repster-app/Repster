@@ -33,4 +33,8 @@ actor ExerciseStatsRepository: ExerciseStatsRepositoryProtocol {
     func fetchAllChartExerciseStats() throws -> [ChartExerciseStatsData] {
         try fetchAll().map(ChartExerciseStatsData.init(from:))
     }
+
+    func fetchChartExerciseStats(for exerciseId: UUID) throws -> ChartExerciseStatsData? {
+        try fetch(for: exerciseId).map(ChartExerciseStatsData.init(from:))
+    }
 }

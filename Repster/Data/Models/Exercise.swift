@@ -27,6 +27,53 @@ enum UnilateralRepTargetMode: String, Codable, CaseIterable, Sendable {
             return "Targets and Smart Suggestions start from the total reps across both sides."
         }
     }
+
+    private static let totalAcrossSidesFallbackNames: Set<String> = [
+        "dumbbell lunge"
+    ]
+
+    /// Resolves a stored raw value to a mode, applying the name-based fallback when
+    /// nothing is stored.
+    ///
+    /// Single source of truth, shared by `Exercise` and `ChartExerciseData`. The fallback
+    /// depends on the exercise *name*, so a second copy of this rule would silently change
+    /// rep targets for the affected exercises if the two ever diverged.
+    static func resolve(
+        rawValue: String?,
+        exerciseName: String,
+        unilateral: Bool,
+        trackingType: TrackingType
+    ) -> UnilateralRepTargetMode {
+        if let rawValue, let mode = UnilateralRepTargetMode(rawValue: rawValue) {
+            return mode
+        }
+        guard unilateral, trackingType.supportsUnilateralLogging else { return .perSide }
+        let normalizedName = exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if totalAcrossSidesFallbackNames.contains(normalizedName) {
+            return .totalAcrossSides
+        }
+        return .perSide
+    }
+}
+
+extension ExerciseFatigueRateSource {
+    /// Single source of truth, shared by `Exercise` and `ChartExerciseData`.
+    static func resolve(
+        rawValue: String?,
+        fatigueRate: Double?,
+        fatigueLearningSessionCount: Int?
+    ) -> ExerciseFatigueRateSource? {
+        if let rawValue, let source = ExerciseFatigueRateSource(rawValue: rawValue) {
+            return source
+        }
+        guard fatigueRate != nil else { return nil }
+        return (fatigueLearningSessionCount ?? 0) > 0 ? .learned : .manualOverride
+    }
+}
+
+/// Shared by `Exercise` and `ChartExerciseData`.
+func isBodyweightStyle(equipmentType: EquipmentType, bodyweightFactor: Double) -> Bool {
+    equipmentType == .bodyweight || bodyweightFactor > 0
 }
 
 @Model
@@ -117,21 +164,18 @@ final class Exercise {
 extension Exercise: @unchecked Sendable {}
 
 extension Exercise {
-    private static let totalAcrossSidesFallbackNames: Set<String> = [
-        "dumbbell lunge"
-    ]
-
     var supportsUnilateralLogging: Bool {
-        trackingType == .weightReps || trackingType == .weightRepsDuration
+        trackingType.supportsUnilateralLogging
     }
 
     var unilateralRepTargetMode: UnilateralRepTargetMode {
         get {
-            if let rawValue = unilateralRepTargetModeRawValue,
-               let mode = UnilateralRepTargetMode(rawValue: rawValue) {
-                return mode
-            }
-            return defaultUnilateralRepTargetMode
+            UnilateralRepTargetMode.resolve(
+                rawValue: unilateralRepTargetModeRawValue,
+                exerciseName: name,
+                unilateral: unilateral,
+                trackingType: trackingType
+            )
         }
         set {
             unilateralRepTargetModeRawValue = newValue.rawValue
@@ -143,11 +187,11 @@ extension Exercise {
     }
 
     var resolvedFatigueRateSource: ExerciseFatigueRateSource? {
-        if let raw = fatigueRateSourceRawValue, let source = ExerciseFatigueRateSource(rawValue: raw) {
-            return source
-        }
-        guard fatigueRate != nil else { return nil }
-        return (fatigueLearningSessionCount ?? 0) > 0 ? .learned : .manualOverride
+        ExerciseFatigueRateSource.resolve(
+            rawValue: fatigueRateSourceRawValue,
+            fatigueRate: fatigueRate,
+            fatigueLearningSessionCount: fatigueLearningSessionCount
+        )
     }
 
     func refreshFatigueRateSourceMetadata() {
@@ -155,15 +199,6 @@ extension Exercise {
     }
 
     var isBodyweightStyleExercise: Bool {
-        equipmentType == .bodyweight || bodyweightFactor > 0
-    }
-
-    private var defaultUnilateralRepTargetMode: UnilateralRepTargetMode {
-        guard unilateral, supportsUnilateralLogging else { return .perSide }
-        let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if Self.totalAcrossSidesFallbackNames.contains(normalizedName) {
-            return .totalAcrossSides
-        }
-        return .perSide
+        isBodyweightStyle(equipmentType: equipmentType, bodyweightFactor: bodyweightFactor)
     }
 }

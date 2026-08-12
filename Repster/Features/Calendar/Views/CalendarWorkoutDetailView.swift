@@ -9,18 +9,18 @@ struct CalendarWorkoutDetailView: View {
     let workoutDetails: [WorkoutDetail]
     let selectedDate: Date
     let unitPreference: UnitPreference
-    let onSaveAsTemplate: ((Workout) -> Void)?
-    let onEditWorkout: ((Workout) -> Void)?
-    let onDeleteWorkout: ((Workout) -> Void)?
+    let onSaveAsTemplate: ((WorkoutSnapshot) -> Void)?
+    let onEditWorkout: ((WorkoutSnapshot) -> Void)?
+    let onDeleteWorkout: ((WorkoutSnapshot) -> Void)?
     let onExerciseTapped: (UUID) -> Void
 
     init(
         workoutDetails: [WorkoutDetail],
         selectedDate: Date,
         unitPreference: UnitPreference,
-        onSaveAsTemplate: ((Workout) -> Void)?,
-        onEditWorkout: ((Workout) -> Void)?,
-        onDeleteWorkout: ((Workout) -> Void)? = nil,
+        onSaveAsTemplate: ((WorkoutSnapshot) -> Void)?,
+        onEditWorkout: ((WorkoutSnapshot) -> Void)?,
+        onDeleteWorkout: ((WorkoutSnapshot) -> Void)? = nil,
         onExerciseTapped: @escaping (UUID) -> Void
     ) {
         self.workoutDetails = workoutDetails
@@ -90,10 +90,10 @@ struct CalendarWorkoutDetailView: View {
     // MARK: - Session Label (T016)
 
     private func workoutHeader(
-        _ workout: Workout,
-        onSaveAsTemplate: ((Workout) -> Void)?,
-        onEditWorkout: ((Workout) -> Void)?,
-        onDeleteWorkout: ((Workout) -> Void)?
+        _ workout: WorkoutSnapshot,
+        onSaveAsTemplate: ((WorkoutSnapshot) -> Void)?,
+        onEditWorkout: ((WorkoutSnapshot) -> Void)?,
+        onDeleteWorkout: ((WorkoutSnapshot) -> Void)?
     ) -> some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
@@ -143,7 +143,7 @@ struct CalendarWorkoutDetailView: View {
         }
     }
 
-    private func sessionLabel(_ workout: Workout) -> some View {
+    private func sessionLabel(_ workout: WorkoutSnapshot) -> some View {
         let label: String = {
             guard let startTime = workout.startTime else { return "Session" }
             let hour = Calendar.current.component(.hour, from: startTime)

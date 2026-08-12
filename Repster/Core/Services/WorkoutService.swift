@@ -131,10 +131,9 @@ actor WorkoutService: WorkoutServiceProtocol {
 
         guard let healthKitUUID = await healthKitService.saveWorkout(payload) else { return }
 
-        // Re-fetch rather than holding the model across the suspension.
-        guard let workout = try? await workoutRepo.fetch(byId: workoutId) else { return }
-        workout.healthKitWorkoutUUID = healthKitUUID
-        try? await workoutRepo.save(workout)
+        // Fetch, mutate and save entirely inside the repository actor — this executor
+        // must never touch a model that another context owns (see §5.5 of the crash analysis).
+        try? await workoutRepo.setHealthKitUUID(healthKitUUID, forWorkoutId: workoutId)
     }
 
     // MARK: - Active Workout (FR-003, AGENT_RULES S7.3)
@@ -143,6 +142,10 @@ actor WorkoutService: WorkoutServiceProtocol {
     /// Called at app launch to detect and resume an active workout.
     func getActiveWorkout() async throws -> Workout? {
         return try await workoutRepo.fetchInProgress()
+    }
+
+    func getActiveWorkoutSummary() async throws -> WorkoutSnapshot? {
+        return try await workoutRepo.fetchInProgressSummary()
     }
 
     // MARK: - CRUD
@@ -157,6 +160,20 @@ actor WorkoutService: WorkoutServiceProtocol {
 
     func fetchAllWorkouts(limit: Int? = nil, offset: Int? = nil) async throws -> [Workout] {
         return try await workoutRepo.fetchAllWorkouts(limit: limit, offset: offset)
+    }
+
+    // MARK: - Snapshot Reads
+
+    func fetchWorkoutSummary(_ workoutId: UUID) async throws -> WorkoutSnapshot? {
+        return try await workoutRepo.fetchWorkoutSummary(byId: workoutId)
+    }
+
+    func fetchWorkoutSummaries(for dateRange: ClosedRange<Date>) async throws -> [WorkoutSnapshot] {
+        return try await workoutRepo.fetchWorkoutSummaries(for: dateRange)
+    }
+
+    func fetchAllWorkoutSummaries(limit: Int? = nil, offset: Int? = nil) async throws -> [WorkoutSnapshot] {
+        return try await workoutRepo.fetchAllWorkoutSummaries(limit: limit, offset: offset)
     }
 
     // MARK: - Metadata Update (FR-009)

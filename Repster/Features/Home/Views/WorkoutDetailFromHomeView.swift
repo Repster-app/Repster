@@ -184,25 +184,25 @@ struct WorkoutDetailFromHomeView: View {
 
     private func loadDetail() async {
         do {
-            guard let workout = try await workoutService.fetchWorkout(workoutId) else {
+            guard let workout = try await workoutService.fetchWorkoutSummary(workoutId) else {
                 isLoading = false
                 return
             }
 
-            let sets = try await setService.fetchSets(for: workout.id)
-            var exerciseSetMap: [UUID: [WorkoutSet]] = [:]
+            let sets = try await setService.fetchSetSnapshots(for: workout.id)
+            var exerciseSetMap: [UUID: [ChartSetData]] = [:]
             for set in sets {
                 exerciseSetMap[set.exerciseId, default: []].append(set)
             }
 
             var exerciseGroups: [ExerciseGroup] = []
-            var exerciseLookup: [UUID: Exercise] = [:]
+            var exerciseLookup: [UUID: ChartExerciseData] = [:]
             for (exerciseId, exerciseSets) in exerciseSetMap {
-                let exercise = try await exerciseService.fetchExercise(exerciseId)
+                let exercise = try await exerciseService.fetchExerciseSnapshot(exerciseId)
                 guard let exercise else { continue }
                 exerciseLookup[exerciseId] = exercise
                 let sorted = exerciseSets.sorted { $0.orderInExercise < $1.orderInExercise }
-                let stats = try? await statsService.fetchStats(for: exerciseId)
+                let stats = try? await statsService.fetchStatsSnapshot(for: exerciseId)
                 exerciseGroups.append(ExerciseGroup(exercise: exercise, sets: sorted, stats: stats))
             }
 

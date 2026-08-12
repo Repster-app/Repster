@@ -4,6 +4,190 @@ import SwiftData
 
 final class SetServiceTests: XCTestCase {
 
+    // MARK: - Mutations moved into the repository actor (Stage 2 step 3)
+    //
+    // `SetService` is `@MainActor` and used to mutate `SetRepository`-owned models directly
+    // — the non-main cross-context write in §5.5 of SWIFTDATA_CONCURRENCY_CRASH_ANALYSIS.md.
+    // Uncomplete, PR-status write-back and rep-target overrides now happen inside the
+    // repository. These pin the behaviour that has to be identical afterwards, including
+    // the bit callers depend on: the ViewModel holds the same `@Model` reference, so the
+    // change must still be visible on the object it passed in.
+
+    /// `save()` must **not** clear a previously stored e1RM when a set stops qualifying.
+    ///
+    /// `save()` has no `else` branch — it only ever writes an estimate, never removes one.
+    /// `edit()` is the opposite. Collapsing the two onto one repository call made it easy to
+    /// give them the same behaviour; nothing in the suite noticed when they were (verified by
+    /// mutation, 2026-08-12).
+    func testSaveLeavesAnExistingE1RMAloneWhenTheSetNoLongerQualifies() async throws {
+        let context = try makeContext()
+        let records = try await seedTrackedCompletedSet(in: context, order: 1)
+
+        records.set.weight = 100
+        records.set.reps = 5
+        _ = try await context.setService.save(records.set)
+
+        let afterEstimate = try await context.setRepo.fetch(byId: records.set.id)
+        let storedE1RM = try XCTUnwrap(afterEstimate?.e1RM)
+        let storedVersion = try XCTUnwrap(afterEstimate?.e1RMFormulaVersion)
+
+        // No reps → no estimate can be computed. save() must leave the stored one in place.
+        records.set.reps = nil
+        records.set.leftReps = nil
+        records.set.rightReps = nil
+        _ = try await context.setService.save(records.set)
+
+        let afterSecondSave = try await context.setRepo.fetch(byId: records.set.id)
+        XCTAssertEqual(afterSecondSave?.e1RM, storedE1RM, "save() must not clear a stored estimate")
+        XCTAssertEqual(afterSecondSave?.e1RMFormulaVersion, storedVersion)
+    }
+
+    /// `save()` never stamped `updatedAt`; `edit()` always has. Both now go through one
+    /// repository call, so the distinction is a parameter and needs pinning.
+    func testSaveDoesNotStampUpdatedAtButEditDoes() async throws {
+        let context = try makeContext()
+        let records = try await seedTrackedCompletedSet(in: context, order: 1)
+
+        let beforeSave = try await context.setRepo.fetch(byId: records.set.id)
+        let updatedAtBeforeSave = try XCTUnwrap(beforeSave?.updatedAt)
+
+        records.set.weight = 105
+        _ = try await context.setService.save(records.set)
+
+        let afterSave = try await context.setRepo.fetch(byId: records.set.id)
+        XCTAssertEqual(
+            afterSave?.updatedAt,
+            updatedAtBeforeSave,
+            "save() must not stamp updatedAt"
+        )
+
+        records.set.weight = 110
+        _ = try await context.setService.edit(records.set)
+
+        let afterEdit = try await context.setRepo.fetch(byId: records.set.id)
+        let updatedAtAfterEdit = try XCTUnwrap(afterEdit?.updatedAt)
+        XCTAssertGreaterThan(
+            updatedAtAfterEdit,
+            updatedAtBeforeSave,
+            "edit() must stamp updatedAt"
+        )
+    }
+
+    /// Editing a set so it no longer qualifies for an e1RM must clear the estimate but leave
+    /// the stored formula version alone.
+    ///
+    /// The old code expressed this by only assigning `e1RMFormulaVersion` inside the branch
+    /// that computed an estimate; the `else` branch set `e1RM = nil` and touched nothing else.
+    /// Moving the write into the repository made that asymmetry easy to flatten into a single
+    /// unconditional assignment — and no existing test noticed when it was (verified by
+    /// mutation, 2026-08-12). Hence this one.
+    func testEditClearsE1RMButKeepsTheStoredFormulaVersion() async throws {
+        let context = try makeContext()
+        let records = try await seedTrackedCompletedSet(in: context, order: 1)
+
+        // First edit: real weight and reps, so an estimate is produced.
+        records.set.weight = 100
+        records.set.reps = 5
+        _ = try await context.setService.edit(records.set)
+
+        let afterEstimate = try await context.setRepo.fetch(byId: records.set.id)
+        let storedVersion = try XCTUnwrap(afterEstimate?.e1RMFormulaVersion)
+        XCTAssertNotNil(afterEstimate?.e1RM)
+
+        // Second edit: no reps, so no estimate can be computed.
+        records.set.reps = nil
+        records.set.leftReps = nil
+        records.set.rightReps = nil
+        _ = try await context.setService.edit(records.set)
+
+        let afterClear = try await context.setRepo.fetch(byId: records.set.id)
+        XCTAssertNil(afterClear?.e1RM, "estimate must be cleared")
+        XCTAssertEqual(
+            afterClear?.e1RMFormulaVersion,
+            storedVersion,
+            "the stored formula version must be left alone when the estimate is cleared"
+        )
+    }
+
+    func testUncompleteClearsStateOnBothThePersistedRowAndTheCallersInstance() async throws {
+        let context = try makeContext()
+        let records = try await seedTrackedCompletedSet(in: context, order: 1)
+        records.set.prStatus = .current
+        try await context.setRepo.save(records.set)
+
+        _ = try await context.setService.uncomplete(records.set)
+
+        // Persisted row
+        let persisted = try await context.setRepo.fetch(byId: records.set.id)
+        XCTAssertEqual(persisted?.completed, false)
+        XCTAssertNil(persisted?.completedAt)
+        XCTAssertNil(persisted?.prStatus)
+
+        // The caller's own instance — ActiveWorkoutViewModel relies on this to update the
+        // set table without a reload (its uncompleteSet comment says so explicitly).
+        XCTAssertFalse(records.set.completed)
+        XCTAssertNil(records.set.completedAt)
+        XCTAssertNil(records.set.prStatus)
+    }
+
+    func testTargetRepOverridePersistsWithoutDisturbingOtherFields() async throws {
+        let context = try makeContext()
+        let records = try await seedTrackedCompletedSet(in: context, order: 1)
+        let originalWeight = records.set.weight
+        let originalReps = records.set.reps
+        let originalOrder = records.set.orderInExercise
+
+        try await context.setService.updateInProgressTargetRepOverride(
+            setId: records.set.id,
+            min: 8,
+            max: 12
+        )
+
+        let persisted = try await context.setRepo.fetch(byId: records.set.id)
+        XCTAssertEqual(persisted?.overrideTargetRepMin, 8)
+        XCTAssertEqual(persisted?.overrideTargetRepMax, 12)
+        XCTAssertEqual(persisted?.weight, originalWeight)
+        XCTAssertEqual(persisted?.reps, originalReps)
+        XCTAssertEqual(persisted?.orderInExercise, originalOrder)
+    }
+
+    func testTargetRepOverrideThrowsForUnknownSet() async throws {
+        let context = try makeContext()
+
+        do {
+            try await context.setService.updateInProgressTargetRepOverride(
+                setId: UUID(),
+                min: 8,
+                max: 12
+            )
+            XCTFail("Expected setNotFound for an unknown set id")
+        } catch let error as SetServiceError {
+            guard case .setNotFound = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+    }
+
+    func testTargetRepOverrideClearsWhenPassedNil() async throws {
+        let context = try makeContext()
+        let records = try await seedTrackedCompletedSet(in: context, order: 1)
+        try await context.setService.updateInProgressTargetRepOverride(
+            setId: records.set.id,
+            min: 8,
+            max: 12
+        )
+
+        try await context.setService.updateInProgressTargetRepOverride(
+            setId: records.set.id,
+            min: nil,
+            max: nil
+        )
+
+        let persisted = try await context.setRepo.fetch(byId: records.set.id)
+        XCTAssertNil(persisted?.overrideTargetRepMin)
+        XCTAssertNil(persisted?.overrideTargetRepMax)
+    }
+
     func testDeleteRemovesCapturedFatigueData() async throws {
         let context = try makeContext()
         let records = try await seedTrackedCompletedSet(in: context, order: 1)
