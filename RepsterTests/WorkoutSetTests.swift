@@ -680,6 +680,145 @@ final class WorkoutSetTests: XCTestCase {
         )
     }
 
+    /// Symmetric to the test above. Found by mutation sweep 2026-08-12: the nil-means-leave-alone
+    /// contract was only exercised for `orderInWorkout`, so writing a bogus `orderInExercise`
+    /// when none was requested went unnoticed.
+    func testApplyOrderingLeavesNilOrderInExerciseUntouched() async throws {
+        let repo = try makeSetRepo()
+        let workoutId = UUID()
+        let set = WorkoutSet(
+            workoutId: workoutId,
+            exerciseId: UUID(),
+            orderInWorkout: 7,
+            orderInExercise: 3
+        )
+        try await repo.save(set)
+
+        try await repo.applyOrdering([SetOrderUpdate(setId: set.id, orderInWorkout: 1)])
+
+        let persisted = try await repo.fetchChartSets(for: workoutId)
+        XCTAssertEqual(persisted.first?.orderInWorkout, 1)
+        XCTAssertEqual(persisted.first?.orderInExercise, 3, "orderInExercise must be left alone")
+    }
+
+    /// The reindex reaches the store even though the caller already applied the same values.
+    ///
+    /// `ActiveWorkoutViewModel` holds this repository's own models and reindexes them on the
+    /// main actor *before* batching, so `fetch(byId:)` returns the very instance it mutated
+    /// and every value comparison inside `applyOrdering` reads as "unchanged". Found
+    /// 2026-08-12: the old `didChangeAny` short-circuit took that as "no save needed" and the
+    /// reindex sat uncommitted until an unrelated later write flushed it. Every other test
+    /// here drives the repository directly, which is why none of them saw it.
+    ///
+    /// Asserted through a second `ModelContext` — it sees only what was committed, never
+    /// another context's pending changes.
+    func testApplyOrderingCommitsWhenTheCallerAlreadyAppliedTheValues() async throws {
+        let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(
+            for: Exercise.self, Workout.self, WorkoutSet.self, ExerciseStats.self,
+            PerformanceRecord.self, HealthProfile.self,
+            configurations: configuration
+        )
+        let repo = SetRepository(modelContainer: container)
+        let workoutId = UUID()
+        let set = WorkoutSet(
+            workoutId: workoutId,
+            exerciseId: UUID(),
+            orderInWorkout: 1,
+            orderInExercise: 1
+        )
+        try await repo.save(set)
+        let setId = set.id
+
+        // reindexOrderInExercise / reindexOrderInWorkout, on the caller's side.
+        let live = try await repo.fetchSets(for: workoutId)
+        let caller = try XCTUnwrap(live.first)
+        caller.orderInExercise = 5
+        caller.orderInWorkout = 9
+        caller.updatedAt = Date()
+
+        // persistSetOrdering
+        try await repo.applyOrdering([
+            SetOrderUpdate(setId: setId, orderInExercise: 5, orderInWorkout: 9)
+        ])
+
+        let probe = ModelContext(container)
+        let committed = try probe.fetch(
+            FetchDescriptor<WorkoutSet>(predicate: #Predicate { $0.id == setId })
+        ).first
+        XCTAssertEqual(
+            committed?.orderInExercise,
+            5,
+            "the reindex must be committed, not left pending in the repository's context"
+        )
+        XCTAssertEqual(committed?.orderInWorkout, 9)
+    }
+
+    /// The weight column renders `effectiveWeight ?? weight`. Every other fixture in this suite
+    /// has them equal, so a regression to plain `weight` was invisible (mutation sweep,
+    /// 2026-08-12). Bodyweight-style exercises are where the two genuinely differ.
+    func testWeightColumnUsesEffectiveWeightNotRawWeight() {
+        let exercise = Exercise(
+            name: "Pull Up",
+            equipmentType: .bodyweight,
+            trackingType: .weightReps,
+            bodyweightFactor: 1.0
+        )
+        // weight = added load; effectiveWeight = added load + bodyweight contribution.
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: exercise.id,
+            weight: 10,
+            effectiveWeight: 90,
+            reps: 6,
+            orderInWorkout: 1,
+            orderInExercise: 1
+        )
+
+        let snapshot = WorkoutSetPerformanceFormatter.fieldDisplay(
+            for: .weight,
+            set: ChartSetData(from: set),
+            exercise: ChartExerciseData(from: exercise),
+            unitPreference: .metric
+        )
+        let live = WorkoutSetPerformanceFormatter.fieldDisplay(
+            for: .weight,
+            set: set,
+            exercise: exercise,
+            unitPreference: .metric
+        )
+
+        XCTAssertEqual(snapshot.text, "90 kg", "must render effectiveWeight, not the 10 kg added load")
+        XCTAssertEqual(snapshot, live)
+    }
+
+    /// Nothing covered the §8.4 hygiene change — the mirrored Apple Health UUID is now written
+    /// inside the repository actor, and a no-op implementation passed the whole suite.
+    func testSetHealthKitUUIDPersistsTheIdentifier() async throws {
+        let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(
+            for: Exercise.self, Workout.self, WorkoutSet.self, ExerciseStats.self,
+            PerformanceRecord.self, HealthProfile.self,
+            configurations: configuration
+        )
+        let repo = WorkoutRepository(modelContainer: container)
+        let workout = Workout(date: Date(), status: .completed)
+        try await repo.save(workout)
+
+        let uuid = UUID()
+        try await repo.setHealthKitUUID(uuid, forWorkoutId: workout.id)
+
+        let persisted = try await repo.fetch(byId: workout.id)
+        XCTAssertEqual(
+            persisted?.healthKitWorkoutUUID,
+            uuid,
+            "the Health sample id must persist — it doubles as the sync flag and the delete handle"
+        )
+
+        // Unknown ids must be a quiet no-op, not a crash.
+        try await repo.setHealthKitUUID(UUID(), forWorkoutId: UUID())
+    }
+
     func testApplyOrderingWithEmptyBatchIsANoOp() async throws {
         let repo = try makeSetRepo()
         try await repo.applyOrdering([])

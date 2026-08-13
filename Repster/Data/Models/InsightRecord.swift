@@ -86,4 +86,3 @@ enum InsightState: String, Codable {
     case seen
 }
 
-extension InsightRecord: @unchecked Sendable {}

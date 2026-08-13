@@ -612,3 +612,210 @@ Suite: **386 tests, 0 failures.**
 `SetService` is still `@MainActor` and still *reads* live models it is handed. Those reads go when
 step 5 changes the signatures to ids and values (§9 open question 1 recommends leaving its isolation
 alone until then).
+
+---
+
+## 15. §9's open questions — answered, 2026-08-12
+
+Answered from the committed source before starting step 5, since all four gate it. Two of them
+turned out to remove work rather than add it.
+
+### Q4 — `applyAffectedSets` and object identity
+
+**This was the one I expected to bite. It can't fail silently — the compiler stops it.**
+
+Today (`ActiveWorkoutViewModel:2066`, duplicated at `EditWorkoutViewModel:525`):
+
+```swift
+let updatedSets = sets                        // array of *references*
+updatedSets[index].prStatus = newStatus       // mutates the object, not the array
+setsByExercise[exerciseId] = updatedSets      // self-assignment, to poke @Observable
+```
+
+The `let` compiles only because `WorkoutSet` is a class. Once the array holds `ChartSetData`
+values, `updatedSets[index].prStatus = …` is a **compile error** on two counts — mutating through
+a `let`, and assigning to a `let` property. So step 5 cannot silently lose PR-badge updates; it
+will refuse to build until this is rewritten.
+
+Four things the rewrite must get right:
+
+1. `ChartSetData`'s properties are all `let`, so it needs a copy helper — `with(prStatus:)` — or a
+   `var prStatus`. Prefer the helper: it keeps the type immutable everywhere else.
+2. `var updatedSets = sets`, then replace the *element*: `updatedSets[index] = old.with(prStatus: …)`.
+3. **The dictionary is `[UUID: CachedPRStatus?]`, a dictionary of optionals.**
+   `if let newStatus = affectedSetIds[set.id]` unwraps the *outer* optional — i.e. "is this set
+   mentioned?" — so a present-but-`nil` entry legitimately clears the badge. Flattening this with
+   `??` or `flatMap` would silently stop demotions-to-no-badge from applying. This is the single
+   easiest thing to get wrong in the whole step.
+4. Preserve the rule that **completed sets receive demotions but never promotions**
+   (`isStatusUpgrade`) — it exists so badges don't change under the user after they've seen them.
+
+Both copies need the same treatment; worth extracting one implementation while doing it.
+
+### Q2 — optimistic UI: not needed, contrary to my assumption
+
+I had assumed the row updated *before* the `await` and that snapshots would therefore need an
+optimistic path. It doesn't. `completeSet` mutates `set.effectiveWeight` / `set.prStatus`
+**after** `setService.save(set)` returns (`ActiveWorkoutViewModel:441-445`), then pokes
+`@Observable`. So today's behaviour is already await-then-update.
+
+With snapshots the ViewModel splices the returned snapshot into the array, which is a *real*
+mutation — so `@Observable` fires on its own and the self-assignment poke disappears. Same latency,
+less code, no optimistic/reconcile machinery required. **Step 5 is simpler than §3.2 Rule 1 implied.**
+
+### Q3 — `updatedAt` on the snapshot: not required
+
+Grep across `Repster/Features/*` finds no read of `.updatedAt` that isn't a write. It is a
+change marker only, so it does not need to reach the UI snapshot and should keep being stamped
+inside the repository (which is what `persist(touchUpdatedAt:)` already does).
+
+### Q1 — `SetService`'s isolation: leave it, revisit after step 5
+
+`SetService` no longer mutates models (§14), but it still *receives* live `WorkoutSet` values in
+`save`/`edit`/`uncomplete`/`delete`. Until step 5 changes those signatures to ids and values,
+moving it off `@MainActor` would change interleaving without removing a single live-model touch.
+After step 5 it holds no models at all and the isolation becomes a free choice — decide then, as
+its own change.
+
+### Consequence for step 5
+
+The plan shrinks: no optimistic-update layer, no `updatedAt` plumbing, no isolation change. What
+remains is the mechanical signature conversion plus **one genuinely delicate function**,
+`applyAffectedSets`, whose failure mode is a compile error rather than a silent one — and whose
+dictionary-of-optionals contract deserves a test written *before* the conversion.
+
+---
+
+## 16. Mutation sweep — measuring what the suite actually catches, 2026-08-12
+
+Three times during this work a real behavioural gap was found by deliberately breaking code, and
+each time the full suite had been green *with the bug present*. That made "N tests pass" untrustworthy
+as evidence on this code, so the coverage was measured rather than assumed: 15 mutations across the
+changed surface, chosen independently of which behaviours had been consciously preserved, each run
+against the whole suite.
+
+**Result: 9 of 14 caught (64%).** One mutation produced invalid Swift and tested nothing; it is
+excluded rather than counted as a pass.
+
+### 16.1 The five misses
+
+None was a subtle logic error. Every one was a **case the fixtures do not contain**:
+
+| Miss | Root cause |
+|---|---|
+| `fieldDisplay` renders `weight` instead of `effectiveWeight` | **No test anywhere had `effectiveWeight ≠ weight`.** Every fixture used barbell/dumbbell, where they are equal — bodyweight-style exercises are the case where they diverge |
+| `applyOrdering` writes `orderInExercise` when none was requested | The nil-means-leave-alone contract was only exercised for `orderInWorkout` |
+| `persist` ignores `clearPRStatus` | The branch only fires for tracking types without rep PRs; every set fixture was `.weightReps` |
+| `setHealthKitUUID` is a no-op | No test at all — the §8.4 hygiene change was never covered |
+| Home includes non-completed workouts | The golden-master fixture seeds only completed workouts, so the status filter never ran |
+
+This is a fixture-diversity problem rather than a correctness problem, but it is precisely the shape
+of hole a real regression slips through. All five now have tests.
+
+### 16.2 What this says about verification here
+
+Eight genuine gaps were found in one day — three by hand, five by the sweep — and **zero by the suite
+turning green**. The conclusion worth carrying forward: on the set/snapshot paths, a passing run
+after a refactor is close to no evidence. Mutate the behaviour being claimed, or the claim is
+unsupported.
+
+It also argues for reordering the remaining plan. **§12 — removing `@unchecked Sendable` — should
+come before step 5.** Tests here are demonstrably a leaky net; §12 replaces the net with a compile
+error, so every remaining live-model crossing becomes a build failure rather than something a
+fixture has to happen to cover. Step 5 is materially safer performed after that guardrail exists.
+
+### 16.3 Method notes for repeating this
+
+- Mutations must be **valid code**. One of the fifteen failed to compile and silently tested nothing;
+  a build failure is not a caught mutation and must be reported separately.
+- Do not pipe the runner through `tail`/`head` — the whole stream buffers and progress is invisible
+  until the end. Append each verdict to a log file as it is decided.
+- The sweep owns the working tree (mutate → build → test → restore), so no source editing can happen
+  alongside it. Read from `git show HEAD:` if analysis is needed meanwhile.
+- Verify the tree is clean against HEAD afterwards; a killed sweep leaves a mutation in place.
+
+### 16.4 Gaps closed and re-verified
+
+All five misses now have tests, and every mutation was re-applied to confirm the test actually
+fails — a test written against a known bug is only worth what re-running that bug proves.
+
+| Previously missed | Now |
+|---|---|
+| `fieldDisplay` renders `weight` not `effectiveWeight` | **caught** |
+| `applyOrdering` writes `orderInExercise` when nil | **caught** |
+| `persist` ignores `clearPRStatus` | **caught** |
+| `setHealthKitUUID` is a no-op | **caught** |
+| Home includes non-completed workouts | **caught** (3 assertions) |
+| PR badge skips the domination check *(re-done — the original mutation was invalid Swift)* | **caught** |
+
+Suite: **391 tests, 0 failures.**
+
+Two infrastructure lessons, both of which produced a verdict that looked like evidence and wasn't:
+
+- **An invalid mutation is not a passing test.** One of the original fifteen didn't compile, so it
+  exercised nothing while appearing in the results.
+- **A failed build is not a surviving mutation.** The Home mutation reported `BUILD-FAILED` on the
+  re-sweep purely because the disk had dropped to ~1 GB under repeated builds. Re-run with space
+  available, it was caught immediately. A sweep script must distinguish "compiler rejected the
+  mutation" from "the build could not run", and should check free space before starting.
+
+**One unexplained event, recorded rather than dismissed:** a single run reported 1 failure on an
+unmodified tree, immediately after the module cache was cleared mid-session. It did not recur in six
+consecutive runs and the failing test was never captured, so the cause is unknown. Most likely build
+state in transition, but that is a hypothesis, not a finding.
+
+---
+
+## 17. §12 — removing `@unchecked Sendable`, first pass — 2026-08-12
+
+**Four models locked in: `ProgramExercise`, `PlannedWorkout`, `PlannedSet`, `InsightRecord`.**
+16 → 12 annotated. Zero new warnings, build succeeds, 391 tests green.
+
+### 17.1 What the compiler actually does here — measured, not assumed
+
+Two assumptions were wrong and were corrected by experiment:
+
+1. *"`SWIFT_VERSION = 5.0` with no `SWIFT_STRICT_CONCURRENCY` means removing the annotation
+   produces nothing."* Wrong — it produces precise diagnostics.
+2. *"The `@Model` macro already conforms these types to `Sendable`, so §12 is a dead end."* Also
+   wrong. That was over-reading a *"redundant conformance"* warning. A compile-time probe
+   (`func f<T: Sendable>(_: T)` applied to the type) settles it: with the manual annotation removed
+   the type does **not** conform.
+
+What removal actually yields, per crossing:
+
+```
+ExerciseStatsRepository.swift:21: warning: non-Sendable type 'ExerciseStats?' cannot be returned
+from actor-isolated implementation to caller of protocol requirement 'fetch(for:)';
+this is an error in the Swift 6 language mode
+```
+
+**These are warnings, and the build still succeeds.** So §12 is an exact, permanent inventory —
+not a build gate — until the project moves to Swift 6 language mode. Worth knowing before relying
+on it: it will not stop a future live-model crossing from compiling, it will only name it.
+
+### 17.2 Measured crossings for the remaining models
+
+Removing all remaining annotations at once (then reverting) gives the real cost of each:
+
+| Model | Crossings | |
+|---|---|---|
+| FatigueObservation, TemplateSet, TemplateExercise | 3 each | cheapest next targets |
+| HealthProfile, Program, WorkoutTemplate | 4 each | |
+| ExerciseStats, PerformanceRecord | 6 each | |
+| BodyweightEntry | 9 | |
+| **Exercise** | **18** | |
+
+`Workout` and `WorkoutSet` were deliberately excluded — step 5 converts exactly those, so measuring
+them now would only count crossings that step is about to delete.
+
+**Note the heuristic error:** §16's estimate from protocol signatures alone put `Exercise` at 8. The
+real figure is 18, because models also cross via concrete (non-protocol) APIs. Protocol-signature
+counting under-reports; use the compiler.
+
+### 17.3 Policy for the rest
+
+Remove a model's annotation only once its crossings are **zero**, so the build stays warning-clean
+and each removal is a permanent guarantee rather than a running tally of debt. The four above met
+that bar today. The others become removable as their crossings are converted — which is the same
+work the rest of Stage 2 is doing anyway, now with a per-model progress metric attached.

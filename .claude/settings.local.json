@@ -188,7 +188,16 @@
       "Bash(awk '{a+=$1; d+=$2} END {print \"vms:   +\"a\" -\"d}')",
       "Bash(sed -n '/init\\(set: WorkoutSet\\)/,/^    }/p' Repster/Core/Services/Protocols/SetServiceProtocol.swift)",
       "Bash(sed -n '/private func syncDerivedPerformanceFields\\(supportsUnilateralLogging/,/^    }/p' Repster/Data/Models/WorkoutSet.swift)",
-      "Bash(sed -n '/var prReps: Int {/,/^    }/p;/var totalReps: Int {/,/^    }/p' Repster/Data/Models/WorkoutSet.swift)"
+      "Bash(sed -n '/var prReps: Int {/,/^    }/p;/var totalReps: Int {/,/^    }/p' Repster/Data/Models/WorkoutSet.swift)",
+      "Bash(awk '{print \" \"$6}')",
+      "Bash(awk '{print \" avail: \"$4}')",
+      "Bash(rm -rf ~/Library/Developer/Xcode/DerivedData/Repster-*/Build/Intermediates.noindex/Repster.build/Debug-iphonesimulator/Repster.build/Objects-normal-tsan)",
+      "Bash(rm -rf ~/Library/Developer/Xcode/DerivedData/ModuleCache.noindex)",
+      "Bash(awk '{print \"  avail: \"$4}')",
+      "Bash(awk '{print \"disk avail: \"$4}')",
+      "Bash(perl -pi -e 's/^extension ExerciseStats: \\\\@unchecked Sendable \\\\{\\\\}$//' Repster/Data/Models/ExerciseStats.swift)",
+      "Bash(du -sh ~/Library/Developer/Xcode/Archives/* 2>/dev/null | sort -hr; echo \"=== runtimes ===\"; xcrun simctl runtime list 2>/dev/null; echo \"=== runtime dirs ===\"; du -sh /Library/Developer/CoreSimulator/Images 2>/dev/null; ls -la /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null)",
+      "Bash(cd /Users/nikolettkiraly/Downloads/NewWorkoutProject; xcodebuild test -project Repster.xcodeproj -scheme Repster -destination 'platform=iOS Simulator,name=iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO > /tmp/repster_clean_run.log 2>&1; echo \"EXIT=$?\"; grep -E \"error:|Executed [0-9]+ tests, with|TEST \\(SUCCEEDED|FAILED\\)\" /tmp/repster_clean_run.log | tail -5; echo \"--- warnings ---\"; grep -c \"warning:\" /tmp/repster_clean_run.log)"
     ]
   }
 }

@@ -1674,6 +1674,10 @@ final class ActiveWorkoutViewModel {
     func refreshCurrentExerciseConfigurationData() async {
         guard currentExercise != nil else { return }
 
+        // Must run first: everything below reads `currentExercise`, so refreshing against a
+        // stale snapshot would recompute the same pre-edit values.
+        await refreshCurrentExerciseSnapshot()
+
         invalidateExerciseInfo()
         async let exerciseInfoRefresh: Void = loadExerciseInfo()
         async let suggestionRefresh: Void = refreshWeightSuggestions(
@@ -1681,6 +1685,22 @@ final class ActiveWorkoutViewModel {
             presentation: .preserveExisting
         )
         _ = await (exerciseInfoRefresh, suggestionRefresh)
+    }
+
+    /// Re-read the current exercise's snapshot from the store and splice it into `exercises`.
+    ///
+    /// `exercises` is otherwise written only on load and on add, so an edit made while the
+    /// workout is open never reaches it: the rest timer keeps the old `defaultRestTime`, and
+    /// `loadExerciseInfo`/the suggestion inputs keep the old `weightIncrement`. Before the
+    /// snapshot conversion this array held the live `Exercise` the settings sheet mutated, so
+    /// it updated for free — a frozen value type has to be refetched deliberately.
+    private func refreshCurrentExerciseSnapshot() async {
+        guard let exerciseId = currentExercise?.id,
+              let index = exercises.firstIndex(where: { $0.id == exerciseId }),
+              let refreshed = try? await exerciseService.fetchExerciseSnapshot(exerciseId)
+        else { return }
+
+        exercises[index] = refreshed
     }
 
     /// Load weight suggestions for unfilled working sets of the current exercise.

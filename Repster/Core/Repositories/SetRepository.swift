@@ -99,7 +99,6 @@ actor SetRepository: SetRepositoryProtocol {
     func applyOrdering(_ updates: [SetOrderUpdate]) throws {
         guard !updates.isEmpty else { return }
 
-        var didChangeAny = false
         for update in updates {
             guard let set = try fetch(byId: update.setId) else { continue }
 
@@ -115,11 +114,16 @@ actor SetRepository: SetRepositoryProtocol {
 
             if didChangeThisSet {
                 set.updatedAt = Date()
-                didChangeAny = true
             }
         }
 
-        guard didChangeAny else { return }
+        // Commit unconditionally. The comparisons above decide whether to bump `updatedAt`
+        // — they cannot decide whether a save is needed. `ActiveWorkoutViewModel` holds this
+        // context's own models and reindexes them on the main actor *before* calling here,
+        // so `fetch(byId:)` returns the very instance it already mutated and every
+        // comparison reads as "unchanged". Short-circuiting on that left the reindex sitting
+        // uncommitted until some unrelated later write on this context happened to flush it.
+        // Saving with no pending changes is a no-op, so the guard bought nothing.
         try modelContext.save()
     }
 

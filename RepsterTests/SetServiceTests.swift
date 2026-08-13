@@ -13,6 +13,42 @@ final class SetServiceTests: XCTestCase {
     // the bit callers depend on: the ViewModel holds the same `@Model` reference, so the
     // change must still be visible on the object it passed in.
 
+    /// Exercises without rep PRs must never carry a PR badge — the pipeline clears `prStatus`
+    /// on persist. Every other fixture here is `.weightReps`, which *does* support rep PRs, so
+    /// ignoring `clearPRStatus` entirely went unnoticed (mutation sweep, 2026-08-12).
+    func testPersistClearsPRStatusForExercisesWithoutRepPRs() async throws {
+        let context = try makeContext()
+        let exercise = Exercise(
+            name: "Plank",
+            equipmentType: .bodyweight,
+            trackingType: .duration
+        )
+        try await context.exerciseRepo.save(exercise)
+        XCTAssertFalse(exercise.trackingType.supportsRepPRs, "fixture must be a non-rep-PR type")
+
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: exercise.id,
+            durationSeconds: 60,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+        // A stale badge from before the exercise's tracking type ruled PRs out.
+        set.prStatus = .current
+
+        _ = try await context.setService.save(set)
+
+        let afterSave = try await context.setRepo.fetch(byId: set.id)
+        XCTAssertNil(afterSave?.prStatus, "save() must clear PR status for a non-rep-PR exercise")
+
+        set.prStatus = .current
+        _ = try await context.setService.edit(set)
+
+        let afterEdit = try await context.setRepo.fetch(byId: set.id)
+        XCTAssertNil(afterEdit?.prStatus, "edit() must clear PR status for a non-rep-PR exercise")
+    }
+
     /// `save()` must **not** clear a previously stored e1RM when a set stops qualifying.
     ///
     /// `save()` has no `else` branch — it only ever writes an estimate, never removes one.

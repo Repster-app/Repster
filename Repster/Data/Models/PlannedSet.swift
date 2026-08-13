@@ -36,4 +36,3 @@ final class PlannedSet {
     }
 }
 
-extension PlannedSet: @unchecked Sendable {}

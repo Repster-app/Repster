@@ -27,4 +27,3 @@ final class PlannedWorkout {
     }
 }
 
-extension PlannedWorkout: @unchecked Sendable {}

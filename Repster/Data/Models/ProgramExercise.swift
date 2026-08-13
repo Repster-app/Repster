@@ -36,4 +36,3 @@ final class ProgramExercise {
     }
 }
 
-extension ProgramExercise: @unchecked Sendable {}

@@ -244,6 +244,34 @@ final class ScreenDataGoldenMasterTests: XCTestCase {
         XCTAssertEqual(volume, expectedVolume, accuracy: 0.001)
     }
 
+    /// Home shows completed workouts only. The fixture seeds nothing else, so dropping the
+    /// status filter entirely went unnoticed (mutation sweep, 2026-08-12) — an in-progress
+    /// session would have appeared in Recent Workouts and the week strip while still running.
+    func testHomeExcludesInProgressWorkouts() async throws {
+        let fixture = try await makeFixture()
+        let viewModel = makeHomeViewModel(fixture)
+
+        let inProgress = try await fixture.workoutService.startWorkout()
+        let set = WorkoutSet(
+            workoutId: inProgress.id, exerciseId: fixture.benchId, date: fixture.date,
+            weight: 60, reps: 5, orderInWorkout: 1, orderInExercise: 1, completed: true
+        )
+        _ = try await fixture.setService.save(set)
+
+        await viewModel.loadData()
+
+        XCTAssertEqual(viewModel.recentWorkouts.count, 1, "only the completed workout")
+        XCTAssertEqual(viewModel.recentWorkouts.first?.id, fixture.workoutId)
+        XCTAssertFalse(
+            viewModel.recentWorkouts.contains { $0.id == inProgress.id },
+            "an in-progress workout must not appear in Recent Workouts"
+        )
+        XCTAssertEqual(
+            viewModel.thisWeekWorkoutCount, 1,
+            "an in-progress workout must not count toward the weekly total"
+        )
+    }
+
     func testHomeWeekStripAndActivityGoldenMaster() async throws {
         let fixture = try await makeFixture()
         let viewModel = makeHomeViewModel(fixture)

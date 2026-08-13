@@ -153,6 +153,64 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         )
     }
 
+    // MARK: - Exercise snapshots must not go stale mid-workout (Stage 2 step 1 follow-up)
+
+    /// An exercise edited while the workout is open has to reach `exercises`.
+    ///
+    /// That array is otherwise written only on load and on add, so a frozen snapshot leaves
+    /// the rest timer reading the old `defaultRestTime` and `loadExerciseInfo` plus the
+    /// suggestion inputs reading the old `weightIncrement` — which are exactly the two fields
+    /// `ExerciseSettingsSheet` edits. Before the snapshot conversion this array held the live
+    /// `Exercise` the sheet mutated, so it refreshed for free.
+    func testRefreshingConfigurationRereadsTheCurrentExerciseSnapshot() async throws {
+        let exerciseService = ExerciseServiceStub()
+        let profile = HealthProfile()
+        let exercise = Exercise(
+            name: "Back Squat",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            weightIncrement: 2.5,
+            defaultRestTime: 90
+        )
+        exerciseService.fetchedExercises[exercise.id] = exercise
+
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: WorkoutServiceStub(),
+            setService: SetServiceStub(),
+            exerciseService: exerciseService,
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            analyticsService: AnalyticsServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+        viewModel.workout = Workout(id: UUID(), date: Date(), status: .inProgress)
+        viewModel.exercises = [ChartExerciseData(from: exercise)]
+        viewModel.setsByExercise = [exercise.id: []]
+
+        XCTAssertEqual(viewModel.currentExercise?.defaultRestTime, 90)
+
+        // The settings sheet persists through the service, so the store now holds new values
+        // while the ViewModel still holds the snapshot it loaded with.
+        exercise.defaultRestTime = 180
+        exercise.weightIncrement = 5
+
+        await viewModel.refreshCurrentExerciseConfigurationData()
+
+        XCTAssertEqual(
+            viewModel.currentExercise?.defaultRestTime,
+            180,
+            "the rest timer would keep starting at the pre-edit duration"
+        )
+        XCTAssertEqual(
+            viewModel.currentExercise?.weightIncrement,
+            5,
+            "exercise info and the suggestion inputs would recompute from the pre-edit increment"
+        )
+    }
+
     func testBackgroundRestTimerNotificationUsesSystemSoundForVibrationMode() {
         XCTAssertTrue(
             ActiveWorkoutViewModel.restTimerBackgroundNotificationUsesSystemSound(for: "vibration")
