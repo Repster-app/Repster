@@ -584,6 +584,13 @@ load; normal-use rarity is purely about a save coinciding with a reload.
 try XCTSkipUnless(ProcessInfo.processInfo.environment["RUN_RACE_REPRO"] == "1", …)
 ```
 
+> ⚠️ **Corrected 2026-08-13 — the mechanism below does not work in this project.** Verified by
+> dumping `ProcessInfo.processInfo.environment` inside the test process: neither
+> `TEST_RUNNER_RUN_RACE_REPRO=1` nor a bare `RUN_RACE_REPRO=1` reaches it, so the gated test
+> **skips while the run reports `** TEST SUCCEEDED **`** — a control that looks like it ran and
+> didn't. `RepsterTests/CrossContextRaceTests.swift` now gates on a consumed marker file
+> instead; see STEP5_SCOPE_AND_TEST_STRATEGY.md §5.3.
+
 To fire it deliberately, pass the variable through to the test runner process — note the
 `TEST_RUNNER_` prefix, which is how `xcodebuild` forwards environment variables to the runner:
 

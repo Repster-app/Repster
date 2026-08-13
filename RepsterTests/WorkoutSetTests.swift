@@ -590,6 +590,160 @@ final class WorkoutSetTests: XCTestCase {
         )
     }
 
+    /// Fails when a stored property is added to `WorkoutSet` and not to `ChartSetData`.
+    ///
+    /// The `Exercise` guard above can compare name sets directly. This one cannot, for three
+    /// reasons that are all properties of `WorkoutSet` rather than of the technique — so they are
+    /// declared here explicitly instead of being silently absorbed by a looser assertion:
+    ///
+    ///  1. **`@Transient` breaks the prefix strip.** SwiftData's macro rewrites persisted
+    ///     properties to `_name`; a `@Transient` one stays `persistedFatigueSnapshot`. The blanket
+    ///     `dropFirst()` the `Exercise` guard uses would turn that into `ersistedFatigueSnapshot`
+    ///     and compare garbage. `Exercise` has no transients, so it never hit this.
+    ///  2. **One property must never be mirrored.** `cachedPRStatus` is a legacy persisted enum
+    ///     kept for schema compatibility only, and its declaration says app logic must not read
+    ///     it. Requiring it in the snapshot would mandate exactly that.
+    ///  3. **Three snapshot fields mirror computed accessors, not storage.** `prStatus` is the
+    ///     decoded form of `cachedPRStatusRaw`; `prReps` and `totalReps` are derived. They are
+    ///     legitimately on the snapshot and legitimately absent from the model's storage.
+    ///
+    /// Anything outside those three exemptions has to be mirrored, by name.
+    func testChartSetDataCoversEveryStoredWorkoutSetProperty() {
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: UUID(),
+            orderInWorkout: 1,
+            orderInExercise: 1
+        )
+
+        /// Never mirrored. Adding to this set is a decision, not a formality.
+        let exemptFromMirroring: Set<String> = [
+            // Legacy schema-compatibility field; `WorkoutSet.swift:40` forbids reading it.
+            "cachedPRStatus",
+            // @Transient — never persisted, and step 5 makes it actor-internal.
+            "persistedFatigueSnapshot",
+        ]
+
+        /// Snapshot field -> the model storage it stands for.
+        let aliases: [String: String] = [
+            "prStatus": "cachedPRStatusRaw",
+        ]
+
+        /// Snapshot fields derived from storage rather than mirroring one property.
+        let derivedOnSnapshot: Set<String> = ["prReps", "totalReps"]
+
+        let modelProperties = Set(
+            Mirror(reflecting: set).children
+                .compactMap(\.label)
+                .filter { !$0.hasPrefix("_$") }
+                // Strip the macro prefix only where the macro actually applied it.
+                .map { $0.hasPrefix("_") ? String($0.dropFirst()) : $0 }
+        )
+        let snapshotProperties = Set(
+            Mirror(reflecting: ChartSetData(from: set)).children.compactMap(\.label)
+        )
+
+        XCTAssertFalse(modelProperties.isEmpty, "Reflection returned nothing — the check is vacuous")
+        XCTAssertTrue(
+            modelProperties.contains("persistedFatigueSnapshot"),
+            "The @Transient property is no longer reflected under its own name — the prefix "
+                + "handling above needs rechecking, not the exemption list"
+        )
+
+        let covered: Set<String> = Set(snapshotProperties.map { aliases[$0] ?? $0 })
+
+        XCTAssertEqual(
+            modelProperties.subtracting(covered).subtracting(exemptFromMirroring),
+            Set<String>(),
+            "WorkoutSet gained stored properties that ChartSetData does not mirror"
+        )
+        XCTAssertEqual(
+            covered.subtracting(modelProperties).subtracting(derivedOnSnapshot),
+            Set<String>(),
+            "ChartSetData has fields WorkoutSet does not — the mirror has drifted"
+        )
+    }
+
+    // MARK: - PRBadgeApplier
+    //
+    // The badge-application rule, extracted from two byte-identical private copies in
+    // ActiveWorkoutViewModel and EditWorkoutViewModel (STEP5 §0.5). Unit-tested directly because
+    // no higher-level test can currently discriminate it: PRService writes each status onto the
+    // same @Model instance the ViewModels hold before returning, so a journey test passes whether
+    // this function works or does nothing at all.
+
+    private func makeBadgeSet(prStatus: CachedPRStatus?, completed: Bool) -> WorkoutSet {
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: UUID(),
+            weight: 100,
+            reps: 5,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: completed
+        )
+        set.prStatus = prStatus
+        return set
+    }
+
+    /// The behaviour chosen on 2026-08-13: badges always match the stored state.
+    ///
+    /// The removed rule blocked exactly this — a completed set gaining a badge mid-workout. It
+    /// never fired in shipped code, and reviving it at step 5 would have left the screen showing
+    /// no badge on the set that legitimately inherits a record after a delete or an un-tick.
+    func testCompletedSetsReceivePromotions() {
+        let set = makeBadgeSet(prStatus: nil, completed: true)
+        var state = [set.exerciseId: [set]]
+
+        PRBadgeApplier.apply([set.id: .current], to: &state)
+
+        XCTAssertEqual(set.prStatus, .current, "a completed set must be allowed to gain a badge")
+    }
+
+    func testCompletedSetsReceiveDemotions() {
+        let set = makeBadgeSet(prStatus: .current, completed: true)
+        var state = [set.exerciseId: [set]]
+
+        PRBadgeApplier.apply([set.id: .previous], to: &state)
+
+        XCTAssertEqual(set.prStatus, .previous)
+    }
+
+    /// The `[UUID: CachedPRStatus?]` trap: a **present but nil** entry means "clear this badge".
+    ///
+    /// `affectedSetIds[id]` is `CachedPRStatus??`. Unwrapping only the outer optional is what
+    /// makes a clear reach the set; flattening with `??` would turn every demotion-to-nothing
+    /// into a no-op and silently strand stale ★s on screen.
+    func testPresentButNilEntryClearsTheBadge() {
+        let set = makeBadgeSet(prStatus: .current, completed: true)
+        var state = [set.exerciseId: [set]]
+
+        PRBadgeApplier.apply([set.id: CachedPRStatus?.none], to: &state)
+
+        XCTAssertNil(set.prStatus, "a present-but-nil entry must clear the badge, not be skipped")
+    }
+
+    func testSetsNotMentionedAreLeftAlone() {
+        let mentioned = makeBadgeSet(prStatus: nil, completed: true)
+        let untouched = makeBadgeSet(prStatus: .matched, completed: true)
+        var state = [mentioned.exerciseId: [mentioned, untouched]]
+
+        PRBadgeApplier.apply([mentioned.id: .current], to: &state)
+
+        XCTAssertEqual(mentioned.prStatus, .current)
+        XCTAssertEqual(untouched.prStatus, .matched, "an unmentioned set must not be rewritten")
+    }
+
+    /// Incomplete sets were never covered by the old rule, and still are not special.
+    func testIncompleteSetsAreTreatedIdentically() {
+        let set = makeBadgeSet(prStatus: nil, completed: false)
+        var state = [set.exerciseId: [set]]
+
+        PRBadgeApplier.apply([set.id: .current], to: &state)
+
+        XCTAssertEqual(set.prStatus, .current)
+    }
+
     // MARK: - SetRepository.applyOrdering (Stage 2 step 4)
 
     private func makeSetRepo() throws -> SetRepository {

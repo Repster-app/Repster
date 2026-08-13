@@ -239,6 +239,11 @@
 		TT0004 /* WorkoutHistoryBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2005 /* WorkoutHistoryBackupTests.swift */; };
 		TT0005 /* SetServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2006 /* SetServiceTests.swift */; };
 		TT0099 /* ScreenDataGoldenMasterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2099 /* ScreenDataGoldenMasterTests.swift */; };
+		TT0100 /* WorkoutJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2100 /* WorkoutJourneyTests.swift */; };
+		TT0101 /* CrossContextRaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2101 /* CrossContextRaceTests.swift */; };
+		TT0102 /* PipelinePerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2102 /* PipelinePerformanceTests.swift */; };
+		TT0103 /* RealDataDifferentialTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2103 /* RealDataDifferentialTests.swift */; };
+		TT0104 /* AffectedSetsPreconditionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2104 /* AffectedSetsPreconditionTests.swift */; };
 		TT0006 /* WorkoutSetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2007 /* WorkoutSetTests.swift */; };
 		TT0007 /* SeedExerciseLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2008 /* SeedExerciseLibraryTests.swift */; };
 		TT0008 /* MonetizationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2009 /* MonetizationServiceTests.swift */; };
@@ -530,6 +535,11 @@
 		TT2005 /* WorkoutHistoryBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutHistoryBackupTests.swift; sourceTree = "<group>"; };
 		TT2006 /* SetServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetServiceTests.swift; sourceTree = "<group>"; };
 		TT2099 /* ScreenDataGoldenMasterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenDataGoldenMasterTests.swift; sourceTree = "<group>"; };
+		TT2100 /* WorkoutJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutJourneyTests.swift; sourceTree = "<group>"; };
+		TT2101 /* CrossContextRaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossContextRaceTests.swift; sourceTree = "<group>"; };
+		TT2102 /* PipelinePerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelinePerformanceTests.swift; sourceTree = "<group>"; };
+		TT2103 /* RealDataDifferentialTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealDataDifferentialTests.swift; sourceTree = "<group>"; };
+		TT2104 /* AffectedSetsPreconditionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AffectedSetsPreconditionTests.swift; sourceTree = "<group>"; };
 		TT2007 /* WorkoutSetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSetTests.swift; sourceTree = "<group>"; };
 		TT2008 /* SeedExerciseLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedExerciseLibraryTests.swift; sourceTree = "<group>"; };
 		TT2009 /* MonetizationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonetizationServiceTests.swift; sourceTree = "<group>"; };
@@ -1382,6 +1392,11 @@
 				TT2005 /* WorkoutHistoryBackupTests.swift */,
 				TT2006 /* SetServiceTests.swift */,
 				TT2099 /* ScreenDataGoldenMasterTests.swift */,
+				TT2100 /* WorkoutJourneyTests.swift */,
+				TT2101 /* CrossContextRaceTests.swift */,
+				TT2102 /* PipelinePerformanceTests.swift */,
+				TT2103 /* RealDataDifferentialTests.swift */,
+				TT2104 /* AffectedSetsPreconditionTests.swift */,
 				TT2008 /* SeedExerciseLibraryTests.swift */,
 				TT2007 /* WorkoutSetTests.swift */,
 				TT2009 /* MonetizationServiceTests.swift */,
@@ -1822,6 +1837,11 @@
 				TT0004 /* WorkoutHistoryBackupTests.swift in Sources */,
 				TT0005 /* SetServiceTests.swift in Sources */,
 				TT0099 /* ScreenDataGoldenMasterTests.swift in Sources */,
+				TT0100 /* WorkoutJourneyTests.swift in Sources */,
+				TT0101 /* CrossContextRaceTests.swift in Sources */,
+				TT0102 /* PipelinePerformanceTests.swift in Sources */,
+				TT0103 /* RealDataDifferentialTests.swift in Sources */,
+				TT0104 /* AffectedSetsPreconditionTests.swift in Sources */,
 				TT0007 /* SeedExerciseLibraryTests.swift in Sources */,
 				TT0006 /* WorkoutSetTests.swift in Sources */,
 				TT0008 /* MonetizationServiceTests.swift in Sources */,

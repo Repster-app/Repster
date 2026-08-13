@@ -122,6 +122,48 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         )
     }
 
+    /// Deleting a PR owner re-badges the set that inherits the record.
+    ///
+    /// `SetService.delete` used to return `Void` — it computed `prService.handleDeletion(...)`
+    /// and discarded it, so `deleteSet` had no way to apply the result. The promoted set's badge
+    /// still reached the screen, but only because `PRService` mutated the very `@Model` instance
+    /// the ViewModel held. Once `setsByExercise` holds value types that stops working, and the
+    /// badge would stay wrong until relaunch.
+    ///
+    /// This has to be a **stub** test. Against the real stack it proves nothing: `PRService`
+    /// writes the status onto the shared instance before `applyAffectedSets` ever runs, so the
+    /// assertion passes with or without the fix — measured in
+    /// `AffectedSetsPreconditionTests`. The stub touches no models, so `applyAffectedSets` is
+    /// the only route by which this badge can change.
+    func testDeletingAPROwnerAppliesTheBadgeChangeReportedByTheService() async throws {
+        let setService = SetServiceStub()
+        let viewModel = makeOrderingViewModel(setService: setService)
+
+        let exercise = makeExercise(name: "Bench Press")
+        viewModel.workout = Workout(id: UUID(), date: Date(), status: .inProgress)
+        viewModel.exercises = [ChartExerciseData(from: exercise)]
+
+        let holder = makeSet(exerciseId: exercise.id, order: 1, reps: 5)
+        let inheritor = makeSet(exerciseId: exercise.id, order: 2, reps: 5)
+        inheritor.completed = true
+        inheritor.prStatus = nil
+        viewModel.setsByExercise = [exercise.id: [holder, inheritor]]
+
+        // The pipeline reports that deleting `holder` promoted `inheritor`.
+        setService.deleteAffectedSetIds = [inheritor.id: .current]
+
+        await viewModel.deleteSet(holder)
+
+        let remaining = try XCTUnwrap(viewModel.setsByExercise[exercise.id])
+        XCTAssertEqual(remaining.map(\.id), [inheritor.id])
+        XCTAssertEqual(
+            remaining.first?.prStatus,
+            .current,
+            "the surviving set never received the badge the delete pipeline reported — "
+                + "SetService.delete's PREvaluationResult is being dropped again"
+        )
+    }
+
     func testDeletingSetReindexesRemainingSetsContiguouslyInOneBatch() async throws {
         let setService = SetServiceStub()
         let viewModel = makeOrderingViewModel(setService: setService)
@@ -4203,8 +4245,76 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
         return try await save(set)
     }
 
-    func delete(_ set: WorkoutSet) async throws {
+    /// Returns whatever `deleteAffectedSetIds` is primed with, so a test can drive the badge
+    /// side of a deletion without a real `PRService`.
+    var deleteAffectedSetIds: [UUID: CachedPRStatus?] = [:]
+
+    /// Records creations and behaves like the real service: the new set lands in the stub's
+    /// own store so later fetches see it.
+    var createdSets: [WorkoutSet] = []
+
+    /// Mirrors the real service: applies the typed values and completion stamps to the stored
+    /// set, so ViewModel tests still observe a completed row after calling through.
+    var completionInputs: [UUID: SetCompletionInput] = [:]
+
+    func save(setId: UUID, input: SetCompletionInput) async throws -> SetSaveResult {
+        completionInputs[setId] = input
+        let stored = workoutSets.values.flatMap { $0 }.first { $0.id == setId }
+        if let set = stored {
+            set.weight = input.weight
+            set.durationSeconds = input.durationSeconds
+            set.distanceMeters = input.distanceMeters
+            set.leftReps = input.leftReps
+            set.rightReps = input.rightReps
+            set.leftRIR = input.leftRIR
+            set.rightRIR = input.rightRIR
+            set.reps = input.reps
+            set.rir = input.rir
+            set.completed = true
+            set.completedAt = Date()
+            set.updatedAt = Date()
+        }
+        return SetSaveResult(
+            setId: setId,
+            effectiveWeight: input.weight ?? 0,
+            prResult: .empty(for: setId)
+        )
+    }
+
+    func create(
+        workoutId: UUID,
+        exerciseId: UUID,
+        date: Date,
+        setType: SetType,
+        orderInWorkout: Int,
+        orderInExercise: Int,
+        weight: Double?,
+        reps: Int?
+    ) async throws -> WorkoutSet {
+        let set = WorkoutSet(
+            workoutId: workoutId,
+            exerciseId: exerciseId,
+            date: date,
+            weight: weight,
+            reps: reps,
+            setType: setType,
+            orderInWorkout: orderInWorkout,
+            orderInExercise: orderInExercise,
+            completed: false
+        )
+        createdSets.append(set)
+        workoutSets[workoutId, default: []].append(set)
+        return set
+    }
+
+    func delete(_ set: WorkoutSet) async throws -> PREvaluationResult {
         deletedSetIds.append(set.id)
+        return PREvaluationResult(
+            setId: set.id,
+            newStatus: nil,
+            affectedSetIds: deleteAffectedSetIds,
+            prRecordChanged: false
+        )
     }
 
     func updateInProgressTargetRepOverride(
@@ -4260,6 +4370,13 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
             return Array(sets.prefix(limit))
         }
         return sets
+    }
+
+    /// Shares `fetchSets(for:limit:)`'s bookkeeping deliberately: the two differ only in the
+    /// type they hand back, so a test asserting on `fetchSetsForExerciseCallCount` keeps
+    /// counting the same fetches after a caller moves to the snapshot variant.
+    func fetchSetSnapshots(for exerciseId: UUID, limit: Int?) async throws -> [ChartSetData] {
+        try await fetchSets(for: exerciseId, limit: limit).map(ChartSetData.init(from:))
     }
 }
 

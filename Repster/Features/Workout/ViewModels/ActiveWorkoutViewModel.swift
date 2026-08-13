@@ -428,21 +428,17 @@ final class ActiveWorkoutViewModel {
                 predictionSnapshot = nil
             }
 
-            // 1. Update the set object with input values
-            applyCompletionInput(input, to: set)
-            set.completed = true
-            set.completedAt = Date()
-            set.updatedAt = Date()
-
-            // 2. Save via SetService (triggers effectiveWeight + PR + stats pipeline)
-            let result = try await setService.save(set)
+            // 1/2. The typed values, the completion stamps and the pipeline all happen inside
+            // the repository actor now. These twelve field writes used to run here, on the main
+            // actor, against a model the repository's context owns.
+            let result = try await setService.save(setId: set.id, input: input)
 
             // 3. Update local state with pipeline results
             set.effectiveWeight = result.effectiveWeight
             set.prStatus = result.prResult.newStatus
 
             // 4. Update any affected sets (e.g., demoted PR owners)
-            applyAffectedSets(result.prResult.affectedSetIds)
+            PRBadgeApplier.apply(result.prResult.affectedSetIds, to: &setsByExercise)
 
             // 4b. Reassign array to trigger @Observable update for UI
             if let sets = setsByExercise[set.exerciseId] {
@@ -491,8 +487,7 @@ final class ActiveWorkoutViewModel {
             }
 
             // 7. Invalidate PR, history, and suggestion caches, then reload
-            prsLoadedForExerciseId = nil
-            historyLoadedForExerciseId = nil
+            invalidateSetDerivedSubTabCaches()
             if currentExercise?.id == set.exerciseId {
                 requestWeightSuggestionRefresh(mode: .preserveExisting, invalidateCache: true)
             }
@@ -542,7 +537,7 @@ final class ActiveWorkoutViewModel {
             // set owned the PR, handleDeletion → findNewPROwner returns the new
             // winner's setId/status, not this set's. SetService.uncomplete already
             // cleared set.prStatus = nil on the same @Model reference.
-            applyAffectedSets(result.prResult.affectedSetIds)
+            PRBadgeApplier.apply(result.prResult.affectedSetIds, to: &setsByExercise)
 
             // The set is back in the pending list — drop any stale done-strip
             // snapshot so re-completing later captures a fresh suggestion.
@@ -557,8 +552,7 @@ final class ActiveWorkoutViewModel {
             updateLiveActivityState()
 
             // Invalidate PR, history, and suggestion caches, then reload
-            prsLoadedForExerciseId = nil
-            historyLoadedForExerciseId = nil
+            invalidateSetDerivedSubTabCaches()
             if currentExercise?.id == exerciseId {
                 requestWeightSuggestionRefresh(mode: .preserveExisting, invalidateCache: true)
             }
@@ -584,18 +578,17 @@ final class ActiveWorkoutViewModel {
         let totalSets = setsByExercise.values.flatMap { $0 }.count
         let exerciseSets = setsByExercise[exerciseId] ?? []
 
-        let newSet = WorkoutSet(
-            workoutId: workout.id,
-            exerciseId: exerciseId,
-            date: Date(),
-            setType: .working,
-            orderInWorkout: totalSets + 1,
-            orderInExercise: exerciseSets.count + 1,
-            completed: false
-        )
-
         do {
-            _ = try await setService.save(newSet)
+            let newSet = try await setService.create(
+                workoutId: workout.id,
+                exerciseId: exerciseId,
+                date: Date(),
+                setType: .working,
+                orderInWorkout: totalSets + 1,
+                orderInExercise: exerciseSets.count + 1,
+                weight: nil,
+                reps: nil
+            )
 
             // Append to local state
             var sets = setsByExercise[exerciseId] ?? []
@@ -604,6 +597,9 @@ final class ActiveWorkoutViewModel {
 
             // Update Live Activity (total sets changed)
             updateLiveActivityState()
+
+            // A new set changes what the History and PRs sub-tabs would show.
+            invalidateSetDerivedSubTabCaches()
 
             // Invalidate and refresh suggestions for the currently visible exercise
             if currentExercise?.id == exerciseId {
@@ -629,18 +625,17 @@ final class ActiveWorkoutViewModel {
         // Find insertion point: before the first non-warmup set
         let insertionIndex = exerciseSets.firstIndex(where: { $0.setType != .warmup }) ?? exerciseSets.count
 
-        let newSet = WorkoutSet(
-            workoutId: workout.id,
-            exerciseId: exerciseId,
-            date: Date(),
-            setType: .warmup,
-            orderInWorkout: totalSets + 1,
-            orderInExercise: insertionIndex + 1,
-            completed: false
-        )
-
         do {
-            _ = try await setService.save(newSet)
+            let newSet = try await setService.create(
+                workoutId: workout.id,
+                exerciseId: exerciseId,
+                date: Date(),
+                setType: .warmup,
+                orderInWorkout: totalSets + 1,
+                orderInExercise: insertionIndex + 1,
+                weight: nil,
+                reps: nil
+            )
 
             // Insert at correct position and reindex
             exerciseSets.insert(newSet, at: insertionIndex)
@@ -651,6 +646,9 @@ final class ActiveWorkoutViewModel {
             // at the workout tail — keeps both order fields consistent.
             orderingUpdates += reindexOrderInWorkout()
             await persistSetOrdering(orderingUpdates)
+
+            // A new set changes what the History and PRs sub-tabs would show.
+            invalidateSetDerivedSubTabCaches()
 
             // Invalidate and refresh suggestions for the currently visible exercise
             if currentExercise?.id == exerciseId {
@@ -671,7 +669,10 @@ final class ActiveWorkoutViewModel {
         let exerciseId = set.exerciseId
 
         do {
-            try await setService.delete(set)
+            // Deleting a PR owner promotes another set; without this the new owner's badge
+            // reaches the screen only because PRService mutated the instance we hold.
+            let prResult = try await setService.delete(set)
+            PRBadgeApplier.apply(prResult.affectedSetIds, to: &setsByExercise)
 
             // Remove from local state
             var sets = setsByExercise[exerciseId] ?? []
@@ -683,8 +684,8 @@ final class ActiveWorkoutViewModel {
             // Update Live Activity (total sets changed)
             updateLiveActivityState()
 
-            // Invalidate PR cache and refresh suggestions as needed
-            prsLoadedForExerciseId = nil
+            // Invalidate the sub-tab caches and refresh suggestions as needed
+            invalidateSetDerivedSubTabCaches()
 
             // Deletion can change fatigue context and first-working-set freshness logic
             if currentExercise?.id == exerciseId {
@@ -709,10 +710,10 @@ final class ActiveWorkoutViewModel {
             let result = try await setService.edit(set)
             set.effectiveWeight = result.effectiveWeight
             set.prStatus = result.prResult.newStatus
-            applyAffectedSets(result.prResult.affectedSetIds)
+            PRBadgeApplier.apply(result.prResult.affectedSetIds, to: &setsByExercise)
 
-            // Invalidate PR cache and refresh suggestions as needed
-            prsLoadedForExerciseId = nil
+            // Invalidate the sub-tab caches and refresh suggestions as needed
+            invalidateSetDerivedSubTabCaches()
 
             // Type changes can add/remove a set from suggestion inputs
             if currentExercise?.id == set.exerciseId {
@@ -776,7 +777,9 @@ final class ActiveWorkoutViewModel {
         // Delete all sets for this exercise
         for set in exerciseSets {
             do {
-                try await setService.delete(set)
+                // Ignored deliberately: this exercise and all its rows are about to leave
+                // the screen, so there is nothing on it left to re-badge.
+                _ = try await setService.delete(set)
             } catch {
                 #if DEBUG
                 dbg("[ActiveWorkoutViewModel] Failed to delete set \(set.id) during exercise removal: \(error)")
@@ -1511,6 +1514,25 @@ final class ActiveWorkoutViewModel {
 
     // MARK: - Sub-Tab Data Loading (WP06 T026/T027)
 
+    /// Drop the sub-tab caches that any change to this workout's sets invalidates.
+    ///
+    /// Both sub-tabs read the *whole* exercise history, current workout included
+    /// (`loadHistoryForCurrentExercise` does not filter by workout), so adding, deleting,
+    /// completing, retyping or annotating a set makes both stale. They are guarded by
+    /// `historyLoadedForExerciseId`/`prsLoadedForExerciseId`, so a stale cache survives until
+    /// the user switches exercise.
+    ///
+    /// This is one call rather than two assignments at seven sites because four of those seven
+    /// were missing the history half: `deleteSet`, `changeSetType`, `addSet` and `addWarmupSet`
+    /// invalidated only the PR cache. Deleting a set therefore left it visible on the History
+    /// tab. That was survivable while the tab held live models — the deleted row was undefined
+    /// behaviour rather than obviously wrong — but the snapshot conversion turns it into
+    /// deterministic staleness, so it has to be right now.
+    private func invalidateSetDerivedSubTabCaches() {
+        historyLoadedForExerciseId = nil
+        prsLoadedForExerciseId = nil
+    }
+
     /// Load history data for the current exercise. Used by the History sub-tab.
     ///
     /// Fetches all sets for the exercise, groups by workout, and sorts newest-first.
@@ -1520,7 +1542,9 @@ final class ActiveWorkoutViewModel {
         guard historyLoadedForExerciseId != exercise.id else { return }
 
         do {
-            let sets = try await setService.fetchSets(for: exercise.id, limit: nil)
+            // Snapshots: these are rendered by `ExerciseHistoryView` in a view body on the main
+            // actor. Live models here were the same shape as crash B on the same screen.
+            let sets = try await setService.fetchSetSnapshots(for: exercise.id, limit: nil)
             let grouped = Dictionary(grouping: sets) { $0.workoutId }
             subTabHistory = grouped.map { workoutId, workoutSets in
                 WorkoutHistoryGroup(
@@ -1563,8 +1587,7 @@ final class ActiveWorkoutViewModel {
     func clearSubTabCache() {
         subTabHistory = []
         subTabPRTable = []
-        historyLoadedForExerciseId = nil
-        prsLoadedForExerciseId = nil
+        invalidateSetDerivedSubTabCaches()
         exerciseInfoData = nil
         exerciseInfoLoadedForExerciseId = nil
         weightSuggestionData = nil
@@ -1694,10 +1717,13 @@ final class ActiveWorkoutViewModel {
     /// `loadExerciseInfo`/the suggestion inputs keep the old `weightIncrement`. Before the
     /// snapshot conversion this array held the live `Exercise` the settings sheet mutated, so
     /// it updated for free — a frozen value type has to be refetched deliberately.
+    /// The index is deliberately resolved *after* the fetch. `@MainActor` is reentrant, so
+    /// `reorderExercises` or `removeExercise` can run during the await — an index captured
+    /// before it would write the snapshot into the wrong slot, or out of bounds.
     private func refreshCurrentExerciseSnapshot() async {
         guard let exerciseId = currentExercise?.id,
-              let index = exercises.firstIndex(where: { $0.id == exerciseId }),
-              let refreshed = try? await exerciseService.fetchExerciseSnapshot(exerciseId)
+              let refreshed = try? await exerciseService.fetchExerciseSnapshot(exerciseId),
+              let index = exercises.firstIndex(where: { $0.id == exerciseId })
         else { return }
 
         exercises[index] = refreshed
@@ -2077,49 +2103,6 @@ final class ActiveWorkoutViewModel {
 
     // MARK: - Private Helpers
 
-    /// Apply affected set status changes from PR pipeline results.
-    ///
-    /// When a set is saved/edited/deleted, the PR pipeline may change
-    /// PR status on other sets (e.g., demoting a previous PR owner).
-    /// To avoid confusing retroactive badge "upgrades" during a workout,
-    /// completed in-session sets only receive demotions, not promotions.
-    private func applyAffectedSets(_ affectedSetIds: [UUID: CachedPRStatus?]) {
-        guard !affectedSetIds.isEmpty else { return }
-
-        for (exerciseId, sets) in setsByExercise {
-            let updatedSets = sets
-            var changed = false
-            for (index, set) in updatedSets.enumerated() {
-                if let newStatus = affectedSetIds[set.id] {
-                    // For completed sets, only apply demotions (not promotions).
-                    // This prevents confusing badge changes on sets the user already saw.
-                    if set.completed, isStatusUpgrade(from: set.prStatus, to: newStatus) {
-                        continue
-                    }
-                    updatedSets[index].prStatus = newStatus
-                    changed = true
-                }
-            }
-            if changed {
-                setsByExercise[exerciseId] = updatedSets
-            }
-        }
-    }
-
-    /// Returns true if the new status is a "promotion" (more prominent badge).
-    /// Visibility hierarchy: .current (★) > .matched (=) > .dominated/.previous/nil (no badge)
-    private func isStatusUpgrade(from old: CachedPRStatus?, to new: CachedPRStatus?) -> Bool {
-        func rank(_ status: CachedPRStatus?) -> Int {
-            switch status {
-            case .current: return 3
-            case .matched: return 2
-            case .dominated, .previous: return 1
-            case nil: return 0
-            }
-        }
-        return rank(new) > rank(old)
-    }
-
     // MARK: - Reindexing
     //
     // These update local state for immediate UI feedback and *return* the persistence work
@@ -2242,6 +2225,9 @@ extension ActiveWorkoutViewModel: SetTableDataSource {
             if let sets = setsByExercise[set.exerciseId] {
                 setsByExercise[set.exerciseId] = sets
             }
+
+            // The History rows carry a note indicator, so a note edit makes that tab stale too.
+            invalidateSetDerivedSubTabCaches()
         } catch {
             #if DEBUG
             dbg("[ActiveWorkoutViewModel] Failed to update set note: \(error)")
@@ -2249,25 +2235,4 @@ extension ActiveWorkoutViewModel: SetTableDataSource {
         }
     }
 
-    private func applyCompletionInput(_ input: SetCompletionInput, to set: WorkoutSet) {
-        let exercise = exercises.first { $0.id == set.exerciseId }
-
-        set.weight = input.weight
-        set.durationSeconds = input.durationSeconds
-        set.distanceMeters = input.distanceMeters
-        set.leftReps = input.leftReps
-        set.rightReps = input.rightReps
-        set.leftRIR = input.leftRIR
-        set.rightRIR = input.rightRIR
-
-        if exercise?.supportsUnilateralLogging == true, exercise?.unilateral == true {
-            set.reps = input.reps
-            set.rir = input.rir
-            set.syncDerivedPerformanceFields(for: exercise)
-        } else {
-            set.reps = input.reps
-            set.rir = input.rir
-            set.side = nil
-        }
-    }
 }

@@ -370,3 +370,109 @@ and `Health & Fitness → Health` becomes a required App Privacy declaration:
 - [ ] Write the first PostHog survey — one multiple-choice question, targeted at users who completed one workout and haven't returned in 5 days
 - [ ] Line up 5 user interviews (r/fitness, r/weightroom, r/gainit, lifting Discords). At this stage these will teach you more than the dashboard will
 - [ ] Screen views for the exercise list and templates screens are deliberately left untracked — revisit if the funnel points at browsing as the drop-off
+
+---
+
+## 7. Reconsider the backup's scope — not blocking, but decide before someone needs it
+
+Raised 2026-08-13, after auditing a real 11,785-set export against the model layer.
+
+**Sets themselves are complete.** `WorkoutHistoryArchiveSet` carries all 39 stored
+properties of `WorkoutSet` — including `rir`, `leftRIR`/`rightRIR`, `side`,
+`restDurationSeconds`, the target and override fields. Nothing is silently dropped at
+the set level. (Checked because RIR looked missing; it isn't — 454 sets in the sample
+carry one.)
+
+**What a backup does not contain:**
+
+| Excluded | Consequence on restore to a new device |
+|---|---|
+| `BodyweightEntry` | the bodyweight log is gone |
+| `WorkoutTemplate` / `TemplateExercise` / `TemplateSet` | templates gone |
+| `Program` / `ProgramExercise` / `PlannedWorkout` / `PlannedSet` | programs gone |
+| `InsightRecord` | insight history gone |
+| `HealthProfile` | only 3 of 24 fields survive (the fatigue-learning ones) |
+| `ExerciseStats`, `PerformanceRecord` | **fine** — deliberately rebuilt on restore |
+
+**This is not a bug, and the in-app copy is not wrong.** `SettingsView.swift:979` says
+*"Restoring replaces workout history only. Templates, programs, bodyweight logs, and
+settings stay untouched."* That is accurate.
+
+**The gap is what it describes.** That sentence covers what restore will not
+*overwrite*, not what the backup does not *contain*. The two readings coincide on the
+device you exported from and diverge completely on a new one — which is the case that
+matters, because it is the case where someone reaches for a backup. `ExportView.swift:52`
+saying the file is *"meant for full restore"* pulls in the same wrong direction.
+
+**The decision:**
+
+- [ ] **Add `BodyweightEntry` to the archive.** The strongest candidate by far: the rows
+      are tiny, and `effectiveWeight` for every bodyweight-style exercise depends on the
+      bodyweight log for *future* sets. Historical sets are safe (their `effectiveWeight`
+      is stored), so this is about the app still working correctly after a restore, not
+      about recovering old numbers.
+- [ ] **Decide on templates and programs** — either include them or say plainly on the
+      export screen that they are not covered.
+- [ ] **Reword the export screen** to describe contents rather than restore semantics,
+      whatever is decided above. "Workout history, exercises and set details" is honest;
+      "full restore" currently is not.
+
+**Unrelated detail found in the same audit, worth knowing:** restore ends with
+`prService.rebuildAll()`, which discards the PR badges the archive did export and
+recomputes them. Among sets with identical weight and reps, which one gets the badge is
+decided by fetch order, so restoring the same backup twice can put the star on a
+different row. Cosmetic — counts and numbers are identical — and it is why
+`RealDataDifferentialTests` tallies badges per exercise rather than per set.
+
+---
+
+## 8. Bodyweight-style sets read differently on different screens — not blocking, decide
+
+Found 2026-08-13 while converting `ExerciseHistoryView` to snapshots. **Not caused by that
+work** — it is pre-existing, and the conversion deliberately preserved it rather than quietly
+changing what a screen shows during a type refactor.
+
+### What happens
+
+Take a Pull Up (bodyweight-style, `bodyweightFactor` 1.0) logged at **+10 kg for 6 reps** with a
+bodyweight of 80 kg. The set stores `weight = 10` and `effectiveWeight = 90`. Those are both
+correct. But the read-only surfaces disagree about which one to show:
+
+| Surface | Renders | Via |
+|---|---|---|
+| History tab — active workout **and** exercise detail | `10 kg × 6` | `ExerciseHistoryView` → `display(...)` |
+| Exercise Info top-set card, active workout screen | `10 kg × 6` | `ExerciseInfoProvider.formatTopSetLabel` → `performanceLabel(...)` |
+| Calendar / workout-detail cards | `90` | `CalendarExerciseCard` → `fieldDisplay(...)` |
+
+Two entry points on the same formatter with different rules:
+`performanceLabel` builds from the raw `weight` (`WorkoutSetPerformanceFormatter:314`), while
+`fieldDisplay` resolves `effectiveWeight ?? weight` (`:171`).
+
+### Why this is a judgement call, not an obvious bug
+
+The raw-weight path is not an oversight — it takes an `isBodyweightStyle` flag and uses it, but
+only for one case: `weight <= 0` renders **`BW`** (`:413`). So the intent was clearly "say BW when
+there is no added load."
+
+What is missing is the other half of that intent. With added load it prints `10 kg` with nothing
+marking it as *additional*, so on a Pull Up it reads as though 10 kg was lifted. `BW` and `10 kg`
+are inconsistent renderings of the same idea — one names the bodyweight, the other silently omits
+it.
+
+Scope: bodyweight-style exercises with added load only. Pure bodyweight sets (`weight = 0`) show
+`BW` and are fine. Non-bodyweight exercises have `effectiveWeight == weight`, so nothing differs.
+Cosmetic — no data is wrong, no calculation uses these labels.
+
+### The decision
+
+- [ ] **Pick one meaning for these labels.** Either `BW+10 kg` (added load, made explicit — most
+      consistent with the existing `BW` case and with what the user typed) or `90 kg` (total load —
+      consistent with the detail cards). The one thing not worth keeping is the current `10 kg`,
+      which reads as a bare weight.
+- [ ] **Apply it to both `performanceLabel` consumers** — the History tab and the Exercise Info
+      top-set card — or the two active-workout surfaces will still disagree with each other.
+
+**Pinned by a test.** `WorkoutJourneyTests.testHistorySubTabShowsPastSessionsNewestFirst` asserts
+the current `10 kg` behaviour, so changing it fails the suite and registers as a deliberate
+behaviour change rather than a tidy-up. Update that assertion as part of whichever option is
+chosen.

@@ -40,6 +40,47 @@ final class SetService: SetServiceProtocol {
 
     // MARK: - SetServiceProtocol
 
+    func create(
+        workoutId: UUID,
+        exerciseId: UUID,
+        date: Date,
+        setType: SetType,
+        orderInWorkout: Int,
+        orderInExercise: Int,
+        weight: Double?,
+        reps: Int?
+    ) async throws -> WorkoutSet {
+        let set = try await setRepo.create(
+            workoutId: workoutId,
+            exerciseId: exerciseId,
+            date: date,
+            setType: setType,
+            orderInWorkout: orderInWorkout,
+            orderInExercise: orderInExercise,
+            weight: weight,
+            reps: reps
+        )
+        // Same pipeline the callers got from `save(newSet)`. Not skipped: a Copy Previous set
+        // has weight and reps, so `hasData` is true and it is PR-evaluated and counted in stats
+        // even though it is incomplete. Changing that here would be a silent behaviour change.
+        _ = try await save(set)
+        return set
+    }
+
+    func save(setId: UUID, input: SetCompletionInput) async throws -> SetSaveResult {
+        guard let set = try await setRepo.fetch(byId: setId) else {
+            throw SetServiceError.setNotFound(setId)
+        }
+        let exercise = try await exerciseRepo.fetchChartExercise(byId: set.exerciseId)
+
+        // The typed values and completion stamps are written inside the repository actor.
+        // `ActiveWorkoutViewModel.completeSet` used to do this on the main actor, immediately
+        // before handing the mutated model over.
+        try await setRepo.applyCompletion(setId: setId, input: input, exercise: exercise)
+
+        return try await save(set)
+    }
+
     func save(_ set: WorkoutSet) async throws -> SetSaveResult {
         let exercise = try await exerciseRepo.fetchChartExercise(byId: set.exerciseId)
 
@@ -316,7 +357,17 @@ final class SetService: SetServiceProtocol {
         )
     }
 
-    func delete(_ set: WorkoutSet) async throws {
+    /// Delete a set and report the PR changes that fell out of it.
+    ///
+    /// The result used to be discarded here (`_ = try await prService.handleDeletion(...)`) and
+    /// the method returned `Void`, so no caller could apply it. Deleting a PR owner promotes
+    /// another set — `PRService` writes `winner.prStatus` directly (`:720`) — and that reached the
+    /// screen *only* because the ViewModel happened to hold the same `@Model` instance the
+    /// service mutated. Once `setsByExercise` holds value types that channel disappears and the
+    /// badge would silently stay wrong until relaunch, so the result has to come back.
+    ///
+    /// Pinned by `AffectedSetsPreconditionTests.testDeletingAPROwnerPromotesAnotherSetThroughIdentityAlone`.
+    func delete(_ set: WorkoutSet) async throws -> PREvaluationResult {
         // 1. Capture values before deletion
         let setId = set.id
         let exerciseId = set.exerciseId
@@ -334,12 +385,20 @@ final class SetService: SetServiceProtocol {
 
         // 3. PR recomputation (FR-005)
         let exercise = try await exerciseRepo.fetch(byId: exerciseId)
+        let prResult: PREvaluationResult
         if supportsRepPRs(for: exercise) {
-            _ = try await prService.handleDeletion(
+            prResult = try await prService.handleDeletion(
                 setId: setId,
                 exerciseId: exerciseId,
                 reps: prReps,
                 cachedPRStatus: cachedPRStatus
+            )
+        } else {
+            prResult = PREvaluationResult(
+                setId: setId,
+                newStatus: nil,
+                affectedSetIds: [:],
+                prRecordChanged: false
             )
         }
 
@@ -358,6 +417,8 @@ final class SetService: SetServiceProtocol {
         )
 
         try await fatigueLearningService.removeCapturedSetData(setId: setId)
+
+        return prResult
     }
 
     func updateInProgressTargetRepOverride(
@@ -390,6 +451,10 @@ final class SetService: SetServiceProtocol {
 
     func fetchSets(for exerciseId: UUID, limit: Int?) async throws -> [WorkoutSet] {
         try await setRepo.fetchSets(for: exerciseId, limit: limit)
+    }
+
+    func fetchSetSnapshots(for exerciseId: UUID, limit: Int?) async throws -> [ChartSetData] {
+        try await setRepo.fetchChartSets(for: exerciseId, limit: limit)
     }
 
     // MARK: - Helpers

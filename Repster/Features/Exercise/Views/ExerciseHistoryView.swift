@@ -55,8 +55,8 @@ struct ExerciseHistoryView: View {
 
     // MARK: - Set Row
 
-    private func setRow(_ set: WorkoutSet, index: Int, siblings: [WorkoutSet]) -> some View {
-        let hasNote = set.notes != nil && !(set.notes?.isEmpty ?? true)
+    private func setRow(_ set: ChartSetData, index: Int, siblings: [ChartSetData]) -> some View {
+        let hasNote = set.hasNote
         let isWarmup = set.setType == .warmup
         let display = WorkoutSetPerformanceFormatter.display(
             for: set,

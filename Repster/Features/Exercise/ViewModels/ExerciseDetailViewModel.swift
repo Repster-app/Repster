@@ -61,7 +61,7 @@ final class ExerciseDetailViewModel {
 
     func loadHistory() async {
         guard !historyLoaded else { return }
-        let sets = (try? await setService.fetchSets(for: exerciseId, limit: nil)) ?? []
+        let sets = (try? await setService.fetchSetSnapshots(for: exerciseId, limit: nil)) ?? []
         let grouped = Dictionary(grouping: sets) { $0.workoutId }
         historyWorkouts = grouped.map { workoutId, workoutSets in
             WorkoutHistoryGroup(

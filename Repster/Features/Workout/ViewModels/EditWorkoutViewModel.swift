@@ -149,7 +149,7 @@ final class EditWorkoutViewModel {
             set.prStatus = result.prResult.newStatus
 
             // Apply affected sets (PR status changes on other sets)
-            applyAffectedSets(result.prResult.affectedSetIds)
+            PRBadgeApplier.apply(result.prResult.affectedSetIds, to: &setsByExercise)
 
             // Reassign array to trigger @Observable update for UI
             if let sets = setsByExercise[set.exerciseId] {
@@ -187,7 +187,7 @@ final class EditWorkoutViewModel {
             // set owned the PR, handleDeletion → findNewPROwner returns the new
             // winner's setId/status, not this set's. SetService.uncomplete already
             // cleared set.prStatus = nil on the same @Model reference.
-            applyAffectedSets(result.prResult.affectedSetIds)
+            PRBadgeApplier.apply(result.prResult.affectedSetIds, to: &setsByExercise)
 
             // Contribution removed — re-completing has to go through save() again.
             uncountedSetIds.insert(set.id)
@@ -212,18 +212,17 @@ final class EditWorkoutViewModel {
         let totalSets = setsByExercise.values.flatMap { $0 }.count
         let exerciseSets = setsByExercise[exerciseId] ?? []
 
-        let newSet = WorkoutSet(
-            workoutId: workoutId,
-            exerciseId: exerciseId,
-            date: workout?.date ?? Date(),
-            setType: .working,
-            orderInWorkout: totalSets + 1,
-            orderInExercise: exerciseSets.count + 1,
-            completed: false
-        )
-
         do {
-            _ = try await setService.save(newSet)
+            let newSet = try await setService.create(
+                workoutId: workoutId,
+                exerciseId: exerciseId,
+                date: workout?.date ?? Date(),
+                setType: .working,
+                orderInWorkout: totalSets + 1,
+                orderInExercise: exerciseSets.count + 1,
+                weight: nil,
+                reps: nil
+            )
             uncountedSetIds.insert(newSet.id)
             setsByExercise[exerciseId, default: []].append(newSet)
         } catch {
@@ -241,18 +240,17 @@ final class EditWorkoutViewModel {
 
         let totalSets = setsByExercise.values.flatMap { $0 }.count
 
-        let newSet = WorkoutSet(
-            workoutId: workoutId,
-            exerciseId: exerciseId,
-            date: workout?.date ?? Date(),
-            setType: .warmup,
-            orderInWorkout: totalSets + 1,
-            orderInExercise: 1,
-            completed: false
-        )
-
         do {
-            _ = try await setService.save(newSet)
+            let newSet = try await setService.create(
+                workoutId: workoutId,
+                exerciseId: exerciseId,
+                date: workout?.date ?? Date(),
+                setType: .warmup,
+                orderInWorkout: totalSets + 1,
+                orderInExercise: 1,
+                weight: nil,
+                reps: nil
+            )
             uncountedSetIds.insert(newSet.id)
 
             // Insert before the first non-warmup set and reindex
@@ -277,7 +275,8 @@ final class EditWorkoutViewModel {
         let exerciseId = set.exerciseId
 
         do {
-            try await setService.delete(set)
+            let prResult = try await setService.delete(set)
+            PRBadgeApplier.apply(prResult.affectedSetIds, to: &setsByExercise)
 
             // Remove from local state
             setsByExercise[exerciseId]?.removeAll { $0.id == set.id }
@@ -307,7 +306,7 @@ final class EditWorkoutViewModel {
             let result = try await setService.edit(set)
             set.effectiveWeight = result.effectiveWeight
             set.prStatus = result.prResult.newStatus
-            applyAffectedSets(result.prResult.affectedSetIds)
+            PRBadgeApplier.apply(result.prResult.affectedSetIds, to: &setsByExercise)
         } catch {
             #if DEBUG
             dbg("[EditWorkoutViewModel] changeSetType failed: \(error)")
@@ -368,7 +367,8 @@ final class EditWorkoutViewModel {
         // Delete all sets for this exercise
         for set in exerciseSets {
             do {
-                try await setService.delete(set)
+                // Ignored deliberately: the exercise and its rows are being removed.
+                _ = try await setService.delete(set)
                 uncountedSetIds.remove(set.id)
             } catch {
                 #if DEBUG
@@ -493,7 +493,7 @@ final class EditWorkoutViewModel {
                 }
                 set.effectiveWeight = result.effectiveWeight
                 set.prStatus = result.prResult.newStatus
-                applyAffectedSets(result.prResult.affectedSetIds)
+                PRBadgeApplier.apply(result.prResult.affectedSetIds, to: &setsByExercise)
             } catch {
                 #if DEBUG
                 dbg("[EditWorkoutViewModel] saveDirtySets failed for \(set.id): \(error)")
@@ -522,40 +522,6 @@ final class EditWorkoutViewModel {
     /// Apply PR status changes to other sets affected by a save/edit/delete.
     /// For completed sets, only applies demotions (not promotions) to avoid
     /// confusing retroactive badge changes during editing.
-    private func applyAffectedSets(_ affectedSetIds: [UUID: CachedPRStatus?]) {
-        guard !affectedSetIds.isEmpty else { return }
-
-        for (exerciseId, sets) in setsByExercise {
-            let updatedSets = sets
-            var changed = false
-            for (index, set) in updatedSets.enumerated() {
-                if let newStatus = affectedSetIds[set.id] {
-                    if set.completed, isStatusUpgrade(from: set.prStatus, to: newStatus) {
-                        continue
-                    }
-                    updatedSets[index].prStatus = newStatus
-                    changed = true
-                }
-            }
-            if changed {
-                setsByExercise[exerciseId] = updatedSets
-            }
-        }
-    }
-
-    /// Returns true if the new status is a "promotion" (more prominent badge).
-    private func isStatusUpgrade(from old: CachedPRStatus?, to new: CachedPRStatus?) -> Bool {
-        func rank(_ status: CachedPRStatus?) -> Int {
-            switch status {
-            case .current: return 3
-            case .matched: return 2
-            case .dominated, .previous: return 1
-            case nil: return 0
-            }
-        }
-        return rank(new) > rank(old)
-    }
-
     /// Reindex orderInExercise for a set array after insertion/deletion.
     private func reindexOrderInExercise(_ sets: inout [WorkoutSet]) {
         for (index, set) in sets.enumerated() {
@@ -599,7 +565,7 @@ extension EditWorkoutViewModel: SetTableDataSource {
             }
             set.effectiveWeight = result.effectiveWeight
             set.prStatus = result.prResult.newStatus
-            applyAffectedSets(result.prResult.affectedSetIds)
+            PRBadgeApplier.apply(result.prResult.affectedSetIds, to: &setsByExercise)
 
             // Reassign array to trigger @Observable update for UI
             if let sets = setsByExercise[set.exerciseId] {

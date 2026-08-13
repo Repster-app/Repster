@@ -42,3 +42,7 @@ Pods/
 
 # Xcode distribution exports
 Repster 20*/
+
+# Personal workout history used as a local test fixture.
+# NEVER commit: this repo is public and the backup contains real training data.
+RepsterTests/Fixtures/Local/

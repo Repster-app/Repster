@@ -48,6 +48,54 @@ struct SetCompletionInput: Sendable {
     }
 }
 
+/// Applies the PR badge changes the pipeline reports to the sets a screen is holding.
+///
+/// One implementation, shared by `ActiveWorkoutViewModel` and `EditWorkoutViewModel`. They
+/// carried byte-identical private copies, which is the drift risk that produced the Stage 1 RIR
+/// near-miss — and they had already started to diverge in intent: `EditWorkoutViewModel`
+/// separately re-reads statuses from the store in `refreshPersistedWorkoutPRState` and applies
+/// them unconditionally, contradicting what its own copy of this function claimed to do.
+///
+/// **The "completed sets receive demotions but never promotions" rule used to live here and has
+/// been removed** (decision recorded 2026-08-13). It never had an observable effect in any
+/// shipped version: `PRService` writes each status onto the same `@Model` instance the ViewModel
+/// holds *before* returning, so the guard compared a value against itself and never fired —
+/// measured in `AffectedSetsPreconditionTests`. Step 5 replaces those shared instances with value
+/// types, which would have brought the rule to life for the first time and made the screen
+/// disagree with the store: delete or un-tick the set holding a record and the set that
+/// legitimately inherits it would show no badge until the workout was reopened. The chosen
+/// behaviour is that badges always match the stored state.
+enum PRBadgeApplier {
+
+    /// - Parameters:
+    ///   - affectedSetIds: pipeline output. A **present but nil** value legitimately clears a
+    ///     badge, so this must not be flattened with `??` — that would silently kill demotions.
+    ///   - setsByExercise: the screen's set state, re-assigned per exercise where something
+    ///     changed so `@Observable` notices.
+    static func apply(
+        _ affectedSetIds: [UUID: CachedPRStatus?],
+        to setsByExercise: inout [UUID: [WorkoutSet]]
+    ) {
+        guard !affectedSetIds.isEmpty else { return }
+
+        for (exerciseId, sets) in setsByExercise {
+            var changed = false
+            for set in sets {
+                // `affectedSetIds[set.id]` is `CachedPRStatus??`; this unwraps the *outer*
+                // optional only, so "present, but nil" reaches `set.prStatus` as a clear.
+                guard let newStatus = affectedSetIds[set.id], set.prStatus != newStatus else {
+                    continue
+                }
+                set.prStatus = newStatus
+                changed = true
+            }
+            if changed {
+                setsByExercise[exerciseId] = sets
+            }
+        }
+    }
+}
+
 /// Data source protocol for set table and exercise tab strip components.
 ///
 /// Conforming types provide exercise/set state and handle user actions

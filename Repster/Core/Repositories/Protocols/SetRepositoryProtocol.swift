@@ -50,6 +50,19 @@ protocol SetRepositoryProtocol: Sendable {
 
     // MARK: - CRUD
 
+    /// Construct and insert a new set inside the repository actor.
+    /// Does not commit — `persist(_:…)` remains the single save.
+    func create(
+        workoutId: UUID,
+        exerciseId: UUID,
+        date: Date,
+        setType: SetType,
+        orderInWorkout: Int,
+        orderInExercise: Int,
+        weight: Double?,
+        reps: Int?
+    ) async throws -> WorkoutSet
+
     func save(_ set: WorkoutSet) async throws
     func delete(_ set: WorkoutSet) async throws
     func fetch(byId id: UUID) async throws -> WorkoutSet?
@@ -62,6 +75,14 @@ protocol SetRepositoryProtocol: Sendable {
     //
     // These exist so `SetService` — which is `@MainActor` — never mutates a model this
     // context owns from the main thread (§5.5 of the crash analysis).
+
+    /// Apply a completion's typed values and completion stamps inside the owning actor.
+    /// Replaces twelve main-actor writes in `ActiveWorkoutViewModel.completeSet`.
+    func applyCompletion(
+        setId: UUID,
+        input: SetCompletionInput,
+        exercise: ChartExerciseData?
+    ) async throws
 
     /// Apply the unilateral derivation (`reps`/`rir`/`side` from the per-side values) and
     /// return the resulting snapshot.
@@ -102,6 +123,10 @@ protocol SetRepositoryProtocol: Sendable {
 
     /// Fetch sets for an exercise with optional limit, ordered by date DESC.
     func fetchSets(for exerciseId: UUID, limit: Int?) async throws -> [WorkoutSet]
+
+    /// Snapshot equivalent of `fetchSets(for exerciseId:limit:)`, ordered by date DESC.
+    /// Used by the exercise-history screens, which render on the main actor.
+    func fetchChartSets(for exerciseId: UUID, limit: Int?) async throws -> [ChartSetData]
 
     /// Fetch sets for an exercise filtered by rep count, with specified sort order.
     /// Used by PRService for PR recomputation.

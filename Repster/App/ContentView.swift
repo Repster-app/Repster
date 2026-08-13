@@ -494,16 +494,16 @@ struct ContentView: View {
                 // 2. Add exercises to the workout before showing it
                 // We use SetService to create initial sets for each exercise
                 for (index, exerciseId) in exerciseIds.enumerated() {
-                    let set = WorkoutSet(
+                    _ = try await services.setService.create(
                         workoutId: workout.id,
                         exerciseId: exerciseId,
                         date: Date(),
                         setType: .working,
                         orderInWorkout: index + 1,
                         orderInExercise: 1,
-                        completed: false
+                        weight: nil,
+                        reps: nil
                     )
-                    _ = try await services.setService.save(set)
                 }
 
                 trackWorkoutStarted(
@@ -625,17 +625,16 @@ struct ContentView: View {
         let newWorkout = try await services.workoutService.startWorkout(options: startOptions)
 
         for sourceSet in workingSets {
-            let newSet = WorkoutSet(
+            _ = try await services.setService.create(
                 workoutId: newWorkout.id,
                 exerciseId: sourceSet.exerciseId,
-                weight: sourceSet.weight,
-                reps: sourceSet.reps,
+                date: Date(),
                 setType: .working,
                 orderInWorkout: sourceSet.orderInWorkout,
                 orderInExercise: sourceSet.orderInExercise,
-                completed: false
+                weight: sourceSet.weight,
+                reps: sourceSet.reps
             )
-            _ = try await services.setService.save(newSet)
         }
 
         trackWorkoutStarted(

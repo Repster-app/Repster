@@ -18,6 +18,40 @@ actor SetRepository: SetRepositoryProtocol {
     // against a model this context owns — the non-main cross-context write in §5.5 of
     // SWIFTDATA_CONCURRENCY_CRASH_ANALYSIS.md.
 
+    /// Construct and insert a new set inside the actor that owns the context.
+    ///
+    /// Every caller used to build `WorkoutSet(...)` on the main actor and hand the instance to
+    /// `SetService.save`, which is how the UI came to hold repository-owned models in the first
+    /// place. The object is created here instead.
+    ///
+    /// Deliberately **does not save**: the single commit stays `persist(_:…)`, exactly as when
+    /// the caller passed in a not-yet-inserted model. `SetService.create` runs that pipeline
+    /// immediately, so the uncommitted window never escapes the service.
+    func create(
+        workoutId: UUID,
+        exerciseId: UUID,
+        date: Date,
+        setType: SetType,
+        orderInWorkout: Int,
+        orderInExercise: Int,
+        weight: Double?,
+        reps: Int?
+    ) throws -> WorkoutSet {
+        let set = WorkoutSet(
+            workoutId: workoutId,
+            exerciseId: exerciseId,
+            date: date,
+            weight: weight,
+            reps: reps,
+            setType: setType,
+            orderInWorkout: orderInWorkout,
+            orderInExercise: orderInExercise,
+            completed: false
+        )
+        modelContext.insert(set)
+        return set
+    }
+
     /// Clear a set's completion and PR status. Used by the uncomplete pipeline.
     func applyUncomplete(setId: UUID) throws {
         guard let set = try fetch(byId: setId) else { return }
@@ -26,6 +60,57 @@ actor SetRepository: SetRepositoryProtocol {
         set.prStatus = nil
         set.updatedAt = Date()
         try modelContext.save()
+    }
+
+    /// Apply a completion's typed values and completion stamps, inside the owning actor.
+    ///
+    /// These twelve writes used to happen in `ActiveWorkoutViewModel.completeSet` on the main
+    /// actor, against a model this context owns — the highest-frequency instance of the
+    /// non-main cross-context write in §5.5 of the crash analysis.
+    ///
+    /// Field order is preserved exactly, including that the unilateral branch runs the
+    /// derivation here and the bilateral branch instead clears `side`.
+    ///
+    /// One deliberate change: `exercise` is the repository's own snapshot rather than the copy
+    /// `ActiveWorkoutViewModel` held in `exercises`. Only `supportsUnilateralLogging` and
+    /// `unilateral` are read, and the store is the authority on both.
+    func applyCompletion(
+        setId: UUID,
+        input: SetCompletionInput,
+        exercise: ChartExerciseData?
+    ) throws {
+        guard let set = try fetch(byId: setId) else {
+            throw SetServiceError.setNotFound(setId)
+        }
+
+        set.weight = input.weight
+        set.durationSeconds = input.durationSeconds
+        set.distanceMeters = input.distanceMeters
+        set.leftReps = input.leftReps
+        set.rightReps = input.rightReps
+        set.leftRIR = input.leftRIR
+        set.rightRIR = input.rightRIR
+        set.reps = input.reps
+        set.rir = input.rir
+
+        // Only the bilateral half is load-bearing. `syncDerivedPerformanceFields` early-returns
+        // unless the exercise is unilateral, so for a bilateral set the pipeline's own
+        // `syncDerivedFields` call does nothing and this is the only thing clearing `side`.
+        //
+        // The unilateral half used to run the derivation here too — proven dead by mutation,
+        // because the pipeline re-runs it a step later on the same instance.
+        // `applyCompletionInput` carried the same redundancy.
+        //
+        // This only has an observable effect on a set that already holds `.both`, which means an
+        // exercise flipped from unilateral to bilateral. Covered by
+        // `testFlippingAnExerciseToBilateralClearsSideOnRecompletion`.
+        if exercise?.supportsUnilateralLogging != true || exercise?.unilateral != true {
+            set.side = nil
+        }
+
+        set.completed = true
+        set.completedAt = Date()
+        set.updatedAt = Date()
     }
 
     /// Apply the unilateral derivation and return the resulting snapshot.
@@ -162,6 +247,25 @@ actor SetRepository: SetRepositoryProtocol {
         let sets = try modelContext.fetch(descriptor)
         sets.forEach { $0.markFatigueLearningSnapshotPersisted() }
         return sets
+    }
+
+    /// Snapshot equivalent of `fetchSets(for exerciseId:limit:)`, ordered by date descending.
+    ///
+    /// Used by the two exercise-history screens. Deliberately does **not** call
+    /// `markFatigueLearningSnapshotPersisted()` the way the live-model fetch above does: that
+    /// side effect rebases `@Transient persistedFatigueSnapshot` off whatever the instance
+    /// currently holds, which on the active-workout screen can be a value the user has typed
+    /// but not committed. `SetService.edit` reads that transient as "the values as last
+    /// persisted" (`:148`) and cannot recover them any other way — its `oldSet` fallback is
+    /// `setRepo.fetch(byId:)`, which returns the *same* instance from this context and is
+    /// therefore already mutated. Marking on a read path is a hazard, not a service.
+    func fetchChartSets(for exerciseId: UUID, limit: Int?) throws -> [ChartSetData] {
+        var descriptor = FetchDescriptor<WorkoutSet>(
+            predicate: #Predicate { $0.exerciseId == exerciseId },
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
+        if let limit { descriptor.fetchLimit = limit }
+        return try modelContext.fetch(descriptor).map(ChartSetData.init(from:))
     }
 
     func fetchSets(for exerciseId: UUID, reps: Int, orderedBy order: SetSortOrder) throws -> [WorkoutSet] {

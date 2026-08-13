@@ -1,10 +1,28 @@
 import Foundation
 
+/// Complete value-type mirror of `WorkoutSet`.
+///
+/// Carries *every* stored property rather than only the fields today's callers happen to read —
+/// the same rule `ChartExerciseData` follows, and for the same reason: one snapshot type per
+/// entity means one `init(from:)` to keep in sync, and a drift guard that *names* the property
+/// when the model gains a field. A second, narrower set snapshot would be free to drift, which is
+/// exactly how the RIR column silently blanked during Stage 1.
+///
+/// Two stored properties on `WorkoutSet` are deliberately **not** mirrored by name, both handled
+/// explicitly by the drift guard rather than by omission:
+///
+///  - `cachedPRStatusRaw` is mirrored as the decoded `prStatus`, matching how every caller reads
+///    it. `WorkoutSet.prStatus` is the computed accessor over the same storage.
+///  - `cachedPRStatus` is a legacy persisted enum kept only for schema compatibility. Its own
+///    declaration says app logic must never read it, so mirroring it would mean doing the one
+///    thing the model forbids.
 struct ChartSetData: Sendable, Equatable {
     let id: UUID
     let workoutId: UUID
     let exerciseId: UUID
     let date: Date
+    let startedAt: Date?
+    let completedAt: Date?
     let weight: Double?
     let effectiveWeight: Double?
     let reps: Int?
@@ -15,16 +33,31 @@ struct ChartSetData: Sendable, Equatable {
     let durationSeconds: Int?
     let distanceMeters: Double?
     let e1RM: Double?
-    let setType: SetType
-    let prStatus: CachedPRStatus?
-    let completed: Bool
-    let orderInWorkout: Int
-    let orderInExercise: Int
-    let notes: String?
+    let e1RMFormulaVersion: String?
+    let rpe: Double?
     let rir: Double?
     let leftRIR: Double?
     let rightRIR: Double?
+    let setType: SetType
+    let pauseDuration: Int?
+    let side: Side?
+    let notes: String?
+    let orderInWorkout: Int
+    let orderInExercise: Int
+    let supersetGroupId: UUID?
+    let completed: Bool
     let excludeFromPRs: Bool
+    let prStatus: CachedPRStatus?
+    let targetWeight: Double?
+    let targetRepMin: Int?
+    let targetRepMax: Int?
+    let overrideTargetRepMin: Int?
+    let overrideTargetRepMax: Int?
+    let targetRPE: Double?
+    let targetRIR: Int?
+    let createdAt: Date
+    let updatedAt: Date
+    let restDurationSeconds: Int?
 
     var hasData: Bool {
         ((weight ?? 0) > 0 && prReps > 0) ||
@@ -43,6 +76,8 @@ struct ChartSetData: Sendable, Equatable {
         self.workoutId = set.workoutId
         self.exerciseId = set.exerciseId
         self.date = set.date
+        self.startedAt = set.startedAt
+        self.completedAt = set.completedAt
         self.weight = set.weight
         self.effectiveWeight = set.effectiveWeight
         self.reps = set.reps
@@ -53,16 +88,31 @@ struct ChartSetData: Sendable, Equatable {
         self.durationSeconds = set.durationSeconds
         self.distanceMeters = set.distanceMeters
         self.e1RM = set.e1RM
-        self.setType = set.setType
-        self.prStatus = set.prStatus
-        self.completed = set.completed
-        self.orderInWorkout = set.orderInWorkout
-        self.orderInExercise = set.orderInExercise
-        self.notes = set.notes
+        self.e1RMFormulaVersion = set.e1RMFormulaVersion
+        self.rpe = set.rpe
         self.rir = set.rir
         self.leftRIR = set.leftRIR
         self.rightRIR = set.rightRIR
+        self.setType = set.setType
+        self.pauseDuration = set.pauseDuration
+        self.side = set.side
+        self.notes = set.notes
+        self.orderInWorkout = set.orderInWorkout
+        self.orderInExercise = set.orderInExercise
+        self.supersetGroupId = set.supersetGroupId
+        self.completed = set.completed
         self.excludeFromPRs = set.excludeFromPRs ?? false
+        self.prStatus = set.prStatus
+        self.targetWeight = set.targetWeight
+        self.targetRepMin = set.targetRepMin
+        self.targetRepMax = set.targetRepMax
+        self.overrideTargetRepMin = set.overrideTargetRepMin
+        self.overrideTargetRepMax = set.overrideTargetRepMax
+        self.targetRPE = set.targetRPE
+        self.targetRIR = set.targetRIR
+        self.createdAt = set.createdAt
+        self.updatedAt = set.updatedAt
+        self.restDurationSeconds = set.restDurationSeconds
     }
 
     /// Mirrors `WorkoutSet.statsReps`.
@@ -70,6 +120,32 @@ struct ChartSetData: Sendable, Equatable {
 
     var hasNote: Bool {
         !(notes ?? "").isEmpty
+    }
+
+    // MARK: - Ported rep-target logic
+    //
+    // Same bodies as `WorkoutSet`'s. These are the rules `SetTableView` and `SetRowView` read
+    // per row, so step 5 needs them on the value type — and duplicated *rules* are what caused
+    // the Stage 1 RIR near-miss, so if either of these grows a condition, both must change.
+
+    var overrideTargetRepRange: ClosedRange<Int>? {
+        guard let overrideTargetRepMin,
+              let overrideTargetRepMax,
+              overrideTargetRepMin < overrideTargetRepMax else {
+            return nil
+        }
+        return overrideTargetRepMin...overrideTargetRepMax
+    }
+
+    var hasOverrideRepTarget: Bool {
+        overrideTargetRepMin != nil || overrideTargetRepMax != nil
+    }
+
+    var preferredTargetRepBounds: (min: Int?, max: Int?) {
+        if hasOverrideRepTarget {
+            return (overrideTargetRepMin, overrideTargetRepMax)
+        }
+        return (targetRepMin, targetRepMax)
     }
 }
 

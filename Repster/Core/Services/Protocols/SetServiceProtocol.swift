@@ -70,6 +70,32 @@ struct SetContributionSnapshot: Sendable {
 /// Performance: Entire pipeline must complete within 100ms (AGENT_RULES S5.5, SC-005).
 protocol SetServiceProtocol: Sendable {
 
+    // MARK: - Create
+
+    /// Create a new set and run the same pipeline `save` runs.
+    ///
+    /// Splits "create a row" out of `save`, which was doing both jobs. Six call sites — two in
+    /// `ContentView` (new workout, Copy Previous), `addSet`, `addWarmupSet` and two in
+    /// `EditWorkoutViewModel` — only ever wanted creation, and built the `WorkoutSet` on the
+    /// main actor to get it.
+    ///
+    /// The pipeline is deliberately identical, not skipped: a Copy Previous set carries weight
+    /// and reps, so `hasData` is true and it is PR-evaluated and counted in stats today despite
+    /// being incomplete. That is shipped behaviour and this split does not change it.
+    ///
+    /// Returns the live model **only** because `setsByExercise` still holds live models. That
+    /// return type goes away with the state conversion; nothing else about this API does.
+    func create(
+        workoutId: UUID,
+        exerciseId: UUID,
+        date: Date,
+        setType: SetType,
+        orderInWorkout: Int,
+        orderInExercise: Int,
+        weight: Double?,
+        reps: Int?
+    ) async throws -> WorkoutSet
+
     // MARK: - Save (FR-001, FR-002, FR-003, FR-012)
 
     /// Save a new set with full pipeline orchestration.
@@ -81,6 +107,14 @@ protocol SetServiceProtocol: Sendable {
     ///
     /// - Parameter set: The WorkoutSet to save. effectiveWeight will be computed and set.
     /// - Returns: SetSaveResult with computed effectiveWeight and PR result.
+    /// Complete an existing set with the values the user typed.
+    ///
+    /// The twelve field writes this implies happen inside the repository actor. They used to be
+    /// performed by `ActiveWorkoutViewModel.completeSet` on the main actor, against a model the
+    /// repository's context owns, immediately before handing that model over — the write half of
+    /// the crash class, on the app's highest-frequency interaction.
+    func save(setId: UUID, input: SetCompletionInput) async throws -> SetSaveResult
+
     func save(_ set: WorkoutSet) async throws -> SetSaveResult
 
     // MARK: - Edit (FR-004)
@@ -132,7 +166,11 @@ protocol SetServiceProtocol: Sendable {
     /// 4. StatsService.updateStats() — decrements totals
     ///
     /// - Parameter set: The WorkoutSet to delete (hard delete, no soft delete).
-    func delete(_ set: WorkoutSet) async throws
+    /// - Returns: The PR changes the deletion caused, including `affectedSetIds` for sets whose
+    ///   badge changed — deleting a PR owner promotes another set. Deliberately **not**
+    ///   `@discardableResult`: ignoring it is the bug this return value exists to prevent, so
+    ///   each caller has to say so explicitly.
+    func delete(_ set: WorkoutSet) async throws -> PREvaluationResult
 
     // MARK: - Lightweight In-Progress Updates
 
@@ -192,6 +230,14 @@ protocol SetServiceProtocol: Sendable {
     ///   - limit: Maximum number of sets to return, or nil for all.
     /// - Returns: WorkoutSets for this exercise, ordered by date descending.
     func fetchSets(for exerciseId: UUID, limit: Int?) async throws -> [WorkoutSet]
+
+    /// Snapshot equivalent of `fetchSets(for exerciseId:limit:)`.
+    ///
+    /// The exercise-history screens must use this: `ExerciseHistoryView` renders inside the
+    /// **active workout** screen (`ActiveWorkoutView:242`) as well as exercise detail, and a
+    /// live `WorkoutSet` read in a view body on the main actor faults through the repository's
+    /// background context — the shape of crash B.
+    func fetchSetSnapshots(for exerciseId: UUID, limit: Int?) async throws -> [ChartSetData]
 }
 
 extension SetServiceProtocol {
