@@ -113,6 +113,30 @@ actor SetRepository: SetRepositoryProtocol {
         set.updatedAt = Date()
     }
 
+    /// Set a set's note, inside the owning actor.
+    ///
+    /// `updateSetNote` used to write `notes` and `updatedAt` on the main actor and then hand the
+    /// mutated model to `edit`. Same class as the completion writes — see `applyCompletion`.
+    func applyNote(setId: UUID, note: String?) throws {
+        guard let set = try fetch(byId: setId) else {
+            throw SetServiceError.setNotFound(setId)
+        }
+        set.notes = note
+        set.updatedAt = Date()
+    }
+
+    /// Change a set's type, inside the owning actor.
+    ///
+    /// Type changes affect PR eligibility, so the caller still runs the full edit pipeline
+    /// afterwards; this only moves the two field writes off the main actor.
+    func applySetType(setId: UUID, type: SetType) throws {
+        guard let set = try fetch(byId: setId) else {
+            throw SetServiceError.setNotFound(setId)
+        }
+        set.setType = type
+        set.updatedAt = Date()
+    }
+
     /// Apply the unilateral derivation and return the resulting snapshot.
     ///
     /// Deliberately does **not** insert or save. `save()` calls this on sets that are not in

@@ -1540,6 +1540,9 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         viewModel.workout = workout
         viewModel.exercises = [ChartExerciseData(from: exercise)]
         viewModel.setsByExercise = [exercise.id: [uncompletedSet, deletedSet, typeChangedSet]]
+        // The stub models the store, and `changeSetType` now applies its field writes there
+        // rather than to the caller's instance — so the sets have to actually be in it.
+        setService.workoutSets[workout.id] = [uncompletedSet, deletedSet, typeChangedSet]
 
         await viewModel.uncompleteSet(uncompletedSet)
         await viewModel.deleteSet(deletedSet)
@@ -4256,6 +4259,31 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
     /// Mirrors the real service: applies the typed values and completion stamps to the stored
     /// set, so ViewModel tests still observe a completed row after calling through.
     var completionInputs: [UUID: SetCompletionInput] = [:]
+
+    var noteUpdates: [UUID: String?] = [:]
+    var setTypeChanges: [UUID: SetType] = [:]
+
+    private func storedSet(_ setId: UUID) -> WorkoutSet? {
+        workoutSets.values.flatMap { $0 }.first { $0.id == setId }
+    }
+
+    private func emptyResult(_ setId: UUID) -> SetSaveResult {
+        SetSaveResult(setId: setId, effectiveWeight: 0, prResult: .empty(for: setId))
+    }
+
+    func updateNote(setId: UUID, note: String?) async throws -> SetSaveResult {
+        noteUpdates[setId] = note
+        storedSet(setId)?.notes = note
+        editedSetIds.append(setId)
+        return emptyResult(setId)
+    }
+
+    func changeSetType(setId: UUID, to type: SetType) async throws -> SetSaveResult {
+        setTypeChanges[setId] = type
+        storedSet(setId)?.setType = type
+        editedSetIds.append(setId)
+        return emptyResult(setId)
+    }
 
     func save(setId: UUID, input: SetCompletionInput) async throws -> SetSaveResult {
         completionInputs[setId] = input

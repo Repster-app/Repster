@@ -137,6 +137,13 @@ protocol SetServiceProtocol: Sendable {
         previousContribution: SetContributionSnapshot?
     ) async throws -> SetSaveResult
 
+    /// Set a set's note and re-run the edit pipeline. The field writes happen inside the
+    /// repository actor rather than on the caller's.
+    func updateNote(setId: UUID, note: String?) async throws -> SetSaveResult
+
+    /// Change a set's type and re-run the edit pipeline — type affects PR eligibility.
+    func changeSetType(setId: UUID, to type: SetType) async throws -> SetSaveResult
+
     // MARK: - Uncomplete
 
     /// Uncomplete a set that was previously completed.

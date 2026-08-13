@@ -703,11 +703,9 @@ final class ActiveWorkoutViewModel {
     ///
     /// Type change may affect PR eligibility, so the full edit pipeline runs.
     func changeSetType(_ set: WorkoutSet, to type: SetType) async {
-        set.setType = type
-        set.updatedAt = Date()
-
         do {
-            let result = try await setService.edit(set)
+            // The two field writes happen inside the repository actor now.
+            let result = try await setService.changeSetType(setId: set.id, to: type)
             set.effectiveWeight = result.effectiveWeight
             set.prStatus = result.prResult.newStatus
             PRBadgeApplier.apply(result.prResult.affectedSetIds, to: &setsByExercise)
@@ -1918,11 +1916,13 @@ final class ActiveWorkoutViewModel {
         var totalSets = 0
         var prsHit = 0
         var exerciseSummaries: [ExerciseSummary] = []
-        var completedWorkoutSets: [WorkoutSet] = []
+        // Snapshots: this runs during `finishWorkout`, i.e. while the workout is being saved,
+        // and every read below would otherwise fault a live model on the main actor.
+        var completedWorkoutSets: [ChartSetData] = []
         var exerciseLookup: [UUID: ChartExerciseData] = [:]
 
         for exercise in exercises {
-            let sets = setsByExercise[exercise.id] ?? []
+            let sets = (setsByExercise[exercise.id] ?? []).map(ChartSetData.init(from:))
             let completedSets = sets.filter { $0.completed }
             exerciseLookup[exercise.id] = exercise
             completedWorkoutSets.append(contentsOf: completedSets)
@@ -2215,11 +2215,8 @@ extension ActiveWorkoutViewModel: SetTableDataSource {
 
     /// Update the note on a set and persist immediately.
     func updateSetNote(_ set: WorkoutSet, note: String?) async {
-        set.notes = note
-        set.updatedAt = Date()
-
         do {
-            _ = try await setService.edit(set)
+            _ = try await setService.updateNote(setId: set.id, note: note)
 
             // Reassign array to trigger @Observable update for UI
             if let sets = setsByExercise[set.exerciseId] {

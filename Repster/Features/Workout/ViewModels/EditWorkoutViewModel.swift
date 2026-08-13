@@ -299,11 +299,9 @@ final class EditWorkoutViewModel {
 
     /// Change a set's type (e.g., warmup -> working -> dropset).
     func changeSetType(_ set: WorkoutSet, to type: SetType) async {
-        set.setType = type
-        set.updatedAt = Date()
-
         do {
-            let result = try await setService.edit(set)
+            // The two field writes happen inside the repository actor now.
+            let result = try await setService.changeSetType(setId: set.id, to: type)
             set.effectiveWeight = result.effectiveWeight
             set.prStatus = result.prResult.newStatus
             PRBadgeApplier.apply(result.prResult.affectedSetIds, to: &setsByExercise)

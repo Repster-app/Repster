@@ -105,6 +105,12 @@ protocol SetRepositoryProtocol: Sendable {
         touchUpdatedAt: Bool
     ) async throws -> ChartSetData
 
+    /// Set a set's note inside the owning actor. Does not commit.
+    func applyNote(setId: UUID, note: String?) async throws
+
+    /// Change a set's type inside the owning actor. Does not commit.
+    func applySetType(setId: UUID, type: SetType) async throws
+
     /// Clear a set's completion and PR status. Used by the uncomplete pipeline.
     func applyUncomplete(setId: UUID) async throws
 

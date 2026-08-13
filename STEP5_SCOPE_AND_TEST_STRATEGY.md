@@ -3,7 +3,9 @@
 **Date:** 2026-08-13
 **Status:** §0.3 items 1–2 done (§6, §7); item 3 done for the create/complete split and
 the delete channel (§8, §10). `edit`/`uncomplete` signatures and items 4–10 not started.
-**Prerequisite:** Stage 2 steps 1/3/4 committed (`644f8f9`), device pass passed.
+**Prerequisite:** Stage 2 steps 1/3/4 committed (`644f8f9`).
+**Device pass:** re-run and **passed 2026-08-13** on the tail work — see `DEVICE_TEST_PASS.md`.
+Control re-verified the same day: still crashes with the shipped signature.
 **Suite:** 422 tests, 0 failures, 2 skipped by design.
 
 `STAGE2_WRITE_PATH_DESIGN.md` §7 step 5 and §15 describe this work. Every claim in those
@@ -75,8 +77,18 @@ mirror (§7). The rest is a verified plan and a test net built to catch the conv
    reachable mid-workout from Exercise Settings → More. `rebuild` rewrites `prStatus` on every set
    of that exercise and reports nothing in `affectedSetIds`. Free today via shared instances; stale
    after the conversion.
-10. Re-measure `@unchecked Sendable` crossings for `Workout`, `WorkoutSet` **and** `Exercise` with
-    the compiler; remove only what reaches zero.
+10. ~~Re-measure `@unchecked Sendable` crossings.~~ **Measured 2026-08-13 — the item is moot.**
+    Removing the annotation from `Workout`, `WorkoutSet` and `Exercise` and doing a *clean* build
+    produces **zero** crossing diagnostics. The only Sendable warnings emitted are `redundant
+    conformance of 'X' to protocol 'Sendable'` for the models that still carry the annotation —
+    i.e. the `@Model` macro already conforms them, and the explicit annotations have been
+    redundant all along.
+
+    This contradicts two entries in the work record's correction table ("the macro does not supply
+    Sendable" and "removing it produces precise per-crossing diagnostics"). Whatever was true when
+    those were written, it is not true of the current toolchain. **The annotations were never what
+    let the unsafe code compile, and removing them cannot be used to measure exposure.** Any future
+    crossing audit needs Swift 6 language mode, not annotation removal. See §11.
 
 Full detail in §3. The delicate functions are `applyAffectedSets` and the delete path — see §0.5.
 
@@ -948,3 +960,34 @@ their mutations and now fail.
 **The general lesson for the rest of step 5:** the differential cannot see write-path regressions
 at all — it renders restored data. Every remaining item converts write paths, so from here the
 journeys are the only net, and they are only as good as the fields the fixtures exercise.
+
+---
+
+## 11. Implementation record — the low-hanging tail, 2026-08-13
+
+Everything outside items 4–5, taken in one pass. Suite stays **422**, 0 failures.
+
+| Item | Outcome |
+|---|---|
+| 3 (part) | `updateSetNote` and `changeSetType` moved to `updateNote(setId:note:)` / `changeSetType(setId:to:)`. Their field writes now happen in `SetRepository.applyNote` / `applySetType` instead of on the main actor, in **both** ViewModels |
+| 8 | `computeSummary` builds `[ChartSetData]`. It runs during `finishWorkout` — i.e. while the workout is being saved — so every read there was a live-model read on the main actor |
+| 9 | **Not independent.** Re-fetching sets after a mid-workout exercise rebuild only matters once `setsByExercise` holds value types; today the ViewModel holds the same instances `prService.rebuild` mutates, so a re-fetch is a no-op. Correctly gated on 4–5 |
+| 10 | **Moot — see above.** Measured rather than assumed, and the assumption was wrong |
+
+Not converted, with reasons:
+
+- `EditWorkoutViewModel.updateSetNote` branches on `uncountedSetIds` between `save` and `edit`,
+  exactly like its `completeSet`. Converting one branch would split where field writes happen, so
+  it moves when `edit` does.
+- `edit` / `uncomplete` still take models. Their callers no longer *pre-mutate* on the two paths
+  above, which was the actual hazard; the signatures are cosmetic until 4–5.
+
+### 11.1 A test that was passing for the wrong reason
+
+`testSetMutationFlowsStillSucceedThroughSetService` failed on the `changeSetType` conversion. Not
+a regression: the test put its sets only in `viewModel.setsByExercise` and never in the stub's
+store, so it only ever passed because the old code mutated the caller's instance directly. Once
+the write moved into the repository, the stub had nothing to write to.
+
+Worth recording because it is a preview of step 5: every place that currently works via shared
+instances will surface exactly this way, as a test that quietly depended on the coupling.

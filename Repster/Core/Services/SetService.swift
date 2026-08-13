@@ -67,6 +67,22 @@ final class SetService: SetServiceProtocol {
         return set
     }
 
+    func updateNote(setId: UUID, note: String?) async throws -> SetSaveResult {
+        guard let set = try await setRepo.fetch(byId: setId) else {
+            throw SetServiceError.setNotFound(setId)
+        }
+        try await setRepo.applyNote(setId: setId, note: note)
+        return try await edit(set)
+    }
+
+    func changeSetType(setId: UUID, to type: SetType) async throws -> SetSaveResult {
+        guard let set = try await setRepo.fetch(byId: setId) else {
+            throw SetServiceError.setNotFound(setId)
+        }
+        try await setRepo.applySetType(setId: setId, type: type)
+        return try await edit(set)
+    }
+
     func save(setId: UUID, input: SetCompletionInput) async throws -> SetSaveResult {
         guard let set = try await setRepo.fetch(byId: setId) else {
             throw SetServiceError.setNotFound(setId)
