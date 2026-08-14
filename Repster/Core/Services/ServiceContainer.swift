@@ -38,7 +38,11 @@ final class ServiceContainer {
         repositoryContainer: RepositoryContainer,
         analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService()
     ) {
-        let subscriptionService = SubscriptionService()
+        // Actors can't hold `any AnalyticsServiceProtocol` directly — see
+        // `AnalyticsErrorReporting`.
+        let errorReporter = AnalyticsErrorReporter(analytics: analyticsService)
+
+        let subscriptionService = SubscriptionService(errorReporter: errorReporter)
         let accessControlService = AccessControlService(subscriptionService: subscriptionService)
 
         // 1. StatsService — depends on repos only
@@ -93,8 +97,8 @@ final class ServiceContainer {
             fatigueLearningService: fatigueLearningService
         )
 
-        // 6b. HealthKitService — no dependencies; owns the HKHealthStore
-        let healthKitService = HealthKitService()
+        // 6b. HealthKitService — owns the HKHealthStore; reports swallowed write failures
+        let healthKitService = HealthKitService(errorReporter: errorReporter)
 
         // 7. WorkoutService — depends on repos + PRService + StatsService + FatigueLearningService
         //    + BodyweightService and HealthKitService (Apple Health mirroring on finish)

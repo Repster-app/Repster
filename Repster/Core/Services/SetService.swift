@@ -48,7 +48,12 @@ final class SetService: SetServiceProtocol {
         orderInWorkout: Int,
         orderInExercise: Int,
         weight: Double?,
-        reps: Int?
+        reps: Int?,
+        leftReps: Int?,
+        rightReps: Int?,
+        rir: Double?,
+        leftRIR: Double?,
+        rightRIR: Double?
     ) async throws -> WorkoutSet {
         let set = try await setRepo.create(
             workoutId: workoutId,
@@ -58,13 +63,46 @@ final class SetService: SetServiceProtocol {
             orderInWorkout: orderInWorkout,
             orderInExercise: orderInExercise,
             weight: weight,
-            reps: reps
+            reps: reps,
+            leftReps: leftReps,
+            rightReps: rightReps,
+            rir: rir,
+            leftRIR: leftRIR,
+            rightRIR: rightRIR
         )
-        // Same pipeline the callers got from `save(newSet)`. Not skipped: a Copy Previous set
-        // has weight and reps, so `hasData` is true and it is PR-evaluated and counted in stats
-        // even though it is incomplete. Changing that here would be a silent behaviour change.
-        _ = try await save(set)
+        // A created row is `completed: false` and has not been performed, so it must not
+        // contribute to PRs or stats. Every caller already assumes a fresh row is uncounted
+        // (`EditWorkoutViewModel.uncountedSetIds`), and the contribution is added by the
+        // completion path in `save(setId:input:)`.
+        //
+        // This used to call `save(set)` unconditionally, which was harmless only while every
+        // creator passed `weight: nil, reps: nil` — no data, so no contribution. Copy Previous
+        // creates prefilled rows: they were PR-evaluated before being lifted, counted in stats
+        // immediately, and then counted a *second* time when the user ticked them off.
+        try await persistWithoutContribution(set)
         return set
+    }
+
+    /// Commit a newly created row with the derivation and weight resolution it needs for
+    /// display, deliberately stopping short of `save()`'s PR evaluation and stats update.
+    ///
+    /// e1RM is left unwritten: an unperformed row must not reach charts or feed any estimate.
+    /// `save()` computes it at completion time.
+    private func persistWithoutContribution(_ set: WorkoutSet) async throws {
+        let exercise = try await exerciseRepo.fetchChartExercise(byId: set.exerciseId)
+        let synced = try await setRepo.syncDerivedFields(on: set, exercise: exercise)
+        let effectiveWeight = try await computeEffectiveWeight(
+            weight: synced.weight,
+            exerciseId: synced.exerciseId,
+            date: synced.date
+        )
+        _ = try await setRepo.persist(
+            set,
+            effectiveWeight: effectiveWeight,
+            e1RM: .leaveAlone,
+            clearPRStatus: false,
+            touchUpdatedAt: false
+        )
     }
 
     func updateNote(setId: UUID, note: String?) async throws -> SetSaveResult {

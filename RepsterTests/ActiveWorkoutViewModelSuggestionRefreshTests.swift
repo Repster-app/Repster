@@ -4317,7 +4317,12 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
         orderInWorkout: Int,
         orderInExercise: Int,
         weight: Double?,
-        reps: Int?
+        reps: Int?,
+        leftReps: Int?,
+        rightReps: Int?,
+        rir: Double?,
+        leftRIR: Double?,
+        rightRIR: Double?
     ) async throws -> WorkoutSet {
         let set = WorkoutSet(
             workoutId: workoutId,
@@ -4325,6 +4330,11 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
             date: date,
             weight: weight,
             reps: reps,
+            leftReps: leftReps,
+            rightReps: rightReps,
+            rir: rir,
+            leftRIR: leftRIR,
+            rightRIR: rightRIR,
             setType: setType,
             orderInWorkout: orderInWorkout,
             orderInExercise: orderInExercise,

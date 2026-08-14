@@ -28,6 +28,33 @@ struct AnalyticsConfiguration: Equatable {
     }
 }
 
+/// PostHog's iOS SDK has no per-event switch for application lifecycle events:
+/// `captureApplicationLifecycleEvents` brings `Application Installed`, `Updated`,
+/// `Opened` and `Backgrounded`, or none of them. Only the first three answer a
+/// question, and the other two dominate volume — on 1.1, the last released version
+/// with lifecycle capture enabled, `Opened` and `Backgrounded` were 76% of every
+/// event the project ingested (623 of 817).
+///
+/// Turning the flag off is not the answer — that is exactly what 1.2 did, and it
+/// left 1.2 and 1.3 with no `Application Installed` at all, so every activation
+/// funnel ran on a denominator of zero for the whole live period. The flag stays
+/// on and this drops the noise in `beforeSend`, before it is cached or sent.
+enum LifecycleEventFilter {
+    static func allows(event: String, properties: [String: Any]) -> Bool {
+        switch event {
+        case "Application Backgrounded":
+            // Fires on every app switch, and a workout is full of them.
+            return false
+        case "Application Opened":
+            // A cold launch is the real session start and carries `version` /
+            // `build`. A resume from background carries only `from_background`.
+            return properties["from_background"] as? Bool != true
+        default:
+            return true
+        }
+    }
+}
+
 protocol AnalyticsClientProtocol {
     /// - Parameter startOptedOut: Applied at SDK setup time rather than immediately
     ///   after, because PostHog captures `Application Installed` / `Application Opened`
@@ -35,7 +62,13 @@ protocol AnalyticsClientProtocol {
     ///   lifecycle event per launch for users who turned analytics off.
     func configure(_ configuration: AnalyticsConfiguration, startOptedOut: Bool)
     func capture(_ event: String, properties: [String: Any])
+    func capture(
+        _ event: String,
+        properties: [String: Any],
+        personPropertiesSetOnce: [String: Any]
+    )
     func screen(_ screen: String, properties: [String: Any])
+    func captureException(_ error: Error, properties: [String: Any])
     func optIn()
     func optOut()
     func isOptOut() -> Bool
@@ -55,9 +88,16 @@ final class PostHogAnalyticsClient: AnalyticsClientProtocol {
         config.personProfiles = .always
         config.setDefaultPersonProperties = false
 
-        // Supplies `Application Installed` / `Opened` / `Became Active`, which are
-        // the denominator for every activation and retention funnel.
+        // Supplies `Application Installed` / `Updated` / `Opened`, which are the
+        // denominator for every activation and retention funnel. See
+        // `LifecycleEventFilter` for why the noisy half is dropped here rather
+        // than by turning this off.
         config.captureApplicationLifecycleEvents = true
+        config.setBeforeSend { event in
+            LifecycleEventFilter.allows(event: event.event, properties: event.properties)
+                ? event
+                : nil
+        }
 
         // Screen views stay manual so they use the curated `AnalyticsScreen` names.
         config.captureScreenViews = false
@@ -70,6 +110,7 @@ final class PostHogAnalyticsClient: AnalyticsClientProtocol {
         // qualitative counterpart to the funnel events.
         config.surveys = true
 
+        configureErrorTracking(on: config)
         configureSessionReplay(on: config)
 
         #if DEBUG
@@ -77,6 +118,23 @@ final class PostHogAnalyticsClient: AnalyticsClientProtocol {
         #endif
 
         PostHogSDK.shared.setup(config)
+    }
+
+    /// Crash and exception capture, via PLCrashReporter under the hood. Catches Mach
+    /// exceptions (`EXC_BAD_ACCESS`, the class of the crash 1.3 shipped with), POSIX
+    /// signals and uncaught `NSException`s; the report is written to disk and sent as
+    /// `$exception` on the next launch.
+    ///
+    /// Two things outside this file have to be true for it to work:
+    /// - **Enable exception autocapture** must be on in PostHog project settings. The
+    ///   SDK reads that remote config at startup and skips installing the crash handler
+    ///   when it is off, so a build with this line can still capture nothing.
+    /// - dSYMs must be uploaded per release, or every frame arrives as a hex address.
+    ///   See `PRE_1.4_CHECKLIST.md` §1.5.
+    ///
+    /// Opt-out is already honoured: `config.optOut` is applied at setup, above.
+    private func configureErrorTracking(on config: PostHogConfig) {
+        config.errorTrackingConfig.autoCapture = true
     }
 
     /// Session replay is deliberately configured so that no workout data can leave
@@ -110,8 +168,24 @@ final class PostHogAnalyticsClient: AnalyticsClientProtocol {
         PostHogSDK.shared.capture(event, properties: properties)
     }
 
+    func capture(
+        _ event: String,
+        properties: [String: Any],
+        personPropertiesSetOnce: [String: Any]
+    ) {
+        PostHogSDK.shared.capture(
+            event,
+            properties: properties,
+            userPropertiesSetOnce: personPropertiesSetOnce
+        )
+    }
+
     func screen(_ screen: String, properties: [String: Any]) {
         PostHogSDK.shared.screen(screen, properties: properties)
+    }
+
+    func captureException(_ error: Error, properties: [String: Any]) {
+        PostHogSDK.shared.captureException(error, properties: properties)
     }
 
     func optIn() {
@@ -130,7 +204,13 @@ final class PostHogAnalyticsClient: AnalyticsClientProtocol {
 final class NoopAnalyticsClient: AnalyticsClientProtocol {
     func configure(_ configuration: AnalyticsConfiguration, startOptedOut: Bool) {}
     func capture(_ event: String, properties: [String: Any]) {}
+    func capture(
+        _ event: String,
+        properties: [String: Any],
+        personPropertiesSetOnce: [String: Any]
+    ) {}
     func screen(_ screen: String, properties: [String: Any]) {}
+    func captureException(_ error: Error, properties: [String: Any]) {}
     func optIn() {}
     func optOut() {}
     func isOptOut() -> Bool { true }
@@ -143,6 +223,7 @@ final class NoopAnalyticsService: AnalyticsServiceProtocol {
     func setCollectionEnabled(_ enabled: Bool) {}
     func screen(_ screen: AnalyticsScreen, properties: [AnalyticsPropertyKey: AnalyticsPropertyValue]) {}
     func track(_ event: AnalyticsEvent, properties: [AnalyticsPropertyKey: AnalyticsPropertyValue]) {}
+    func captureError(_ error: Error, context: AnalyticsErrorContext) {}
 }
 
 final class AnalyticsService: AnalyticsServiceProtocol {
@@ -153,25 +234,15 @@ final class AnalyticsService: AnalyticsServiceProtocol {
     private let client: any AnalyticsClientProtocol
     private let configuration: AnalyticsConfiguration
     private let userDefaults: UserDefaults
-    private let appVersion: String?
-    private let buildNumber: String?
 
     init(
         client: any AnalyticsClientProtocol,
         configuration: AnalyticsConfiguration,
-        userDefaults: UserDefaults = .standard,
-        appVersion: String? = nil,
-        buildNumber: String? = nil
+        userDefaults: UserDefaults = .standard
     ) {
         self.client = client
         self.configuration = configuration
         self.userDefaults = userDefaults
-        self.appVersion = appVersion?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .nonEmpty
-        self.buildNumber = buildNumber?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .nonEmpty
     }
 
     var isCollectionEnabled: Bool {
@@ -206,16 +277,40 @@ final class AnalyticsService: AnalyticsServiceProtocol {
         client.capture(event.rawValue, properties: sanitize(properties))
     }
 
+    func track(
+        _ event: AnalyticsEvent,
+        properties: [AnalyticsPropertyKey: AnalyticsPropertyValue],
+        personPropertiesSetOnce: [AnalyticsPropertyKey: AnalyticsPropertyValue]
+    ) {
+        guard isCollectionEnabled else { return }
+        client.capture(
+            event.rawValue,
+            properties: sanitize(properties),
+            personPropertiesSetOnce: sanitize(personPropertiesSetOnce)
+        )
+    }
+
+    /// Only the error's type and description travel with this — deliberately no
+    /// payload, so a failed Health write can never carry workout contents off the
+    /// device. Keep thrown error messages free of user data (`WorkoutHistoryBackupError`
+    /// interpolates ids, never names or notes) and that stays true.
+    func captureError(_ error: Error, context: AnalyticsErrorContext) {
+        guard isCollectionEnabled else { return }
+        client.captureException(error, properties: sanitize([
+            .errorContext: .string(context.rawValue),
+            .errorType: .string(String(describing: type(of: error)))
+        ]))
+    }
+
+    /// Version is deliberately not stamped here. PostHog's static context already
+    /// puts `$app_version` / `$app_build` on *every* event, including the SDK's own
+    /// lifecycle events — a custom copy could only ever cover the events the app
+    /// fires itself, which is how 1.2 through 1.4 ended up with two version
+    /// properties that disagreed about which events they applied to.
     func sanitize(_ properties: [AnalyticsPropertyKey: AnalyticsPropertyValue]) -> [String: Any] {
         var result: [String: Any] = [:]
         for (key, value) in properties {
             result[key.rawValue] = value.rawValue
-        }
-        if let appVersion {
-            result[AnalyticsPropertyKey.appVersion.rawValue] = appVersion
-        }
-        if let buildNumber {
-            result[AnalyticsPropertyKey.buildNumber.rawValue] = buildNumber
         }
         return result
     }
@@ -237,8 +332,32 @@ final class AnalyticsService: AnalyticsServiceProtocol {
     }
 }
 
-private extension String {
-    var nonEmpty: String? { isEmpty ? nil : self }
+// MARK: - Error reporting port
+
+/// The half of `AnalyticsServiceProtocol` that actors need. `HealthKitService` and
+/// `SubscriptionService` are actors, so they hold this rather than the service itself
+/// — same arrangement, and the same reason, as `AnalyticsAttributionReporter`.
+protocol AnalyticsErrorReporting: Sendable {
+    func report(_ error: Error, context: AnalyticsErrorContext)
+}
+
+struct AnalyticsErrorReporter: AnalyticsErrorReporting, @unchecked Sendable {
+    // `AnalyticsServiceProtocol` predates strict concurrency and is not Sendable,
+    // but `AnalyticsService` holds only immutable state and forwards to the
+    // PostHog SDK, which is thread-safe by contract.
+    private let analytics: any AnalyticsServiceProtocol
+
+    init(analytics: any AnalyticsServiceProtocol) {
+        self.analytics = analytics
+    }
+
+    func report(_ error: Error, context: AnalyticsErrorContext) {
+        analytics.captureError(error, context: context)
+    }
+}
+
+struct NoopAnalyticsErrorReporter: AnalyticsErrorReporting {
+    func report(_ error: Error, context: AnalyticsErrorContext) {}
 }
 
 enum AnalyticsServiceFactory {
@@ -266,9 +385,7 @@ enum AnalyticsServiceFactory {
         return AnalyticsService(
             client: client ?? PostHogAnalyticsClient(),
             configuration: configuration,
-            userDefaults: userDefaults,
-            appVersion: bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
-            buildNumber: bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+            userDefaults: userDefaults
         )
     }
 }

@@ -8,8 +8,18 @@ import SwiftUI
 import RevenueCatUI
 import StoreKit
 
+/// One-time, versioned rebuild of derived data on first launch after an update.
+///
+/// Version 2 also rebuilds stats. Until it shipped, `SetService.create` ran the full save
+/// pipeline on rows it had just created, so every Copy Previous set was PR-evaluated and
+/// counted in stats before being performed — and counted a second time when the user
+/// completed it. Stored PRs and aggregates on existing installs carry that inflation, and
+/// arithmetic-delta stats can't self-heal, so both are recomputed from the logged sets.
+///
+/// The UserDefaults key predates the stats rebuild and is left alone: it's persisted on
+/// device, and the version number is what gates the work.
 enum StartupPRRebuildMaintenance {
-    static let currentVersion = 1
+    static let currentVersion = 2
     static let userDefaultsKey = "startupPRRebuildMaintenanceVersion"
 
     static func runIfNeeded(
@@ -20,9 +30,11 @@ enum StartupPRRebuildMaintenance {
 
         do {
             try await settingsService.rebuildPRs()
+            try await settingsService.rebuildStats()
             userDefaults.set(currentVersion, forKey: userDefaultsKey)
         } catch {
-            dbg("[ContentView] Startup PR rebuild maintenance failed: \(error)")
+            // Version stays unstamped, so this retries on the next launch.
+            dbg("[ContentView] Startup rebuild maintenance failed: \(error)")
         }
     }
 }
@@ -288,7 +300,7 @@ struct ContentView: View {
                 // Only when nothing else is claiming the screen. A resumed workout takes
                 // the fullScreenCover, and two modals racing on launch is how one of them
                 // gets dismissed unread.
-                services.analyticsService.whatsNewShown(version: release.version)
+                services.analyticsService.whatsNewShown()
                 // Same reasoning as the paywall: a sheet asking for attention followed by
                 // a rating request in one session is how you earn one star.
                 reviewPrompt.suppressForThisSession()
@@ -575,6 +587,7 @@ struct ContentView: View {
     }
 
     /// Copy a past workout. If an active workout exists, triggers confirmation dialog.
+    @MainActor
     private func copyWorkout(_ workoutId: UUID) async {
         do {
             let activeWorkout = try await services.workoutService.getActiveWorkoutSummary()
@@ -590,6 +603,7 @@ struct ContentView: View {
     }
 
     /// Called when user confirms discarding the active workout to proceed with copy.
+    @MainActor
     private func discardActiveAndCopy() async {
         guard let pendingId = pendingCopyWorkoutId else { return }
         do {
@@ -615,25 +629,40 @@ struct ContentView: View {
     }
 
     /// Perform the actual copy of a source workout, then show active workout.
+    ///
+    /// `@MainActor` because this mutates presentation state. It used to be nonisolated, and
+    /// the main app target doesn't set `SWIFT_APPROACHABLE_CONCURRENCY`, so a nonisolated
+    /// async function here did *not* inherit the caller's executor — the `@State` writes below
+    /// happened off the main actor and the cover could come up before they landed.
+    @MainActor
     private func performCopy(_ sourceWorkoutId: UUID) async throws {
+        // Warmups are part of the workout being copied. Filtering to `.working` here dropped
+        // them silently — the set type is carried through instead.
         let sourceSets = try await services.setService.fetchSetSnapshots(for: sourceWorkoutId)
-        let workingSets = sourceSets
-            .filter { $0.setType == .working }
             .sorted { ($0.orderInWorkout, $0.orderInExercise) < ($1.orderInWorkout, $1.orderInExercise) }
 
         let startOptions = pendingWorkoutStartOptions ?? .default
         let newWorkout = try await services.workoutService.startWorkout(options: startOptions)
 
-        for sourceSet in workingSets {
+        for sourceSet in sourceSets {
+            // Per-side reps and RIR have to be carried explicitly. `reps` on a unilateral row is
+            // only a derived mirror of `max(left, right)` (`syncDerivedPerformanceFields`), so
+            // copying it alone produced a row the Sets tab read as 0/0 while History and the PR
+            // badge read the mirror — the two disagreed on the same set.
             _ = try await services.setService.create(
                 workoutId: newWorkout.id,
                 exerciseId: sourceSet.exerciseId,
                 date: Date(),
-                setType: .working,
+                setType: sourceSet.setType,
                 orderInWorkout: sourceSet.orderInWorkout,
                 orderInExercise: sourceSet.orderInExercise,
                 weight: sourceSet.weight,
-                reps: sourceSet.reps
+                reps: sourceSet.reps,
+                leftReps: sourceSet.leftReps,
+                rightReps: sourceSet.rightReps,
+                rir: sourceSet.rir,
+                leftRIR: sourceSet.leftRIR,
+                rightRIR: sourceSet.rightRIR
             )
         }
 
@@ -645,9 +674,15 @@ struct ContentView: View {
         )
 
         hasActiveWorkout = true
-        showCopyPreviousSheet = false
-        showActiveWorkout = true
         pendingWorkoutStartOptions = nil
+
+        // Let the sheet finish dismissing before presenting the cover, matching
+        // `startWorkoutWithExercises`. Presenting in the same tick gave a cover whose
+        // `.task` ran against a view tree built before the copy landed — the screen came
+        // up empty and only filled in when reopened.
+        showCopyPreviousSheet = false
+        try await Task.sleep(for: .milliseconds(300))
+        showActiveWorkout = true
     }
 
     // MARK: - Tab Bar Appearance

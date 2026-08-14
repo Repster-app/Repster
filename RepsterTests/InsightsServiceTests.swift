@@ -1003,4 +1003,147 @@ final class InsightsServiceTests: XCTestCase {
         XCTAssertNotNil(rest, "3-rep gap between short and long rests should fire the rest rule")
         XCTAssertEqual(rest?.subjectName, "Squat")
     }
+
+    // MARK: - PR pace rule
+
+    /// The drought variant fed the timeline chart `[medianGap, daysSinceLastPR]`
+    /// — two durations in days — where it expects event timestamps. The chart
+    /// reads the last value as the most recent event, so a 235-day plateau was
+    /// drawn as one dot on 1 Jan 1970 under a headline gap of ~20,000 days.
+    ///
+    /// Every preview and gallery sample fed the chart real timestamps, which is
+    /// why the mismatch only showed on device.
+    @MainActor
+    func testPRPaceDroughtChartsPRDatesRatherThanDurations() throws {
+        let now = Date()
+        let fly = makeExercise(name: "Seated Machine Fly", primaryMuscle: "chest")
+
+        // Five PRs about 12 days apart and then nothing, but the lift is still
+        // being trained — which is what separates a plateau from a dropped lift.
+        let prDaysAgo = [283, 271, 259, 247, 235]  // oldest first
+        var workouts: [Workout] = []
+        var setsByWorkout: [UUID: [WorkoutSet]] = [:]
+
+        for days in prDaysAgo + [3] {
+            let date = daysAgo(days, from: now)
+            let workout = Workout(date: date, startTime: date, status: .completed)
+            workouts.append(workout)
+            setsByWorkout[workout.id] = [WorkoutSet(
+                workoutId: workout.id,
+                exerciseId: fly.id,
+                date: date,
+                completedAt: date,
+                weight: 60,
+                effectiveWeight: 60,
+                reps: 10,
+                setType: .working,
+                orderInWorkout: 0,
+                orderInExercise: 0,
+                completed: true,
+                cachedPRStatus: prDaysAgo.contains(days) ? .current : nil
+            )]
+        }
+
+        let context = InsightAnalysisContext(
+            workouts: workouts,
+            setsByWorkout: setsByWorkout,
+            exercisesById: [fly.id: fly],
+            observations: [],
+            referenceDate: now,
+            unitPreference: .metric
+        )
+
+        let findings = PRPaceInsightRule().evaluate(context)
+        let drought = try XCTUnwrap(
+            findings.first { $0.headline.contains("overdue") },
+            "A 235-day gap against a 12-day PR cadence should fire the drought variant"
+        )
+
+        XCTAssertEqual(drought.chartKind, .timeline)
+        XCTAssertEqual(drought.chartValues.count, prDaysAgo.count)
+        for (plotted, days) in zip(drought.chartValues, prDaysAgo) {
+            XCTAssertEqual(
+                plotted,
+                daysAgo(days, from: now).timeIntervalSince1970,
+                accuracy: 1,
+                "Timeline charts plot event timestamps, not gap durations"
+            )
+        }
+        XCTAssertEqual(
+            try XCTUnwrap(drought.typicalGapDays), 12, accuracy: 0.01,
+            "The cadence the chart prints has to be the one the text quotes"
+        )
+    }
+
+    // MARK: - Dropped exercise rule
+
+    /// The rule takes its median over every session but hands the chart only the
+    /// last 8, so the chart's own estimate described a different stretch of
+    /// training than the sentence beneath it — "usually every 15" under prose
+    /// reading "about every 5 days". The rule's figure now travels with the
+    /// finding.
+    @MainActor
+    func testDroppedExerciseCarriesItsFullHistoryCadence() throws {
+        let now = Date()
+        let thrust = makeExercise(name: "Hip Thrust", primaryMuscle: "glutes")
+
+        // Twelve sessions 5 days apart, then 8 more at 15, then a 60-day gap:
+        // the median over everything is 5, over the charted tail it's 15.
+        let recent = [60, 75, 90, 105, 120, 135, 150, 165]
+        let earlier = Array(stride(from: 170, through: 225, by: 5))
+        let sessionDaysAgo = (recent + earlier).sorted(by: >)  // oldest first
+
+        var workouts: [Workout] = []
+        var setsByWorkout: [UUID: [WorkoutSet]] = [:]
+        for days in sessionDaysAgo {
+            let date = daysAgo(days, from: now)
+            let workout = Workout(date: date, startTime: date, status: .completed)
+            workouts.append(workout)
+            setsByWorkout[workout.id] = [WorkoutSet(
+                workoutId: workout.id,
+                exerciseId: thrust.id,
+                date: date,
+                completedAt: date,
+                weight: 100,
+                effectiveWeight: 100,
+                reps: 10,
+                setType: .working,
+                orderInWorkout: 0,
+                orderInExercise: 0,
+                completed: true
+            )]
+        }
+
+        let context = InsightAnalysisContext(
+            workouts: workouts,
+            setsByWorkout: setsByWorkout,
+            exercisesById: [thrust.id: thrust],
+            observations: [],
+            referenceDate: now,
+            unitPreference: .metric
+        )
+
+        let finding = try XCTUnwrap(
+            DroppedExerciseInsightRule().evaluate(context).first,
+            "A 60-day gap on a lift trained 20 times should read as dropped"
+        )
+
+        XCTAssertEqual(
+            try XCTUnwrap(finding.typicalGapDays), 5, accuracy: 0.01,
+            "The carried cadence is the median over every session"
+        )
+        XCTAssertTrue(
+            finding.detailText.contains("about every 5 days"),
+            "…which is the same number the card's text quotes"
+        )
+
+        // The charted tail on its own would have said something else entirely,
+        // which is the whole reason the figure is carried rather than derived.
+        let charted = finding.chartValues.sorted()
+        XCTAssertEqual(charted.count, 8)
+        let chartedGaps = zip(charted.dropFirst(), charted)
+            .map { ($0 - $1) / 86_400 }
+            .sorted()
+        XCTAssertEqual(chartedGaps[chartedGaps.count / 2], 15, accuracy: 0.01)
+    }
 }

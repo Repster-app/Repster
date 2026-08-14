@@ -52,8 +52,16 @@ actor ChartDataService: ChartDataServiceProtocol {
 
     /// Canonical filter for sets eligible for chart aggregation.
     /// Applied post-fetch since hasData is a computed property.
+    ///
+    /// `completed` matters as much as `hasData`: a row can carry weight and reps without
+    /// having been performed. Copy Previous creates exactly that, and an uncompleted row
+    /// plotted as a data point claims a session that never happened. Stats, PRs and the
+    /// History tab all draw the line at completion — charts do too.
+    ///
+    /// Deliberately not filtered on workout status: the current in-progress workout should
+    /// appear, and now does so from the moment a set is ticked off rather than before.
     private nonisolated func chartEligibleSets(_ sets: [ChartSetData]) -> [ChartSetData] {
-        sets.filter { $0.hasData && $0.setType != .warmup && $0.setType != .partial }
+        sets.filter { $0.completed && $0.hasData && $0.setType != .warmup && $0.setType != .partial }
     }
 
     private func fetchExerciseLookup() async throws -> [UUID: ChartExerciseData] {

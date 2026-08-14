@@ -101,7 +101,9 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         )
 
         guard let baseE1RM = baseEstimate.value, baseEstimate.source != .noData else {
-            return .unavailable(.noStrengthData)
+            return .unavailable(
+                baseEstimate.suppressedForBodyweightHistory ? .bodyweightHistoryOnly : .noStrengthData
+            )
         }
 
         let calibrationAdjustment = await calibrationProvider.calibrationAdjustment(for: exerciseId)
@@ -255,6 +257,34 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         let allEligible = allSets.filter { isEligibleForCapacity(set: $0, excludedWorkoutIds: allExcluded) }
 
         if let mostRecent = peakAcrossRecentWorkouts(allEligible, limit: 1) {
+            // A set logged at bodyweight can never be eligible: every e1RM formula is
+            // `weight * repFactor`, so 0 kg yields 0 and fails the `> 0` test above. Without
+            // this check the fallback reaches straight past a bodyweight era to the last
+            // weighted session — a year back, in the reported case — and presents it as a
+            // current load prescription. Withhold rather than mislead.
+            let loggedAtBodyweightSince = allSets.contains { set in
+                set.completed &&
+                    set.hasData &&
+                    set.setType != .warmup &&
+                    set.setType != .partial &&
+                    !allExcluded.contains(set.workoutId) &&
+                    (set.e1RM ?? 0) <= 0 &&
+                    set.date > mostRecent.workoutDate
+            }
+            if loggedAtBodyweightSince {
+                dbg("""
+                    [Prescription] Withholding stale baseline from \(mostRecent.workoutDate): \
+                    exercise has been logged at bodyweight since
+                    """)
+                return BaseE1RMEstimate(
+                    value: nil,
+                    source: .noData,
+                    sourceWorkoutDate: nil,
+                    topSet: nil,
+                    suppressedForBodyweightHistory: true
+                )
+            }
+
             dbg("""
                 [Prescription] No in-window data; falling back to most recent workout \
                 from \(mostRecent.workoutDate) (e1RM = \(String(format: "%.1f", mostRecent.value)) kg)

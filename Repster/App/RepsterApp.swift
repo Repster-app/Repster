@@ -45,6 +45,26 @@ struct RepsterApp: App {
                 analyticsService: analyticsService
             )
 
+            // Apple Search Ads attribution. Both collectors are gated on the same
+            // analytics preference the factory checks, because the privacy policy
+            // promises one toggle covers everything — a second collection path
+            // that ignored it would make the published policy wrong.
+            //
+            // Attribution cannot be backfilled, so a user who opts in later still
+            // gets resolved: the stored state stays `pending` until it succeeds.
+            if let attributionService = AttributionServiceFactory.makeService(
+                analytics: analyticsService
+            ) {
+                // RevenueCat decodes the same token server-side, which is what
+                // puts campaign data on the customer and lets revenue be split
+                // by channel. One line, and it needs no other wiring.
+                Purchases.shared.attribution.enableAdServicesAttributionTokenCollection()
+
+                Task.detached(priority: .utility) {
+                    await attributionService.resolveIfNeeded()
+                }
+            }
+
             // Clean up any stale Live Activities from a previous app session
             // (e.g., user force-quit the app while a workout was active)
             LiveActivityManager().cleanupStaleActivities()

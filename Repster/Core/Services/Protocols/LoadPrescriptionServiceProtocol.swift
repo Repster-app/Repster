@@ -139,6 +139,7 @@ enum SuggestionUnavailableReason: String, Sendable, Equatable {
     case noPendingSets
     case missingTarget
     case noStrengthData
+    case bodyweightHistoryOnly
     case calculationFailed
 
     var title: String {
@@ -155,6 +156,8 @@ enum SuggestionUnavailableReason: String, Sendable, Equatable {
             return "Missing target"
         case .noStrengthData:
             return "Not enough history"
+        case .bodyweightHistoryOnly:
+            return "Logged at bodyweight"
         case .calculationFailed:
             return "Suggestion unavailable"
         }
@@ -174,6 +177,8 @@ enum SuggestionUnavailableReason: String, Sendable, Equatable {
             return "This set needs reps or RIR guidance from the set entry, template, or Smart Suggestions defaults."
         case .noStrengthData:
             return "Complete more sets for this exercise before Smart Suggestions can estimate a baseline."
+        case .bodyweightHistoryOnly:
+            return "Your recent sets for this exercise were logged at bodyweight, so there's no load to estimate from. Older weighted sets are too far back to be a fair guide."
         case .calculationFailed:
             return "The app could not build a suggestion from the current input state."
         }
@@ -493,17 +498,23 @@ struct BaseE1RMEstimate: Sendable {
     /// Nil for `.noData` or when no eligible source set could be identified.
     /// Used by the UI to render "last top: 52 kg × 8 · RIR 1" footer chip.
     let topSet: HistoricalSetSnapshot?
+    /// True when a usable older baseline existed but was deliberately withheld because the
+    /// exercise has been logged more recently at bodyweight. Lets the caller distinguish
+    /// "never logged" from "logged recently, but not at a load we can build an estimate from".
+    let suppressedForBodyweightHistory: Bool
 
     init(
         value: Double?,
         source: E1RMSource,
         sourceWorkoutDate: Date? = nil,
-        topSet: HistoricalSetSnapshot? = nil
+        topSet: HistoricalSetSnapshot? = nil,
+        suppressedForBodyweightHistory: Bool = false
     ) {
         self.value = value
         self.source = source
         self.sourceWorkoutDate = sourceWorkoutDate
         self.topSet = topSet
+        self.suppressedForBodyweightHistory = suppressedForBodyweightHistory
     }
 }
 

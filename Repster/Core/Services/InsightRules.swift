@@ -340,8 +340,15 @@ struct PRPaceInsightRule: InsightRule {
                 ),
                 methodologyText: "\(dates.count) PRs on record; cadence from your own history",
                 chartKind: .timeline,
-                chartLabels: ["typical gap", "current gap"],
-                chartValues: [medianGap, daysSinceLastPR],
+                // Event timestamps, not the two durations the text quotes:
+                // `InsightTimelineChart` reads the last value as the most recent
+                // event and measures the trailing gap as (now − it). Handing it
+                // [medianGap, daysSinceLastPR] placed both dots a few minutes
+                // after the epoch, so the card headlined its gap as ~20,000 days
+                // and dated the series to 1 Jan 1970.
+                chartLabels: sorted.map { _ in "PR" },
+                chartValues: sorted.map { $0.timeIntervalSince1970 },
+                typicalGapDays: medianGap,
                 // Ranked below the burst variant so a good stretch wins when
                 // both hold.
                 effectSize: min(0.75, daysSinceLastPR / (medianGap * 3.0)),

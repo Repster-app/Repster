@@ -1542,7 +1542,12 @@ final class ActiveWorkoutViewModel {
         do {
             // Snapshots: these are rendered by `ExerciseHistoryView` in a view body on the main
             // actor. Live models here were the same shape as crash B on the same screen.
+            // Completed rows only. This fetch was unfiltered, so rows that exist but haven't
+            // been performed — Copy Previous prefills, and the current workout's untouched
+            // rows — were listed as history alongside genuinely logged sets. A workout whose
+            // rows are all uncompleted drops out of the grouping entirely.
             let sets = try await setService.fetchSetSnapshots(for: exercise.id, limit: nil)
+                .filter(\.completed)
             let grouped = Dictionary(grouping: sets) { $0.workoutId }
             subTabHistory = grouped.map { workoutId, workoutSets in
                 WorkoutHistoryGroup(

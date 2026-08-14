@@ -197,7 +197,10 @@
       "Bash(awk '{print \"disk avail: \"$4}')",
       "Bash(perl -pi -e 's/^extension ExerciseStats: \\\\@unchecked Sendable \\\\{\\\\}$//' Repster/Data/Models/ExerciseStats.swift)",
       "Bash(du -sh ~/Library/Developer/Xcode/Archives/* 2>/dev/null | sort -hr; echo \"=== runtimes ===\"; xcrun simctl runtime list 2>/dev/null; echo \"=== runtime dirs ===\"; du -sh /Library/Developer/CoreSimulator/Images 2>/dev/null; ls -la /Library/Developer/CoreSimulator/Profiles/Runtimes/ 2>/dev/null)",
-      "Bash(cd /Users/nikolettkiraly/Downloads/NewWorkoutProject; xcodebuild test -project Repster.xcodeproj -scheme Repster -destination 'platform=iOS Simulator,name=iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO > /tmp/repster_clean_run.log 2>&1; echo \"EXIT=$?\"; grep -E \"error:|Executed [0-9]+ tests, with|TEST \\(SUCCEEDED|FAILED\\)\" /tmp/repster_clean_run.log | tail -5; echo \"--- warnings ---\"; grep -c \"warning:\" /tmp/repster_clean_run.log)"
+      "Bash(cd /Users/nikolettkiraly/Downloads/NewWorkoutProject; xcodebuild test -project Repster.xcodeproj -scheme Repster -destination 'platform=iOS Simulator,name=iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO > /tmp/repster_clean_run.log 2>&1; echo \"EXIT=$?\"; grep -E \"error:|Executed [0-9]+ tests, with|TEST \\(SUCCEEDED|FAILED\\)\" /tmp/repster_clean_run.log | tail -5; echo \"--- warnings ---\"; grep -c \"warning:\" /tmp/repster_clean_run.log)",
+      "Bash(cd ~/Library/Developer/Xcode/Products/com.magnusespensen.Repster/Crashes/Points/ *)",
+      "Bash(awk 'NR>=1960 && NR<=2130 { if \\($0 ~ /\\\\/\\\\* \\(Debug|Release\\) \\\\*\\\\/ = \\\\{/\\) print NR\": \"$0; if \\($0 ~ /DEBUG_INFORMATION_FORMAT|PRODUCT_NAME|PRODUCT_BUNDLE_IDENTIFIER|CODE_SIGN_ENTITLEMENTS/\\) print NR\": \"$0 }' Repster.xcodeproj/project.pbxproj)",
+      "Bash(:)"
     ]
   }
 }

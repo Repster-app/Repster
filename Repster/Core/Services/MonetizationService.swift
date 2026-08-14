@@ -239,8 +239,14 @@ actor SubscriptionService: SubscriptionServiceProtocol {
     private var cachedSnapshot: SubscriptionSnapshot
     private var customerInfoObservationTask: Task<Void, Never>?
 
-    init(entitlementIdentifier: String = RevenueCatConfiguration.entitlementIdentifier) {
+    private let errorReporter: any AnalyticsErrorReporting
+
+    init(
+        entitlementIdentifier: String = RevenueCatConfiguration.entitlementIdentifier,
+        errorReporter: any AnalyticsErrorReporting = NoopAnalyticsErrorReporter()
+    ) {
         self.entitlementIdentifier = entitlementIdentifier
+        self.errorReporter = errorReporter
         self.cachedSnapshot = .unknown(entitlementIdentifier: entitlementIdentifier)
         Task { await startCustomerInfoObservation() }
     }
@@ -256,6 +262,9 @@ actor SubscriptionService: SubscriptionServiceProtocol {
             cachedSnapshot = snapshot
             return snapshot
         } catch {
+            // Falls back to the cached snapshot, so a paying user can silently be
+            // shown the free tier for a whole session if this starts failing.
+            errorReporter.report(error, context: .subscriptionRefresh)
             dbg("[Monetization] Failed to refresh subscription status: \(error)")
             return cachedSnapshot
         }

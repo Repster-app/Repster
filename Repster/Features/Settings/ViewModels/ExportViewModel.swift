@@ -44,6 +44,7 @@ final class ExportViewModel {
                 self.analyticsService.backupExported()
                 self.isExporting = false
             } catch {
+                self.analyticsService.captureError(error, context: .backupExport)
                 self.errorMessage = error.localizedDescription
                 self.isExporting = false
             }
@@ -133,6 +134,7 @@ final class RestoreBackupViewModel {
                 self.errorMessage = nil
                 self.state = .previewing
             } catch {
+                analyticsService.captureError(error, context: .backupPreview)
                 errorMessage = error.localizedDescription
                 state = .failed
             }
@@ -160,6 +162,7 @@ final class RestoreBackupViewModel {
                 self.state = .completed
                 self.analyticsService.backupImported()
             } catch {
+                self.analyticsService.captureError(error, context: .backupRestore)
                 self.errorMessage = error.localizedDescription
                 self.state = .failed
             }

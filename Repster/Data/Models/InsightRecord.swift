@@ -27,6 +27,12 @@ final class InsightRecord {
     var chartKindRaw: String?
     var chartLabels: [String]
     var chartValues: [Double]
+    /// Typical spacing between the plotted events for `.timeline` findings, so
+    /// the chart quotes the same cadence the card's text does instead of
+    /// re-deriving one from the trailing window it was handed. Optional both for
+    /// lightweight migration of rows written before it existed and because most
+    /// chart kinds have no such figure; nil leaves the chart to its own estimate.
+    var typicalGapDays: Double?
     var generatedAt: Date
     var seenAt: Date?
     var createdAt: Date
@@ -56,6 +62,7 @@ final class InsightRecord {
         chartKind: InsightChartKind = .ranking,
         chartLabels: [String] = [],
         chartValues: [Double] = [],
+        typicalGapDays: Double? = nil,
         generatedAt: Date = Date(),
         seenAt: Date? = nil,
         createdAt: Date = Date(),
@@ -74,6 +81,7 @@ final class InsightRecord {
         self.chartKindRaw = chartKind.rawValue
         self.chartLabels = chartLabels
         self.chartValues = chartValues
+        self.typicalGapDays = typicalGapDays
         self.generatedAt = generatedAt
         self.seenAt = seenAt
         self.createdAt = createdAt

@@ -303,6 +303,67 @@ final class ChartDataServiceTests: XCTestCase {
         XCTAssertEqual(series.points[1].topReps, 4)
     }
 
+    /// A Copy Previous row carries weight and reps the moment it is created, so `hasData`
+    /// alone let it plot as a session the user had not performed. Weight-derived metrics
+    /// hid it behind their `> 0` guard, but the rep metrics have no such guard and showed it.
+    func testUncompletedPrefilledSetDoesNotPlotAsAChartPoint() async throws {
+        let context = try makeContext()
+        let exercise = makeExercise(name: "Leg Extension - 1 leg", primaryMuscle: "quads")
+        let performedWorkout = makeWorkout(on: makeDate(year: 2026, month: 1, day: 10))
+        let prefilledWorkout = makeWorkout(on: makeDate(year: 2026, month: 1, day: 17))
+
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(performedWorkout)
+        try await context.workoutRepo.save(prefilledWorkout)
+        try await context.setRepo.save(
+            makeSet(
+                workoutId: performedWorkout.id,
+                exerciseId: exercise.id,
+                date: performedWorkout.date,
+                weight: 45,
+                effectiveWeight: 45,
+                reps: 10,
+                setType: .working,
+                orderInWorkout: 1,
+                orderInExercise: 1
+            )
+        )
+        // Prefilled by Copy Previous, never ticked off.
+        try await context.setRepo.save(
+            WorkoutSet(
+                workoutId: prefilledWorkout.id,
+                exerciseId: exercise.id,
+                date: prefilledWorkout.date,
+                weight: 45,
+                effectiveWeight: 45,
+                reps: 10,
+                setType: .working,
+                orderInWorkout: 1,
+                orderInExercise: 1,
+                completed: false
+            )
+        )
+
+        let repsSeries = try await context.chartService.fetchExerciseProgress(
+            metric: .maxReps,
+            exerciseIds: [exercise.id],
+            timeRange: .all
+        )
+        let weightSeries = try await context.chartService.fetchExerciseProgress(
+            metric: .maxWeight,
+            exerciseIds: [exercise.id],
+            timeRange: .all
+        )
+
+        let reps = try XCTUnwrap(repsSeries.first)
+        XCTAssertEqual(reps.points.count, 1, "only the performed session plots")
+        XCTAssertEqual(reps.points[0].date, performedWorkout.date)
+
+        let weight = try XCTUnwrap(weightSeries.first)
+        XCTAssertEqual(weight.points.count, 1)
+        XCTAssertEqual(weight.points[0].date, performedWorkout.date)
+    }
+
     func testFetchEarliestWorkoutDateReturnsEarliestCompletedWorkoutOnly() async throws {
         let context = try makeContext()
         let inProgress = makeWorkout(

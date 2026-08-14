@@ -185,21 +185,45 @@ final class AnalyticsServiceTests: XCTestCase {
         XCTAssertEqual(client.captures.last?.properties["source"] as? String, "template")
     }
 
-    func testEveryEventStampsAppVersionAndBuildNumber() {
-        let (service, client, defaults) = makeService(appVersion: "1.4.2", buildNumber: "312")
+    /// Version comes from PostHog's `$app_version` alone. A second, app-stamped
+    /// copy only ever covered app-fired events, never the SDK's lifecycle ones.
+    func testEventsCarryNoAppStampedVersionProperties() {
+        let (service, client, defaults) = makeService()
         defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
 
         service.configure()
         service.track(.workoutStarted, properties: [.source: .string("empty")])
         service.screen(.home)
 
-        let capture = client.captures.first
-        XCTAssertEqual(capture?.properties["app_version"] as? String, "1.4.2")
-        XCTAssertEqual(capture?.properties["build_number"] as? String, "312")
+        XCTAssertNil(client.captures.first?.properties["app_version"])
+        XCTAssertNil(client.captures.first?.properties["build_number"])
+        XCTAssertNil(client.screens.first?.properties["app_version"])
+        XCTAssertNil(client.screens.first?.properties["build_number"])
+    }
 
-        let screen = client.screens.first
-        XCTAssertEqual(screen?.properties["app_version"] as? String, "1.4.2")
-        XCTAssertEqual(screen?.properties["build_number"] as? String, "312")
+    func testLifecycleFilterDropsBackgroundedAndBackgroundResumes() {
+        XCTAssertFalse(LifecycleEventFilter.allows(event: "Application Backgrounded", properties: [:]))
+        XCTAssertFalse(
+            LifecycleEventFilter.allows(
+                event: "Application Opened",
+                properties: ["from_background": true]
+            )
+        )
+    }
+
+    /// The three that funnels actually read must survive — turning the SDK flag off
+    /// to silence the noise is what left 1.2 and 1.3 with no install event at all.
+    func testLifecycleFilterKeepsColdLaunchesInstallsAndCustomEvents() {
+        XCTAssertTrue(
+            LifecycleEventFilter.allows(
+                event: "Application Opened",
+                properties: ["from_background": false, "version": "1.4"]
+            )
+        )
+        XCTAssertTrue(LifecycleEventFilter.allows(event: "Application Installed", properties: [:]))
+        XCTAssertTrue(LifecycleEventFilter.allows(event: "Application Updated", properties: [:]))
+        XCTAssertTrue(LifecycleEventFilter.allows(event: "workout started", properties: [:]))
+        XCTAssertTrue(LifecycleEventFilter.allows(event: "$screen", properties: [:]))
     }
 
     func testImportStartedHelperEmitsSourceAndUnit() {
@@ -383,6 +407,40 @@ final class AnalyticsServiceTests: XCTestCase {
         XCTAssertNil(ActiveWorkoutSessionMarker.startedAt(userDefaults: defaults))
     }
 
+    func testCaptureErrorTagsContextAndErrorType() {
+        let (service, client, _) = makeService()
+
+        service.captureError(SampleError.healthWriteFailed, context: .healthKitWorkoutWrite)
+
+        XCTAssertEqual(client.exceptions.count, 1)
+        let properties = client.exceptions[0].properties
+        XCTAssertEqual(properties[AnalyticsPropertyKey.errorContext.rawValue] as? String, "healthkit_workout_write")
+        XCTAssertEqual(properties[AnalyticsPropertyKey.errorType.rawValue] as? String, "SampleError")
+    }
+
+    /// Handled failures are analytics like any other event — the Settings toggle
+    /// has to suppress them too, not just the funnel.
+    func testCaptureErrorRespectsOptOut() {
+        let (service, client, _) = makeService()
+        service.setCollectionEnabled(false)
+
+        service.captureError(SampleError.healthWriteFailed, context: .backupExport)
+
+        XCTAssertTrue(client.exceptions.isEmpty)
+    }
+
+    /// The error context is what groups `$exception` issues in PostHog, so a
+    /// rename here silently splits an existing issue in two.
+    func testErrorContextRawValuesMatchTrackingPlan() {
+        XCTAssertEqual(AnalyticsErrorContext.healthKitAuthorization.rawValue, "healthkit_authorization")
+        XCTAssertEqual(AnalyticsErrorContext.healthKitWorkoutWrite.rawValue, "healthkit_workout_write")
+        XCTAssertEqual(AnalyticsErrorContext.healthKitWorkoutDelete.rawValue, "healthkit_workout_delete")
+        XCTAssertEqual(AnalyticsErrorContext.subscriptionRefresh.rawValue, "subscription_refresh")
+        XCTAssertEqual(AnalyticsErrorContext.backupExport.rawValue, "backup_export")
+        XCTAssertEqual(AnalyticsErrorContext.backupPreview.rawValue, "backup_preview")
+        XCTAssertEqual(AnalyticsErrorContext.backupRestore.rawValue, "backup_restore")
+    }
+
     func testMissingConfigurationFailsClosed() {
         XCTAssertNil(AnalyticsConfiguration(projectToken: "", host: "https://eu.i.posthog.com"))
         XCTAssertNil(AnalyticsConfiguration(projectToken: "$(POSTHOG_PROJECT_TOKEN)", host: "https://eu.i.posthog.com"))
@@ -393,10 +451,7 @@ final class AnalyticsServiceTests: XCTestCase {
         "AnalyticsServiceTests.\(name)"
     }
 
-    private func makeService(
-        appVersion: String? = nil,
-        buildNumber: String? = nil
-    ) -> (
+    private func makeService() -> (
         service: AnalyticsService,
         client: SpyAnalyticsClient,
         defaults: UserDefaults
@@ -412,9 +467,7 @@ final class AnalyticsServiceTests: XCTestCase {
             AnalyticsService(
                 client: client,
                 configuration: configuration,
-                userDefaults: defaults,
-                appVersion: appVersion,
-                buildNumber: buildNumber
+                userDefaults: defaults
             ),
             client,
             defaults
@@ -520,11 +573,17 @@ final class ReviewPromptServiceTests: XCTestCase {
     }
 }
 
+private enum SampleError: Error {
+    case healthWriteFailed
+}
+
 private final class SpyAnalyticsClient: AnalyticsClientProtocol {
     private(set) var configured: AnalyticsConfiguration?
     private(set) var configuredStartOptedOut: Bool?
     private(set) var captures: [(event: String, properties: [String: Any])] = []
+    private(set) var personPropertyCaptures: [(event: String, personProperties: [String: Any])] = []
     private(set) var screens: [(screen: String, properties: [String: Any])] = []
+    private(set) var exceptions: [(error: Error, properties: [String: Any])] = []
     private(set) var optInCount = 0
     private(set) var optOutCount = 0
     private var optedOut = false
@@ -538,8 +597,21 @@ private final class SpyAnalyticsClient: AnalyticsClientProtocol {
         captures.append((event, properties))
     }
 
+    func capture(
+        _ event: String,
+        properties: [String: Any],
+        personPropertiesSetOnce: [String: Any]
+    ) {
+        captures.append((event, properties))
+        personPropertyCaptures.append((event, personPropertiesSetOnce))
+    }
+
     func screen(_ screen: String, properties: [String: Any]) {
         screens.append((screen, properties))
+    }
+
+    func captureException(_ error: Error, properties: [String: Any]) {
+        exceptions.append((error, properties))
     }
 
     func optIn() {

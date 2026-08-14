@@ -58,9 +58,11 @@ actor HealthKitService: HealthKitServiceProtocol {
     // MARK: - Dependencies
 
     private let healthStore: HKHealthStore?
+    private let errorReporter: any AnalyticsErrorReporting
 
-    init() {
+    init(errorReporter: any AnalyticsErrorReporting = NoopAnalyticsErrorReporter()) {
         self.healthStore = HKHealthStore.isHealthDataAvailable() ? HKHealthStore() : nil
+        self.errorReporter = errorReporter
     }
 
     // MARK: - Availability & Flags
@@ -98,6 +100,10 @@ actor HealthKitService: HealthKitServiceProtocol {
         do {
             try await healthStore.requestAuthorization(toShare: shareTypes, read: [])
         } catch {
+            // Not the same as the user declining — a denial arrives through
+            // `authorizationStatus` below. Reaching here means the request itself
+            // failed, which the user sees as the sheet doing nothing.
+            errorReporter.report(error, context: .healthKitAuthorization)
             return .failed(error.localizedDescription)
         }
 
@@ -159,6 +165,9 @@ actor HealthKitService: HealthKitServiceProtocol {
             return workout?.uuid
         } catch {
             // Never propagate: a Health failure must not fail the workout finish.
+            // Which is exactly why it needs reporting — the user's workout is saved
+            // and nothing on screen suggests Health silently missed it.
+            errorReporter.report(error, context: .healthKitWorkoutWrite)
             #if DEBUG
             print("[HealthKit] saveWorkout failed: \(error.localizedDescription)")
             #endif
@@ -233,6 +242,7 @@ actor HealthKitService: HealthKitServiceProtocol {
             try await healthStore.delete(samples)
         } catch {
             // Best-effort. The sample may already be gone, or was written by another install.
+            errorReporter.report(error, context: .healthKitWorkoutDelete)
             #if DEBUG
             print("[HealthKit] deleteWorkout failed: \(error.localizedDescription)")
             #endif

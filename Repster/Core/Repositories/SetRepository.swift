@@ -35,7 +35,12 @@ actor SetRepository: SetRepositoryProtocol {
         orderInWorkout: Int,
         orderInExercise: Int,
         weight: Double?,
-        reps: Int?
+        reps: Int?,
+        leftReps: Int? = nil,
+        rightReps: Int? = nil,
+        rir: Double? = nil,
+        leftRIR: Double? = nil,
+        rightRIR: Double? = nil
     ) throws -> WorkoutSet {
         let set = WorkoutSet(
             workoutId: workoutId,
@@ -43,6 +48,11 @@ actor SetRepository: SetRepositoryProtocol {
             date: date,
             weight: weight,
             reps: reps,
+            leftReps: leftReps,
+            rightReps: rightReps,
+            rir: rir,
+            leftRIR: leftRIR,
+            rightRIR: rightRIR,
             setType: setType,
             orderInWorkout: orderInWorkout,
             orderInExercise: orderInExercise,

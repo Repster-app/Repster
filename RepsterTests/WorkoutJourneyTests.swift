@@ -949,4 +949,99 @@ extension WorkoutJourneyTests {
         await reopened.loadWorkout()
         XCTAssertEqual(reopened.currentSets.first?.weight, 120)
     }
+
+    // MARK: - Baseline selection across a switch to bodyweight
+
+    /// A 0 kg set can never satisfy the capacity filter — every e1RM formula is
+    /// `weight * repFactor`. The stale fallback therefore walked straight past a bodyweight
+    /// era to the last weighted session and offered a year-old load as a current suggestion.
+    func testStaleWeightedBaselineIsWithheldOnceTheExerciseIsLoggedAtBodyweight() async throws {
+        let stack = try Stack()
+        let exercise = Fixture.barbell()
+        try await stack.exerciseRepo.save(exercise)
+
+        try await seedCompletedSet(
+            stack,
+            exercise: exercise,
+            date: Date().addingTimeInterval(-400 * 86_400),
+            weight: 100,
+            reps: 5
+        )
+        // Logged since, at bodyweight — real, completed, and inside the recency window.
+        try await seedCompletedSet(
+            stack,
+            exercise: exercise,
+            date: Date().addingTimeInterval(-2 * 86_400),
+            weight: 0,
+            reps: 8
+        )
+
+        let estimate = try await stack.loadPrescriptionService.estimateBaseE1RM(
+            exerciseId: exercise.id,
+            completedSessionSets: []
+        )
+
+        XCTAssertEqual(estimate.source, .noData)
+        XCTAssertNil(estimate.value)
+        XCTAssertNil(estimate.sourceWorkoutDate, "no date to anchor a 'based on...' banner to")
+        XCTAssertTrue(estimate.suppressedForBodyweightHistory)
+    }
+
+    /// The counterpart: without newer bodyweight logging, the stale fallback is still correct
+    /// and must keep working. Withholding is meant to be narrow.
+    func testStaleWeightedBaselineStillAppliesWithoutNewerBodyweightLogging() async throws {
+        let stack = try Stack()
+        let exercise = Fixture.barbell()
+        try await stack.exerciseRepo.save(exercise)
+
+        try await seedCompletedSet(
+            stack,
+            exercise: exercise,
+            date: Date().addingTimeInterval(-400 * 86_400),
+            weight: 100,
+            reps: 5
+        )
+
+        let estimate = try await stack.loadPrescriptionService.estimateBaseE1RM(
+            exerciseId: exercise.id,
+            completedSessionSets: []
+        )
+
+        XCTAssertEqual(estimate.source, .staleRecentPerformance)
+        XCTAssertNotNil(estimate.value)
+        XCTAssertFalse(estimate.suppressedForBodyweightHistory)
+    }
+
+    /// Seed one completed set in its own finished workout at an explicit date.
+    private func seedCompletedSet(
+        _ stack: Stack,
+        exercise: Exercise,
+        date: Date,
+        weight: Double,
+        reps: Int
+    ) async throws {
+        let workout = Workout(
+            date: date,
+            title: "Session",
+            startTime: date,
+            endTime: date.addingTimeInterval(1_800),
+            duration: 1_800,
+            status: .completed
+        )
+        try await stack.workoutRepo.save(workout)
+
+        let set = WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            date: date,
+            completedAt: date,
+            weight: weight,
+            reps: reps,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+        _ = try await stack.setService.save(set)
+    }
 }

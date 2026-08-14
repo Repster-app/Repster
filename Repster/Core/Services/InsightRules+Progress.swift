@@ -323,6 +323,9 @@ struct DroppedExerciseInsightRule: InsightRule {
                 chartKind: .timeline,
                 chartLabels: sorted.suffix(8).map { _ in "" },
                 chartValues: sorted.suffix(8).map { $0.timeIntervalSince1970 },
+                // Over every session, matching the text — the chart only gets
+                // the last 8, whose median can be a different number entirely.
+                typicalGapDays: medianGap,
                 effectSize: min(1.0, currentGap / (medianGap * 8)),
                 tone: .diagnostic
             ))

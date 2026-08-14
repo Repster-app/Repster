@@ -51,7 +51,7 @@ Shipped in 1.3 — these can contain real user data:
 > Screens (`$screen_name`): `Home`, `Calendar`, `Charts`, `Settings`,
 > `Active Workout`, `Workout Summary`, `Paywall`
 >
-> Plus PostHog's `Application Installed` / `Opened` / `Became Active`
+> Plus PostHog's `Application Installed` / `Updated` / `Opened`
 
 All `workout completed` properties listed below — including `access_tier` and
 `remaining_free_workouts` — are already in 1.3.
@@ -72,8 +72,14 @@ simulator runs land in production analytics. See gap 6 in section 5.
 | Event | Meaning |
 |---|---|
 | `Application Installed` | First launch after install. Your denominator for activation. |
-| `Application Opened` | Cold launch. |
-| `Application Became Active` | Foreground, incl. returning from background — inflates "opens", don't use it for retention. |
+| `Application Updated` | First launch on a new build. Carries `previous_version` / `previous_build`. |
+| `Application Opened` | Cold launch only. Carries `version` / `build`. |
+
+`Application Backgrounded`, and `Application Opened` fired on a resume from
+background, are dropped client-side before they are sent — see
+`LifecycleEventFilter` in `AnalyticsService.swift`. They were 76% of all ingested
+volume on 1.1 and answered nothing. Don't build on them; they won't be there.
+See gap 8 for what this means for 1.2 and 1.3 data.
 
 ### Onboarding
 | Event | Key properties | Meaning |
@@ -152,8 +158,13 @@ Note `step_index` for `import_prompt` moved from 4 to 5 in 1.4 when the Apple
 Health step was inserted ahead of it. The `step` name is unchanged; build funnels
 on the name, not the index.
 
-Every event also carries `app_version` and `build_number` — always available as a
-breakdown or filter, and the first thing to check when a metric moves.
+Every event also carries PostHog's own `$app_version` and `$app_build` — always
+available as a breakdown or filter, and the first thing to check when a metric
+moves. Use these, never `app_version` / `build_number`: those were an app-stamped
+duplicate that existed from 1.2 to 1.4, and because the app stamped them itself
+they were never on the SDK's lifecycle events. `$app_version` is on everything,
+for all of history. (`$app_build` is an integer, so it sorts properly;
+`build_number` was a string.)
 
 ---
 
@@ -239,7 +250,7 @@ The question: *is anything quietly broken?*
 2. **Import outcomes** (Trends, breakdown `result`) — `import completed`
 3. **Import failures by source** (Trends, breakdown `source_type`, filtered `result != success`) — `import completed`
 4. **Backups** (Trends) — `backup exported`, `backup imported`
-5. **Version mix** (Trends, unique users, breakdown `app_version`) — `Application Opened`
+5. **Version mix** (Trends, unique users, breakdown `$app_version`) — `$screen`
 6. **Analytics opt-outs** (Trends, breakdown `enabled`) — `analytics opt-out toggled`
 7. **Screen traffic** (Trends, unique users, breakdown `$screen_name`) — `$screen`
 8. **Unit preference** (Trends, breakdown `unit_system`) — `unit system toggled`
@@ -366,7 +377,7 @@ is what stops the AI inventing things that don't exist in your project.
 > 3. Trend of `import completed` broken down by `source_type`, filtered to
 >    `result` is not `success`.
 > 4. Trend, weekly, with two series: `backup exported` and `backup imported`.
-> 5. Trend, unique users, of `Application Opened` broken down by `app_version`.
+> 5. Trend, unique users, of `$screen` broken down by `$app_version`.
 > 6. Trend of `analytics opt-out toggled` broken down by `enabled`.
 > 7. Trend, unique users, of the `$screen` event broken down by `$screen_name`.
 > 8. Trend of `unit system toggled` broken down by `unit_system`.
@@ -434,10 +445,38 @@ Small code fixes that would make the dashboards above meaningfully better.
    **Anything captured before 2026-08-10 from a debug build is contamination.**
    Filter it out of historical funnels where it matters.
 
-7. **`Application Installed` casing.** posthog-ios 3.58.1 — the only version this
-   project has ever resolved — emits `Application Installed` with a capital I
-   (`PostHogAppLifeCycleIntegration.swift:120`). There is no code path in the app
+7. **`Application Installed` casing.** posthog-ios (3.58.1 through 1.4, 3.69.3
+   since) emits `Application Installed` with a capital I
+   (`PostHogAppLifeCycleIntegration.swift:105`). There is no code path in the app
    or SDK that produces a lowercase variant, and the marketing site has no
    posthog-js snippet. Keep the capital-I event in all insights. If a lowercase
    definition shows real 30-day volume in Data Management → Events, something
    outside this repo is writing to the project.
+
+8. **Lifecycle events do not exist for 1.2 or 1.3 — this is the big one.**
+   `captureApplicationLifecycleEvents` was flipped to `false` in `e447efe`
+   (2026-05-20, shipped in 1.2) and only restored in `f4d2e65` (2026-08-08, 1.4).
+   Measured over the whole live period:
+
+   | Version | Real users | `Opened` | `Backgrounded` | `Installed` |
+   |---|---|---|---|---|
+   | 1.1 | 7 | 313 | 310 | 6 |
+   | 1.2 | 8 | 0 | 0 | 0 |
+   | 1.3 | 153 | 0 | 0 | 0 |
+
+   **Every funnel in this guide that starts at `Application Installed` has been
+   running on a denominator of zero since 2026-05-20.** Nothing is recoverable —
+   the events were never sent. For activation over the 1.2/1.3 era, use first-ever
+   `$screen` per person as the install proxy instead:
+
+   ```sql
+   SELECT person_id, min(timestamp) AS installed_at
+   FROM events
+   WHERE timestamp >= now() - INTERVAL 90 DAY
+   GROUP BY person_id
+   ```
+
+   It slightly undercounts (a user who installed and never opened a screen is
+   invisible) but it is the only signal that spans the gap. From 1.4 onward
+   `Application Installed` is trustworthy again, and `Application Opened` counts
+   cold launches only — which is what you wanted from it anyway.

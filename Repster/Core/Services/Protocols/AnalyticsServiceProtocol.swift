@@ -7,6 +7,25 @@ protocol AnalyticsServiceProtocol {
     func setCollectionEnabled(_ enabled: Bool)
     func screen(_ screen: AnalyticsScreen, properties: [AnalyticsPropertyKey: AnalyticsPropertyValue])
     func track(_ event: AnalyticsEvent, properties: [AnalyticsPropertyKey: AnalyticsPropertyValue])
+
+    /// Declared here rather than only in the extension below so it dispatches
+    /// dynamically. Callers hold `any AnalyticsServiceProtocol`, and an
+    /// extension-only method would statically bind to the default — silently
+    /// dropping every person property before it reached `AnalyticsService`.
+    func track(
+        _ event: AnalyticsEvent,
+        properties: [AnalyticsPropertyKey: AnalyticsPropertyValue],
+        personPropertiesSetOnce: [AnalyticsPropertyKey: AnalyticsPropertyValue]
+    )
+
+    /// Handled failures — the ones the app deliberately swallows so a Health write
+    /// or a subscription refresh can't take a workout down with it. Crashes are
+    /// captured automatically by the SDK; these never would be, because from the
+    /// outside nothing went wrong.
+    ///
+    /// Declared here for the same dynamic-dispatch reason as the person-property
+    /// overload above.
+    func captureError(_ error: Error, context: AnalyticsErrorContext)
 }
 
 extension AnalyticsServiceProtocol {
@@ -17,6 +36,34 @@ extension AnalyticsServiceProtocol {
     func track(_ event: AnalyticsEvent) {
         self.track(event, properties: [:])
     }
+
+    /// Person properties are a PostHog concept, so conformers that only model
+    /// events fall back to the event alone rather than each having to restate
+    /// this. `AnalyticsService` overrides it and actually sends them.
+    func track(
+        _ event: AnalyticsEvent,
+        properties: [AnalyticsPropertyKey: AnalyticsPropertyValue],
+        personPropertiesSetOnce: [AnalyticsPropertyKey: AnalyticsPropertyValue]
+    ) {
+        self.track(event, properties: properties)
+    }
+
+    /// Conformers that only model events (test doubles, `NoopAnalyticsService`)
+    /// drop these rather than each having to restate the no-op.
+    func captureError(_ error: Error, context: AnalyticsErrorContext) {}
+}
+
+/// Where a handled failure came from. A closed list for the same reason
+/// `AnalyticsScreen` is one: these become `$exception` issue groupings in PostHog,
+/// and free-form strings would fragment them.
+enum AnalyticsErrorContext: String {
+    case healthKitAuthorization = "healthkit_authorization"
+    case healthKitWorkoutWrite = "healthkit_workout_write"
+    case healthKitWorkoutDelete = "healthkit_workout_delete"
+    case subscriptionRefresh = "subscription_refresh"
+    case backupExport = "backup_export"
+    case backupPreview = "backup_preview"
+    case backupRestore = "backup_restore"
 }
 
 // MARK: - AnalyticsEvents helpers
@@ -479,10 +526,11 @@ extension AnalyticsServiceProtocol {
     /// Fires once per version, when the update sheet auto-presents on launch. Reopening
     /// it from Settings is deliberately untracked — it's a different intent and would
     /// otherwise inflate the denominator of the Apple Health prompt funnel.
-    func whatsNewShown(version: String) {
-        track(.whatsNewShown, properties: [
-            .appVersion: .string(version)
-        ])
+    /// No version property: the sheet only ever presents the release matching
+    /// `CFBundleShortVersionString`, so PostHog's own `$app_version` already says
+    /// which release was shown, on this and every other event.
+    func whatsNewShown() {
+        track(.whatsNewShown)
     }
 }
 
@@ -578,6 +626,10 @@ enum AnalyticsEvent: String, CaseIterable {
     case appleHealthPromptAnswered = "apple health prompt answered"
     case appleHealthDisabled = "apple health disabled"
     case whatsNewShown = "whats new shown"
+    /// Fires once per install, when Apple's AdServices lookup succeeds. Its real
+    /// job is verification: if this event stops arriving, attribution is broken
+    /// and every paid-vs-organic breakdown has silently gone unsegmented.
+    case attributionResolved = "attribution resolved"
 }
 
 enum AnalyticsPropertyKey: String, CaseIterable {
@@ -609,9 +661,8 @@ enum AnalyticsPropertyKey: String, CaseIterable {
     case result
     case unitSystem = "unit_system"
     case errorType = "error_type"
+    case errorContext = "error_context"
     case enabled
-    case appVersion = "app_version"
-    case buildNumber = "build_number"
     case accessTier = "access_tier"
     case remainingFreeWorkouts = "remaining_free_workouts"
     case rirEntered = "rir_entered"
@@ -624,6 +675,14 @@ enum AnalyticsPropertyKey: String, CaseIterable {
     case completedWorkoutCount = "completed_workout_count"
     case elapsedSecondsBucket = "elapsed_seconds_bucket"
     case trigger
+    // Attribution. Set as person properties (see `AnalyticsAttributionReporter`),
+    // which is why they can be filtered on events that predate resolution.
+    case acquisitionChannel = "acquisition_channel"
+    case asaCampaignId = "asa_campaign_id"
+    case asaAdGroupId = "asa_ad_group_id"
+    case asaKeywordId = "asa_keyword_id"
+    case asaConversionType = "asa_conversion_type"
+    case asaCountry = "asa_country"
 }
 
 enum AnalyticsPropertyValue: Equatable {

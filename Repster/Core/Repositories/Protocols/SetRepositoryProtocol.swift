@@ -60,7 +60,12 @@ protocol SetRepositoryProtocol: Sendable {
         orderInWorkout: Int,
         orderInExercise: Int,
         weight: Double?,
-        reps: Int?
+        reps: Int?,
+        leftReps: Int?,
+        rightReps: Int?,
+        rir: Double?,
+        leftRIR: Double?,
+        rightRIR: Double?
     ) async throws -> WorkoutSet
 
     func save(_ set: WorkoutSet) async throws

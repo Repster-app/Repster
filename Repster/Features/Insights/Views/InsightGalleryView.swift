@@ -231,7 +231,8 @@ private enum Fixtures {
             methodology: "Last performed 94 days ago",
             kind: .timeline,
             labels: Array(repeating: "", count: 7),
-            values: daysAgo([180, 166, 150, 137, 122, 108, 94])
+            values: daysAgo([180, 166, 150, 137, 122, 108, 94]),
+            typicalGapDays: 14
         ),
         item(
             ruleId: "prPace",
@@ -241,6 +242,7 @@ private enum Fixtures {
             kind: .timeline,
             labels: Array(repeating: "", count: 7),
             values: daysAgo([64, 48, 33, 21, 12, 7, 4]),
+            typicalGapDays: 18,
             isNew: true
         ),
         item(
@@ -300,6 +302,7 @@ private enum Fixtures {
         kind: InsightChartKind,
         labels: [String],
         values: [Double],
+        typicalGapDays: Double? = nil,
         isNew: Bool = false
     ) -> InsightItem {
         InsightItem(
@@ -312,6 +315,7 @@ private enum Fixtures {
             chartKind: kind,
             chartLabels: labels,
             chartValues: values,
+            typicalGapDays: typicalGapDays,
             isNew: isNew,
             generatedAt: Date()
         )

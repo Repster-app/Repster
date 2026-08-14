@@ -202,6 +202,8 @@
 		FL0005 /* FatigueLearningServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1005 /* FatigueLearningServiceTests.swift */; };
 		FL0006 /* FatigueLearningAdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1006 /* FatigueLearningAdminView.swift */; };
 		HK0001 /* HealthKitServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = HK1001 /* HealthKitServiceProtocol.swift */; };
+		ATRB0001 /* AttributionServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = ATRB1001 /* AttributionServiceProtocol.swift */; };
+		ATRB0002 /* AttributionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ATRB1002 /* AttributionService.swift */; };
 		HK0002 /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = HK1002 /* HealthKitService.swift */; };
 		HK0003 /* HealthKitEnergyEstimateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = HK1003 /* HealthKitEnergyEstimateTests.swift */; };
 		HLTH01 /* AppleHealthConnectionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = HLTH11 /* AppleHealthConnectionModel.swift */; };
@@ -248,6 +250,7 @@
 		TT0007 /* SeedExerciseLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2008 /* SeedExerciseLibraryTests.swift */; };
 		TT0008 /* MonetizationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2009 /* MonetizationServiceTests.swift */; };
 		TT0009 /* AnalyticsServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2010 /* AnalyticsServiceTests.swift */; };
+		ATRB0003 /* AttributionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ATRB2001 /* AttributionServiceTests.swift */; };
 		ZA0001 /* TrendLineCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZB0001 /* TrendLineCalculator.swift */; };
 		ZA0002 /* ChartsTabViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZB0002 /* ChartsTabViewModel.swift */; };
 		ZA0003 /* BreakdownTabViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZB0003 /* BreakdownTabViewModel.swift */; };
@@ -500,6 +503,8 @@
 		FL1005 /* FatigueLearningServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningServiceTests.swift; sourceTree = "<group>"; };
 		FL1006 /* FatigueLearningAdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningAdminView.swift; sourceTree = "<group>"; };
 		HK1001 /* HealthKitServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitServiceProtocol.swift; sourceTree = "<group>"; };
+		ATRB1001 /* AttributionServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttributionServiceProtocol.swift; sourceTree = "<group>"; };
+		ATRB1002 /* AttributionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttributionService.swift; sourceTree = "<group>"; };
 		HK1002 /* HealthKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitService.swift; sourceTree = "<group>"; };
 		HK1003 /* HealthKitEnergyEstimateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitEnergyEstimateTests.swift; sourceTree = "<group>"; };
 		HLTH11 /* AppleHealthConnectionModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleHealthConnectionModel.swift; sourceTree = "<group>"; };
@@ -544,6 +549,7 @@
 		TT2008 /* SeedExerciseLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedExerciseLibraryTests.swift; sourceTree = "<group>"; };
 		TT2009 /* MonetizationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonetizationServiceTests.swift; sourceTree = "<group>"; };
 		TT2010 /* AnalyticsServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsServiceTests.swift; sourceTree = "<group>"; };
+		ATRB2001 /* AttributionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttributionServiceTests.swift; sourceTree = "<group>"; };
 		ZB0001 /* TrendLineCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendLineCalculator.swift; sourceTree = "<group>"; };
 		ZB0002 /* ChartsTabViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartsTabViewModel.swift; sourceTree = "<group>"; };
 		ZB0003 /* BreakdownTabViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreakdownTabViewModel.swift; sourceTree = "<group>"; };
@@ -1056,6 +1062,7 @@
 			isa = PBXGroup;
 			children = (
 				HK1002 /* HealthKitService.swift */,
+				ATRB1002 /* AttributionService.swift */,
 				D60001 /* Protocols */,
 				PH1002 /* AnalyticsService.swift */,
 				B70002 /* PRService.swift */,
@@ -1195,6 +1202,7 @@
 			isa = PBXGroup;
 			children = (
 				HK1001 /* HealthKitServiceProtocol.swift */,
+				ATRB1001 /* AttributionServiceProtocol.swift */,
 				B70001 /* PRServiceProtocol.swift */,
 				B70004 /* StatsServiceProtocol.swift */,
 				B70005 /* SetServiceProtocol.swift */,
@@ -1401,6 +1409,7 @@
 				TT2007 /* WorkoutSetTests.swift */,
 				TT2009 /* MonetizationServiceTests.swift */,
 				TT2010 /* AnalyticsServiceTests.swift */,
+				ATRB2001 /* AttributionServiceTests.swift */,
 				FL1005 /* FatigueLearningServiceTests.swift */,
 				IN1009 /* InsightsServiceTests.swift */,
 				IN1031 /* ExerciseWorkoutCountTests.swift */,
@@ -1589,6 +1598,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				HK0001 /* HealthKitServiceProtocol.swift in Sources */,
+				ATRB0001 /* AttributionServiceProtocol.swift in Sources */,
+				ATRB0002 /* AttributionService.swift in Sources */,
 				HK0002 /* HealthKitService.swift in Sources */,
 				A10001 /* TrackingType.swift in Sources */,
 				A10002 /* SetType.swift in Sources */,
@@ -1846,6 +1857,7 @@
 				TT0006 /* WorkoutSetTests.swift in Sources */,
 				TT0008 /* MonetizationServiceTests.swift in Sources */,
 				TT0009 /* AnalyticsServiceTests.swift in Sources */,
+				ATRB0003 /* AttributionServiceTests.swift in Sources */,
 				FL0005 /* FatigueLearningServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

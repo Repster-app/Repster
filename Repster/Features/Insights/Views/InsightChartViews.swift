@@ -50,7 +50,11 @@ struct InsightChartView: View {
         case .range:
             InsightRangeChart(labels: insight.chartLabels, values: insight.chartValues, color: color)
         case .timeline:
-            InsightTimelineChart(values: insight.chartValues, color: color)
+            InsightTimelineChart(
+                values: insight.chartValues,
+                color: color,
+                typicalGapDays: insight.typicalGapDays
+            )
         }
     }
 }
@@ -689,6 +693,10 @@ struct InsightTimelineChart: View {
     /// Event timestamps as `timeIntervalSince1970`, oldest first.
     let values: [Double]
     let color: Color
+    /// The producing rule's own cadence figure, when it has one. Preferred over
+    /// the derived estimate below so the chart and the card's text can't quote
+    /// different numbers for the same series.
+    var typicalGapDays: Double?
     var referenceDate: Date = Date()
 
     private var sorted: [Double] { values.sorted() }
@@ -700,15 +708,20 @@ struct InsightTimelineChart: View {
 
     /// Typical spacing between events, so the trailing gap has something to be
     /// unusual against.
+    ///
+    /// Falls back to a median over the plotted events only when the rule didn't
+    /// supply one — that estimate is over whatever trailing window the chart was
+    /// handed, which is why a rule that quotes a cadence should pass its own.
+    /// Even counts take the upper of the two middle gaps rather than their
+    /// average, matching how the rules pick their median.
     private var medianGapDays: Int? {
+        if let typicalGapDays {
+            return max(1, Int(typicalGapDays.rounded()))
+        }
         guard sorted.count >= 3 else { return nil }
         let gaps = zip(sorted.dropFirst(), sorted).map { ($0 - $1) / 86_400 }.sorted()
         guard !gaps.isEmpty else { return nil }
-        let middle = gaps.count / 2
-        let value = gaps.count.isMultiple(of: 2)
-            ? (gaps[middle - 1] + gaps[middle]) / 2
-            : gaps[middle]
-        return max(1, Int(value.rounded()))
+        return max(1, Int(gaps[gaps.count / 2].rounded()))
     }
 
     var body: some View {

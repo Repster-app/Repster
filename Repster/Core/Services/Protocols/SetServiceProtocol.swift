@@ -93,8 +93,17 @@ protocol SetServiceProtocol: Sendable {
         orderInWorkout: Int,
         orderInExercise: Int,
         weight: Double?,
-        reps: Int?
+        reps: Int?,
+        leftReps: Int?,
+        rightReps: Int?,
+        rir: Double?,
+        leftRIR: Double?,
+        rightRIR: Double?
     ) async throws -> WorkoutSet
+
+    // Note: the per-side parameters have no defaults here — Swift doesn't allow default
+    // arguments on a protocol requirement. The blank-row convenience lives in the extension
+    // below, which is what the "add an empty set" callers use.
 
     // MARK: - Save (FR-001, FR-002, FR-003, FR-012)
 
@@ -248,6 +257,34 @@ protocol SetServiceProtocol: Sendable {
 }
 
 extension SetServiceProtocol {
+    /// Create a row with no per-side values — the "Add Set" / "Add Warmup" case.
+    func create(
+        workoutId: UUID,
+        exerciseId: UUID,
+        date: Date,
+        setType: SetType,
+        orderInWorkout: Int,
+        orderInExercise: Int,
+        weight: Double?,
+        reps: Int?
+    ) async throws -> WorkoutSet {
+        try await create(
+            workoutId: workoutId,
+            exerciseId: exerciseId,
+            date: date,
+            setType: setType,
+            orderInWorkout: orderInWorkout,
+            orderInExercise: orderInExercise,
+            weight: weight,
+            reps: reps,
+            leftReps: nil,
+            rightReps: nil,
+            rir: nil,
+            leftRIR: nil,
+            rightRIR: nil
+        )
+    }
+
     func edit(_ set: WorkoutSet) async throws -> SetSaveResult {
         try await edit(set, previousContribution: nil)
     }

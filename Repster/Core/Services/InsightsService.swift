@@ -23,6 +23,14 @@ struct InsightFinding {
     let chartKind: InsightChartKind
     let chartLabels: [String]
     let chartValues: [Double]
+    /// The typical spacing between the plotted events, for `.timeline` findings
+    /// that quote one in their text.
+    ///
+    /// Carried rather than left to the chart to re-derive: rules take their
+    /// median over the whole history but pass the chart a trailing window of
+    /// events, so the two disagreed on the same card — a chart reading "usually
+    /// every 15" under prose reading "about every 10 days".
+    let typicalGapDays: Double?
     /// Normalized 0...1 magnitude of the finding. Rules return nothing below
     /// their minimum-effect floor, so this is always "worth saying".
     let effectSize: Double
@@ -40,6 +48,7 @@ struct InsightFinding {
         chartKind: InsightChartKind,
         chartLabels: [String],
         chartValues: [Double],
+        typicalGapDays: Double? = nil,
         effectSize: Double,
         tone: InsightTone = .neutral
     ) {
@@ -53,6 +62,7 @@ struct InsightFinding {
         self.chartKind = chartKind
         self.chartLabels = chartLabels
         self.chartValues = chartValues
+        self.typicalGapDays = typicalGapDays
         self.effectSize = effectSize
     }
 }
@@ -345,6 +355,7 @@ actor InsightsService: InsightsServiceProtocol {
                 match.chartKind = finding.chartKind
                 match.chartLabels = finding.chartLabels
                 match.chartValues = finding.chartValues
+                match.typicalGapDays = finding.typicalGapDays
                 match.generatedAt = referenceDate
                 match.updatedAt = referenceDate
                 liveIds.insert(match.id)
@@ -360,6 +371,7 @@ actor InsightsService: InsightsServiceProtocol {
                     chartKind: finding.chartKind,
                     chartLabels: finding.chartLabels,
                     chartValues: finding.chartValues,
+                    typicalGapDays: finding.typicalGapDays,
                     generatedAt: referenceDate
                 )
                 modelContext.insert(record)
@@ -665,6 +677,7 @@ actor InsightsService: InsightsServiceProtocol {
             chartKind: record.chartKind,
             chartLabels: record.chartLabels,
             chartValues: record.chartValues,
+            typicalGapDays: record.typicalGapDays,
             isNew: record.state == .new,
             generatedAt: record.generatedAt
         )

@@ -14,6 +14,9 @@ struct InsightItem: Identifiable, Sendable, Equatable {
     let chartKind: InsightChartKind
     let chartLabels: [String]
     let chartValues: [Double]
+    /// Typical spacing between plotted events, for `.timeline` findings whose
+    /// text quotes a cadence. Nil leaves the chart to estimate its own.
+    let typicalGapDays: Double?
     let isNew: Bool
     let generatedAt: Date
 

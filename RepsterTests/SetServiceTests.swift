@@ -1196,6 +1196,137 @@ final class SetServiceTests: XCTestCase {
         XCTAssertEqual(finalCallCount, 2)
     }
 
+    // MARK: - Created rows must not contribute until they are performed
+
+    func testCreatingAPrefilledSetDoesNotCountTowardStatsOrPRs() async throws {
+        let context = try makeContext()
+        let workoutDate = makeDate(2026, 3, 22, 9, 0)
+        let records = try await insertExerciseAndWorkout(
+            in: context,
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest",
+            date: workoutDate
+        )
+
+        // Copy Previous creates rows that already carry weight and reps. They are targets,
+        // not performances — nothing has been lifted yet.
+        let created = try await context.setService.create(
+            workoutId: records.workout.id,
+            exerciseId: records.exercise.id,
+            date: workoutDate,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            weight: 100,
+            reps: 5
+        )
+
+        let performanceRecords = try await context.performanceRecordRepo.fetchAll(
+            for: records.exercise.id,
+            recordType: .repMax
+        )
+        let stats = try await context.statsService.fetchStats(for: records.exercise.id)
+        let persisted = try await context.setRepo.fetch(byId: created.id)
+
+        XCTAssertFalse(created.completed)
+        XCTAssertTrue(performanceRecords.isEmpty)
+        XCTAssertNil(persisted?.prStatus)
+        XCTAssertNil(persisted?.e1RM)
+        XCTAssertEqual(stats?.totalSets ?? 0, 0)
+        XCTAssertEqual(stats?.totalReps ?? 0, 0)
+        XCTAssertEqual(stats?.totalVolume ?? 0, 0, accuracy: 0.001)
+    }
+
+    func testCompletingAPrefilledSetCountsItExactlyOnce() async throws {
+        let context = try makeContext()
+        let workoutDate = makeDate(2026, 3, 22, 9, 0)
+        let records = try await insertExerciseAndWorkout(
+            in: context,
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest",
+            date: workoutDate
+        )
+
+        let created = try await context.setService.create(
+            workoutId: records.workout.id,
+            exerciseId: records.exercise.id,
+            date: workoutDate,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            weight: 100,
+            reps: 5
+        )
+
+        _ = try await context.setService.save(
+            setId: created.id,
+            input: SetCompletionInput(weight: 100, reps: 5)
+        )
+
+        let stats = try await context.statsService.fetchStats(for: records.exercise.id)
+        let performanceRecords = try await context.performanceRecordRepo.fetchAll(
+            for: records.exercise.id,
+            recordType: .repMax
+        )
+
+        // The prefill used to add a contribution of its own, so completing the row counted
+        // the same set a second time: 2 sets, 10 reps, 1000 kg of volume for one performance.
+        XCTAssertEqual(stats?.totalSets, 1)
+        XCTAssertEqual(stats?.totalReps, 5)
+        XCTAssertEqual(stats?.totalVolume ?? 0, 500, accuracy: 0.001)
+        XCTAssertEqual(performanceRecords.count, 1)
+    }
+
+    func testCreateCarriesPerSideRepsAndRIR() async throws {
+        let context = try makeContext()
+        let workoutDate = makeDate(2026, 3, 22, 9, 0)
+        let exercise = Exercise(
+            name: "Leg Extension - 1 leg",
+            equipmentType: .machinePin,
+            trackingType: .weightReps,
+            primaryMuscle: "quads",
+            unilateral: true
+        )
+        let workout = Workout(
+            date: workoutDate,
+            title: "Legs",
+            startTime: workoutDate,
+            status: .inProgress
+        )
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(workout)
+
+        let created = try await context.setService.create(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            date: workoutDate,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            weight: 45,
+            reps: 10,
+            leftReps: 10,
+            rightReps: 9,
+            rir: 0,
+            leftRIR: 0,
+            rightRIR: 0
+        )
+
+        let persisted = try await context.setRepo.fetch(byId: created.id)
+
+        // Copying `reps` alone left these nil, so the Sets tab read the row as 0/0 while
+        // History and the PR badge read the derived `reps` mirror and disagreed with it.
+        XCTAssertEqual(persisted?.leftReps, 10)
+        XCTAssertEqual(persisted?.rightReps, 9)
+        XCTAssertEqual(persisted?.leftRIR, 0)
+        XCTAssertEqual(persisted?.rightRIR, 0)
+        XCTAssertEqual(persisted?.reps, 10, "derived mirror is max(left, right)")
+    }
+
     private func makeContext() throws -> SetServiceTestContext {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
