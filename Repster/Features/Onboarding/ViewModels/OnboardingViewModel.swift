@@ -14,8 +14,15 @@ final class OnboardingViewModel {
 
     // MARK: - User Selections (defaults applied)
 
-    var selectedUnit: UnitPreference = .metric
+    /// Seeded from the device locale so the units screen is a confirmation rather than a
+    /// decision. The choice is still explicit — this only changes what's preselected.
+    var selectedUnit: UnitPreference = UnitPreference.fromCurrentLocale()
     var bodyweightInput: String = ""
+
+    /// No longer asked for. The Smart Suggestions step wanted a target rep count and RIR
+    /// before the user had logged a single set, which is a decision with nothing to base
+    /// it on — everyone took the default. These are still written on finish so a fresh
+    /// install lands in a known state, and `PrescriptionSettingsView` is where they change.
     var defaultTargetReps: Int = 8
     var defaultTargetRIR: Int = 2
 

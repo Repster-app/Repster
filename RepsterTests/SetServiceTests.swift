@@ -1382,11 +1382,6 @@ final class SetServiceTests: XCTestCase {
             fatigueLearningService: fatigueLearningService
         )
         let backupService = WorkoutHistoryBackupService(
-            workoutRepo: workoutRepo,
-            exerciseRepo: exerciseRepo,
-            setRepo: setRepo,
-            fatigueObservationRepo: fatigueObservationRepo,
-            fatigueLearningAuditRepo: fatigueLearningAuditRepo,
             statsService: statsService,
             prService: prService,
             modelContainer: container

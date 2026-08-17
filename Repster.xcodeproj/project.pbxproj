@@ -141,9 +141,7 @@
 		AK0002 /* OnboardingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0002 /* OnboardingViewModel.swift */; };
 		AK0003 /* OnboardingContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0003 /* OnboardingContainerView.swift */; };
 		AK0004 /* WelcomeStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0004 /* WelcomeStepView.swift */; };
-		AK0005 /* UnitsStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0005 /* UnitsStepView.swift */; };
-		AK0006 /* SmartSuggestionsOnboardingStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0006 /* SmartSuggestionsOnboardingStepView.swift */; };
-		AK0007 /* BodyweightStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0007 /* BodyweightStepView.swift */; };
+		AK0005 /* UnitsBodyweightStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0005 /* UnitsBodyweightStepView.swift */; };
 		AK0008 /* ImportStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0008 /* ImportStepView.swift */; };
 		AL0001 /* CSVParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BL0001 /* CSVParser.swift */; };
 		AL0002 /* ImportServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = BL0002 /* ImportServiceProtocol.swift */; };
@@ -160,6 +158,9 @@
 		WN0001 /* WhatsNewRelease.swift in Sources */ = {isa = PBXBuildFile; fileRef = WN1001 /* WhatsNewRelease.swift */; };
 		WN0002 /* WhatsNewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = WN1002 /* WhatsNewSheet.swift */; };
 		WN0003 /* InsightsSectionPromotionMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = WN1003 /* InsightsSectionPromotionMigration.swift */; };
+		HW0001 /* HowItWorksPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = HW1001 /* HowItWorksPage.swift */; };
+		HW0002 /* HowItWorksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HW1002 /* HowItWorksView.swift */; };
+		HW0003 /* HomeWalkthroughBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = HW1003 /* HomeWalkthroughBanner.swift */; };
 		AN0001 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0001 /* HomeViewModel.swift */; };
 		AN0002 /* WeekStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0002 /* WeekStripView.swift */; };
 		AN0003 /* StartWorkoutCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0003 /* StartWorkoutCardView.swift */; };
@@ -442,9 +443,7 @@
 		BK0002 /* OnboardingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingViewModel.swift; sourceTree = "<group>"; };
 		BK0003 /* OnboardingContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingContainerView.swift; sourceTree = "<group>"; };
 		BK0004 /* WelcomeStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeStepView.swift; sourceTree = "<group>"; };
-		BK0005 /* UnitsStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnitsStepView.swift; sourceTree = "<group>"; };
-		BK0006 /* SmartSuggestionsOnboardingStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSuggestionsOnboardingStepView.swift; sourceTree = "<group>"; };
-		BK0007 /* BodyweightStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyweightStepView.swift; sourceTree = "<group>"; };
+		BK0005 /* UnitsBodyweightStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnitsBodyweightStepView.swift; sourceTree = "<group>"; };
 		BK0008 /* ImportStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportStepView.swift; sourceTree = "<group>"; };
 		BL0001 /* CSVParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVParser.swift; sourceTree = "<group>"; };
 		BL0002 /* ImportServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportServiceProtocol.swift; sourceTree = "<group>"; };
@@ -461,6 +460,9 @@
 		WN1001 /* WhatsNewRelease.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNewRelease.swift; sourceTree = "<group>"; };
 		WN1002 /* WhatsNewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNewSheet.swift; sourceTree = "<group>"; };
 		WN1003 /* InsightsSectionPromotionMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsSectionPromotionMigration.swift; sourceTree = "<group>"; };
+		HW1001 /* HowItWorksPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HowItWorksPage.swift; sourceTree = "<group>"; };
+		HW1002 /* HowItWorksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HowItWorksView.swift; sourceTree = "<group>"; };
+		HW1003 /* HomeWalkthroughBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeWalkthroughBanner.swift; sourceTree = "<group>"; };
 		BN0001 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
 		BN0002 /* WeekStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekStripView.swift; sourceTree = "<group>"; };
 		BN0003 /* StartWorkoutCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartWorkoutCardView.swift; sourceTree = "<group>"; };
@@ -679,6 +681,7 @@
 				IN2001 /* Insights */,
 				HLTH21 /* Health */,
 				WN2001 /* WhatsNew */,
+				HW2001 /* HowItWorks */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -1014,9 +1017,7 @@
 			children = (
 				BK0003 /* OnboardingContainerView.swift */,
 				BK0004 /* WelcomeStepView.swift */,
-				BK0005 /* UnitsStepView.swift */,
-				BK0006 /* SmartSuggestionsOnboardingStepView.swift */,
-				BK0007 /* BodyweightStepView.swift */,
+				BK0005 /* UnitsBodyweightStepView.swift */,
 				BK0008 /* ImportStepView.swift */,
 			);
 			path = Views;
@@ -1039,6 +1040,7 @@
 				BN0005 /* ThisWeekActivityView.swift */,
 				BN0006 /* RecentWorkoutCardView.swift */,
 				BN0007 /* HomeView.swift */,
+				HW1003 /* HomeWalkthroughBanner.swift */,
 				BN0008 /* CopyPreviousSheet.swift */,
 				BN0009 /* WorkoutDetailFromHomeView.swift */,
 				BN0011 /* MonthlyStatsCardView.swift */,
@@ -1358,6 +1360,15 @@
 				WN1002 /* WhatsNewSheet.swift */,
 			);
 			path = WhatsNew;
+			sourceTree = "<group>";
+		};
+		HW2001 /* HowItWorks */ = {
+			isa = PBXGroup;
+			children = (
+				HW1001 /* HowItWorksPage.swift */,
+				HW1002 /* HowItWorksView.swift */,
+			);
+			path = HowItWorks;
 			sourceTree = "<group>";
 		};
 		IN2001 /* Insights */ = {
@@ -1768,9 +1779,7 @@
 				AK0002 /* OnboardingViewModel.swift in Sources */,
 				AK0003 /* OnboardingContainerView.swift in Sources */,
 				AK0004 /* WelcomeStepView.swift in Sources */,
-				AK0005 /* UnitsStepView.swift in Sources */,
-				AK0006 /* SmartSuggestionsOnboardingStepView.swift in Sources */,
-				AK0007 /* BodyweightStepView.swift in Sources */,
+				AK0005 /* UnitsBodyweightStepView.swift in Sources */,
 				AK0008 /* ImportStepView.swift in Sources */,
 				AIM001 /* ImportService.swift in Sources */,
 				AL0001 /* CSVParser.swift in Sources */,
@@ -1789,6 +1798,9 @@
 				WN0001 /* WhatsNewRelease.swift in Sources */,
 				WN0002 /* WhatsNewSheet.swift in Sources */,
 				WN0003 /* InsightsSectionPromotionMigration.swift in Sources */,
+				HW0001 /* HowItWorksPage.swift in Sources */,
+				HW0002 /* HowItWorksView.swift in Sources */,
+				HW0003 /* HomeWalkthroughBanner.swift in Sources */,
 				AC0015 /* ExerciseInfoData.swift in Sources */,
 				AC0016 /* ExerciseInfoProvider.swift in Sources */,
 				AC0017 /* E1RMCardView.swift in Sources */,

@@ -367,7 +367,10 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
         let templateSets = try verificationContext.fetch(FetchDescriptor<TemplateSet>())
 
         XCTAssertEqual(restoreResult.workoutsRestored, 2)
-        XCTAssertEqual(restoreResult.exercisesUpserted, 1)
+        // Both the trained exercise and "Jogging", which has no sets: the archive now carries the
+        // whole library rather than only exercises that appear in one. Covered directly by
+        // `testExportBackupIncludesExercisesWithNoLoggedSets`.
+        XCTAssertEqual(restoreResult.exercisesUpserted, 2)
         XCTAssertEqual(restoreResult.setsRestored, 2)
         XCTAssertEqual(restoreResult.skippedFatigueObservations, 0)
         XCTAssertEqual(restoreResult.skippedFatigueLearningAudits, 0)
@@ -855,29 +858,200 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
         XCTAssertTrue(remaining.isEmpty)
     }
 
-    func testRestoreBackupRejectsUnsupportedArchiveVersion() async throws {
+    func testRestoreBackupRejectsArchiveFromNewerAppVersion() async throws {
         let context = try makeBackupServiceContext()
-        let invalidArchive = WorkoutHistoryArchive(
-            version: 99,
-            exportedAt: Date(),
-            workouts: [],
-            exercises: [],
-            sets: [],
-            fatigueObservations: nil,
-            fatigueLearningAudits: nil,
-            healthProfileLearning: nil
-        )
+        let invalidArchive = makeEmptyArchive(version: 99)
         let invalidData = try encodeBackupArchive(invalidArchive)
 
         do {
             _ = try await context.service.restoreBackup(data: invalidData)
-            XCTFail("Expected unsupported backup version to fail")
+            XCTFail("Expected an archive from a newer app version to fail")
+        } catch let error as WorkoutHistoryBackupError {
+            guard case .archiveVersionTooNew(let version) = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+            XCTAssertEqual(version, 99)
+            XCTAssertEqual(
+                error.errorDescription,
+                "This backup was made by a newer version of Repster (backup format 99). "
+                    + "Update Repster, then restore it again."
+            )
+        }
+    }
+
+    func testRestoreBackupRejectsArchiveBelowMinimumSupportedVersion() async throws {
+        let context = try makeBackupServiceContext()
+        let invalidData = try encodeBackupArchive(makeEmptyArchive(version: 0))
+
+        do {
+            _ = try await context.service.restoreBackup(data: invalidData)
+            XCTFail("Expected a below-minimum archive version to fail")
         } catch let error as WorkoutHistoryBackupError {
             guard case .invalidArchiveVersion(let version) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
-            XCTAssertEqual(version, 99)
+            XCTAssertEqual(version, 0)
         }
+    }
+
+    /// The tripwire for a future format bump.
+    ///
+    /// Every `.repsterbackup` in the wild today is v1, and restore accepts the whole
+    /// `minimumSupportedVersion ... currentVersion` range rather than an exact match — but that
+    /// range is a single value right now, so the range check itself is not yet observable. What is
+    /// observable is this: a real v1 payload, checked in, must keep decoding. When someone raises
+    /// `currentVersion`, this test is what fails if v1 quietly stopped being readable.
+    func testCheckedInV1ArchiveStillPreviewsAndRestores() async throws {
+        let context = try makeBackupServiceContext()
+        let data = try Data(contentsOf: Self.v1FixtureURL)
+
+        let preview = try context.service.previewBackup(data: data)
+        XCTAssertEqual(preview.archiveVersion, 1)
+        XCTAssertEqual(preview.workoutCount, 2)
+        XCTAssertEqual(preview.exerciseCount, 2)
+        XCTAssertEqual(preview.setCount, 4)
+
+        let result = try await context.service.restoreBackup(data: data)
+        XCTAssertEqual(result.workoutsRestored, 2)
+        XCTAssertEqual(result.exercisesUpserted, 2)
+        XCTAssertEqual(result.setsRestored, 4)
+        XCTAssertFalse(result.hasSkippedLearningData)
+
+        let restoredSets = try await context.setRepo.fetchSets(from: .distantPast, to: .distantFuture)
+        XCTAssertEqual(restoredSets.count, 4)
+        XCTAssertEqual(restoredSets.compactMap(\.reps).sorted(), [5, 5, 10, 12])
+
+        let profile = try await context.healthProfileRepo.fetchOrCreate()
+        XCTAssertEqual(profile.prescriptionLearnedFatigueRate, 0.042)
+        XCTAssertEqual(profile.prescriptionFatigueLearningSessionCount, 7)
+    }
+
+    /// Pins the archive's ordering contract, which is otherwise only implied by the three
+    /// fetch-then-re-sort pipelines in `exportBackup()`.
+    ///
+    /// Written to guard the Phase 1 read-path refactor: moving those fetches onto a single
+    /// `ModelContext` must not reorder anyone's backup. Every case here is a *near*-tie resolved by
+    /// the comparator's next key — never a true tie, because `Array.sorted(by:)` is not stable and
+    /// pinning an unspecified order would only produce a flaky test.
+    func testExportBackupOrderingContract() async throws {
+        let context = try makeBackupServiceContext()
+
+        // Saved in an order no sort would reproduce, and cased so a case-*sensitive* sort would put
+        // "Zercher Squat" before "bench press".
+        let zercher = Exercise(name: "Zercher Squat", equipmentType: .barbell, trackingType: .weightReps)
+        let bench = Exercise(name: "bench press", equipmentType: .barbell, trackingType: .weightReps)
+        let abWheel = Exercise(name: "Ab Wheel", equipmentType: .other, trackingType: .weightReps)
+        try await context.exerciseRepo.save(zercher)
+        try await context.exerciseRepo.save(bench)
+        try await context.exerciseRepo.save(abWheel)
+
+        // Same date, so only the createdAt tiebreak can separate them — and saved late-first.
+        let sharedDate = makeDate(2026, 4, 10, 6, 0)
+        let late = Workout(
+            date: sharedDate,
+            title: "Day1 Late",
+            status: .completed,
+            createdAt: makeDate(2026, 4, 10, 10, 0),
+            updatedAt: makeDate(2026, 4, 10, 10, 0)
+        )
+        let early = Workout(
+            date: sharedDate,
+            title: "Day1 Early",
+            status: .completed,
+            createdAt: makeDate(2026, 4, 10, 9, 0),
+            updatedAt: makeDate(2026, 4, 10, 9, 0)
+        )
+        let nextDay = Workout(
+            date: makeDate(2026, 4, 11, 6, 0),
+            title: "Day2",
+            status: .completed,
+            createdAt: makeDate(2026, 4, 11, 9, 0),
+            updatedAt: makeDate(2026, 4, 11, 9, 0)
+        )
+        try await context.workoutRepo.save(late)
+        try await context.workoutRepo.save(early)
+        try await context.workoutRepo.save(nextDay)
+
+        // Each workout's sets are saved with orderInWorkout descending, so insertion order and
+        // archive order disagree.
+        for (workout, label) in [(early, "early"), (late, "late"), (nextDay, "day2")] {
+            for order in [2, 1] {
+                try await context.setRepo.save(
+                    WorkoutSet(
+                        workoutId: workout.id,
+                        exerciseId: bench.id,
+                        date: workout.date,
+                        weight: 100,
+                        effectiveWeight: 100,
+                        reps: 5,
+                        setType: .working,
+                        notes: "\(label)-\(order)",
+                        orderInWorkout: order,
+                        orderInExercise: order,
+                        completed: true
+                    )
+                )
+            }
+        }
+
+        let archive = try decodeBackupArchive(try await context.service.exportBackup())
+
+        XCTAssertEqual(archive.exercises.map(\.name), ["Ab Wheel", "bench press", "Zercher Squat"])
+        XCTAssertEqual(archive.workouts.map(\.title), ["Day1 Early", "Day1 Late", "Day2"])
+        XCTAssertEqual(
+            archive.sets.compactMap(\.notes),
+            ["early-1", "early-2", "late-1", "late-2", "day2-1", "day2-2"]
+        )
+    }
+
+    func testExportBackupIncludesExercisesWithNoLoggedSets() async throws {
+        let context = try makeBackupServiceContext()
+
+        let trained = Exercise(
+            name: "Barbell Row",
+            equipmentType: .barbell,
+            trackingType: .weightReps
+        )
+        // Built in the library but never trained — the case that used to be dropped on export and
+        // so vanished when restoring onto a new device.
+        let untrained = Exercise(
+            name: "Zercher Squat",
+            equipmentType: .barbell,
+            trackingType: .weightReps
+        )
+        try await context.exerciseRepo.save(trained)
+        try await context.exerciseRepo.save(untrained)
+
+        let workoutDate = makeDate(2026, 4, 2, 7, 0)
+        let workout = Workout(
+            date: workoutDate,
+            title: "Pull",
+            startTime: workoutDate,
+            status: .completed
+        )
+        try await context.workoutRepo.save(workout)
+        try await context.setRepo.save(
+            WorkoutSet(
+                workoutId: workout.id,
+                exerciseId: trained.id,
+                date: workoutDate,
+                weight: 80,
+                effectiveWeight: 80,
+                reps: 8,
+                setType: .working,
+                orderInWorkout: 0,
+                orderInExercise: 0,
+                completed: true
+            )
+        )
+
+        let archive = try decodeBackupArchive(try await context.service.exportBackup())
+
+        XCTAssertEqual(archive.exercises.map(\.name), ["Barbell Row", "Zercher Squat"])
+        XCTAssertTrue(
+            archive.exercises.contains { $0.id == untrained.id },
+            "An exercise with no logged sets must still be backed up"
+        )
     }
 
     func testRestoreBackupRejectsArchiveWithSetReferencingMissingWorkout() async throws {
@@ -1138,6 +1312,25 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
         XCTAssertNotNil(survivingWorkout)
     }
 
+    /// Checked in, unlike `Fixtures/Local/` — this one is synthetic precisely so it can live in a
+    /// public repo and survive as a format guard.
+    private static let v1FixtureURL = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .appendingPathComponent("Fixtures/archive-v1.repsterbackup")
+
+    private func makeEmptyArchive(version: Int) -> WorkoutHistoryArchive {
+        WorkoutHistoryArchive(
+            version: version,
+            exportedAt: Date(),
+            workouts: [],
+            exercises: [],
+            sets: [],
+            fatigueObservations: nil,
+            fatigueLearningAudits: nil,
+            healthProfileLearning: nil
+        )
+    }
+
     private func makeBackupServiceContext() throws -> WorkoutHistoryBackupArchiveTestContext {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
@@ -1232,11 +1425,6 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             exerciseStatsRepository: exerciseStatsRepo
         )
         let service = WorkoutHistoryBackupService(
-            workoutRepo: workoutRepo,
-            exerciseRepo: exerciseRepo,
-            setRepo: setRepo,
-            fatigueObservationRepo: fatigueObservationRepo,
-            fatigueLearningAuditRepo: fatigueLearningAuditRepo,
             statsService: statsService,
             prService: prService,
             modelContainer: container
@@ -1358,6 +1546,33 @@ final class WorkoutHistoryBackupArchiveViewModelTests: XCTestCase {
         let shareURL = try XCTUnwrap(viewModel.shareItem?.url)
         XCTAssertEqual(shareURL.pathExtension, "repsterbackup")
         XCTAssertNil(viewModel.errorMessage)
+    }
+
+    func testExportViewModelSweepsPreviousTemporaryFiles() async throws {
+        let service = BackupServiceStub()
+        let viewModel = ExportViewModel(workoutHistoryBackupService: service)
+        let fileManager = FileManager.default
+
+        viewModel.generateExport()
+        try await waitUntilOnMainActor { viewModel.shareItem != nil && viewModel.isExporting == false }
+        let directory = try XCTUnwrap(viewModel.shareItem?.url).deletingLastPathComponent()
+
+        // Planted rather than produced by a second export: the filename is stamped to the second,
+        // so two exports inside the same second reuse one name and would hide an absent sweep.
+        let stale = directory.appendingPathComponent("stale-export.repsterbackup")
+        try Data("stale".utf8).write(to: stale)
+
+        viewModel.generateExport()
+        try await waitUntilOnMainActor { viewModel.shareItem != nil && viewModel.isExporting == false }
+        let currentURL = try XCTUnwrap(viewModel.shareItem?.url)
+
+        // Exports used to accumulate in tmp forever — ~7 MB apiece for a large history.
+        XCTAssertFalse(fileManager.fileExists(atPath: stale.path))
+        XCTAssertTrue(fileManager.fileExists(atPath: currentURL.path))
+        XCTAssertEqual(
+            try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil).count,
+            1
+        )
     }
 
     func testRestoreBackupViewModelPreviewsBeforeConfirmation() throws {

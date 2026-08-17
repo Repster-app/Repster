@@ -101,7 +101,10 @@ struct ActiveWorkoutView: View {
 
                 // Sub-tab content (T025/T026/T027)
                 subTabContent
-            } else if !viewModel.isLoading {
+            } else if !viewModel.isLoading && !viewModel.isWorkoutFinished {
+                // Finishing clears the exercise list a beat before this screen
+                // dismisses. Prompting for exercises behind the closing summary
+                // reads as the workout having been thrown away.
                 emptyExerciseState
             }
 

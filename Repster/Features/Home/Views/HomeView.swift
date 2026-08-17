@@ -16,6 +16,13 @@ struct HomeView: View {
     /// Home is reported once per view lifetime — see `reportHomeContentIfNeeded`.
     @State private var hasReportedHomeContent = false
 
+    /// Set the moment the walkthrough opens rather than when it finishes — see
+    /// `WalkthroughPreferences.openedKey`.
+    @AppStorage(WalkthroughPreferences.openedKey) private var hasOpenedWalkthrough = false
+    @AppStorage(WalkthroughPreferences.bannerDismissedKey) private var walkthroughBannerDismissed = false
+    @State private var showWalkthrough = false
+    @State private var hasReportedBannerShown = false
+
     let refreshTrigger: UUID
     let popToRootTrigger: UUID
     let workoutAccessMessage: String?
@@ -63,6 +70,23 @@ struct HomeView: View {
                     headerSection
                     WeekStripView(weekDays: viewModel.weekDays, onDayTap: onDayTapped)
                     startWorkoutSection
+
+                    // Not part of HomeSectionConfig on purpose: it removes itself, so it
+                    // has no business appearing in Customize Home as something to arrange.
+                    if showsWalkthroughBanner {
+                        HomeWalkthroughBanner(
+                            onTap: openWalkthrough,
+                            onDismiss: {
+                                walkthroughBannerDismissed = true
+                                services.analyticsService.walkthroughBannerDismissed()
+                            }
+                        )
+                        .onAppear {
+                            guard !hasReportedBannerShown else { return }
+                            hasReportedBannerShown = true
+                            services.analyticsService.walkthroughBannerShown()
+                        }
+                    }
 
                     // Customizable sections (ordered by user preference)
                     ForEach(viewModel.sectionConfig.visibleSections) { section in
@@ -112,6 +136,9 @@ struct HomeView: View {
         }
         .sheet(isPresented: $viewModel.showCustomizeSheet) {
             CustomizeHomeSheet(config: $viewModel.sectionConfig)
+        }
+        .sheet(isPresented: $showWalkthrough) {
+            HowItWorksView(analyticsService: services.analyticsService)
         }
         .onChange(of: viewModel.sectionConfig) {
             viewModel.lastLoadTime = nil
@@ -194,6 +221,21 @@ struct HomeView: View {
     }
 
     // MARK: - Start Workout
+
+    /// Hidden while a workout is running: Home is about resuming then, and an offer to
+    /// explain the basics is the wrong thing to put next to a session in progress.
+    private var showsWalkthroughBanner: Bool {
+        !hasOpenedWalkthrough
+            && !walkthroughBannerDismissed
+            && !viewModel.hasActiveWorkout
+            && WalkthroughPreferences.completedWorkoutCount() < WalkthroughPreferences.completedWorkoutCeiling
+    }
+
+    private func openWalkthrough() {
+        WalkthroughPreferences.markOpened()
+        services.analyticsService.walkthroughBannerTapped()
+        showWalkthrough = true
+    }
 
     @ViewBuilder
     private var startWorkoutSection: some View {

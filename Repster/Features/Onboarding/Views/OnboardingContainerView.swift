@@ -43,26 +43,12 @@ struct OnboardingContainerView: View {
                 )
                     .tag(OnboardingStep.welcome)
 
-                UnitsStepView(
+                UnitsBodyweightStepView(
                     selectedUnit: $viewModel.selectedUnit,
-                    onNext: { viewModel.next() }
-                )
-                .tag(OnboardingStep.units)
-
-                BodyweightStepView(
                     bodyweightInput: $viewModel.bodyweightInput,
-                    unitPreference: viewModel.selectedUnit,
-                    onNext: { viewModel.next() },
-                    onSkip: { viewModel.skip() }
-                )
-                .tag(OnboardingStep.bodyweight)
-
-                SmartSuggestionsOnboardingStepView(
-                    defaultTargetReps: $viewModel.defaultTargetReps,
-                    defaultTargetRIR: $viewModel.defaultTargetRIR,
                     onNext: { viewModel.next() }
                 )
-                .tag(OnboardingStep.smartSuggestions)
+                .tag(OnboardingStep.unitsAndBodyweight)
 
                 // Absent from `visibleSteps` when HealthKit is unavailable, so the tab
                 // is unreachable rather than conditionally built — a conditional child

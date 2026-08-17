@@ -67,8 +67,6 @@ final class RealDataDifferentialTests: XCTestCase {
         let exerciseStatsRepo = ExerciseStatsRepository(modelContainer: container)
         let performanceRecordRepo = PerformanceRecordRepository(modelContainer: container)
         let healthProfileRepo = HealthProfileRepository(modelContainer: container)
-        let fatigueObservationRepo = FatigueObservationRepository(modelContainer: container)
-        let fatigueLearningAuditRepo = FatigueLearningSetAuditRepository(modelContainer: container)
 
         let statsService = StatsService(
             exerciseStatsRepository: exerciseStatsRepo,
@@ -91,11 +89,6 @@ final class RealDataDifferentialTests: XCTestCase {
             setRepo: setRepo,
             exerciseStatsRepo: exerciseStatsRepo,
             backupService: WorkoutHistoryBackupService(
-                workoutRepo: workoutRepo,
-                exerciseRepo: exerciseRepo,
-                setRepo: setRepo,
-                fatigueObservationRepo: fatigueObservationRepo,
-                fatigueLearningAuditRepo: fatigueLearningAuditRepo,
                 statsService: statsService,
                 prService: prService,
                 modelContainer: container

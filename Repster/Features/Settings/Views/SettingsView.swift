@@ -47,6 +47,7 @@ struct SettingsView: View {
     @State private var viewModel: SettingsViewModel
     @State private var pendingMuscleAssignmentCount: Int = 0
     @State private var showWhatsNew = false
+    @State private var showHowItWorks = false
     @Environment(ServiceContainer.self) private var services
 
     // Read only for the On/Off summary on the row; the integration itself is managed in
@@ -146,6 +147,11 @@ struct SettingsView: View {
             // No `whats new shown` event here: opening it deliberately is a different
             // intent from meeting it on launch, and mixing the two would make the
             // auto-presentation rate unreadable.
+            // No banner event from here: opening it deliberately is a different intent,
+            // and mixing the two makes the banner's tap rate unreadable.
+            .sheet(isPresented: $showHowItWorks) {
+                HowItWorksView(analyticsService: analyticsService)
+            }
             .sheet(isPresented: $showWhatsNew) {
                 if let release = WhatsNewRelease.current {
                     WhatsNewSheet(
@@ -358,6 +364,18 @@ struct SettingsView: View {
                 Spacer()
                 Text(viewModel.appVersion)
                     .foregroundStyle(Color.textSecondary)
+            }
+
+            // The permanent home for the walkthrough. Unconditional, unlike What's New —
+            // it's how anyone who dismissed the banner, or who arrived long after it
+            // retired, gets back to it.
+            Button {
+                showHowItWorks = true
+            } label: {
+                SettingsNavigationRow(
+                    title: "How it works",
+                    systemImage: "questionmark.circle"
+                )
             }
 
             // Hidden when this release has nothing to say, rather than opening an empty

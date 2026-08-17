@@ -62,8 +62,17 @@ final class ExportViewModel {
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateFormat = "yyyyMMdd-HHmmss"
 
+        // Each export supersedes the last, so the directory is cleared rather than accumulating:
+        // a large history is ~7 MB a file, and nothing here was ever cleaned up before. Its own
+        // subdirectory so the sweep can't touch anything else living in tmp.
+        let fileManager = FileManager.default
+        let directory = fileManager.temporaryDirectory
+            .appendingPathComponent("WorkoutHistoryBackups", isDirectory: true)
+        try? fileManager.removeItem(at: directory)
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+
         let filename = "repster-workout-history-backup-\(formatter.string(from: Date()))"
-        let url = FileManager.default.temporaryDirectory
+        let url = directory
             .appendingPathComponent(filename)
             .appendingPathExtension("repsterbackup")
 

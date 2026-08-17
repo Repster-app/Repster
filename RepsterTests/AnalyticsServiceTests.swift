@@ -118,16 +118,16 @@ final class AnalyticsServiceTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
 
         service.configure()
-        service.onboardingStepViewed(.bodyweight)
-        service.onboardingStepSkipped(.bodyweight)
+        service.onboardingStepViewed(.unitsAndBodyweight)
+        service.onboardingStepSkipped(.unitsAndBodyweight)
 
         let viewed = client.captures[client.captures.count - 2]
         XCTAssertEqual(viewed.event, "onboarding step viewed")
-        XCTAssertEqual(viewed.properties["step"] as? String, "bodyweight")
-        XCTAssertEqual(viewed.properties["step_index"] as? Int, 2)
+        XCTAssertEqual(viewed.properties["step"] as? String, "units_bodyweight")
+        XCTAssertEqual(viewed.properties["step_index"] as? Int, 1)
 
         XCTAssertEqual(client.captures.last?.event, "onboarding step skipped")
-        XCTAssertEqual(client.captures.last?.properties["step"] as? String, "bodyweight")
+        XCTAssertEqual(client.captures.last?.properties["step"] as? String, "units_bodyweight")
     }
 
     func testEmptyStateShownDoesNotAlsoEmitAScreen() {

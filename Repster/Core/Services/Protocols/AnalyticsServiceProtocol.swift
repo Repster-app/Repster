@@ -532,6 +532,41 @@ extension AnalyticsServiceProtocol {
     func whatsNewShown() {
         track(.whatsNewShown)
     }
+
+    // MARK: - Walkthrough
+    //
+    // `shown` is the denominator the other two are read against — without it a tap rate
+    // is a number with nothing under it. Opening from Settings deliberately fires no
+    // banner event, so the banner funnel stays a banner funnel.
+
+    func walkthroughBannerShown() {
+        track(.walkthroughBannerShown)
+    }
+
+    func walkthroughBannerTapped() {
+        track(.walkthroughBannerTapped)
+    }
+
+    func walkthroughBannerDismissed() {
+        track(.walkthroughBannerDismissed)
+    }
+
+    func walkthroughPageViewed(_ page: HowItWorksPage) {
+        track(.walkthroughPageViewed, properties: [
+            .step: .string(page.analyticsName),
+            .stepIndex: .int(page.index)
+        ])
+    }
+
+    /// `reachedLast` separates finishing from bailing. A cliff at page five says seven
+    /// pages is too many; a low completion rate with an even spread says something else.
+    func walkthroughCompleted(reachedLast: Bool, lastPage: HowItWorksPage) {
+        track(.walkthroughCompleted, properties: [
+            .result: .string(reachedLast ? "reached_last" : "closed_early"),
+            .step: .string(lastPage.analyticsName),
+            .stepIndex: .int(lastPage.index)
+        ])
+    }
 }
 
 /// Where Repster offered the Apple Health integration. Keep the raw values
@@ -568,9 +603,10 @@ extension OnboardingStep {
     var analyticsName: String {
         switch self {
         case .welcome: return "welcome"
-        case .units: return "units"
-        case .bodyweight: return "bodyweight"
-        case .smartSuggestions: return "smart_suggestions"
+        // Was two steps, "units" and "bodyweight", plus a "smart_suggestions" step that
+        // no longer exists. Funnels spanning the release that merged them will show the
+        // old names before it and this one after.
+        case .unitsAndBodyweight: return "units_bodyweight"
         case .appleHealth: return "apple_health"
         case .importPrompt: return "import_prompt"
         }
@@ -626,6 +662,11 @@ enum AnalyticsEvent: String, CaseIterable {
     case appleHealthPromptAnswered = "apple health prompt answered"
     case appleHealthDisabled = "apple health disabled"
     case whatsNewShown = "whats new shown"
+    case walkthroughBannerShown = "walkthrough banner shown"
+    case walkthroughBannerTapped = "walkthrough banner tapped"
+    case walkthroughBannerDismissed = "walkthrough banner dismissed"
+    case walkthroughPageViewed = "walkthrough page viewed"
+    case walkthroughCompleted = "walkthrough completed"
     /// Fires once per install, when Apple's AdServices lookup succeeds. Its real
     /// job is verification: if this event stops arriving, attribution is broken
     /// and every paid-vs-organic breakdown has silently gone unsegmented.

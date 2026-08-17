@@ -72,13 +72,24 @@ struct WorkoutSummarySheet: View {
     /// Whether the compact effort selector popover is showing.
     @State private var showEffortOptions = false
 
+    /// The summary as it stood the moment saving or discarding began.
+    ///
+    /// `finishWorkout` clears the ViewModel's workout state *before* it signals
+    /// dismissal, so recomputing during the closing animation would blank this
+    /// sheet out to "No workout data" while it is still on screen.
+    @State private var frozenSummary: WorkoutSummaryData?
+
+    /// The automatic title as it stood alongside `frozenSummary`, so the heading
+    /// does not fall back to a generic "Workout" while the sheet slides away.
+    @State private var frozenTitle: String?
+
     // MARK: - Body
 
     var body: some View {
         VStack(spacing: 0) {
             headerBar
 
-            if let summary = viewModel.computeSummary() {
+            if let summary = displaySummary {
                 ScrollView {
                     VStack(spacing: 18) {
                         recapHero(summary: summary)
@@ -105,7 +116,7 @@ struct WorkoutSummarySheet: View {
         }
         .background(Color.bg.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if viewModel.workout != nil {
+            if viewModel.workout != nil || viewModel.isWorkoutFinished {
                 saveActionBar
             }
         }
@@ -135,6 +146,13 @@ struct WorkoutSummarySheet: View {
                 dbg("[WorkoutSummarySheet] Save as template failed: \(error)")
             }
         )
+    }
+
+    // MARK: - Summary Source
+
+    /// Live summary while the workout exists, then the frozen one while closing.
+    private var displaySummary: WorkoutSummaryData? {
+        viewModel.computeSummary() ?? frozenSummary
     }
 
     // MARK: - Header
@@ -707,6 +725,8 @@ struct WorkoutSummarySheet: View {
 
     private func saveAndClose() async {
         isSaving = true
+        frozenSummary = viewModel.computeSummary()
+        frozenTitle = automaticWorkoutTitle
 
         for (exerciseId, selection) in fatigueSelections {
             let nudge: FatigueNudge?
@@ -733,27 +753,31 @@ struct WorkoutSummarySheet: View {
             perceivedEffort: selectedEffort
         )
 
-        isSaving = false
-
-        if viewModel.isWorkoutFinished {
-            dismiss()
+        // On success `ActiveWorkoutView` dismisses the whole stack off
+        // `isWorkoutFinished`, and dismissing this sheet as well is what made
+        // closing a workout play as two separate animations. Only reset the
+        // button when the save failed and the sheet is staying put.
+        if !viewModel.isWorkoutFinished {
+            isSaving = false
         }
     }
 
     private func discardAndClose() async {
         isDiscarding = true
-        await viewModel.discardWorkout()
-        isDiscarding = false
+        frozenSummary = viewModel.computeSummary()
+        frozenTitle = automaticWorkoutTitle
 
-        if viewModel.isWorkoutFinished {
-            dismiss()
+        await viewModel.discardWorkout()
+
+        if !viewModel.isWorkoutFinished {
+            isDiscarding = false
         }
     }
 
     // MARK: - Formatting
 
     private var automaticWorkoutTitle: String {
-        viewModel.workout?.displayTitle ?? "Workout"
+        viewModel.workout?.displayTitle ?? frozenTitle ?? "Workout"
     }
 
     private var normalizedWorkoutTitle: String? {

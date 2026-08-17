@@ -144,11 +144,6 @@ final class ServiceContainer {
 
         // 11. WorkoutHistoryBackupService — archive export + restore
         let workoutHistoryBackupService = WorkoutHistoryBackupService(
-            workoutRepo: repositoryContainer.workoutRepository,
-            exerciseRepo: repositoryContainer.exerciseRepository,
-            setRepo: repositoryContainer.setRepository,
-            fatigueObservationRepo: repositoryContainer.fatigueObservationRepository,
-            fatigueLearningAuditRepo: repositoryContainer.fatigueLearningSetAuditRepository,
             statsService: statsService,
             prService: prService,
             modelContainer: repositoryContainer.modelContainer

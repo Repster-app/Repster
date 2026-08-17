@@ -18,11 +18,9 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
 
     // MARK: - Dependencies
 
-    private let workoutRepo: any WorkoutRepositoryProtocol
-    private let exerciseRepo: any ExerciseRepositoryProtocol
-    private let setRepo: any SetRepositoryProtocol
-    private let fatigueObservationRepo: any FatigueObservationRepositoryProtocol
-    private let fatigueLearningAuditRepo: any FatigueLearningSetAuditRepositoryProtocol
+    // Deliberately no repositories: both export and restore own their `ModelContext` outright, and
+    // taking a repository here would reintroduce the cross-actor model traffic F1 is about. The two
+    // services are rebuild triggers, invoked after restore commits — they hand back no models.
     private let statsService: any StatsServiceProtocol
     private let prService: any PRServiceProtocol
     private let modelContainer: ModelContainer
@@ -30,20 +28,10 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
     // MARK: - Init
 
     init(
-        workoutRepo: any WorkoutRepositoryProtocol,
-        exerciseRepo: any ExerciseRepositoryProtocol,
-        setRepo: any SetRepositoryProtocol,
-        fatigueObservationRepo: any FatigueObservationRepositoryProtocol,
-        fatigueLearningAuditRepo: any FatigueLearningSetAuditRepositoryProtocol,
         statsService: any StatsServiceProtocol,
         prService: any PRServiceProtocol,
         modelContainer: ModelContainer
     ) {
-        self.workoutRepo = workoutRepo
-        self.exerciseRepo = exerciseRepo
-        self.setRepo = setRepo
-        self.fatigueObservationRepo = fatigueObservationRepo
-        self.fatigueLearningAuditRepo = fatigueLearningAuditRepo
         self.statsService = statsService
         self.prService = prService
         self.modelContainer = modelContainer
@@ -52,12 +40,35 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
     // MARK: - WorkoutHistoryBackupServiceProtocol
 
     func exportBackup() async throws -> Data {
-        let workouts = try await sortedWorkouts()
-        let allSets = try await setRepo.fetchSets(from: .distantPast, to: .distantFuture)
-        let exerciseIds = Set(allSets.map(\.exerciseId))
-        let exercises = try await exerciseRepo.fetchAll()
-            .filter { exerciseIds.contains($0.id) }
-            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        // Everything is read through one context that this actor creates, uses and discards, so no
+        // `@Model` object crosses an actor boundary.
+        //
+        // This used to call three `@ModelActor` repositories and then fault ~40 properties off each
+        // returned model from in here — live models across the boundary, which is the crash class
+        // that shipped in 1.3 and twice in TestFlight 1.4. It was a confirmed crash, not a
+        // theoretical one: `CrossContextRaceTests.testExportBackupUnderConcurrentSaves` took the
+        // runner down in `WorkoutSet.setType.getter` with the byte-identical signature. See
+        // BACKUP_EXPORT_SCOPING.md F1.
+        let context = ModelContext(modelContainer)
+
+        // The fetch sorts mirror the repositories these reads replaced. The re-sorts below are not
+        // total orders and `Array.sorted(by:)` is not stable, so feeding them the same input order
+        // is what keeps ties landing where they did — see `testExportBackupOrderingContract`.
+        let workouts = try context.fetch(
+            FetchDescriptor<Workout>(sortBy: [SortDescriptor(\.date, order: .reverse)])
+        ).sorted {
+            if $0.date != $1.date { return $0.date < $1.date }
+            return $0.createdAt < $1.createdAt
+        }
+        let allSets = try context.fetch(
+            FetchDescriptor<WorkoutSet>(sortBy: [SortDescriptor(\.date)])
+        )
+        // The whole library, not just exercises with logged sets: a custom exercise the user built
+        // but hasn't trained yet is still their work, and it would otherwise vanish on a restore to
+        // a new device. Exercises are ~1.5% of rows in a large history, so this is close to free.
+        let exercises = try context.fetch(
+            FetchDescriptor<Exercise>(sortBy: [SortDescriptor(\.name)])
+        ).sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
 
         let workoutIndex = Dictionary(uniqueKeysWithValues: workouts.enumerated().map { ($0.element.id, $0.offset) })
         let sortedSets = allSets.sorted { lhs, rhs in
@@ -68,16 +79,14 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
             return lhs.createdAt < rhs.createdAt
         }
 
-        // Fetch fatigue observations
-        let observationContext = ModelContext(modelContainer)
-        let allObservations = try observationContext.fetch(FetchDescriptor<FatigueObservation>())
+        let allObservations = try context.fetch(FetchDescriptor<FatigueObservation>())
             .sorted { $0.createdAt < $1.createdAt }
-        let allAudits = try observationContext.fetch(FetchDescriptor<FatigueLearningSetAudit>())
+        let allAudits = try context.fetch(FetchDescriptor<FatigueLearningSetAudit>())
             .sorted { lhs, rhs in
                 if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
                 return lhs.visibleSetNumber < rhs.visibleSetNumber
             }
-        let healthProfile = try observationContext.fetch(FetchDescriptor<HealthProfile>()).first
+        let healthProfile = try context.fetch(FetchDescriptor<HealthProfile>()).first
 
         let archiveWorkouts = workouts.map(WorkoutHistoryArchiveWorkout.init)
         let archiveExercises = exercises.map(WorkoutHistoryArchiveExercise.init)
@@ -231,14 +240,6 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
 
     // MARK: - Helpers
 
-    private func sortedWorkouts() async throws -> [Workout] {
-        let workouts = try await workoutRepo.fetchAllWorkouts(limit: nil, offset: nil)
-        return workouts.sorted {
-            if $0.date != $1.date { return $0.date < $1.date }
-            return $0.createdAt < $1.createdAt
-        }
-    }
-
     private nonisolated func decodeArchive(_ data: Data) throws -> WorkoutHistoryArchive {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
@@ -250,7 +251,12 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
             throw WorkoutHistoryBackupError.decodingFailed(error.localizedDescription)
         }
 
-        guard archive.version == WorkoutHistoryArchive.currentVersion else {
+        // Newer-than-this-build is a different failure from malformed: the file is fine, the app is
+        // behind, and the fix is an update rather than a different file.
+        guard archive.version <= WorkoutHistoryArchive.currentVersion else {
+            throw WorkoutHistoryBackupError.archiveVersionTooNew(archive.version)
+        }
+        guard archive.version >= WorkoutHistoryArchive.minimumSupportedVersion else {
             throw WorkoutHistoryBackupError.invalidArchiveVersion(archive.version)
         }
 

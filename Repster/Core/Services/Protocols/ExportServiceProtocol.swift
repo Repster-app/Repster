@@ -30,11 +30,15 @@ struct WorkoutHistoryRestoreResult: Sendable {
 
 enum WorkoutHistoryBackupError: Error, LocalizedError, Sendable {
     case invalidArchiveVersion(Int)
+    case archiveVersionTooNew(Int)
     case decodingFailed(String)
     case invalidArchive(String)
 
     var errorDescription: String? {
         switch self {
+        case .archiveVersionTooNew(let version):
+            return "This backup was made by a newer version of Repster (backup format \(version)). "
+                + "Update Repster, then restore it again."
         case .invalidArchiveVersion(let version):
             return "Unsupported backup version: \(version)."
         case .decodingFailed(let message):
@@ -46,7 +50,16 @@ enum WorkoutHistoryBackupError: Error, LocalizedError, Sendable {
 }
 
 struct WorkoutHistoryArchive: Codable, Sendable {
+    /// The version this build writes.
     static let currentVersion = 1
+
+    /// The oldest version this build can still read.
+    ///
+    /// Every `.repsterbackup` a user has saved since launch is v1, and those files are the whole
+    /// point of the feature — they sit in Files and iCloud Drive indefinitely. So restore accepts
+    /// anything in `minimumSupportedVersion ... currentVersion` and this constant only moves when a
+    /// format genuinely stops being decodable, which is a deliberate act of dropping user backups.
+    static let minimumSupportedVersion = 1
 
     let version: Int
     let exportedAt: Date

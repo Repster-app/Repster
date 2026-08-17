@@ -1319,8 +1319,13 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         context.pendingSet.overrideTargetRepMax = 12
         context.viewModel.markSetDirty(context.pendingSet, field: .reps)
 
+        // The spy records the call on entry, so `evaluationCount` rises when the refresh is
+        // *dispatched* — the applied state lands later. Waiting on the count alone and then
+        // asserting on the state races that gap, which is a sub-millisecond window in isolation and
+        // a real one under full-suite load.
         try await waitUntil {
-            loadPrescriptionService.evaluationCount == 2
+            loadPrescriptionService.evaluationCount == 2 &&
+            context.viewModel.suggestionState(for: context.pendingSet.id)?.target?.repRange == 8...12
         }
 
         XCTAssertEqual(loadPrescriptionService.lastRecordedTargetReps, [10])
@@ -1339,8 +1344,10 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         XCTAssertTrue(didCommit)
         context.viewModel.markSetDirty(context.pendingSet, field: .reps)
 
+        // Same dispatch-vs-applied race as the manual-draft test above.
         try await waitUntil {
-            loadPrescriptionService.evaluationCount == 2
+            loadPrescriptionService.evaluationCount == 2 &&
+            context.viewModel.suggestionState(for: context.pendingSet.id)?.target?.repRange == 8...12
         }
 
         XCTAssertEqual(context.viewModel.suggestionState(for: context.pendingSet.id)?.target?.repRange, 8...12)
@@ -3734,7 +3741,8 @@ final class WorkoutHistoryBackupServiceTests: XCTestCase {
         let records = try await context.performanceRecordRepo.fetchAll(for: archivedExerciseId)
 
         XCTAssertEqual(restoreResult.workoutsRestored, 2)
-        XCTAssertEqual(restoreResult.exercisesUpserted, 1)
+        // Includes the exercise with no logged sets: the archive carries the whole library now.
+        XCTAssertEqual(restoreResult.exercisesUpserted, 2)
         XCTAssertEqual(restoreResult.setsRestored, 2)
         XCTAssertEqual(restoredWorkouts.count, 2)
         XCTAssertFalse(restoredWorkouts.contains(where: { $0.id == replacementWorkoutId }))
@@ -3766,7 +3774,8 @@ final class WorkoutHistoryBackupServiceTests: XCTestCase {
             _ = try await context.service.restoreBackup(data: invalidData)
             XCTFail("Expected unsupported backup version to fail")
         } catch let error as WorkoutHistoryBackupError {
-            guard case .invalidArchiveVersion(let version) = error else {
+            // A version above `currentVersion` is a stale app, not a bad file.
+            guard case .archiveVersionTooNew(let version) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(version, 99)
@@ -3795,8 +3804,6 @@ final class WorkoutHistoryBackupServiceTests: XCTestCase {
         let performanceRecordRepo = PerformanceRecordRepository(modelContainer: container)
         let bodyweightRepo = BodyweightEntryRepository(modelContainer: container)
         let healthProfileRepo = HealthProfileRepository(modelContainer: container)
-        let fatigueObservationRepo = FatigueObservationRepository(modelContainer: container)
-        let fatigueLearningAuditRepo = FatigueLearningSetAuditRepository(modelContainer: container)
 
         let statsService = StatsService(
             exerciseStatsRepository: exerciseStatsRepo,
@@ -3813,11 +3820,6 @@ final class WorkoutHistoryBackupServiceTests: XCTestCase {
             exerciseRepository: exerciseRepo
         )
         let service = WorkoutHistoryBackupService(
-            workoutRepo: workoutRepo,
-            exerciseRepo: exerciseRepo,
-            setRepo: setRepo,
-            fatigueObservationRepo: fatigueObservationRepo,
-            fatigueLearningAuditRepo: fatigueLearningAuditRepo,
             statsService: statsService,
             prService: prService,
             modelContainer: container
