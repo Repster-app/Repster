@@ -42,9 +42,11 @@
         <a href="#templates">Templates</a>
         <a href="#calendar">Calendar</a>
         <a href="#charts">Charts</a>
+        <a href="#insights">Insights</a>
         <a href="#settings">Settings</a>
         <a href="#bodyweight">Body Weight</a>
         <a href="#import-export">Import and Export</a>
+        <a href="#apple-health">Apple Health</a>
         <a href="#onboarding">Onboarding</a>
         <a href="#subscription">Subscription</a>
       </nav>
@@ -95,13 +97,14 @@
           <p>Set rows handle the fields required by the exercise tracking type, such as weight, reps, duration, distance, RIR, and completion status. For unilateral exercises, left and right work can be tracked separately.</p>
 
           <h3>Set Types</h3>
-          <p>Sets can be marked as working, warmup, or partial where supported. These classifications help totals, PR checks, and suggestion calculations stay meaningful.</p>
+          <p>Any set row can be re-typed from its context menu. The available types are Working, Warm-up, Partial, Drop Set, Rest-Pause, Cluster, Myo-Rep, AMRAP, Back-off, Failure, Tempo, Isometric, and Eccentric.</p>
+          <p>The type is not just a label — it feeds totals, personal record checks, and Smart Suggestions. Whether warm-ups count toward totals and record checks is controlled by a setting.</p>
 
           <h3>Smart Weight Suggestions</h3>
           <p>When enabled, Repster shows suggested weight for the next set based on recent performance, target reps, target RIR, and fatigue modeling.</p>
 
           <h3>Rest Timer</h3>
-          <p>The rest timer starts after completed sets. It supports pause and resume, time adjustments, and compact behavior so the timer stays visible while logging.</p>
+          <p>The rest timer starts automatically after a completed set. It can be paused and resumed, adjusted up or down, set to an exact duration, or dismissed if you want to move straight on.</p>
 
           <h3>Session Timer</h3>
           <p>The workout header tracks elapsed time from the start of the session until the workout is finished.</p>
@@ -246,6 +249,23 @@
           <p>Charts support time filters such as week, month, year, and all time depending on the chart.</p>
         </section>
 
+        <section class="doc-section" id="insights">
+          <h2>Insights</h2>
+          <p>Insights is a findings feed rather than a stats wall. It surfaces a small number of specific, personally-derived observations about your training — each one backed by a chart, and often by a one-tap action.</p>
+
+          <h3>What It Looks For</h3>
+          <p>Repster currently checks for ten patterns: muscle balance, rep-target adherence, training consistency, rest-period sweet spot, RIR calibration, personal record pace, strength trend, volume ramp, deload readiness, and exercises you have quietly dropped.</p>
+
+          <h3>Why the Feed Is Often Short</h3>
+          <p>Every finding has to clear a statistical gate before it is allowed to appear, so one well-supported insight is preferred over a dozen noisy ones. An empty feed is a valid result, not a failure — it usually means there is not yet enough data, or nothing stands out.</p>
+
+          <h3>Reacting to a Finding</h3>
+          <p>Open a card to see the detail and its chart. You can mark a finding useful or not useful, or snooze one you do not want to see for a while. Insights are computed on your device from your own logged workouts.</p>
+
+          <h3>Where It Appears</h3>
+          <p>An Insights section on Home shows the top finding with a badge for unread items, and opens the full feed.</p>
+        </section>
+
         <section class="doc-section" id="settings">
           <h2>Settings</h2>
           <p>Settings control units, formulas, data management, and workout behavior.</p>
@@ -300,15 +320,42 @@
           <p>Reset App Data deletes local app data after confirmation and restores the app to a fresh state.</p>
         </section>
 
+        <section class="doc-section" id="apple-health">
+          <h2>Apple Health</h2>
+          <p>Repster can add your finished workouts to Apple Health. The integration is off until you turn it on, and iOS asks for permission separately before anything is written.</p>
+
+          <h3>What Gets Written</h3>
+          <p>One strength training workout each time you finish a session, containing the start time, the end time, and — only if you enable Estimated Calories — an estimated active energy value. Exercise names, weights, reps, notes and bodyweight values are never written.</p>
+
+          <h3>Estimated Calories</h3>
+          <p>A separate toggle, also off by default. The estimate is calculated on your device from the session length and your most recently logged bodyweight, using a fixed activity factor for strength training. It is an estimate rather than a measurement, and nothing is written if you have never logged a bodyweight.</p>
+
+          <h3>Reading Health Data</h3>
+          <p>Repster does not read your health data and requests no read permissions. The single exception is deletion: when you delete a workout in Repster, the app looks up the matching entry it previously wrote so it can remove that from Health too. That lookup can only find entries Repster itself created.</p>
+
+          <h3>Turning It Off</h3>
+          <p>Switching the integration off in Settings stops future writes. Workouts already written stay in Health until you delete them there, or delete the corresponding workout in Repster.</p>
+        </section>
+
         <section class="doc-section" id="onboarding">
           <h2>Onboarding</h2>
           <p>Initial setup helps configure Repster before the first workout.</p>
 
-          <h3>Quick Setup</h3>
-          <p>Quick setup gets you into the app quickly with the minimum required preferences.</p>
+          <p>Setup is four short screens, and every choice can be changed later in Settings.</p>
 
-          <h3>Advanced Setup</h3>
-          <p>Advanced setup can include unit preference, e1RM formula selection, bodyweight entry, and optional import. These choices can be changed later in Settings.</p>
+          <h3>Welcome</h3>
+          <p>A short introduction to what Repster does.</p>
+
+          <h3>Units and Bodyweight</h3>
+          <p>Choose metric or imperial, and optionally enter your current bodyweight. These share a screen because a bodyweight figure is meaningless without a unit.</p>
+
+          <h3>Apple Health</h3>
+          <p>An optional offer to write your finished workouts to Apple Health. This screen is skipped entirely on devices where Health is unavailable. See <a href="#apple-health">Apple Health</a> for what the integration does.</p>
+
+          <h3>Import</h3>
+          <p>An optional prompt to bring existing workout history in from a CSV export before you start logging.</p>
+
+          <p>Every screen after the welcome can be skipped.</p>
         </section>
 
         <section class="doc-section" id="subscription">
