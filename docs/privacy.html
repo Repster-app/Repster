@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Repster privacy policy for workout data, Apple Health, purchases, diagnostics, and anonymous product analytics.">
+  <title>Privacy Policy - Repster</title>
+  <link rel="stylesheet" href="styles.css?v=20260817-1">
+</head>
+<body>
+  <header class="topbar on-light" aria-label="Site navigation">
+    <a class="brand" href="index.html" aria-label="Repster home">
+      <img src="assets/repster-logo.png" alt="">
+      <span>Repster</span>
+    </a>
+    <nav class="nav" aria-label="Primary navigation">
+      <a href="index.html">Home</a>
+      <a href="docs.html">Docs</a>
+      <a href="support.html">Support</a>
+      <a class="active" href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+    </nav>
+  </header>
+
+  <section class="page-hero">
+    <div class="page-inner">
+      <p class="eyebrow">Last updated: August 17, 2026</p>
+      <h1>Privacy Policy</h1>
+      <p>Repster is designed so your workout data stays on your device unless you choose to export or share it.</p>
+    </div>
+  </section>
+
+  <main class="content">
+    <article class="policy">
+      <section class="policy-section">
+        <h2>Overview</h2>
+        <p>Repster is a workout logging app for iOS. Workout history, exercises, templates, bodyweight entries, and settings are stored locally on your device unless you choose to export or share them. We do not operate workout-data servers or user accounts.</p>
+        <p>Repster does not sell your personal information.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>Data Stored On Device</h2>
+        <p>The app stores training data locally using Apple's app storage technologies. Local data can include:</p>
+        <ul>
+          <li>Workout history, exercises, sets, notes, and workout titles.</li>
+          <li>Personal records, templates, and exercise library changes.</li>
+          <li>Bodyweight entries, fatigue learning data, and recommendation settings.</li>
+          <li>App settings such as units, formulas, rest timers, import settings, and subscription access state.</li>
+        </ul>
+        <p>This data does not leave your device unless you explicitly export, share, back up, or otherwise move it outside the app. Repster does not send exercise names, set weights, reps, notes, CSV contents, bodyweight values, or raw workout logs to product analytics.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>Apple Health</h2>
+        <p>Repster can add your finished workouts to Apple Health. The integration is <strong>off until you turn it on</strong> in the app at Settings &gt; Apple Health, and iOS asks for your permission separately before anything is written.</p>
+        <p>When it is on, Repster writes one strength training workout to Health each time you finish a workout, containing only the start time, the end time, and — if you have enabled Estimated Calories — an estimated active energy value. Repster does not write exercise names, set weights, reps, notes, or bodyweight values to Health.</p>
+        <p>Estimated Calories is a separate toggle that is also off by default. When enabled, the estimate is calculated on your device from the workout's length and the most recent bodyweight you logged in Repster, using a fixed activity factor for strength training. It is an estimate, not a measurement, and no estimate is written when you have never logged a bodyweight.</p>
+        <p>Repster does not read your health data. The one exception is deletion: when you delete a workout in Repster, the app looks up the matching workout it previously wrote to Health so it can remove that entry too. This lookup can only find entries Repster itself created, and Repster requests no read permissions for any health data type.</p>
+        <p>Health data written by Repster goes only to the Health store on your own device. It is never sent to Repster, to product analytics, or to any third party. Turning the integration off stops future writes; workouts already written stay in Health until you delete them there or delete the corresponding workout in Repster.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>Anonymous Product Analytics</h2>
+        <p>Repster uses PostHog EU cloud for anonymous product analytics. Analytics help us understand aggregate app usage: which screens are opened, how onboarding progresses, when workouts are started, completed, discarded or abandoned, coarse ranges for things like workout duration and set counts, how many times features inside a workout were used (for example opening the history or charts view for an exercise, or skipping a rest timer), paywall and purchase actions, import completion, and backup export. Repster does not create accounts, and analytics are grouped under a random identifier generated on your device at install time.</p>
+        <p>Analytics are enabled by default and can be turned off in the app at Settings &gt; Data &amp; Backups &gt; Share Anonymous Analytics. Turning this off disables event collection, session recordings, surveys, crash and error diagnostics, and advertising attribution together.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>Session Recordings</h2>
+        <p>Repster records anonymous playback of app screens through PostHog session replay, so we can see where the app is confusing to use. <strong>All text is masked before a recording leaves your device</strong> — recordings show layout, navigation and where you tapped, with every label, number and text field obscured. Images are masked in the same way. This means recordings do not reveal exercise names, weights, reps, notes, bodyweight values, or any other workout content.</p>
+        <p>Recordings contain no network request contents and no app logs. They are covered by the same setting as the rest of analytics and stop entirely when you turn Share Anonymous Analytics off.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>In-App Surveys</h2>
+        <p>Repster occasionally shows short multiple-choice surveys asking about your experience with the app. Answering is always optional, responses are stored against the same anonymous device identifier, and Repster does not collect free-text responses through surveys.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>Crash and Error Diagnostics</h2>
+        <p>If Repster crashes, or hits an error it recovers from silently — writing a workout to Apple Health, refreshing your subscription, or exporting or restoring a backup — it sends a diagnostic report so the problem can be found and fixed.</p>
+        <p>A report contains the error and where in the app it happened, along with your device model, iOS version and Repster version. <strong>It never contains your workouts, exercise names, weights, reps, notes or bodyweight values.</strong> Reports carry only the error type and a fixed label naming the operation that failed, never the data that operation was working on.</p>
+        <p>Crash reports are written to your device and sent the next time you open the app, so a report can arrive after the session that produced it has ended. Turning off Share Anonymous Analytics turns these off too.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>Advertising and Attribution</h2>
+        <p>When Repster is first opened, it asks Apple whether the install came from one of Repster's own Apple Search Ads campaigns. This uses Apple's own AdServices framework and happens once per install.</p>
+        <p>Apple's answer tells Repster whether the install was attributed to an ad and, if it was, a campaign identifier, an ad group identifier, a keyword identifier, the country or region, and whether it was a first download or a redownload. This is used only to understand which campaigns bring people to the app.</p>
+        <p><strong>No advertising identifier (IDFA) is read</strong>, no advertising profile is built, and this information is never combined with data from any third party. That is why Repster does not show a tracking permission prompt. Attribution is covered by the same Share Anonymous Analytics setting as everything else, and turning it off stops it entirely — including the request to Apple.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>Subscriptions and Purchases</h2>
+        <p>Repster uses RevenueCat to manage subscription status and in-app purchase entitlement checks. Purchases are processed by Apple's App Store. RevenueCat receives purchase and device/app information needed to validate subscription access.</p>
+        <p>RevenueCat's privacy policy is available at <a href="https://www.revenuecat.com/privacy/" rel="noopener">revenuecat.com/privacy</a>. RevenueCat's terms are available at <a href="https://www.revenuecat.com/terms/" rel="noopener">revenuecat.com/terms</a>.</p>
+        <p>Repster does not receive your full payment card details. Payment processing, cancellation, renewal, and refund handling are managed through Apple and your Apple ID.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>AI Template Feature</h2>
+        <p>Repster may include an optional AI template helper. This feature prepares prompt text for you to copy into ChatGPT or another AI tool manually. Repster does not directly connect to OpenAI or another AI provider for that workflow.</p>
+        <p>You control what you copy, paste, submit, or import. Do not include information in an AI prompt that you do not want to share with the AI service you choose to use.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>Export, Backup, and Sharing</h2>
+        <p>You can export workout data, CSV files, templates, or backups from the app. Exported files are saved or shared only where you choose, such as Files, iCloud Drive, email, messaging apps, or other storage locations available on your device.</p>
+        <p>Once you export or share data outside Repster, that destination's privacy practices apply.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>Data Deletion</h2>
+        <p>You can delete local app data using reset options in Repster where available. You can also remove local app data by uninstalling the app from your device.</p>
+        <p>Because Repster does not run workout-data servers, there is no separate Repster server copy of your workout history to delete. Subscription records held by Apple or RevenueCat are handled under their own policies.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>What Repster Does Not Do</h2>
+        <p>Repster does not sell data, does not use IDFA, does not show ads inside the app, and does not enable PostHog interaction autocapture or heatmaps. Analytics are not used for ad targeting, and the campaign information described under Advertising and Attribution is used only to measure Repster's own Apple Search Ads campaigns. Repster has no user accounts, so no analytics data is linked to a name, email address, or any other real-world identity. Repster does not send exercise names, set weights, reps, notes, CSV contents, bodyweight values, or raw workout logs to analytics — including in session recordings, where all text is masked. Repster does not read health data from Apple Health, and no health data is sent off your device.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>Children's Privacy</h2>
+        <p>Repster is not directed to children under 13 and does not knowingly collect personal information from children under 13. The app does not require account creation.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>Changes to This Policy</h2>
+        <p>If this policy changes, the last-updated date at the top of this page will be updated. Material changes will be reflected on this page.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>Support</h2>
+        <p>If you contact Repster for support, we use the information you provide only to respond to your request.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>Contact</h2>
+        <p>For privacy questions, contact <a href="mailto:repsterworkout@gmail.com">repsterworkout@gmail.com</a>.</p>
+        <p>See also the <a href="terms.html">Repster Terms of Use</a>.</p>
+      </section>
+    </article>
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <span>Repster for iOS.</span>
+      <nav aria-label="Footer navigation">
+        <a href="docs.html">Docs</a>
+        <a href="support.html">Support</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>

@@ -12,7 +12,7 @@ Last checked: August 14, 2026
 > **Changed again on August 14, 2026:** crash and error capture is now enabled
 > (`errorTrackingConfig.autoCapture`), adding two `Diagnostics` data types, and
 > Apple Search Ads attribution was added, adding `Identifiers -> Advertising Data`.
-> Both now have policy copy in `marketing/website/privacy.html` and paragraphs in
+> Both now have policy copy in `docs/privacy.html` and paragraphs in
 > the App Review Notes below. **Neither is live yet** — the deployed page is still
 > the May 16, 2026 one. See `PRE_1.4_CHECKLIST.md` §1.1.
 
@@ -123,19 +123,19 @@ This setup should not require App Tracking Transparency because Repster does not
 
 Add a section like this to the live privacy policy:
 
-`marketing/website/privacy.html` is the repo source of truth. As of August 14,
-2026 it covers, in addition to the original event list: onboarding progression,
-workout abandonment, masked session recordings, multiple-choice surveys, the
-anonymous per-install identifier behind person profiles, Apple Health, crash and
-error diagnostics, and Apple Search Ads attribution. Do not paraphrase it here —
-read the file.
+`docs/privacy.html` **is** the deployed page — as of 2026-08-17 there is only one
+copy, and GitHub Pages serves this folder directly. As of August 17, 2026 it
+covers, in addition to the original event list: onboarding progression, workout
+abandonment, in-workout interaction counts, masked session recordings,
+multiple-choice surveys, the anonymous per-install identifier behind person
+profiles, Apple Health, crash and error diagnostics, and Apple Search Ads
+attribution. Do not paraphrase it here — read the file.
 
-⚠️ **The source file is not the deployed page.** GitHub Pages serves the live
-policy from the root of the `main` branch (`privacy.html`), which is a
-Pages-only branch with a different site template — different nav, logo path and
-stylesheet. Copying `marketing/website/privacy.html` over it will break the page.
-The live page is still dated May 16, 2026 and actively states that replay and
-surveys are disabled. See `PRE_1.4_CHECKLIST.md` §1.1 for the deploy procedure.
+⚠️ **Until the Pages source is switched, the file and the live page still differ.**
+Pages must be repointed to branch `NewMain`, folder `/docs` (it currently serves
+the root of `main`). Until that happens the live page is dated May 16, 2026 and
+actively states that replay and surveys are disabled. See `PRE_1.4_CHECKLIST.md`
+§1.1.
 
 The three commitments that must stay literally true in the app:
 
@@ -184,7 +184,7 @@ Use this in the App Review Notes field:
 - `Repster/Core/Services/AnalyticsService.swift`
 - `Repster/Core/Services/AttributionService.swift`
 - `Repster/Core/Services/HealthKitService.swift` and `Repster/Info.plist`
-- `marketing/website/privacy.html` (repo source of truth)
+- `docs/privacy.html` (repo source of truth)
 - Live GitHub Pages privacy policy at `https://repster-app.github.io/Repster/privacy.html`
   — served from the **root of `main`**, not from the file above
 

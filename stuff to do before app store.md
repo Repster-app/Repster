@@ -1,7 +1,7 @@
 # Stuff To Do Before App Store
 
 - Confirm `repsterworkout@gmail.com` is the final `Repster` support email.
-- Publish `marketing/website/privacy.html` to the final `https://repster-app.github.io/Repster/privacy.html` privacy policy URL.
+- Publish `docs/privacy.html` to the final `https://repster-app.github.io/Repster/privacy.html` privacy policy URL.
 - Add a visible `Terms of Use` link around the membership/paywall flow and make sure purchase, restore, and manage-subscription paths are all review-ready.
 - Replace the RevenueCat test API key with the live production key and verify the real offering / entitlement setup before submission.
 - Do a last pass on App Store-facing copy, screenshots, and icon branding.

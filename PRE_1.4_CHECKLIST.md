@@ -41,7 +41,7 @@ sections 2.3 and 1.11 exist:
 
 ### 1.1 Deploy the updated privacy policy
 
-`marketing/website/privacy.html` was rewritten on 2026-08-08 and must be live at
+`docs/privacy.html` must be live at
 <https://repster-app.github.io/Repster/privacy.html> **before** any build
 containing session replay is released.
 
@@ -49,13 +49,23 @@ Why this is blocking, not housekeeping: the app now records (masked) session
 replays. The currently live policy says Repster *does not* do that. Shipping the
 build first means recording users under a policy that denies it.
 
-- [ ] Commit and push `marketing/website/privacy.html`
-- [ ] Confirm the live URL shows "Last updated: August 8, 2026" — **bump this date**
-      if the Health (1.6), attribution (1.9) or crash-diagnostics sections below
-      are added, which they must be
-- [ ] Confirm the live page has the **Session Recordings** and **In-App Surveys** sections
-- [ ] Add a **Crash & Error Diagnostics** section — see 1.12 for the copy
-- [ ] Confirm the contact address reads `repsterworkout@gmail.com`
+**The content is done** (2026-08-17). All the section requirements below —
+Session Recordings, In-App Surveys, Crash & Error Diagnostics, Apple Health
+(§1.6), attribution (§1.9) — are already in `docs/privacy.html`, along with the
+five sections the 2026-08-08 rewrite had dropped (Children's Privacy, Data
+Deletion, Export/Backup/Sharing, Changes to This Policy, AI Template Feature).
+**What is left is the deploy, which is now a Pages settings change.**
+
+- [ ] Push `NewMain` with `docs/`
+- [ ] Repo Settings → Pages → Source: **branch `NewMain`, folder `/docs`**
+      (currently branch `main`, folder `/`)
+- [ ] Confirm <https://repster-app.github.io/Repster/privacy.html> shows
+      "Last updated: August 17, 2026"
+- [ ] Confirm `/terms.html`, `/support.html`, `/docs.html` and `/` still resolve —
+      the app links to privacy and terms from Settings, **including in versions
+      already on the App Store**, so a 404 here breaks a shipped build
+- [ ] Only then archive `main`. Leaving it intact means the rollback is one
+      settings change.
 
 ### 1.2 App Store Connect — App Privacy
 
@@ -173,7 +183,7 @@ from the archive — but a crash you can't read is a crash you won't fix.
 ### 1.6 Privacy policy must describe Apple Health
 
 Apple requires any app with the HealthKit entitlement to have a privacy policy
-covering its health-data handling. `marketing/website/privacy.html` was rewritten
+covering its health-data handling. `docs/privacy.html` was rewritten
 on 2026-08-08 and predates the integration, so it doesn't mention Health at all.
 
 Repster's story here is short and unusually clean, so say it plainly:
@@ -238,7 +248,7 @@ policy that doesn't mention it.
 Repster's story here is short, so say it plainly:
 
 - [ ] Add an **Advertising & Attribution** section to
-      `marketing/website/privacy.html` stating that Repster asks Apple whether an
+      `docs/privacy.html` stating that Repster asks Apple whether an
       install came from one of its Apple Search Ads campaigns
 - [ ] State what is received: a campaign, ad group and keyword identifier, plus
       the country and whether it was a first download or a reinstall
@@ -289,7 +299,7 @@ visible feature attached to it.
 Draft copy lives in `marketing/app-store/privacy-review-checklist.md` under
 "Privacy Policy Copy To Include". The points it has to make:
 
-- [ ] Add a **Crash & Error Diagnostics** section to `marketing/website/privacy.html`
+- [ ] Add a **Crash & Error Diagnostics** section to `docs/privacy.html`
 - [ ] State what triggers a report: a crash, or an error Repster recovers from
       silently (an Apple Health write, a subscription refresh, a backup export or
       restore)
@@ -659,7 +669,7 @@ others makes the published policy wrong:
 2. `Repster/Core/Services/AttributionService.swift` — what attribution collects,
    and the opt-out gate in `AttributionServiceFactory` that keeps the single
    toggle honest
-3. `marketing/website/privacy.html` — the live policy
+3. `docs/privacy.html` — the live policy
 4. `marketing/app-store/privacy-review-checklist.md` — ASC answers + review notes
 5. `Repster/PrivacyInfo.xcprivacy` — the privacy manifest
 
@@ -686,7 +696,7 @@ and `Health & Fitness → Health` becomes a required App Privacy declaration:
 2. `Repster/Info.plist` — usage descriptions. Both keys are already present; what
    proves write-only is the empty read set passed to `requestAuthorization`, not
    the absence of the share key. A read path would change the call, not the plist
-3. `marketing/website/privacy.html` — the Apple Health section from 1.6
+3. `docs/privacy.html` — the Apple Health section from 1.6
 4. `marketing/app-store/privacy-review-checklist.md` — ASC answers + review notes
 5. `HEALTHKIT_INTEGRATION_EXPLORATION.md` — the design record, which currently
    documents the read path as explicitly out of scope
