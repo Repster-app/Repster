@@ -54,18 +54,21 @@ Session Recordings, In-App Surveys, Crash & Error Diagnostics, Apple Health
 (§1.6), attribution (§1.9) — are already in `docs/privacy.html`, along with the
 five sections the 2026-08-08 rewrite had dropped (Children's Privacy, Data
 Deletion, Export/Backup/Sharing, Changes to This Policy, AI Template Feature).
-**What is left is the deploy, which is now a Pages settings change.**
+**DEPLOYED AND VERIFIED 2026-08-18.** The live page is byte-identical to
+`docs/privacy.html`, reads "Last updated: August 17, 2026", and no longer carries
+the false claim that session replay and surveys are disabled. This section is no
+longer a blocker.
 
-- [ ] Push `NewMain` with `docs/`
-- [ ] Repo Settings → Pages → Source: **branch `NewMain`, folder `/docs`**
-      (currently branch `main`, folder `/`)
-- [ ] Confirm <https://repster-app.github.io/Repster/privacy.html> shows
+- [x] Push `NewMain` with `docs/`
+- [x] Repo Settings → Pages → Source: **branch `NewMain`, folder `/docs`**
+- [x] Confirm <https://repster-app.github.io/Repster/privacy.html> shows
       "Last updated: August 17, 2026"
-- [ ] Confirm `/terms.html`, `/support.html`, `/docs.html` and `/` still resolve —
+- [x] Confirm `/terms.html`, `/support.html`, `/docs.html` and `/` still resolve —
       the app links to privacy and terms from Settings, **including in versions
-      already on the App Store**, so a 404 here breaks a shipped build
+      already on the App Store**, so a 404 here breaks a shipped build.
+      All five return 200; `styles.css` and `assets/repster-logo.png` load too
 - [ ] Only then archive `main`. Leaving it intact means the rollback is one
-      settings change.
+      settings change — no rush, and no reason to do it before 1.4 ships
 
 ### 1.2 App Store Connect — App Privacy
 
