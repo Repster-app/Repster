@@ -557,6 +557,10 @@ final class ActiveWorkoutViewModel {
                 requestWeightSuggestionRefresh(mode: .preserveExisting, invalidateCache: true)
             }
 
+            // Analytics only. Un-ticking a set is the user correcting something, so
+            // this is the best confusion proxy the tap surface offers.
+            analyticsService.recordWorkoutInteraction(.setsUncompleted)
+
         } catch {
             // Revert on failure
             set.completed = oldCompleted
@@ -605,6 +609,8 @@ final class ActiveWorkoutViewModel {
             if currentExercise?.id == exerciseId {
                 requestWeightSuggestionRefresh(mode: .preserveExisting, invalidateCache: true)
             }
+
+            analyticsService.recordWorkoutInteraction(.setsAdded)
 
         } catch {
             #if DEBUG
@@ -655,6 +661,10 @@ final class ActiveWorkoutViewModel {
                 requestWeightSuggestionRefresh(mode: .preserveExisting, invalidateCache: true)
             }
 
+            // Same counter as `addSet` — the tally measures "sets added", and
+            // splitting warmups out would answer a question nothing is asking.
+            analyticsService.recordWorkoutInteraction(.setsAdded)
+
         } catch {
             #if DEBUG
             dbg("[ActiveWorkoutViewModel] Failed to add warmup set: \(error)")
@@ -667,6 +677,14 @@ final class ActiveWorkoutViewModel {
     /// Delete a set. Triggers PR/stats cascade via SetService.
     func deleteSet(_ set: WorkoutSet) async {
         let exerciseId = set.exerciseId
+        let setId = set.id
+
+        // Out of screen state before it leaves the store: `delete` awaits a PR and stats pipeline,
+        // and the set table renders during it.
+        var sets = setsByExercise[exerciseId] ?? []
+        sets.removeAll { $0.id == setId }
+        let orderingUpdates = reindexOrderInExercise(&sets)
+        setsByExercise[exerciseId] = sets
 
         do {
             // Deleting a PR owner promotes another set; without this the new owner's badge
@@ -674,11 +692,6 @@ final class ActiveWorkoutViewModel {
             let prResult = try await setService.delete(set)
             PRBadgeApplier.apply(prResult.affectedSetIds, to: &setsByExercise)
 
-            // Remove from local state
-            var sets = setsByExercise[exerciseId] ?? []
-            sets.removeAll { $0.id == set.id }
-            let orderingUpdates = reindexOrderInExercise(&sets)
-            setsByExercise[exerciseId] = sets
             await persistSetOrdering(orderingUpdates)
 
             // Update Live Activity (total sets changed)
@@ -692,10 +705,15 @@ final class ActiveWorkoutViewModel {
                 requestWeightSuggestionRefresh(mode: .preserveExisting, invalidateCache: true)
             }
 
+            analyticsService.recordWorkoutInteraction(.setsDeleted)
+
         } catch {
             #if DEBUG
             dbg("[ActiveWorkoutViewModel] Failed to delete set: \(error)")
             #endif
+            // The row is still in the store but no longer on screen, and the reindex above already
+            // renumbered the survivors in memory. Re-read instead of trying to unwind that.
+            await loadActiveWorkout()
         }
     }
 
@@ -766,24 +784,15 @@ final class ActiveWorkoutViewModel {
     }
 
     /// Remove an exercise and all its sets from the workout.
+    ///
+    /// The exercise leaves the screen *before* its rows leave the store. The loop below awaits once
+    /// per set, and `ExerciseTabStripView` reads every exercise's sets on every render, so holding
+    /// these across the loop would put deleted models in front of the main actor.
     func removeExercise(at index: Int) async {
         guard index >= 0, index < exercises.count else { return }
 
         let exercise = exercises[index]
         let exerciseSets = setsByExercise[exercise.id] ?? []
-
-        // Delete all sets for this exercise
-        for set in exerciseSets {
-            do {
-                // Ignored deliberately: this exercise and all its rows are about to leave
-                // the screen, so there is nothing on it left to re-badge.
-                _ = try await setService.delete(set)
-            } catch {
-                #if DEBUG
-                dbg("[ActiveWorkoutViewModel] Failed to delete set \(set.id) during exercise removal: \(error)")
-                #endif
-            }
-        }
 
         // Remove from local state
         exercises.remove(at: index)
@@ -798,6 +807,26 @@ final class ActiveWorkoutViewModel {
 
         // Update Live Activity (exercise changed)
         updateLiveActivityState()
+
+        // Delete all sets for this exercise
+        var deleteFailed = false
+        for set in exerciseSets {
+            do {
+                // Ignored deliberately: this exercise and all its rows are about to leave
+                // the screen, so there is nothing on it left to re-badge.
+                _ = try await setService.delete(set)
+            } catch {
+                deleteFailed = true
+                #if DEBUG
+                dbg("[ActiveWorkoutViewModel] Failed to delete set \(set.id) during exercise removal: \(error)")
+                #endif
+            }
+        }
+
+        // A partial failure leaves rows the screen has already forgotten. Re-read rather than guess.
+        if deleteFailed {
+            await loadActiveWorkout()
+        }
     }
 
     /// Reorder exercises via drag gesture on tab strip.
@@ -846,7 +875,25 @@ final class ActiveWorkoutViewModel {
             resumeWorkoutClock()
         } else {
             pauseWorkoutClock()
+            // Pauses only. Counting resumes as well would just double the number
+            // for anyone who unpaused, which is nearly everyone.
+            analyticsService.recordWorkoutInteraction(.workoutPauses)
         }
+    }
+
+    // MARK: - Analytics-only interaction hooks
+
+    /// `SetTableDataSource` conformance — see that protocol for why the tap gesture
+    /// reports this instead of the view observing `selectedExerciseIndex`.
+    func recordExerciseTabSelected() {
+        analyticsService.recordWorkoutInteraction(.exerciseSwitches)
+    }
+
+    /// Opens the add-exercise sheet. Exists so the count lives in one place rather
+    /// than at each `showAddExerciseSheet = true` call site in the view.
+    func presentAddExerciseSheet() {
+        analyticsService.recordWorkoutInteraction(.exercisePickerOpens)
+        showAddExerciseSheet = true
     }
 
     func currentElapsedTime(referenceDate: Date = Date()) -> TimeInterval {
@@ -1983,6 +2030,9 @@ final class ActiveWorkoutViewModel {
         let totalReps = completedSets.reduce(0) { $0 + ($1.reps ?? 0) }
         let prsHit = setsByExercise.values.flatMap { $0 }.filter { $0.prStatus == .current }.count
         let startContext = WorkoutStartContextStore.recall()
+        // Read before the store is cleared below — `WorkoutStartContextStore.clear()`
+        // resets the tally through the session marker.
+        let interactions = WorkoutInteractionTally.snapshot()
 
         do {
             try await workoutService.finishWorkout(
@@ -2017,7 +2067,8 @@ final class ActiveWorkoutViewModel {
                 accessTier: accessTier,
                 remainingFreeWorkouts: accessSnapshot.remainingFreeWorkouts,
                 rirSetCount: loggedRIRs.count,
-                averageRIR: averageRIR
+                averageRIR: averageRIR,
+                interactions: interactions
             )
             WorkoutStartContextStore.clear()
             ReviewPromptService.recordCompletedWorkout()
@@ -2028,17 +2079,7 @@ final class ActiveWorkoutViewModel {
             stopWorkoutClockTicker()
             clearPersistedWorkoutClockState()
             clearPersistedSelectedExerciseState()
-
-            // Clear local state
-            self.workout = nil
-            self.exercises = []
-            self.selectedExerciseIndex = 0
-            self.setsByExercise = [:]
-            self.isWorkoutPaused = false
-            self.accumulatedElapsedSeconds = 0
-            self.lastWorkoutResumedAt = nil
-            self.elapsedTime = 0
-            dismissTimer()
+            clearScreenState()
 
             // End Live Activity (workout completed)
             liveActivityManager.endActivity()
@@ -2058,6 +2099,12 @@ final class ActiveWorkoutViewModel {
     /// Calls WorkoutService.deleteWorkout() which cascade-deletes all sets,
     /// the workout itself, and rebuilds PRs/stats for affected exercises.
     /// Clears local state and signals the View layer to dismiss.
+    ///
+    /// **Screen state is dropped before the delete, not after.** `deleteWorkout` commits the set
+    /// deletions a third of the way through a pipeline that then rebuilds PRs and stats per
+    /// exercise, and the main actor renders throughout — the workout clock alone invalidates every
+    /// observer once a second. Reading a persisted property on a deleted model traps inside
+    /// SwiftData, so nothing the view can reach may still point at these rows once the await starts.
     func discardWorkout() async {
         guard let workout else { return }
         let referenceDate = Date()
@@ -2065,33 +2112,31 @@ final class ActiveWorkoutViewModel {
         let durationSeconds = currentElapsedTime(referenceDate: referenceDate)
         let setCount = setsByExercise.values.flatMap { $0 }.count
         let startContext = WorkoutStartContextStore.recall()
+        let interactions = WorkoutInteractionTally.snapshot()
+        // Read off the model while it still exists — the analytics call below runs after the delete.
+        let workoutId = workout.id
+        let workoutDate = workout.date
+
+        stopWorkoutClockTicker()
+        clearScreenState()
 
         do {
-            try await workoutService.deleteWorkout(workout.id)
+            try await workoutService.deleteWorkout(workoutId)
 
             analyticsService.workoutDiscarded(
                 durationSeconds: durationSeconds,
                 setCount: setCount,
-                date: workout.date,
+                date: workoutDate,
                 source: startContext.source,
-                templateUsed: startContext.templateUsed
+                templateUsed: startContext.templateUsed,
+                interactions: interactions
             )
             WorkoutStartContextStore.clear()
 
-            stopWorkoutClockTicker()
+            // The persisted clock and selection deliberately outlive the screen, so they are only
+            // discarded once the workout really is gone — the failure path below reloads from them.
             clearPersistedWorkoutClockState()
             clearPersistedSelectedExerciseState()
-
-            // Clear local state
-            self.workout = nil
-            self.exercises = []
-            self.selectedExerciseIndex = 0
-            self.setsByExercise = [:]
-            self.isWorkoutPaused = false
-            self.accumulatedElapsedSeconds = 0
-            self.lastWorkoutResumedAt = nil
-            self.elapsedTime = 0
-            dismissTimer()
 
             // End Live Activity (workout discarded)
             liveActivityManager.endActivity()
@@ -2103,7 +2148,25 @@ final class ActiveWorkoutViewModel {
             #if DEBUG
             dbg("[ActiveWorkoutViewModel] Failed to discard workout: \(error)")
             #endif
+            // The delete can fail partway, so the store is the only honest source for what is left.
+            await loadActiveWorkout()
         }
+    }
+
+    /// Drop everything the workout screen renders from.
+    ///
+    /// Extracted because the discard runs it *before* its delete and the finish runs it *after*
+    /// its save; keeping one list stops the two orderings from drifting apart.
+    private func clearScreenState() {
+        self.workout = nil
+        self.exercises = []
+        self.selectedExerciseIndex = 0
+        self.setsByExercise = [:]
+        self.isWorkoutPaused = false
+        self.accumulatedElapsedSeconds = 0
+        self.lastWorkoutResumedAt = nil
+        self.elapsedTime = 0
+        dismissTimer()
     }
 
     // MARK: - Private Helpers

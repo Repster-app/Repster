@@ -46,6 +46,8 @@ struct ExerciseTabStripView: View {
                         )
                         .id(exercise.id)
                         .onTapGesture {
+                            guard index != dataSource.selectedExerciseIndex else { return }
+                            dataSource.recordExerciseTabSelected()
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 dataSource.selectedExerciseIndex = index
                             }
@@ -88,7 +90,7 @@ struct ExerciseTabStripView: View {
                     }
                 }
                 .padding(.horizontal, 18)
-                .padding(.vertical, 7)
+                .padding(.vertical, 5)
             }
             .onChange(of: dataSource.selectedExerciseIndex) { _, newIndex in
                 // Auto-scroll to keep active tab visible
@@ -150,7 +152,7 @@ private struct ExerciseTab: View {
         }
         .foregroundColor(isActive ? .white : .textTertiary)
         .padding(.horizontal, 14)
-        .frame(minHeight: 40)
+        .frame(minHeight: 36)
             .background(isActive ? Color.accent : Color.bgCard)
             .cornerRadius(7)
             .contentShape(Rectangle())

@@ -175,6 +175,18 @@ protocol SetTableDataSource: AnyObject, Observable {
     /// Remove the exercise at the given index and delete all its sets.
     func removeExercise(at index: Int) async
 
+    /// Analytics only: the user tapped an exercise tab.
+    ///
+    /// Exists because `selectedExerciseIndex` is written programmatically from nine
+    /// places (restore on load, jump to a newly added exercise, clamp after
+    /// removal, reorder, reset on finish and discard), so neither its `didSet` nor
+    /// an `onChange` in the view can tell intent from bookkeeping. Only the tap
+    /// gesture can.
+    ///
+    /// Default no-op, so the shared tab strip does not instrument the
+    /// edit-historic-workout screen.
+    func recordExerciseTabSelected()
+
     /// Sets grouped by exercise ID for checking completion status.
     var setsByExercise: [UUID: [WorkoutSet]] { get }
 
@@ -194,6 +206,7 @@ extension SetTableDataSource {
 }
 
 extension SetTableDataSource {
+    func recordExerciseTabSelected() {}
     func suggestionState(for setId: UUID) -> SetSuggestionState? { nil }
     func suggestedWeight(for setId: UUID) -> Double? {
         suggestionState(for: setId)?.suggestion?.suggestedWeight

@@ -9,23 +9,25 @@
 
 import SwiftUI
 
-enum RestTimerPresentationMode: Equatable {
-    case full
-    case compact
-}
-
 enum ActiveWorkoutBottomAccessoryLayout {
-    static func timerPresentationMode(
+    /// Whether the rest timer belongs on screen for this state.
+    ///
+    /// The timer used to have a full and a compact height, and this picked between them
+    /// based on the keyboard. It is one height now, so only the `.finished` rule survives:
+    /// a completed rest is suppressed while the set keypad is open, because the message is
+    /// redundant mid-entry — you are already logging the next set — and a bar appearing
+    /// underneath would shift the keypad while a thumb is on it.
+    static func shouldShowRestTimer(
         for state: RestTimerState,
         isKeyboardVisible: Bool
-    ) -> RestTimerPresentationMode? {
+    ) -> Bool {
         switch state {
         case .idle:
-            return nil
+            return false
         case .running, .paused:
-            return isKeyboardVisible ? .compact : .full
+            return true
         case .finished:
-            return isKeyboardVisible ? nil : .full
+            return !isKeyboardVisible
         }
     }
 }
@@ -135,6 +137,11 @@ struct ActiveWorkoutView: View {
             if newTab != .sets {
                 setKeyboardManager.hide()
             }
+            // Whether people consult their own training data while training is the
+            // question this app's premise rests on, and nothing measured it.
+            if let interaction = newTab.analyticsInteraction {
+                services.analyticsService.recordWorkoutInteraction(interaction)
+            }
         }
         .onChange(of: services.unitPreference) { _, _ in
             Task {
@@ -174,6 +181,7 @@ struct ActiveWorkoutView: View {
 
             // Exercise settings gear icon
             Button {
+                services.analyticsService.recordWorkoutInteraction(.exerciseSettingsOpens)
                 showExerciseSettingsSheet = true
             } label: {
                 Image(systemName: "gearshape")
@@ -197,7 +205,7 @@ struct ActiveWorkoutView: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 6)
+        .padding(.vertical, 2)
     }
 
     // MARK: - Sub-Tab Content (T025/T026/T027)
@@ -213,7 +221,7 @@ struct ActiveWorkoutView: View {
                     keyboardManager: setKeyboardManager
                 )
                     .padding(.horizontal, 20)
-                    .padding(.top, 8)
+                    .padding(.top, 4)
 
                 // Smart Suggestions module (opt-in, read-only suggestions)
                 WeightSuggestionModuleView(
@@ -223,6 +231,7 @@ struct ActiveWorkoutView: View {
                     isLoading: viewModel.isLoadingWeightSuggestions,
                     isRefreshing: viewModel.isRefreshingWeightSuggestions,
                     onRefresh: {
+                        services.analyticsService.recordWorkoutInteraction(.suggestionRefreshes)
                         Task {
                             await viewModel.refreshWeightSuggestions(
                                 invalidateCache: true,
@@ -282,38 +291,43 @@ struct ActiveWorkoutView: View {
         selectedSubTab == .sets && setKeyboardManager.context?.trackedField != nil
     }
 
-    private var timerPresentationMode: RestTimerPresentationMode? {
-        ActiveWorkoutBottomAccessoryLayout.timerPresentationMode(
+    private var isRestTimerVisible: Bool {
+        ActiveWorkoutBottomAccessoryLayout.shouldShowRestTimer(
             for: viewModel.restTimer,
             isKeyboardVisible: isSetKeyboardVisible
         )
     }
 
     private var bottomAccessoryAnimationKey: String {
-        let timerKey: String
-        switch timerPresentationMode {
-        case .full:
-            timerKey = "full"
-        case .compact:
-            timerKey = "compact"
-        case .none:
-            timerKey = "hidden"
-        }
-        return "\(selectedSubTab)-\(isSetKeyboardVisible)-\(timerKey)"
+        "\(selectedSubTab)-\(isSetKeyboardVisible)-\(isRestTimerVisible)"
     }
 
     @ViewBuilder
     private var bottomAccessoryArea: some View {
         VStack(spacing: 0) {
-            if let timerPresentationMode {
+            if isRestTimerVisible {
                 RestTimerView(
                     state: viewModel.restTimer,
-                    presentationMode: timerPresentationMode,
-                    onAddTime: { viewModel.addTime($0) },
-                    onSubtractTime: { viewModel.subtractTime($0) },
-                    onSetDuration: { viewModel.setTimerDuration($0) },
+                    onAddTime: {
+                        services.analyticsService.recordWorkoutInteraction(.restTimerAdjusts)
+                        viewModel.addTime($0)
+                    },
+                    onSubtractTime: {
+                        services.analyticsService.recordWorkoutInteraction(.restTimerAdjusts)
+                        viewModel.subtractTime($0)
+                    },
+                    onSetDuration: {
+                        services.analyticsService.recordWorkoutInteraction(.restTimerAdjusts)
+                        viewModel.setTimerDuration($0)
+                    },
                     onTogglePause: { viewModel.toggleRestTimerPause() },
-                    onDismiss: { viewModel.dismissTimer() }
+                    // Counted here rather than in `dismissTimer()`, which is also the
+                    // internal cleanup path for finish, discard and set completion —
+                    // that would add a phantom skip to every workout.
+                    onDismiss: {
+                        services.analyticsService.recordWorkoutInteraction(.restTimerSkips)
+                        viewModel.dismissTimer()
+                    }
                 )
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -358,7 +372,7 @@ struct ActiveWorkoutView: View {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(.textPrimary)
-                    .frame(width: 44, height: 44)
+                    .frame(width: 44, height: 36)
             }
 
             Spacer()
@@ -374,12 +388,12 @@ struct ActiveWorkoutView: View {
 
             // +Exercise button
             Button {
-                viewModel.showAddExerciseSheet = true
+                viewModel.presentAddExerciseSheet()
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(.accent)
-                    .frame(width: 44, height: 44)
+                    .frame(width: 44, height: 36)
             }
 
             // Finish Workout button
@@ -396,7 +410,7 @@ struct ActiveWorkoutView: View {
             }
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 8)
+        .padding(.vertical, 4)
     }
 
     // MARK: - Empty State
@@ -419,7 +433,7 @@ struct ActiveWorkoutView: View {
                 .foregroundColor(.textTertiary)
 
             Button {
-                viewModel.showAddExerciseSheet = true
+                viewModel.presentAddExerciseSheet()
             } label: {
                 Text("Add Exercises")
                     .font(.system(size: 16, weight: .semibold))
@@ -452,14 +466,14 @@ private struct WorkoutSubTabBar: View {
                         .font(.system(size: 12, weight: selectedTab == tab ? .semibold : .medium))
                         .foregroundStyle(selectedTab == tab ? Color.textPrimary : Color.textSecondary)
                         .frame(maxWidth: .infinity)
-                        .frame(minHeight: 36)
+                        .frame(minHeight: 32)
                         .background(selectedTab == tab ? Color.bgSubtle : Color.clear)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(3)
+        .padding(2)
         .background(Color.bgCard.opacity(0.9))
         .overlay(
             RoundedRectangle(cornerRadius: 11)

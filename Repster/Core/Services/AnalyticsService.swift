@@ -142,7 +142,7 @@ final class PostHogAnalyticsClient: AnalyticsClientProtocol {
     /// layer (PostHog masks `SwiftUI.CGDrawingView`), not just editable fields —
     /// recordings show layout, navigation and taps with all text redacted.
     ///
-    /// Keep this in sync with `marketing/website/privacy.html` and
+    /// Keep this in sync with `docs/privacy.html` and
     /// `marketing/app-store/privacy-review-checklist.md`.
     private func configureSessionReplay(on config: PostHogConfig) {
         config.sessionReplay = true
@@ -288,6 +288,16 @@ final class AnalyticsService: AnalyticsServiceProtocol {
             properties: sanitize(properties),
             personPropertiesSetOnce: sanitize(personPropertiesSetOnce)
         )
+    }
+
+    /// The only real implementation of the tally — the protocol default is a no-op.
+    ///
+    /// The opt-out gate is here, at increment time rather than at send time, so an
+    /// opted-out user accumulates nothing at all rather than accumulating locally
+    /// and having it dropped on the way out.
+    func recordWorkoutInteraction(_ interaction: WorkoutInteraction) {
+        guard isCollectionEnabled else { return }
+        WorkoutInteractionTally.increment(interaction, userDefaults: userDefaults)
     }
 
     /// Only the error's type and description travel with this — deliberately no

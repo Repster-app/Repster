@@ -240,7 +240,12 @@ final class HomeViewModel {
             if let dayWorkouts = workoutsByDay[i] {
                 for workout in dayWorkouts {
                     do {
-                        let exerciseIds = try await setService.fetchExerciseIds(for: workout.id)
+                        // fetchExerciseIds returns a Set built from an unsorted fetch, so which
+                        // three muscles a day settled on changed between launches. Snapshots
+                        // come back sorted by orderInWorkout for the same underlying query.
+                        let sets = try await setService.fetchSetSnapshots(for: workout.id)
+                        var seenExerciseIds: Set<UUID> = []
+                        let exerciseIds = sets.map(\.exerciseId).filter { seenExerciseIds.insert($0).inserted }
                         for exerciseId in exerciseIds {
                             if let exercise = try await cachedExercise(exerciseId),
                                let muscle = ExercisePrimaryGroup.normalizedValue(exercise.primaryMuscle),
@@ -341,7 +346,11 @@ final class HomeViewModel {
             for workout in completed {
                 let sets = try await setService.fetchSetSnapshots(for: workout.id)
                 let workingSetsWithData = sets.filter { $0.setType == .working && $0.hasData }
-                let exerciseIds = Set(sets.map(\.exerciseId))
+                // First-appearance order, not Set order. Sets come back sorted by
+                // orderInWorkout, so this lists muscles in the order they were trained —
+                // and stays put between launches, which Set iteration does not.
+                var seenExerciseIds: Set<UUID> = []
+                let exerciseIds = sets.map(\.exerciseId).filter { seenExerciseIds.insert($0).inserted }
 
                 var exerciseLookup: [UUID: ChartExerciseData] = [:]
                 var muscleGroups: [String] = []

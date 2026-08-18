@@ -1,5 +1,6 @@
 import XCTest
 import SwiftData
+import UIKit
 @testable import Repster
 
 /// The paired control for the cross-context crash class.
@@ -369,6 +370,105 @@ final class CrossContextRaceTests: XCTestCase {
                 exerciseRepository: exerciseRepo
             ),
             modelContainer: container
+        )
+    }
+
+    // MARK: - The deleted-read control (gated — expected to crash)
+
+    /// The paired control for the 1.4 (4) discard crash. **It crashes the runner, and that is the
+    /// passing result** — exactly like the live-model control above.
+    ///
+    /// Reproduced 2026-08-18 on the sixth configuration, and the five that failed are the finding:
+    /// deleting a row and reading it back is *not* fatal on its own. It is fatal only when the
+    /// attribute being read was **never resolved**. Four earlier attempts used an in-memory store,
+    /// where the object graph *is* the store and nothing can go missing; all of them fetched
+    /// eagerly, so every read answered from a resident value and never touched the row.
+    ///
+    /// So this one is on disk and fetches with `propertiesToFetch` limited to scalars, leaving
+    /// `setType` an unresolved fault. It models what hours of uptime do to a held object — the app
+    /// owner's observation that the crashed process had been running 2h58m — without waiting for
+    /// them. Single `ModelContext` throughout, because the app has exactly one shared
+    /// `SetRepository` (verified in `ServiceContainer`); a cross-context harness would not be
+    /// modelling the shipped code.
+    ///
+    /// Expected output, naming the same property as the TestFlight report:
+    ///
+    /// ```
+    /// SwiftData/BackingData.swift:249: Fatal error: This backing data was detached from a
+    /// context without resolving attribute faults: PersistentIdentifier(…) - \WorkoutSet.setType
+    /// ```
+    ///
+    /// Reads scalars before `setType`, mirroring `ChartSetData.init(from:)`: the report showed 21
+    /// scalar reads succeeding and the first `Codable`-backed attribute trapping.
+    ///
+    /// ```bash
+    /// touch RepsterTests/Fixtures/Local/RUN_DELETED_READ_REPRO
+    /// ```
+    func testUnmaterialisedSetTypeGoesFatalOnceTheRowIsDeleted() async throws {
+        let marker = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/Local/RUN_DELETED_READ_REPRO")
+        let requested = FileManager.default.fileExists(atPath: marker.path)
+        if requested { try? FileManager.default.removeItem(at: marker) }
+        try XCTSkipUnless(
+            requested,
+            "Reproduction attempt for the discard crash — expected to SIGTRAP the runner. "
+                + "Run deliberately: touch RepsterTests/Fixtures/Local/RUN_DELETED_READ_REPRO"
+        )
+
+        let storeURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("aged-read-\(UUID().uuidString).store")
+        let container = try ModelContainer(
+            for: Exercise.self, Workout.self, WorkoutSet.self, ExerciseStats.self,
+            PerformanceRecord.self, BodyweightEntry.self, HealthProfile.self,
+            FatigueObservation.self, FatigueLearningSetAudit.self,
+            configurations: ModelConfiguration(url: storeURL)
+        )
+        defer { try? FileManager.default.removeItem(at: storeURL) }
+
+        let context = ModelContext(container)
+        let workoutId = UUID()
+        let exerciseId = UUID()
+        for index in 0..<200 {
+            context.insert(WorkoutSet(
+                workoutId: workoutId,
+                exerciseId: exerciseId,
+                weight: 100,
+                reps: 5,
+                setType: .working,
+                orderInWorkout: index + 1,
+                orderInExercise: index + 1,
+                completed: true
+            ))
+        }
+        try context.save()
+
+        // Held by the screen, with `setType` never loaded — the aged state, forced.
+        var descriptor = FetchDescriptor<WorkoutSet>(
+            predicate: #Predicate { $0.workoutId == workoutId }
+        )
+        descriptor.propertiesToFetch = [\.orderInExercise]
+        let held = try context.fetch(descriptor)
+        XCTAssertEqual(held.count, 200)
+
+        // What `deleteSets(for:)` does: delete every row and commit.
+        for set in held { context.delete(set) }
+        try context.save()
+
+        // Scalars first, as `ChartSetData.init(from:)` reads them.
+        for set in held {
+            _ = set.orderInExercise
+            _ = set.completed
+        }
+        // Then the Codable-backed attribute the report died on.
+        for set in held {
+            _ = set.setType
+        }
+
+        XCTFail(
+            "The control did not crash. Either SwiftData stopped trapping on unresolved attribute "
+                + "faults or this harness stopped leaving `setType` unresolved — in which case "
+                + "DeleteOrderingTests are no longer evidence that anything was fixed."
         )
     }
 }

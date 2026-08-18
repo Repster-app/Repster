@@ -54,7 +54,9 @@ Shipped in 1.3 — these can contain real user data:
 > Plus PostHog's `Application Installed` / `Updated` / `Opened`
 
 All `workout completed` properties listed below — including `access_tier` and
-`remaining_free_workouts` — are already in 1.3.
+`remaining_free_workouts` — are already in 1.3. The **exception** is the thirteen
+in-workout interaction counters (`history_views`, `sets_uncompleted`, …), added
+2026-08-17 and not in 1.3 or 1.4.
 
 **Therefore, until 1.4 ships:** Dashboard 3 (Monetization) and Dashboard 5
 (Health) are fully populated with real data. Dashboard 2 (Core loop) works except
@@ -101,6 +103,39 @@ See gap 8 for what this means for 1.2 and 1.3 data.
 `started` = `completed` + `discarded` + `abandoned` + `resumed`-then-terminal.
 The ratio between those three terminal states is the single most useful health
 number you have.
+
+#### The in-workout interaction tally
+
+All three terminal events (`completed`, `discarded`, `abandoned`) additionally
+carry thirteen **raw integer** counters describing what the user did during the
+session. Counted locally in UserDefaults during the workout and sent once at the
+end — there is deliberately no per-tap event. Added 2026-08-17, so **not in 1.3 or
+1.4**; see `WORKOUT_INTERACTION_TALLY_DESIGN.md`.
+
+| Property | Counts |
+|---|---|
+| `history_views` / `pr_views` / `chart_views` | Opening that per-exercise sub-tab mid-workout |
+| `suggestion_refreshes` | Refreshing the weight suggestion |
+| `exercise_picker_opens` | Opening the add-exercise sheet |
+| `exercise_switches` | Tapping a different exercise tab (taps only, never programmatic jumps) |
+| `exercise_settings_opens` | The gear beside the sub-tab bar |
+| `sets_added` / `sets_deleted` / `sets_uncompleted` | Set edits during the session |
+| `rest_timer_skips` / `rest_timer_adjusts` | Dismissing or ±adjusting a rest |
+| `workout_pauses` | Tapping the clock to pause (not to resume) |
+
+Three things to know before building insights on these:
+
+1. **They are raw ints, not buckets.** Use average/median, and bucket at query
+   time if you want a distribution. Every counter is present on every event
+   including zeros, so averages are over all workouts — which is what you want.
+2. **The first four are the interesting ones.** They measure whether people
+   consult their own training data while training, which is the app's premise and
+   was previously unmeasured. `sets_uncompleted` is the best confusion proxy
+   available: un-ticking a set is someone correcting something.
+3. **There is no ordering or timing.** `history_views: 3` cannot tell you whether
+   they were planning before the first set or diagnosing after a failed one. Use
+   the tally to find the cohort, then session replay to see what happened —
+   e.g. filter to `sets_uncompleted >= 3` and watch ten of those recordings.
 
 ### Activation / depth
 | Event | Key properties | Meaning |

@@ -133,7 +133,12 @@ final class CalendarViewModel {
         for (date, dateWorkoutList) in dateWorkouts {
             var muscleGroups: [String] = []
             for workout in dateWorkoutList {
-                let exerciseIds = try await setService.fetchExerciseIds(for: workout.id)
+                // fetchExerciseIds returns a Set built from an unsorted fetch, so dot order
+                // shuffled between launches. Snapshots come back sorted by orderInWorkout
+                // for the same underlying query.
+                let sets = try await setService.fetchSetSnapshots(for: workout.id)
+                var seenExerciseIds: Set<UUID> = []
+                let exerciseIds = sets.map(\.exerciseId).filter { seenExerciseIds.insert($0).inserted }
                 for exerciseId in exerciseIds {
                     let exercise = try await cachedExercise(exerciseId)
                     if let muscle = ExercisePrimaryGroup.normalizedValue(exercise?.primaryMuscle),

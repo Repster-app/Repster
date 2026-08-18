@@ -18,6 +18,15 @@ protocol AnalyticsServiceProtocol {
         personPropertiesSetOnce: [AnalyticsPropertyKey: AnalyticsPropertyValue]
     )
 
+    /// Counts one in-workout interaction locally; sends nothing. See the extension
+    /// default below for the opt-out reasoning.
+    ///
+    /// Declared here rather than only in the extension for the same dynamic-dispatch
+    /// reason as the overloads above: `AnalyticsService` overrides it to use its own
+    /// injected `UserDefaults`, and an extension-only method would statically bind to
+    /// the default and write to `.standard` instead.
+    func recordWorkoutInteraction(_ interaction: WorkoutInteraction)
+
     /// Handled failures — the ones the app deliberately swallows so a Health write
     /// or a subscription refresh can't take a workout down with it. Crashes are
     /// captured automatically by the SDK; these never would be, because from the
@@ -51,6 +60,17 @@ extension AnalyticsServiceProtocol {
     /// Conformers that only model events (test doubles, `NoopAnalyticsService`)
     /// drop these rather than each having to restate the no-op.
     func captureError(_ error: Error, context: AnalyticsErrorContext) {}
+
+    /// Deliberately records nothing. Only conformers that own a `UserDefaults` can
+    /// implement this meaningfully, and in the app that is `AnalyticsService` alone
+    /// — `NoopAnalyticsService` is opted out by definition. Writing to `.standard`
+    /// here instead would mean every ViewModel test using an analytics spy
+    /// accumulated counters into the real user domain.
+    ///
+    /// Same hazard, and same reasoning, as the person-properties default above: a
+    /// new conformer that should count interactions must override this, or it will
+    /// silently count none.
+    func recordWorkoutInteraction(_ interaction: WorkoutInteraction) {}
 }
 
 /// Where a handled failure came from. A closed list for the same reason
@@ -141,6 +161,11 @@ enum ActiveWorkoutSessionMarker {
         userDefaults.set(date, forKey: startedAtKey)
         userDefaults.set(false, forKey: firstSetLoggedKey)
         userDefaults.set(0, forKey: setCountKey)
+        // This type is the single lifecycle owner for in-flight analytics
+        // bookkeeping. The tally deliberately has no reset of its own to call,
+        // so there is no second place that can disagree about whether a workout
+        // is in flight.
+        WorkoutInteractionTally.reset(userDefaults: userDefaults)
     }
 
     static func startedAt(userDefaults: UserDefaults = .standard) -> Date? {
@@ -176,6 +201,118 @@ enum ActiveWorkoutSessionMarker {
         userDefaults.removeObject(forKey: startedAtKey)
         userDefaults.removeObject(forKey: firstSetLoggedKey)
         userDefaults.removeObject(forKey: setCountKey)
+        WorkoutInteractionTally.reset(userDefaults: userDefaults)
+    }
+}
+
+/// Which in-workout interactions are counted, and the PostHog property name each
+/// arrives under.
+///
+/// Raw values *are* the property names: a matching `AnalyticsPropertyKey` case
+/// must exist for every one of these, and
+/// `testEveryWorkoutInteractionHasAnAnalyticsPropertyKey` fails the build if the
+/// two vocabularies drift. A hand-written `switch` between the two enums would be
+/// thirteen lines that can silently be wrong.
+///
+/// See `WORKOUT_INTERACTION_TALLY_DESIGN.md` for what is deliberately *not* here.
+enum WorkoutInteraction: String, CaseIterable {
+
+    // Consulting your own training data mid-workout. These four are the reason
+    // the tally exists — they measure whether the app's premise holds in a gym.
+
+    case historyViews = "history_views"
+    case prViews = "pr_views"
+    case chartViews = "chart_views"
+    case suggestionRefreshes = "suggestion_refreshes"
+
+    // Navigation churn: how much hunting the screen costs.
+
+    case exercisePickerOpens = "exercise_picker_opens"
+    /// User taps on the exercise tab strip only — never the nine programmatic
+    /// writes to `selectedExerciseIndex`. See `SetTableDataSource
+    /// .recordExerciseTabSelected()`.
+    case exerciseSwitches = "exercise_switches"
+    case exerciseSettingsOpens = "exercise_settings_opens"
+
+    // Corrections. The closest thing to a confusion signal taps can give:
+    // un-ticking a set is someone fixing something.
+
+    case setsUncompleted = "sets_uncompleted"
+    case setsDeleted = "sets_deleted"
+    case setsAdded = "sets_added"
+
+    // Rest timer and workout clock.
+
+    /// Only a hand dismissal. `dismissTimer()` is also the internal cleanup path
+    /// for finish/discard/set-completion, so counting there would add a phantom
+    /// skip to every workout.
+    case restTimerSkips = "rest_timer_skips"
+    case restTimerAdjusts = "rest_timer_adjusts"
+    /// Pauses only, not resumes.
+    case workoutPauses = "workout_pauses"
+}
+
+/// Per-workout interaction counters, accumulated locally and shipped as
+/// properties on whichever terminal event ends the workout.
+///
+/// **Why UserDefaults rather than ViewModel state.** Two of the three terminal
+/// events fire from outside `ActiveWorkoutViewModel` and after it is gone:
+/// `workout abandoned` is emitted by `ContentView` on a *later launch*, and
+/// `workout discarded` also fires from `ContentView.discardActiveAndCopy()`,
+/// which never builds that ViewModel at all. Same trade, same reason, as
+/// `ActiveWorkoutSessionMarker.setCount`.
+///
+/// One key holding `[String: Int]` rather than thirteen keys: one
+/// read-modify-write per increment, one `removeObject` to reset, and a new
+/// counter needs no key bookkeeping.
+enum WorkoutInteractionTally {
+    private static let key = "analyticsActiveWorkoutInteractions"
+
+    /// Route increments through `AnalyticsServiceProtocol.recordWorkoutInteraction(_:)`
+    /// rather than calling this directly — that is where the opt-out gate lives.
+    static func increment(_ interaction: WorkoutInteraction, userDefaults: UserDefaults = .standard) {
+        var counts = stored(userDefaults: userDefaults)
+        counts[interaction.rawValue, default: 0] += 1
+        userDefaults.set(counts, forKey: key)
+    }
+
+    /// Every counter, **zeros included**.
+    ///
+    /// Omitting unused counters would make PostHog average each one over only the
+    /// workouts that used it — "History opens per workout" would silently become
+    /// "per workout that opened History", a number that can only look healthy.
+    static func snapshot(userDefaults: UserDefaults = .standard) -> [WorkoutInteraction: Int] {
+        let counts = stored(userDefaults: userDefaults)
+        return Dictionary(uniqueKeysWithValues: WorkoutInteraction.allCases.map {
+            ($0, counts[$0.rawValue] ?? 0)
+        })
+    }
+
+    /// Raw `Int`, not `AnalyticsBuckets.count`: the mean is the interesting
+    /// statistic here, and PostHog can bucket a numeric property at query time —
+    /// it cannot unbucket `"4-6"`. `prs_hit` is the existing raw-int precedent.
+    ///
+    /// Iterates `allCases` rather than the passed dictionary, so a partial
+    /// dictionary still produces the full property set with zeros. That makes the
+    /// "always send every counter" rule structural at the point the properties are
+    /// built, instead of a promise `snapshot()` alone has to keep.
+    static func properties(
+        from interactions: [WorkoutInteraction: Int]
+    ) -> [AnalyticsPropertyKey: AnalyticsPropertyValue] {
+        var result: [AnalyticsPropertyKey: AnalyticsPropertyValue] = [:]
+        for interaction in WorkoutInteraction.allCases {
+            guard let key = AnalyticsPropertyKey(rawValue: interaction.rawValue) else { continue }
+            result[key] = .int(interactions[interaction] ?? 0)
+        }
+        return result
+    }
+
+    static func reset(userDefaults: UserDefaults = .standard) {
+        userDefaults.removeObject(forKey: key)
+    }
+
+    private static func stored(userDefaults: UserDefaults) -> [String: Int] {
+        userDefaults.dictionary(forKey: key) as? [String: Int] ?? [:]
     }
 }
 
@@ -240,7 +377,8 @@ extension AnalyticsServiceProtocol {
         accessTier: String?,
         remainingFreeWorkouts: Int?,
         rirSetCount: Int,
-        averageRIR: Double?
+        averageRIR: Double?,
+        interactions: [WorkoutInteraction: Int]
     ) {
         var properties: [AnalyticsPropertyKey: AnalyticsPropertyValue] = [
             .durationBucket: .string(AnalyticsBuckets.duration(seconds: durationSeconds)),
@@ -274,6 +412,7 @@ extension AnalyticsServiceProtocol {
         if let averageRIR {
             properties[.averageRirBucket] = .string(AnalyticsBuckets.rir(averageRIR))
         }
+        properties.merge(WorkoutInteractionTally.properties(from: interactions)) { current, _ in current }
         track(.workoutCompleted, properties: properties)
     }
 
@@ -282,7 +421,8 @@ extension AnalyticsServiceProtocol {
         setCount: Int,
         date: Date,
         source: WorkoutStartSource?,
-        templateUsed: Bool?
+        templateUsed: Bool?,
+        interactions: [WorkoutInteraction: Int]
     ) {
         var properties: [AnalyticsPropertyKey: AnalyticsPropertyValue] = [
             .durationBucket: .string(AnalyticsBuckets.duration(seconds: durationSeconds)),
@@ -296,6 +436,7 @@ extension AnalyticsServiceProtocol {
         if let templateUsed {
             properties[.templateUsed] = .bool(templateUsed)
         }
+        properties.merge(WorkoutInteractionTally.properties(from: interactions)) { current, _ in current }
         track(.workoutDiscarded, properties: properties)
     }
 
@@ -400,7 +541,12 @@ extension AnalyticsServiceProtocol {
     /// A workout that was started but never completed or discarded — the user
     /// left the app mid-session and never came back to it. Detected on next
     /// launch, so it always lags the actual abandonment by one app open.
-    func workoutAbandoned(setCount: Int, source: WorkoutStartSource?, templateUsed: Bool?) {
+    func workoutAbandoned(
+        setCount: Int,
+        source: WorkoutStartSource?,
+        templateUsed: Bool?,
+        interactions: [WorkoutInteraction: Int]
+    ) {
         var properties: [AnalyticsPropertyKey: AnalyticsPropertyValue] = [
             .setCountBucket: .string(AnalyticsBuckets.count(setCount))
         ]
@@ -410,6 +556,7 @@ extension AnalyticsServiceProtocol {
         if let templateUsed {
             properties[.templateUsed] = .bool(templateUsed)
         }
+        properties.merge(WorkoutInteractionTally.properties(from: interactions)) { current, _ in current }
         track(.workoutAbandoned, properties: properties)
     }
 
@@ -716,6 +863,22 @@ enum AnalyticsPropertyKey: String, CaseIterable {
     case completedWorkoutCount = "completed_workout_count"
     case elapsedSecondsBucket = "elapsed_seconds_bucket"
     case trigger
+    // In-workout interaction tally. One case per `WorkoutInteraction`, raw values
+    // identical — enforced by `testEveryWorkoutInteractionHasAnAnalyticsPropertyKey`.
+    // Raw ints rather than buckets; see `WorkoutInteractionTally.properties(from:)`.
+    case historyViews = "history_views"
+    case prViews = "pr_views"
+    case chartViews = "chart_views"
+    case suggestionRefreshes = "suggestion_refreshes"
+    case exercisePickerOpens = "exercise_picker_opens"
+    case exerciseSwitches = "exercise_switches"
+    case exerciseSettingsOpens = "exercise_settings_opens"
+    case setsUncompleted = "sets_uncompleted"
+    case setsDeleted = "sets_deleted"
+    case setsAdded = "sets_added"
+    case restTimerSkips = "rest_timer_skips"
+    case restTimerAdjusts = "rest_timer_adjusts"
+    case workoutPauses = "workout_pauses"
     // Attribution. Set as person properties (see `AnalyticsAttributionReporter`),
     // which is why they can be filtered on events that predate resolution.
     case acquisitionChannel = "acquisition_channel"

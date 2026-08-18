@@ -5,58 +5,75 @@ import SwiftData
 @MainActor
 final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
 
-    func testRunningTimerUsesFullPresentationWhenKeyboardHidden() {
-        let mode = ActiveWorkoutBottomAccessoryLayout.timerPresentationMode(
-            for: .running(remaining: 90, total: 120),
-            isKeyboardVisible: false
-        )
+    // MARK: - Rest timer visibility
+    //
+    // The timer had a full and a compact height, and these tests pinned which one the keyboard
+    // selected. It is one height now, so the only rule left to protect is the `.finished` one —
+    // and that is the rule most easily lost, because it looks like sizing logic and isn't.
 
-        XCTAssertEqual(mode, .full)
+    func testRunningTimerIsVisibleWhenKeyboardHidden() {
+        XCTAssertTrue(
+            ActiveWorkoutBottomAccessoryLayout.shouldShowRestTimer(
+                for: .running(remaining: 90, total: 120),
+                isKeyboardVisible: false
+            )
+        )
     }
 
-    func testRunningTimerUsesCompactPresentationWhenKeyboardVisible() {
-        let mode = ActiveWorkoutBottomAccessoryLayout.timerPresentationMode(
-            for: .running(remaining: 90, total: 120),
-            isKeyboardVisible: true
+    func testRunningTimerStaysVisibleWhenKeyboardVisible() {
+        XCTAssertTrue(
+            ActiveWorkoutBottomAccessoryLayout.shouldShowRestTimer(
+                for: .running(remaining: 90, total: 120),
+                isKeyboardVisible: true
+            )
         )
-
-        XCTAssertEqual(mode, .compact)
     }
 
-    func testPausedTimerUsesFullPresentationWhenKeyboardHidden() {
-        let mode = ActiveWorkoutBottomAccessoryLayout.timerPresentationMode(
-            for: .paused(remaining: 90, total: 120, source: .manual),
-            isKeyboardVisible: false
+    func testPausedTimerIsVisibleWhenKeyboardHidden() {
+        XCTAssertTrue(
+            ActiveWorkoutBottomAccessoryLayout.shouldShowRestTimer(
+                for: .paused(remaining: 90, total: 120, source: .manual),
+                isKeyboardVisible: false
+            )
         )
-
-        XCTAssertEqual(mode, .full)
     }
 
-    func testPausedTimerUsesCompactPresentationWhenKeyboardVisible() {
-        let mode = ActiveWorkoutBottomAccessoryLayout.timerPresentationMode(
-            for: .paused(remaining: 90, total: 120, source: .manual),
-            isKeyboardVisible: true
+    func testPausedTimerStaysVisibleWhenKeyboardVisible() {
+        XCTAssertTrue(
+            ActiveWorkoutBottomAccessoryLayout.shouldShowRestTimer(
+                for: .paused(remaining: 90, total: 120, source: .manual),
+                isKeyboardVisible: true
+            )
         )
-
-        XCTAssertEqual(mode, .compact)
     }
 
-    func testFinishedTimerUsesFullPresentationWhenKeyboardHidden() {
-        let mode = ActiveWorkoutBottomAccessoryLayout.timerPresentationMode(
-            for: .finished,
-            isKeyboardVisible: false
+    func testIdleTimerIsHidden() {
+        XCTAssertFalse(
+            ActiveWorkoutBottomAccessoryLayout.shouldShowRestTimer(
+                for: .idle,
+                isKeyboardVisible: false
+            )
         )
-
-        XCTAssertEqual(mode, .full)
     }
 
+    func testFinishedTimerIsVisibleWhenKeyboardHidden() {
+        XCTAssertTrue(
+            ActiveWorkoutBottomAccessoryLayout.shouldShowRestTimer(
+                for: .finished,
+                isKeyboardVisible: false
+            )
+        )
+    }
+
+    /// "Rest complete" must not appear while the set keypad is open: the message is redundant
+    /// mid-entry, and the bar sliding in would push the keypad under a thumb already in motion.
     func testFinishedTimerIsHiddenWhenKeyboardVisible() {
-        let mode = ActiveWorkoutBottomAccessoryLayout.timerPresentationMode(
-            for: .finished,
-            isKeyboardVisible: true
+        XCTAssertFalse(
+            ActiveWorkoutBottomAccessoryLayout.shouldShowRestTimer(
+                for: .finished,
+                isKeyboardVisible: true
+            )
         )
-
-        XCTAssertNil(mode)
     }
 
     // MARK: - Reindexing is one batched write, not N pipeline runs (Stage 2 step 4)
@@ -3970,6 +3987,224 @@ private struct TestContext {
     let secondExercise: Exercise?
 }
 
+// MARK: - Delete Ordering
+
+/// The screen must stop pointing at a row *before* the row leaves the store.
+///
+/// A deleted SwiftData model traps inside `getValue` on any persisted-property read, and the main
+/// actor keeps rendering throughout a delete: the workout clock invalidates every observer once a
+/// second, and the summary sheet's own `isDiscarding` write queues a re-render immediately before
+/// the await. Shipped as an `EXC_BREAKPOINT` in 1.4 (4) — discard from the summary sheet,
+/// `computeSummary()` mapped `setsByExercise` into `ChartSetData` mid-delete, and
+/// `WorkoutSet.setType` trapped.
+///
+/// These tests observe the ViewModel from *inside* the service call, because the ordering is only
+/// visible while the delete is in flight; asserting on the end state passes either way.
+/// Background in `DISCARD_USE_AFTER_DELETE_SCOPING.md`.
+@MainActor
+final class DeleteOrderingTests: XCTestCase {
+
+    /// What the screen held while a delete was in flight.
+    private final class MidDeleteObservation {
+        var observed = false
+        var workoutIsNil = false
+        var exercisesAreEmpty = false
+        var setsAreEmpty = false
+        var exerciseIdsOnScreen: [UUID] = []
+        var setIdsOnScreen: [UUID] = []
+    }
+
+    private struct DeleteFailure: Error {}
+
+    // MARK: Discard
+
+    func testDiscardDropsScreenStateBeforeTheWorkoutIsDeleted() async throws {
+        let harness = makeHarness()
+        let seeded = seed(into: harness)
+
+        let observation = MidDeleteObservation()
+        harness.workoutService.onDeleteWorkout = { [viewModel = harness.viewModel] _ in
+            observation.observed = true
+            observation.workoutIsNil = viewModel.workout == nil
+            observation.exercisesAreEmpty = viewModel.exercises.isEmpty
+            observation.setsAreEmpty = viewModel.setsByExercise.isEmpty
+        }
+
+        await harness.viewModel.discardWorkout()
+
+        XCTAssertTrue(observation.observed, "deleteWorkout was never reached")
+        XCTAssertTrue(
+            observation.workoutIsNil,
+            "The sheet could still read a live Workout (title, id) while its row was being deleted"
+        )
+        XCTAssertTrue(observation.exercisesAreEmpty, "The tab strip could still read the exercises")
+        XCTAssertTrue(
+            observation.setsAreEmpty,
+            "computeSummary() could still map sets whose rows are gone — this is the shipped crash"
+        )
+        XCTAssertEqual(harness.workoutService.deletedWorkoutIds, [seeded.workoutId])
+        XCTAssertTrue(harness.viewModel.isWorkoutFinished)
+    }
+
+    func testAFailedDiscardPutsTheWorkoutBackOnScreen() async throws {
+        let harness = makeHarness()
+        let seeded = seed(into: harness)
+        harness.workoutService.deleteWorkoutError = DeleteFailure()
+
+        await harness.viewModel.discardWorkout()
+
+        XCTAssertFalse(harness.viewModel.isWorkoutFinished, "A failed discard must not dismiss the screen")
+        XCTAssertEqual(
+            harness.viewModel.workout?.id,
+            seeded.workoutId,
+            "State is cleared before the delete, so a failure has to reload it from the store"
+        )
+        XCTAssertEqual(harness.viewModel.setsByExercise[seeded.exerciseId]?.count, 2)
+        XCTAssertEqual(harness.viewModel.exercises.count, 2)
+    }
+
+    // MARK: Exercise removal
+
+    func testRemovingAnExerciseTakesItOffScreenBeforeDeletingItsSets() async throws {
+        let harness = makeHarness()
+        let seeded = seed(into: harness)
+
+        // The loop awaits once per set; the first call is the earliest observable point.
+        let observation = MidDeleteObservation()
+        harness.setService.onDelete = { [viewModel = harness.viewModel] _ in
+            guard !observation.observed else { return }
+            observation.observed = true
+            observation.exerciseIdsOnScreen = viewModel.exercises.map(\.id)
+            observation.setIdsOnScreen = viewModel.setsByExercise.values.flatMap { $0 }.map(\.id)
+        }
+
+        await harness.viewModel.removeExercise(at: 0)
+
+        XCTAssertTrue(observation.observed, "no set was deleted")
+        XCTAssertFalse(
+            observation.exerciseIdsOnScreen.contains(seeded.exerciseId),
+            "ExerciseTabStripView reads every exercise's sets on every render, including mid-loop"
+        )
+        XCTAssertTrue(
+            Set(observation.setIdsOnScreen).isDisjoint(with: seeded.setIds),
+            "The removed exercise's rows were still reachable while they were being deleted"
+        )
+        XCTAssertEqual(harness.setService.deletedSetIds.count, 2)
+    }
+
+    // MARK: Single set
+
+    func testDeletingASetTakesItOffScreenBeforeTheServiceCall() async throws {
+        let harness = makeHarness()
+        let seeded = seed(into: harness)
+        let target = try XCTUnwrap(harness.viewModel.setsByExercise[seeded.exerciseId]?.first)
+
+        let observation = MidDeleteObservation()
+        harness.setService.onDelete = { [viewModel = harness.viewModel] _ in
+            observation.observed = true
+            observation.setIdsOnScreen = viewModel.currentSets.map(\.id)
+        }
+
+        await harness.viewModel.deleteSet(target)
+
+        XCTAssertTrue(observation.observed, "delete was never reached")
+        XCTAssertFalse(
+            observation.setIdsOnScreen.contains(target.id),
+            "SetTableView could still render the row while its PR and stats pipeline ran"
+        )
+        XCTAssertEqual(observation.setIdsOnScreen.count, 1, "the surviving row should still be on screen")
+    }
+
+    // MARK: - Harness
+
+    private struct Harness {
+        let viewModel: ActiveWorkoutViewModel
+        let workoutService: WorkoutServiceStub
+        let setService: SetServiceStub
+        let exerciseService: ExerciseServiceStub
+    }
+
+    private struct Seeded {
+        let workoutId: UUID
+        let exerciseId: UUID
+        let setIds: Set<UUID>
+    }
+
+    private func makeHarness() -> Harness {
+        let profile = HealthProfile()
+        let workoutService = WorkoutServiceStub()
+        let setService = SetServiceStub()
+        let exerciseService = ExerciseServiceStub()
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: workoutService,
+            setService: setService,
+            exerciseService: exerciseService,
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            analyticsService: AnalyticsServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+        return Harness(
+            viewModel: viewModel,
+            workoutService: workoutService,
+            setService: setService,
+            exerciseService: exerciseService
+        )
+    }
+
+    /// Two exercises, two sets on the first and one on the second, in both the ViewModel and the
+    /// stubs — the stub side is what the failure path reloads from.
+    private func seed(into harness: Harness) -> Seeded {
+        let workout = Workout(id: UUID(), date: Date(), status: .inProgress)
+        let first = makeExercise(name: "Back Squat")
+        let second = makeExercise(name: "Bench Press")
+
+        let firstSets = [
+            makeSet(workoutId: workout.id, exerciseId: first.id, order: 1),
+            makeSet(workoutId: workout.id, exerciseId: first.id, order: 2)
+        ]
+        let secondSets = [makeSet(workoutId: workout.id, exerciseId: second.id, order: 3)]
+
+        harness.workoutService.activeWorkout = workout
+        harness.setService.workoutSets[workout.id] = firstSets + secondSets
+        harness.exerciseService.fetchedExercises[first.id] = first
+        harness.exerciseService.fetchedExercises[second.id] = second
+
+        harness.viewModel.workout = workout
+        harness.viewModel.exercises = [ChartExerciseData(from: first), ChartExerciseData(from: second)]
+        harness.viewModel.setsByExercise = [first.id: firstSets, second.id: secondSets]
+        harness.viewModel.selectedExerciseIndex = 0
+
+        return Seeded(workoutId: workout.id, exerciseId: first.id, setIds: Set(firstSets.map(\.id)))
+    }
+
+    private func makeExercise(name: String) -> Exercise {
+        Exercise(
+            name: name,
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            weightIncrement: 2.5,
+            defaultRestTime: 120
+        )
+    }
+
+    private func makeSet(workoutId: UUID, exerciseId: UUID, order: Int) -> WorkoutSet {
+        WorkoutSet(
+            workoutId: workoutId,
+            exerciseId: exerciseId,
+            weight: 100,
+            reps: 5,
+            rir: 2.0,
+            orderInWorkout: order,
+            orderInExercise: order,
+            completed: true
+        )
+    }
+}
+
 private final class WorkoutHistoryBackupServiceStub: @unchecked Sendable, WorkoutHistoryBackupServiceProtocol {
     var exportData = Data("backup".utf8)
     var previewResult = WorkoutHistoryBackupPreview(
@@ -4221,6 +4456,12 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
     var fetchSetsForExerciseCallCount = 0
     /// One entry per `applyOrdering` call — reindexing must issue a single batch, not N.
     var orderingBatches: [[SetOrderUpdate]] = []
+    /// Runs on the main actor *inside* `delete`, before it returns. The only way to observe what
+    /// the screen still holds while a delete is in flight — which is where the row is already gone
+    /// from the store but the ViewModel may still be handing it to a view body.
+    var onDelete: (@MainActor (UUID) async -> Void)?
+    /// When set, `delete` throws it after the gate runs, to drive the failure path.
+    var deleteError: Error?
 
     func save(_ set: WorkoutSet) async throws -> SetSaveResult {
         SetSaveResult(
@@ -4349,6 +4590,8 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
 
     func delete(_ set: WorkoutSet) async throws -> PREvaluationResult {
         deletedSetIds.append(set.id)
+        await onDelete?(set.id)
+        if let deleteError { throw deleteError }
         return PREvaluationResult(
             setId: set.id,
             newStatus: nil,
@@ -4428,6 +4671,11 @@ private final class WorkoutServiceStub: @unchecked Sendable, WorkoutServiceProto
     var lastFinishPerceivedEffort: Double?
     var lastFinishDurationSecondsOverride: Int?
     var finishCallCount = 0
+    var deletedWorkoutIds: [UUID] = []
+    /// Runs on the main actor *inside* `deleteWorkout`. See `SetServiceStub.onDelete`.
+    var onDeleteWorkout: (@MainActor (UUID) async -> Void)?
+    /// When set, `deleteWorkout` throws it after the gate runs, to drive the failure path.
+    var deleteWorkoutError: Error?
 
     func startWorkout(options: WorkoutStartOptions) async throws -> Workout {
         Workout(
@@ -4494,7 +4742,9 @@ private final class WorkoutServiceStub: @unchecked Sendable, WorkoutServiceProto
         let _ = excludedExerciseIds
     }
     func deleteWorkout(_ workoutId: UUID) async throws {
-        let _ = workoutId
+        deletedWorkoutIds.append(workoutId)
+        await onDeleteWorkout?(workoutId)
+        if let deleteWorkoutError { throw deleteWorkoutError }
     }
 }
 

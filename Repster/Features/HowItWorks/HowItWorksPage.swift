@@ -5,6 +5,23 @@
 // used to ask for a target RIR before the user had logged a set — a decision with nothing
 // to base it on — and the fix was to delete that question, not to move it in here behind
 // an explanation.
+//
+// ---------------------------------------------------------------------------------------
+// EDITING THE WALKTHROUGH
+//
+// Wording:      the `title` and `caption` switches below. One line each, nothing else
+//               references them.
+//
+// Picture:      drop an image into Assets.xcassets named exactly `assetName` — so
+//               `howitworks-logSet` replaces page 2's drawing. No code change: the view
+//               prefers an asset when one exists and falls back to the built illustration
+//               when it doesn't. Design for a 210pt-tall box on a dark background.
+//
+// Order:        the declaration order of the cases below is the page order.
+//
+// Add / remove: add or delete a case. Everything — the dots, "n of 7", the page-viewed
+//               events — counts off `allCases`, so nothing else needs touching.
+// ---------------------------------------------------------------------------------------
 
 import Foundation
 
@@ -54,6 +71,11 @@ enum HowItWorksPage: String, CaseIterable, Identifiable {
             return "Chart any exercise or muscle group over any window, and watch the line go where you want it."
         }
     }
+
+    /// Asset catalog name that overrides this page's drawn illustration, if it exists.
+    /// Nothing has to be added for a page to work — this is the escape hatch for pages
+    /// where a real picture beats a diagram.
+    var assetName: String { "howitworks-\(rawValue)" }
 
     var analyticsName: String { rawValue }
 

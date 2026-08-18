@@ -84,4 +84,18 @@ enum ExerciseSubTab: String, CaseIterable {
     case history = "History"
     case prs = "PRs"
     case charts = "Charts"
+
+    /// Which in-workout interaction counter opening this tab increments.
+    ///
+    /// `nil` for `.sets`, which is the default tab and is also returned to
+    /// automatically on every exercise switch — counting it would measure the
+    /// exercise count, not a decision to look at anything.
+    var analyticsInteraction: WorkoutInteraction? {
+        switch self {
+        case .sets: return nil
+        case .history: return .historyViews
+        case .prs: return .prViews
+        case .charts: return .chartViews
+        }
+    }
 }

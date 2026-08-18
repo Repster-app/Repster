@@ -5,8 +5,7 @@
 import SwiftUI
 
 struct CopyPreviousSheet: View {
-    let workouts: [CopyPreviousWorkout]
-    let unitPreference: UnitPreference
+    let services: ServiceContainer
     @Binding var showDiscardConfirmation: Bool
     let onWorkoutSelected: (UUID) -> Void
     let onDiscardAndCopy: () -> Void
@@ -14,10 +13,23 @@ struct CopyPreviousSheet: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    /// Loaded inside the sheet rather than handed in by the presenter: the list used to be
+    /// fetched while the Start Workout sheet was still dismissing, and the sheet came up
+    /// showing whatever the presenter's state held at that moment — nothing, on first open.
+    @State private var workouts: [CopyPreviousWorkout] = []
+    @State private var isLoading = true
+
+    /// Copying is a recency habit — people repeat last week's session, not one from eight
+    /// months ago. Every workout past this cap costs a set fetch to build a card nobody
+    /// scrolls to. Finding an old session wants search, not a longer list.
+    private static let workoutLimit = 30
+
     var body: some View {
         NavigationStack {
             Group {
-                if workouts.isEmpty {
+                if isLoading {
+                    loadingState
+                } else if workouts.isEmpty {
                     emptyState
                 } else {
                     workoutList
@@ -48,6 +60,7 @@ struct CopyPreviousSheet: View {
             }
         }
         .preferredColorScheme(.dark)
+        .task { await loadWorkouts() }
     }
 
     // MARK: - Workout List
@@ -87,22 +100,31 @@ struct CopyPreviousSheet: View {
                 Text("\(workout.setCount) sets")
                 if let primaryMetric = workout.primaryMetric {
                     Text("\u{00B7}")
-                    Text(primaryMetric.formattedValue(unitPreference: unitPreference))
+                    Text(primaryMetric.formattedValue(unitPreference: services.unitPreference))
                 }
             }
             .font(.system(size: 12, weight: .medium))
             .foregroundStyle(Color.textTertiary)
 
+            // Same flowing tags as the home screen's recent workout cards — an HStack here
+            // squeezed the wider names until they wrapped mid-word ("Shoulder / s").
             if !workout.muscleGroups.isEmpty {
-                HStack(spacing: 6) {
+                FlowLayout(spacing: 6) {
                     ForEach(workout.muscleGroups, id: \.self) { muscle in
-                        Text(ExercisePrimaryGroup.displayName(for: muscle))
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Color.textSecondary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.bgSubtle)
-                            .cornerRadius(6)
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(MuscleGroupColors.color(for: muscle))
+                                .frame(width: 4, height: 4)
+                            Text(ExercisePrimaryGroup.displayName(for: muscle))
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Color.textSecondary)
+                                .lineLimit(1)
+                                .fixedSize()
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.bgSubtle)
+                        .cornerRadius(6)
                     }
                 }
             }
@@ -113,7 +135,14 @@ struct CopyPreviousSheet: View {
         .cornerRadius(14)
     }
 
-    // MARK: - Empty State
+    // MARK: - Placeholder States
+
+    @ViewBuilder
+    private var loadingState: some View {
+        ProgressView()
+            .tint(Color.textTertiary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
 
     @ViewBuilder
     private var emptyState: some View {
@@ -123,6 +152,76 @@ struct CopyPreviousSheet: View {
                 .foregroundStyle(Color.textTertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Loading
+
+    @MainActor
+    private func loadWorkouts() async {
+        defer { isLoading = false }
+        do {
+            let allWorkouts = try await services.workoutService.fetchAllWorkoutSummaries(limit: nil, offset: nil)
+            // Capped after the status filter, not via fetchAllWorkoutSummaries(limit:) —
+            // limiting the query would cap the pre-filter set and silently drop completed
+            // workouts behind any in-progress ones.
+            let completed = allWorkouts
+                .filter { $0.status == .completed }
+                .sorted { $0.date > $1.date }
+                .prefix(Self.workoutLimit)
+
+            // A lifter rotates a few dozen exercises, so the same ones recur in almost every
+            // workout. Without this each one is refetched per workout it appears in.
+            var exerciseCache: [UUID: ChartExerciseData] = [:]
+            var items: [CopyPreviousWorkout] = []
+            for workout in completed {
+                let sets = try await services.setService.fetchSetSnapshots(for: workout.id)
+                let workingSetsWithData = sets.filter { $0.setType == .working && $0.hasData }
+                // First-appearance order, not Set order. Sets come back sorted by
+                // orderInWorkout, so this lists muscles in the order they were trained —
+                // and stays put between launches, which Set iteration does not.
+                var seenExerciseIds: Set<UUID> = []
+                let exerciseIds = sets.map(\.exerciseId).filter { seenExerciseIds.insert($0).inserted }
+
+                var exerciseLookup: [UUID: ChartExerciseData] = [:]
+                var muscleGroups: [String] = []
+                for exerciseId in exerciseIds {
+                    let exercise: ChartExerciseData?
+                    if let cached = exerciseCache[exerciseId] {
+                        exercise = cached
+                    } else {
+                        // Misses aren't cached — a nil here means a deleted exercise, which
+                        // is rare enough not to be worth an optional-of-optional dictionary.
+                        exercise = try await services.exerciseService.fetchExerciseSnapshot(exerciseId)
+                        if let exercise { exerciseCache[exerciseId] = exercise }
+                    }
+                    guard let exercise else { continue }
+
+                    exerciseLookup[exerciseId] = exercise
+                    if let muscle = ExercisePrimaryGroup.normalizedValue(exercise.primaryMuscle),
+                       !muscleGroups.contains(muscle) {
+                        muscleGroups.append(muscle)
+                    }
+                }
+                let aggregate = WorkoutAggregateSummary.summarize(
+                    sets: workingSetsWithData,
+                    exercisesById: exerciseLookup
+                )
+
+                items.append(CopyPreviousWorkout(
+                    id: workout.id,
+                    displayTitle: workout.displayTitle,
+                    date: workout.date,
+                    exerciseCount: exerciseIds.count,
+                    setCount: workingSetsWithData.count,
+                    primaryMetric: aggregate.primaryMetric,
+                    muscleGroups: muscleGroups
+                ))
+            }
+
+            workouts = items
+        } catch {
+            dbg("[CopyPreviousSheet] Failed to load workouts: \(error)")
+        }
     }
 
     // MARK: - Formatting

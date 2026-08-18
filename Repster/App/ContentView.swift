@@ -81,9 +81,6 @@ struct ContentView: View {
     /// Whether the Copy Previous sheet is shown (from StartWorkoutSheet).
     @State private var showCopyPreviousSheet = false
 
-    /// Loaded copy previous workouts for the sheet.
-    @State private var copyPreviousWorkouts: [CopyPreviousWorkout] = []
-
     /// Whether the discard confirmation is shown in copy previous flow.
     @State private var showDiscardConfirmation = false
 
@@ -95,6 +92,14 @@ struct ContentView: View {
 
     /// Whether the templates flow should open after StartWorkoutSheet dismisses.
     @State private var pendingTemplateFlow = false
+
+    /// Whether the Copy Previous sheet should open after StartWorkoutSheet dismisses.
+    @State private var pendingCopyPreviousFlow = false
+
+    /// Whether StartWorkoutSheet has finished animating out. The copy-previous handoff is
+    /// queued behind an async access check that can outlive the dismissal, so whichever of
+    /// the two finishes last is the one that presents.
+    @State private var startWorkoutSheetDidDismiss = false
 
     /// Whether the full-screen templates flow is presented.
     @State private var showTemplateFlow = false
@@ -254,6 +259,9 @@ struct ContentView: View {
                 }
             }
         }
+        .onChange(of: showStartWorkoutSheet) { _, isShowing in
+            if isShowing { startWorkoutSheetDidDismiss = false }
+        }
         .onChange(of: showExerciseList) { _, isShowing in
             if !isShowing {
                 homeRefreshTrigger = UUID()
@@ -322,11 +330,16 @@ struct ContentView: View {
                 )
             }
         }
+        // Both follow-on flows wait for this sheet to finish dismissing. Presenting while
+        // another sheet is still animating out is dropped by UIKit and re-presented from a
+        // stale snapshot.
         .sheet(isPresented: $showStartWorkoutSheet, onDismiss: {
             if pendingTemplateFlow {
                 pendingTemplateFlow = false
                 showTemplateFlow = true
             }
+            startWorkoutSheetDidDismiss = true
+            presentCopyPreviousIfReady()
         }) {
             StartWorkoutSheet(
                 accessMessage: workoutAccessMessage,
@@ -345,8 +358,7 @@ struct ContentView: View {
             pendingWorkoutStartOptions = nil
         }) {
             CopyPreviousSheet(
-                workouts: copyPreviousWorkouts,
-                unitPreference: services.unitPreference,
+                services: services,
                 showDiscardConfirmation: $showDiscardConfirmation,
                 onWorkoutSelected: { workoutId in
                     Task { await copyWorkout(workoutId) }
@@ -475,7 +487,18 @@ struct ContentView: View {
     private func beginCopyPreviousFlow(options: WorkoutStartOptions) async {
         guard await ensureWorkoutCreationAccess() else { return }
         pendingWorkoutStartOptions = options
-        await loadCopyPreviousWorkouts()
+        // The sheet loads its own list once it's on screen; this only queues the handoff.
+        pendingCopyPreviousFlow = true
+        presentCopyPreviousIfReady()
+    }
+
+    /// Present the Copy Previous sheet once the flow is queued *and* StartWorkoutSheet has
+    /// finished dismissing. Called from both sides so the later one wins; presenting into a
+    /// sheet that is still animating out is what left the list empty on first open.
+    @MainActor
+    private func presentCopyPreviousIfReady() {
+        guard pendingCopyPreviousFlow, startWorkoutSheetDidDismiss else { return }
+        pendingCopyPreviousFlow = false
         showCopyPreviousSheet = true
     }
 
@@ -538,54 +561,6 @@ struct ContentView: View {
 
     // MARK: - Copy Previous
 
-    /// Load completed workouts for the Copy Previous sheet.
-    @MainActor
-    private func loadCopyPreviousWorkouts() async {
-        do {
-            let allWorkouts = try await services.workoutService.fetchAllWorkoutSummaries(limit: nil, offset: nil)
-            let completed = allWorkouts
-                .filter { $0.status == .completed }
-                .sorted { $0.date > $1.date }
-
-            var items: [CopyPreviousWorkout] = []
-            for workout in completed {
-                let sets = try await services.setService.fetchSetSnapshots(for: workout.id)
-                let workingSetsWithData = sets.filter { $0.setType == .working && $0.hasData }
-                let exerciseIds = Set(sets.map(\.exerciseId))
-
-                var exerciseLookup: [UUID: ChartExerciseData] = [:]
-                var muscleGroups: [String] = []
-                for exerciseId in exerciseIds {
-                    if let exercise = try await services.exerciseService.fetchExerciseSnapshot(exerciseId) {
-                        exerciseLookup[exerciseId] = exercise
-                        if let muscle = ExercisePrimaryGroup.normalizedValue(exercise.primaryMuscle),
-                           !muscleGroups.contains(muscle) {
-                            muscleGroups.append(muscle)
-                        }
-                    }
-                }
-                let aggregate = WorkoutAggregateSummary.summarize(
-                    sets: workingSetsWithData,
-                    exercisesById: exerciseLookup
-                )
-
-                items.append(CopyPreviousWorkout(
-                    id: workout.id,
-                    displayTitle: workout.displayTitle,
-                    date: workout.date,
-                    exerciseCount: exerciseIds.count,
-                    setCount: workingSetsWithData.count,
-                    primaryMetric: aggregate.primaryMetric,
-                    muscleGroups: muscleGroups
-                ))
-            }
-
-            copyPreviousWorkouts = items
-        } catch {
-            dbg("[ContentView] Failed to load copy previous workouts: \(error)")
-        }
-    }
-
     /// Copy a past workout. If an active workout exists, triggers confirmation dialog.
     @MainActor
     private func copyWorkout(_ workoutId: UUID) async {
@@ -615,7 +590,8 @@ struct ContentView: View {
                     setCount: activeSets.count,
                     date: activeWorkout.date,
                     source: priorContext.source,
-                    templateUsed: priorContext.templateUsed
+                    templateUsed: priorContext.templateUsed,
+                    interactions: WorkoutInteractionTally.snapshot()
                 )
                 WorkoutStartContextStore.clear()
                 try await services.workoutService.deleteWorkout(activeWorkout.id)
@@ -742,7 +718,11 @@ struct ContentView: View {
         services.analyticsService.workoutAbandoned(
             setCount: ActiveWorkoutSessionMarker.setCount(),
             source: context.source,
-            templateUsed: context.templateUsed
+            templateUsed: context.templateUsed,
+            // Survives the app being killed, which is the whole reason the tally
+            // lives in UserDefaults: this is the population whose behaviour matters
+            // most and the only one with no live ViewModel to ask.
+            interactions: WorkoutInteractionTally.snapshot()
         )
         ActiveWorkoutSessionMarker.clear()
     }

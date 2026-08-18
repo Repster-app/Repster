@@ -1,33 +1,40 @@
 // RestTimerView.swift
-// Visual rest timer with countdown, progress ring, and action buttons.
+// Visual rest timer rendered as a full-width band with a hairline progress rule.
 // Spec: FR-006 (Rest timer auto-starts after set completion)
 // Contract: WP06 T029
 //
-// Displays a countdown bar at the bottom of the active workout screen.
-// States: idle (hidden), running (countdown + controls), finished (completion message).
+// Displays one 45pt edge-to-edge band at the bottom of the active workout screen.
+// States: idle (hidden), running/paused (countdown + controls), finished (completion message).
 // Pure presentational — receives state and callbacks.
 
 import SwiftUI
 
-/// Displays the rest timer as a horizontal bar with progress ring, countdown, and controls.
+/// Displays the rest timer as a full-width band topped by a 2pt progress rule.
 ///
-/// Hidden when state is `.idle`. Shows countdown with +30s and dismiss buttons when
-/// `.running`. Shows "Rest complete" message when `.finished`.
+/// The rule doubles as the separator between the band and the set list: it is drawn in
+/// `Color.border` across the full width, with the elapsed portion overpainted in accent.
+/// Progress therefore reads as its own object rather than a tint washed behind the text,
+/// which is what made an earlier draining-fill version illegible — a 10% accent fill over
+/// `bgSubtle` is only a ~2% luminance step.
+///
+/// The band runs edge to edge and sits flush to the bottom so it reads as part of the screen
+/// rather than a card floating on it. At 45pt it replaces a 108pt two-row layout.
+///
+/// Controls, left to right: the countdown (tap to set an exact duration), then −15s, +15s,
+/// pause/resume and dismiss. ±30s is two taps of ±15s; the long-press alternative was rejected
+/// as undiscoverable mid-set.
 struct RestTimerView: View {
 
     /// Current timer state from the ViewModel.
     let state: RestTimerState
 
-    /// Layout mode for the timer while the set-entry keyboard is active or hidden.
-    let presentationMode: RestTimerPresentationMode
-
-    /// Called when the user taps a positive time adjustment (+15s, +30s).
+    /// Called when the user taps a positive time adjustment (+15s).
     let onAddTime: (Int) -> Void
 
-    /// Called when the user taps a negative time adjustment (-15s, -30s).
+    /// Called when the user taps a negative time adjustment (-15s).
     let onSubtractTime: (Int) -> Void
 
-    /// Called when the user sets an exact duration via the edit button.
+    /// Called when the user sets an exact duration by tapping the countdown.
     let onSetDuration: (Int) -> Void
 
     /// Called when the user toggles the rest timer between running and paused.
@@ -42,61 +49,98 @@ struct RestTimerView: View {
     /// Text for the exact time input.
     @State private var exactTimeText = ""
 
+    /// Height of the progress rule along the top edge.
+    private static let ruleHeight: CGFloat = 2
+
+    /// Height of the control row beneath the rule.
+    private static let rowHeight: CGFloat = 43
+
     var body: some View {
         switch state {
         case .idle:
             EmptyView()
 
         case .running(let remaining, let total):
-            timerContent(remaining: remaining, total: total, pauseSource: nil)
+            band(remaining: remaining, total: total, pauseSource: nil)
 
         case .paused(let remaining, let total, let source):
-            timerContent(remaining: remaining, total: total, pauseSource: source)
+            band(remaining: remaining, total: total, pauseSource: source)
 
         case .finished:
-            if presentationMode == .compact {
-                EmptyView()
-            } else {
-                finishedContent
-            }
+            finishedBand
         }
     }
 
-    // MARK: - Running State
+    // MARK: - Running / Paused
 
-    /// Countdown display with progress ring, time, adjustment buttons, and dismiss.
-    private func timerContent(
+    /// The countdown band: progress rule on top, controls beneath.
+    private func band(
         remaining: Int,
         total: Int,
         pauseSource: RestTimerPauseSource?
     ) -> some View {
-        VStack(spacing: presentationMode == .full ? 8 : 0) {
-            timerHeader(remaining: remaining, total: total, pauseSource: pauseSource)
-
-            if presentationMode == .full {
-                HStack(spacing: 6) {
-                    timerAdjustButton("-30s") { onSubtractTime(30) }
-                    timerAdjustButton("-15s") { onSubtractTime(15) }
-                    timerAdjustButton("+15s") { onAddTime(15) }
-                    timerAdjustButton("+30s") { onAddTime(30) }
-
-                    Button {
-                        exactTimeText = "\(remaining)"
-                        showTimeEditor = true
-                    } label: {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.textSecondary)
-                            .frame(width: 36, height: 32)
-                            .background(Color.bgSubtle)
-                            .cornerRadius(8)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
+        let isPaused = pauseSource != nil
+        let progress = total > 0
+            ? max(0, min(1, CGFloat(remaining) / CGFloat(total)))
+            : 0
+        // The workout clock owning the pause means this timer cannot be resumed from here.
+        let pauseButtonEnabled = pauseSource != .workout
+        let pauseButtonIcon = pauseSource == .manual ? "play.fill" : "pause.fill"
+        let pauseButtonLabel: String
+        switch pauseSource {
+        case .manual:
+            pauseButtonLabel = "Resume rest timer"
+        case .workout:
+            pauseButtonLabel = "Rest timer paused with workout"
+        case .none:
+            pauseButtonLabel = "Pause rest timer"
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, presentationMode == .full ? 12 : 10)
+
+        return VStack(spacing: 0) {
+            progressRule(progress: progress, color: isPaused ? .textSecondary : .accent)
+
+            HStack(spacing: 8) {
+                Button {
+                    exactTimeText = "\(remaining)"
+                    showTimeEditor = true
+                } label: {
+                    Text(formatTime(remaining))
+                        .font(.system(size: 24, weight: .bold, design: .monospaced))
+                        .foregroundColor(isPaused ? .textSecondary : .textPrimary)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Rest time remaining \(formatTime(remaining))")
+                .accessibilityHint("Tap to set an exact rest time")
+
+                Spacer(minLength: 4)
+
+                adjustButton("-15s") { onSubtractTime(15) }
+                adjustButton("+15s") { onAddTime(15) }
+
+                Button(action: onTogglePause) {
+                    Image(systemName: pauseButtonIcon)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(pauseButtonEnabled ? .textSecondary : .textTertiary.opacity(0.45))
+                        .frame(width: 30, height: 32)
+                }
+                .buttonStyle(.plain)
+                .disabled(!pauseButtonEnabled)
+                .accessibilityLabel(pauseButtonLabel)
+
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.textSecondary)
+                        .frame(width: 26, height: 32)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss rest timer")
+            }
+            .padding(.horizontal, 20)
+            .frame(height: Self.rowHeight)
+        }
+        .frame(maxWidth: .infinity)
         .background(Color.bgCard)
         .alert("Set Rest Time", isPresented: $showTimeEditor) {
             TextField("Seconds", text: $exactTimeText)
@@ -112,99 +156,63 @@ struct RestTimerView: View {
         }
     }
 
-    private func timerHeader(
-        remaining: Int,
-        total: Int,
-        pauseSource: RestTimerPauseSource?
-    ) -> some View {
-        let pauseButtonEnabled = pauseSource != .workout
-        let pauseButtonIcon = pauseSource == .manual ? "play.fill" : "pause.fill"
-        let pauseButtonLabel: String
-        switch pauseSource {
-        case .manual:
-            pauseButtonLabel = "Resume rest timer"
-        case .workout:
-            pauseButtonLabel = "Rest timer paused with workout"
-        case .none:
-            pauseButtonLabel = "Pause rest timer"
-        }
+    /// The 2pt rule along the top edge: full-width separator, overpainted to show progress.
+    private func progressRule(progress: CGFloat, color: Color) -> some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                Rectangle()
+                    .fill(Color.border)
 
-        return HStack(spacing: 16) {
-            ZStack {
-                Circle()
-                    .stroke(Color.bgSubtle, lineWidth: 4)
-                    .frame(width: 44, height: 44)
-                Circle()
-                    .trim(from: 0, to: total > 0 ? CGFloat(remaining) / CGFloat(total) : 0)
-                    .stroke(Color.accent, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                    .frame(width: 44, height: 44)
-                    .rotationEffect(.degrees(-90))
-                    .animation(.linear(duration: 1), value: remaining)
-            }
-
-            Text(formatTime(remaining))
-                .font(.system(size: 24, weight: .bold, design: .monospaced))
-                .foregroundColor(.textPrimary)
-
-            Spacer()
-
-            HStack(spacing: 4) {
-                Button(action: onTogglePause) {
-                    Image(systemName: pauseButtonIcon)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(pauseButtonEnabled ? .textTertiary : .textTertiary.opacity(0.45))
-                        .frame(width: 36, height: 36)
-                }
-                .buttonStyle(.plain)
-                .disabled(!pauseButtonEnabled)
-                .accessibilityLabel(pauseButtonLabel)
-
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.textTertiary)
-                        .frame(width: 36, height: 36)
-                }
-                .buttonStyle(.plain)
+                Rectangle()
+                    .fill(color)
+                    .frame(width: geometry.size.width * progress)
+                    .animation(.linear(duration: 1), value: progress)
             }
         }
+        .frame(height: Self.ruleHeight)
     }
 
-    /// A small time adjustment button.
-    private func timerAdjustButton(_ label: String, action: @escaping () -> Void) -> some View {
-        Button(label, action: action)
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundColor(.accent)
-            .frame(maxWidth: .infinity)
-            .frame(height: 32)
-            .background(Color.accentSoft)
-            .cornerRadius(8)
-            .buttonStyle(.plain)
+    /// A time adjustment button sized to sit inside the band.
+    private func adjustButton(_ label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.accent)
+                .frame(width: 46, height: 30)
+                .background(Color.bgSubtle)
+                .cornerRadius(8)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Finished State
 
-    /// "Rest complete" message with dismiss button.
-    private var finishedContent: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 22))
-                .foregroundColor(.success)
+    /// "Rest complete" message in the same band, rule filled green.
+    private var finishedBand: some View {
+        VStack(spacing: 0) {
+            progressRule(progress: 1, color: .success)
 
-            Text("Rest complete")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.textPrimary)
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 19))
+                    .foregroundColor(.success)
 
-            Spacer()
+                Text("Rest complete")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.textPrimary)
 
-            Button("Dismiss") { onDismiss() }
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.textSecondary)
-                .frame(height: 44)
+                Spacer()
+
+                Button("Dismiss") { onDismiss() }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.textSecondary)
+                    .frame(height: 32)
+            }
+            .padding(.horizontal, 20)
+            .frame(height: Self.rowHeight)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-        .background(Color.bgCard)
+        .frame(maxWidth: .infinity)
+        .background(Color.successSoft)
     }
 
     // MARK: - Formatting
@@ -224,7 +232,23 @@ struct RestTimerView: View {
             Spacer()
             RestTimerView(
                 state: .running(remaining: 90, total: 120),
-                presentationMode: .full,
+                onAddTime: { _ in },
+                onSubtractTime: { _ in },
+                onSetDuration: { _ in },
+                onTogglePause: {},
+                onDismiss: {}
+            )
+        }
+    }
+}
+
+#Preview("Running - Nearly Done") {
+    ZStack {
+        Color.bg.ignoresSafeArea()
+        VStack {
+            Spacer()
+            RestTimerView(
+                state: .running(remaining: 8, total: 120),
                 onAddTime: { _ in },
                 onSubtractTime: { _ in },
                 onSetDuration: { _ in },
@@ -242,7 +266,23 @@ struct RestTimerView: View {
             Spacer()
             RestTimerView(
                 state: .paused(remaining: 45, total: 90, source: .manual),
-                presentationMode: .full,
+                onAddTime: { _ in },
+                onSubtractTime: { _ in },
+                onSetDuration: { _ in },
+                onTogglePause: {},
+                onDismiss: {}
+            )
+        }
+    }
+}
+
+#Preview("Paused - With Workout") {
+    ZStack {
+        Color.bg.ignoresSafeArea()
+        VStack {
+            Spacer()
+            RestTimerView(
+                state: .paused(remaining: 45, total: 90, source: .workout),
                 onAddTime: { _ in },
                 onSubtractTime: { _ in },
                 onSetDuration: { _ in },
@@ -260,7 +300,6 @@ struct RestTimerView: View {
             Spacer()
             RestTimerView(
                 state: .finished,
-                presentationMode: .full,
                 onAddTime: { _ in },
                 onSubtractTime: { _ in },
                 onSetDuration: { _ in },

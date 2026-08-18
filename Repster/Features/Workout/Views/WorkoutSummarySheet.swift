@@ -151,8 +151,15 @@ struct WorkoutSummarySheet: View {
     // MARK: - Summary Source
 
     /// Live summary while the workout exists, then the frozen one while closing.
+    ///
+    /// Once either action starts, the frozen copy wins outright rather than being a fallback for
+    /// `nil`. `computeSummary()` reads live models, and both actions leave them mid-flight: the
+    /// discard deletes the rows out from under this view, and the finish has the repository actor
+    /// saving them while the main actor reads. Both writes that start the actions — `isSaving`,
+    /// `isDiscarding` — are read by this body, so a re-render inside that window is guaranteed.
     private var displaySummary: WorkoutSummaryData? {
-        viewModel.computeSummary() ?? frozenSummary
+        if isSaving || isDiscarding { return frozenSummary }
+        return viewModel.computeSummary() ?? frozenSummary
     }
 
     // MARK: - Header

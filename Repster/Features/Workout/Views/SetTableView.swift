@@ -204,7 +204,7 @@ struct SetTableView: View {
         .textCase(.uppercase)
         .foregroundColor(Color.textPrimary.opacity(0.78))
         .padding(.horizontal, 8)
-        .frame(height: 38)
+        .frame(height: 34)
         .background(Color.bgInput.opacity(0.78))
         .overlay(
             Rectangle()

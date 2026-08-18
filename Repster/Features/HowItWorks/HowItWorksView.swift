@@ -154,8 +154,23 @@ struct HowItWorksView: View {
 
     // MARK: - Illustrations
 
+    /// An image in the asset catalog named `page.assetName` wins over the drawn version,
+    /// so a page can be replaced with a real picture without touching this file.
     @ViewBuilder
     private func illustration(for page: HowItWorksPage) -> some View {
+        if UIImage(named: page.assetName) != nil {
+            Image(page.assetName)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+        } else {
+            drawnIllustration(for: page)
+        }
+    }
+
+    @ViewBuilder
+    private func drawnIllustration(for page: HowItWorksPage) -> some View {
         switch page {
         case .startWorkout:
             VStack(spacing: 8) {
@@ -392,4 +407,13 @@ private struct TrendSparkline: View {
             }
         }
     }
+}
+
+// MARK: - Preview
+
+/// Xcode canvas, so wording and illustrations can be iterated without a build-run cycle.
+/// `NoopAnalyticsService` keeps preview renders out of the funnels.
+#Preview("How it works") {
+    HowItWorksView(analyticsService: NoopAnalyticsService())
+        .preferredColorScheme(.dark)
 }

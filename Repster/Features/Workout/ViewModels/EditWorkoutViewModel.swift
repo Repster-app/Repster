@@ -273,27 +273,32 @@ final class EditWorkoutViewModel {
     /// Delete a set from the workout.
     func deleteSet(_ set: WorkoutSet) async {
         let exerciseId = set.exerciseId
+        let setId = set.id
+
+        // Out of screen state before it leaves the store: `delete` awaits a PR and stats pipeline,
+        // and the set table renders during it. Reading a deleted model traps inside SwiftData.
+        setsByExercise[exerciseId]?.removeAll { $0.id == setId }
+
+        // Reindex remaining sets
+        if var sets = setsByExercise[exerciseId] {
+            reindexOrderInExercise(&sets)
+            setsByExercise[exerciseId] = sets
+        }
 
         do {
             let prResult = try await setService.delete(set)
             PRBadgeApplier.apply(prResult.affectedSetIds, to: &setsByExercise)
 
-            // Remove from local state
-            setsByExercise[exerciseId]?.removeAll { $0.id == set.id }
-
-            // Reindex remaining sets
-            if var sets = setsByExercise[exerciseId] {
-                reindexOrderInExercise(&sets)
-                setsByExercise[exerciseId] = sets
-            }
-
             // Remove from uncountedSetIds if it was added during this session
-            uncountedSetIds.remove(set.id)
+            uncountedSetIds.remove(setId)
 
         } catch {
             #if DEBUG
             dbg("[EditWorkoutViewModel] deleteSet failed: \(error)")
             #endif
+            // Still in the store, already off the screen, and the survivors are renumbered in
+            // memory — re-read rather than unwind.
+            await loadWorkout()
         }
     }
 
@@ -356,24 +361,14 @@ final class EditWorkoutViewModel {
     }
 
     /// Remove the exercise at the given index and delete all its sets.
+    ///
+    /// The exercise leaves the screen *before* its rows leave the store — the loop awaits once per
+    /// set, and the set table renders in between. Reading a deleted model traps inside SwiftData.
     func removeExercise(at index: Int) async {
         guard index >= 0, index < exercises.count else { return }
 
         let exercise = exercises[index]
         let exerciseSets = setsByExercise[exercise.id] ?? []
-
-        // Delete all sets for this exercise
-        for set in exerciseSets {
-            do {
-                // Ignored deliberately: the exercise and its rows are being removed.
-                _ = try await setService.delete(set)
-                uncountedSetIds.remove(set.id)
-            } catch {
-                #if DEBUG
-                dbg("[EditWorkoutViewModel] delete set during removeExercise failed: \(error)")
-                #endif
-            }
-        }
 
         // Remove from local state
         exercises.remove(at: index)
@@ -382,6 +377,26 @@ final class EditWorkoutViewModel {
         // Clamp selectedExerciseIndex
         if selectedExerciseIndex >= exercises.count {
             selectedExerciseIndex = max(0, exercises.count - 1)
+        }
+
+        // Delete all sets for this exercise
+        var deleteFailed = false
+        for set in exerciseSets {
+            do {
+                // Ignored deliberately: the exercise and its rows are being removed.
+                _ = try await setService.delete(set)
+                uncountedSetIds.remove(set.id)
+            } catch {
+                deleteFailed = true
+                #if DEBUG
+                dbg("[EditWorkoutViewModel] delete set during removeExercise failed: \(error)")
+                #endif
+            }
+        }
+
+        // A partial failure leaves rows the screen has already forgotten. Re-read rather than guess.
+        if deleteFailed {
+            await loadWorkout()
         }
     }
 

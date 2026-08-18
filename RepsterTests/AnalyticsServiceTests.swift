@@ -262,7 +262,8 @@ final class AnalyticsServiceTests: XCTestCase {
             accessTier: "free",
             remainingFreeWorkouts: 3,
             rirSetCount: 8,
-            averageRIR: 2.4
+            averageRIR: 2.4,
+            interactions: [:]
         )
 
         let capture = client.captures.last
@@ -319,7 +320,8 @@ final class AnalyticsServiceTests: XCTestCase {
             accessTier: "subscribed",
             remainingFreeWorkouts: nil,
             rirSetCount: 0,
-            averageRIR: nil
+            averageRIR: nil,
+            interactions: [:]
         )
 
         let capture = client.captures.last
@@ -405,6 +407,137 @@ final class AnalyticsServiceTests: XCTestCase {
 
         WorkoutStartContextStore.clear(userDefaults: defaults)
         XCTAssertNil(ActiveWorkoutSessionMarker.startedAt(userDefaults: defaults))
+    }
+
+    // MARK: - In-workout interaction tally
+
+    /// `WorkoutInteraction` raw values *are* the PostHog property names, so a case
+    /// without a matching `AnalyticsPropertyKey` would be silently dropped by
+    /// `WorkoutInteractionTally.properties(from:)` — the counter would be
+    /// incremented all workout and then never sent.
+    func testEveryWorkoutInteractionHasAnAnalyticsPropertyKey() {
+        for interaction in WorkoutInteraction.allCases {
+            XCTAssertNotNil(
+                AnalyticsPropertyKey(rawValue: interaction.rawValue),
+                "WorkoutInteraction.\(interaction) has no AnalyticsPropertyKey with raw value '\(interaction.rawValue)'"
+            )
+        }
+    }
+
+    /// Absent counters must arrive as explicit zeros. Omitting them would make
+    /// PostHog average each one over only the workouts that used it.
+    func testTallySnapshotReportsEveryCounterIncludingZeros() {
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        WorkoutInteractionTally.increment(.historyViews, userDefaults: defaults)
+        WorkoutInteractionTally.increment(.historyViews, userDefaults: defaults)
+        WorkoutInteractionTally.increment(.setsUncompleted, userDefaults: defaults)
+
+        let snapshot = WorkoutInteractionTally.snapshot(userDefaults: defaults)
+        XCTAssertEqual(snapshot.count, WorkoutInteraction.allCases.count)
+        XCTAssertEqual(snapshot[.historyViews], 2)
+        XCTAssertEqual(snapshot[.setsUncompleted], 1)
+        XCTAssertEqual(snapshot[.chartViews], 0)
+        XCTAssertEqual(snapshot[.restTimerSkips], 0)
+    }
+
+    /// Starting a workout must not inherit the previous workout's counters, and the
+    /// terminal-event path must not leave them behind for the next one.
+    func testTallyLifecycleIsOwnedByTheSessionMarker() {
+        let defaults = UserDefaults(suiteName: defaultsSuiteName)!
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        WorkoutInteractionTally.increment(.exerciseSwitches, userDefaults: defaults)
+        ActiveWorkoutSessionMarker.markStarted(userDefaults: defaults)
+        XCTAssertEqual(WorkoutInteractionTally.snapshot(userDefaults: defaults)[.exerciseSwitches], 0)
+
+        WorkoutInteractionTally.increment(.exerciseSwitches, userDefaults: defaults)
+        WorkoutStartContextStore.clear(userDefaults: defaults)
+        XCTAssertEqual(WorkoutInteractionTally.snapshot(userDefaults: defaults)[.exerciseSwitches], 0)
+    }
+
+    func testRecordWorkoutInteractionAccumulatesWithoutSendingAnything() {
+        let (service, client, defaults) = makeService()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        service.configure()
+        let capturesBefore = client.captures.count
+
+        service.recordWorkoutInteraction(.prViews)
+        service.recordWorkoutInteraction(.prViews)
+        service.recordWorkoutInteraction(.workoutPauses)
+
+        XCTAssertEqual(client.captures.count, capturesBefore, "interactions must not send events of their own")
+        let snapshot = WorkoutInteractionTally.snapshot(userDefaults: defaults)
+        XCTAssertEqual(snapshot[.prViews], 2)
+        XCTAssertEqual(snapshot[.workoutPauses], 1)
+    }
+
+    /// The gate is at increment time, so an opted-out user accumulates nothing at
+    /// all rather than accumulating locally and having it dropped on the way out.
+    func testOptedOutUserAccumulatesNoInteractions() {
+        let (service, _, defaults) = makeService()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        service.configure()
+        service.setCollectionEnabled(false)
+        service.recordWorkoutInteraction(.historyViews)
+
+        XCTAssertEqual(WorkoutInteractionTally.snapshot(userDefaults: defaults)[.historyViews], 0)
+    }
+
+    func testWorkoutCompletedCarriesInteractionCountsAsRawInts() {
+        let (service, client, defaults) = makeService()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        service.configure()
+        service.workoutCompleted(
+            durationSeconds: 40 * 60,
+            completedSetCount: 10,
+            exerciseCount: 3,
+            totalReps: 60,
+            prsHit: 0,
+            date: Date(),
+            source: .empty,
+            templateUsed: false,
+            unitSystem: "metric",
+            perceivedEffortEntered: false,
+            notesEntered: false,
+            excludedFromProgression: false,
+            accessTier: "free",
+            remainingFreeWorkouts: 1,
+            rirSetCount: 0,
+            averageRIR: nil,
+            interactions: [.historyViews: 4, .restTimerSkips: 2, .chartViews: 0]
+        )
+
+        let properties = client.captures.last?.properties
+        // Raw ints, not buckets: PostHog can bucket a number at query time but
+        // cannot unbucket "4-6", and the mean is what these are for.
+        XCTAssertEqual(properties?["history_views"] as? Int, 4)
+        XCTAssertEqual(properties?["rest_timer_skips"] as? Int, 2)
+        XCTAssertEqual(properties?["chart_views"] as? Int, 0)
+    }
+
+    /// Abandoned workouts are the population whose behaviour matters most, and the
+    /// only one with no live ViewModel to read counters from.
+    func testWorkoutAbandonedCarriesInteractionCounts() {
+        let (service, client, defaults) = makeService()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        service.configure()
+        service.workoutAbandoned(
+            setCount: 2,
+            source: .template,
+            templateUsed: true,
+            interactions: [.exercisePickerOpens: 3, .setsAdded: 0]
+        )
+
+        let capture = client.captures.last
+        XCTAssertEqual(capture?.event, "workout abandoned")
+        XCTAssertEqual(capture?.properties["exercise_picker_opens"] as? Int, 3)
+        XCTAssertEqual(capture?.properties["sets_added"] as? Int, 0)
     }
 
     func testCaptureErrorTagsContextAndErrorType() {

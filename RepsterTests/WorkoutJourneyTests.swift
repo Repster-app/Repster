@@ -448,6 +448,72 @@ final class WorkoutJourneyTests: XCTestCase {
         XCTAssertEqual(relaunched.currentSets.map(\.orderInExercise), [1, 2])
     }
 
+    // MARK: - Journey: discarding and removing
+
+    /// Discarding takes the whole session with it, PR records included.
+    ///
+    /// The end state is only half of what matters here. The other half — that the ViewModel stops
+    /// pointing at these rows *before* they are deleted — is not observable from outside the call,
+    /// so it lives in `DeleteOrderingTests`. This journey is what proves the reordering did not
+    /// break the delete itself.
+    func testDiscardingAWorkoutLeavesNothingBehind() async throws {
+        let stack = try Stack()
+        let exercise = Fixture.barbell()
+        let viewModel = try await startWorkout(stack, with: [exercise])
+        let workoutId = try XCTUnwrap(viewModel.workout?.id)
+
+        try await completeNextSet(viewModel, weight: 100, reps: 5)
+        await viewModel.addSet(for: exercise.id)
+        try await completeNextSet(viewModel, weight: 110, reps: 5)
+        XCTAssertEqual(try stack.committedSets(for: workoutId).count, 2)
+        XCTAssertGreaterThan(try stack.committedRecordCount(), 0, "the session should have set a PR to clean up")
+
+        await viewModel.discardWorkout()
+
+        XCTAssertNil(viewModel.workout)
+        XCTAssertTrue(viewModel.exercises.isEmpty)
+        XCTAssertTrue(viewModel.setsByExercise.isEmpty)
+        XCTAssertTrue(viewModel.isWorkoutFinished)
+
+        XCTAssertTrue(try stack.committedSets(for: workoutId).isEmpty)
+        XCTAssertEqual(try stack.committedRecordCount(), 0, "records must be rebuilt away with the sets")
+
+        let relaunched = stack.makeViewModel()
+        await relaunched.loadActiveWorkout()
+        XCTAssertNil(relaunched.workout, "a discarded workout must not come back as the active one")
+        XCTAssertTrue(relaunched.currentSets.isEmpty)
+    }
+
+    /// Removing one exercise mid-workout leaves the other exactly as it was.
+    func testRemovingAnExerciseMidWorkoutLeavesTheOtherIntact() async throws {
+        let stack = try Stack()
+        let bench = Fixture.barbell()
+        let pullUp = Fixture.bodyweightStyle()
+        let viewModel = try await startWorkout(stack, with: [bench, pullUp])
+        let workoutId = try XCTUnwrap(viewModel.workout?.id)
+
+        try await completeNextSet(viewModel, weight: 100, reps: 5)
+        viewModel.selectedExerciseIndex = 1
+        try await completeNextSet(viewModel, weight: 10, reps: 8)
+        viewModel.selectedExerciseIndex = 0
+
+        await viewModel.removeExercise(at: 0)
+
+        XCTAssertEqual(viewModel.exercises.map(\.id), [pullUp.id])
+        XCTAssertNil(viewModel.setsByExercise[bench.id])
+        XCTAssertEqual(viewModel.currentSets.count, 1, "the surviving exercise should be selected and intact")
+        XCTAssertEqual(viewModel.currentSets.compactMap(\.reps), [8])
+
+        let committed = try stack.committedSets(for: workoutId)
+        XCTAssertEqual(committed.map(\.exerciseId), [pullUp.id])
+        try assertScreenMatchesStore(viewModel, stack)
+
+        let relaunched = stack.makeViewModel()
+        await relaunched.loadActiveWorkout()
+        XCTAssertEqual(relaunched.exercises.map(\.id), [pullUp.id])
+        XCTAssertEqual(relaunched.currentSets.compactMap(\.reps), [8])
+    }
+
     // MARK: - Journey: PR badges across sets
 
     /// Beating a PR demotes the set that held it.

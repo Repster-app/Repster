@@ -28,7 +28,7 @@ enum RevenueCatConfiguration {
         return key
     }()
     static let entitlementIdentifier = "Repster"
-    static let freeWorkoutLimit = 5
+    static let freeWorkoutLimit = 10
 }
 
 enum SubscriptionStatus: Equatable {
