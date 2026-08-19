@@ -62,14 +62,23 @@ struct TrainingStatusCardView: View {
         return status.band?.headline ?? "Your first weeks"
     }
 
+    /// The headline says which way the week went; the subtitle says by how
+    /// much. Without a size, "well above your usual" covers everything from a
+    /// tenth extra to triple, and the reader was left to work the multiple out
+    /// from two numbers sitting at opposite ends of the card.
     private var subtitle: String {
         guard status.hasData else {
             return "Your training status builds as you log workouts"
         }
         guard status.band != nil else {
-            return "Building your baseline — comparisons start in a few weeks"
+            return "Building your usual week — comparisons start in a few weeks"
         }
-        return "Last 7 days"
+        guard let relation = WeekComparisonGeometry.relationText(
+            current: status.currentSets, usual: status.baselineSets ?? 0
+        ) else {
+            return "Last 7 days"
+        }
+        return "Last 7 days · \(relation)"
     }
 
     /// Calm by default, and the same for every band. Tinting by direction reads
@@ -85,34 +94,23 @@ struct TrainingStatusCardView: View {
     // MARK: - Comparison
 
     private var comparison: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(status.currentSets)")
-                    .font(.system(size: 24, weight: .bold))
-                    .monospacedDigit()
-                    .foregroundStyle(Color.textPrimary)
-                Text("SETS")
-                    .font(.system(size: 12, weight: .semibold))
-                    .kerning(0.5)
-                    .foregroundStyle(Color.textTertiary)
-
-                Spacer(minLength: 8)
-
-                Text("8-week avg \(Int((status.baselineSets ?? 0).rounded()))")
-                    .font(.system(size: 11.5, weight: .medium))
-                    .monospacedDigit()
-                    .foregroundStyle(Color.textSecondary)
-            }
-
-            BaselineMeter(
+        VStack(alignment: .leading, spacing: 9) {
+            WeekComparisonBars(
                 current: status.currentSets,
-                baseline: status.baselineSets ?? 0,
-                showsCaption: true
+                usual: status.baselineSets ?? 0
             )
+
+            // The one line the old card never said out loud. "Usual" is the
+            // whole basis of the comparison above it, and a reader who doesn't
+            // know what it's measured over can't tell whether to believe it.
+            Text("Your usual week is the average of your last 8 weeks")
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(Color.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
-            "\(status.currentSets) sets in the last 7 days, against a baseline of \(Int((status.baselineSets ?? 0).rounded()))"
+            "\(status.currentSets) sets in the last 7 days, against a usual week of \(Int((status.baselineSets ?? 0).rounded())), averaged over your last 8 weeks"
         )
     }
 

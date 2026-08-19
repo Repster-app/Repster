@@ -67,3 +67,46 @@ struct WorkoutActivityAttributes: ActivityAttributes {
         var isRestTimerFinished: Bool
     }
 }
+
+// MARK: - Rest Section Display State
+
+extension WorkoutActivityAttributes.ContentState {
+
+    /// Which rest treatment the Live Activity should render.
+    ///
+    /// Extracted from the widget's view bodies so it can be tested: `ActivityViewContext` has
+    /// no public initialiser, but `ContentState` is a plain struct, so every branch below is
+    /// reachable from a unit test while the view chains are not.
+    ///
+    /// Both chains — Lock Screen and the Dynamic Island's expanded region — read this, which is
+    /// what stops them from drifting apart. They rendered the same five states through two
+    /// hand-maintained if/else ladders, and both carried the same `.complete` gap.
+    enum RestDisplay: Equatable {
+        case workoutPaused
+        case restPaused
+        /// Counting down to the given end date.
+        case counting(until: Date)
+        case complete
+        case ready
+    }
+
+    /// - Parameter now: injected so tests can sit either side of the end date.
+    func restDisplay(at now: Date = .now) -> RestDisplay {
+        if isWorkoutPaused { return .workoutPaused }
+        if isRestTimerPaused { return .restPaused }
+
+        if isRestTimerRunning, let endDate = restTimerEndDate {
+            // Past the end date this is a *finished* timer, not an absent one.
+            //
+            // Nothing pushes `isRestTimerFinished` while the app is suspended — the tick that
+            // sets it needs the app to be executing — so relying on that flag alone left an
+            // expired timer falling through to `.ready` ("Ready for next set"), or more often
+            // frozen on a spent 0:00 because nothing re-rendered at all. The end date is
+            // already here and is true whether or not anyone pushed anything.
+            return endDate > now ? .counting(until: endDate) : .complete
+        }
+
+        if isRestTimerFinished { return .complete }
+        return .ready
+    }
+}

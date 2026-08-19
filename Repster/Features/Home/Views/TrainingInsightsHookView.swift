@@ -66,7 +66,11 @@ struct TrainingInsightsHookView: View {
                 }
 
                 if let baseline = status?.baselineSets, baseline > 0 {
-                    BaselineMeter(current: status?.currentSets ?? 0, baseline: baseline)
+                    WeekComparisonBars(
+                        current: status?.currentSets ?? 0,
+                        usual: baseline,
+                        isCompact: true
+                    )
                 }
             }
             .padding(14)
@@ -82,13 +86,19 @@ struct TrainingInsightsHookView: View {
         return status.band?.headline ?? "Your first weeks"
     }
 
+    /// Both figures moved into the bars below, so the subtitle carries the one
+    /// thing they can't state on their own: the size of the gap.
     private var subtitle: String {
         guard let status, status.hasData else {
             return "Builds as you log workouts"
         }
         let sets = "\(status.currentSets) set\(status.currentSets == 1 ? "" : "s") this week"
-        guard let baseline = status.baselineSets, baseline > 0 else { return sets }
-        return "\(sets) · you average \(Int(baseline.rounded()))"
+        guard let baseline = status.baselineSets, baseline > 0,
+              let relation = WeekComparisonGeometry.relationText(
+                  current: status.currentSets, usual: baseline
+              )
+        else { return sets }
+        return relation
     }
 
     /// Matches TrainingStatusCardView: one calm tint for every band, so neither

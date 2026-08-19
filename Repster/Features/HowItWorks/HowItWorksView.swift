@@ -225,12 +225,6 @@ struct HowItWorksView: View {
                     .foregroundColor(.textTertiary)
             }
 
-        case .personalRecords:
-            VStack(spacing: 8) {
-                illoRow("trophy", .gold, "Bench press · 62.5 kg × 8", "New 8-rep best · +2.5 kg", highlighted: true)
-                illoRow("chart.line.uptrend.xyaxis", .gold, "Estimated 1RM", "78 kg · up from 74 kg")
-            }
-
         case .weeklyVolume:
             VStack(spacing: 12) {
                 illoRow("gauge.medium", .accent, "Tracking normally", "14 sets · 8-week avg 12")

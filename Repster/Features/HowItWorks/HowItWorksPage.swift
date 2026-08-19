@@ -30,7 +30,9 @@ enum HowItWorksPage: String, CaseIterable, Identifiable {
     case logSet
     case suggestions
     case rir
-    case personalRecords
+    // No page for personal records: the gold PR badge appears in the set row the moment
+    // one lands, which teaches itself. A page explaining it would spend a slot saying
+    // "you'll notice the thing you can't miss".
     case weeklyVolume
     case charts
 
@@ -42,7 +44,6 @@ enum HowItWorksPage: String, CaseIterable, Identifiable {
         case .logSet:           return "Log a set"
         case .suggestions:      return "Smart Suggestions"
         case .rir:              return "What RIR means"
-        case .personalRecords:  return "Every PR, caught"
         case .weeklyVolume:     return "Where your week went"
         case .charts:           return "Progress over time"
         }
@@ -53,22 +54,35 @@ enum HowItWorksPage: String, CaseIterable, Identifiable {
         case .startWorkout:
             return "Tap + to begin. Start fresh, repeat a past session, or load a routine you saved."
         case .logSet:
-            return "Enter the weight and reps, then tap the circle to complete the set. That's the whole loop."
+            // "Tick the box", not "tap the circle" — `CompletionCheckbox` is a rounded
+            // square, and it fills blue when a set is done.
+            return "Type the weight and reps, then tick the box. That's the whole loop, and everything else in Repster is built on it."
         case .suggestions:
-            return "Repster reads your recent sets for an exercise and suggests a working weight. Take it, or type your own."
+            // The screenshot shows the weight stepping down across sets with "Easing off
+            // slightly to manage session fatigue" underneath. That — a target per set,
+            // adjusted as you tire, with its reasoning shown — is the actual product.
+            // "Suggests a working weight" described a lookup table.
+            return "A target for every set, easing off as fatigue builds through the session — and a line telling you why it landed there."
         case .rir:
             // Reps in reserve is the one piece of vocabulary the app can't avoid, and it
             // comes after Suggestions on purpose: by now the reader has seen a weight
             // appear from nowhere, so this answers a question they already have.
-            return "Reps in reserve — how many good reps you had left. Logging it is what makes the next suggestion accurate."
-        case .personalRecords:
-            return "Repster flags personal records as you log them, and tracks your estimated 1RM for every exercise."
+            //
+            // Second sentence earns the page its keep — the same colours run down the RIR
+            // column of every set table, so this is a legend for something they've already
+            // looked at rather than a definition in the abstract.
+            return "Reps in reserve — how many good reps you had left. You'll see these colours on every set you log, and they're what the next suggestion is built from."
         case .weeklyVolume:
-            // Matches the status card's own restraint: it states the comparison and
-            // refuses to grade it, so the walkthrough shouldn't promise a verdict.
-            return "Repster compares this week against your own average — and tells you the comparison, not a score."
+            // Matches the panel's own restraint: every bar is measured against a tick
+            // marked "your usual", and the deltas are left uncoloured on purpose. The
+            // caption shouldn't promise a verdict the screen deliberately withholds.
+            return "Every muscle group against your own usual week, in sets, reps, or volume. Repster shows you the comparison and leaves the verdict to you."
         case .charts:
-            return "Chart any exercise or muscle group over any window, and watch the line go where you want it."
+            // The screenshot is four years of sessions with a trend line cut through
+            // them. Individual sessions bounce enormously — the trend is the part that
+            // answers the question, which is worth saying rather than "watch the line go
+            // where you want it".
+            return "Every session you've logged, over any window you like. Sessions bounce around; the trend line is the part that tells you whether it's working."
         }
     }
 

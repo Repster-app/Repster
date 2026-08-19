@@ -768,7 +768,7 @@ private struct WorkoutPreferencesView: View {
                         .foregroundStyle(Color.textPrimary)
                     Spacer()
                     Picker("", selection: Binding(
-                        get: { viewModel.profile?.restTimerAlert ?? "both" },
+                        get: { viewModel.profile?.restTimerAlert ?? HealthProfile.defaultAlertMode },
                         set: { newValue in
                             Task { await viewModel.updateRestTimerAlert(newValue) }
                         }
@@ -781,9 +781,42 @@ private struct WorkoutPreferencesView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                 }
+
+                if viewModel.showsRestAlarmPermissionWarning {
+                    Button {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(Color.orange)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Notifications are off")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(Color.textPrimary)
+                                Text("Rest alerts can't reach you once you leave this screen or lock your phone. Tap to turn them on.")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.textSecondary)
+                                    .multilineTextAlignment(.leading)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(Color.textTertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
             } footer: {
-                Text("Warmup changes rebuild affected records so the rest of the app stays consistent.")
-                    .foregroundStyle(Color.textTertiary)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Warmup changes rebuild affected records so the rest of the app stays consistent.")
+                    // iOS gives a notification no haptic unless a sound is attached, so a rest
+                    // alert that arrives while Repster is in the background cannot vibrate
+                    // silently. On a phone set to silent it still vibrates only.
+                    Text("Vibration alerts play a sound when your rest ends while Repster is in the background, unless your phone is on silent.")
+                }
+                .foregroundStyle(Color.textTertiary)
             }
         }
         .scrollContentBackground(.hidden)
@@ -791,7 +824,10 @@ private struct WorkoutPreferencesView: View {
         .navigationTitle("Workout Preferences")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            Task { await viewModel.refreshProfile() }
+            Task {
+                await viewModel.refreshProfile()
+                await viewModel.refreshRestAlarmAuthorization()
+            }
         }
         .sheet(isPresented: $viewModel.showRestTimeSheet) {
             RestTimePickerSheet(

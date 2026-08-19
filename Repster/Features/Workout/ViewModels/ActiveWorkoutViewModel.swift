@@ -10,7 +10,6 @@ import ActivityKit
 import AudioToolbox
 import Combine
 import Foundation
-import UserNotifications
 import SwiftUI
 
 // MARK: - Workout Summary Types (T031)
@@ -67,6 +66,20 @@ enum ActiveWorkoutSessionDefaultsKeys {
     static let restTimerRemainingDuration = "activeWorkoutRestTimerRemainingDuration"
     static let restTimerIsPaused = "activeWorkoutRestTimerIsPaused"
     static let restTimerPauseSource = "activeWorkoutRestTimerPauseSource"
+
+    /// Clear every rest-timer key in one call.
+    ///
+    /// Three places need this and two of them are outside `ActiveWorkoutViewModel` — a discard
+    /// from `ContentView` and the data reset in `SettingsService` — which is exactly how they
+    /// came to disagree about which keys existed. One list, one caller-visible name.
+    static func clearRestTimerState(in defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: restTimerWorkoutId)
+        defaults.removeObject(forKey: restTimerStartDate)
+        defaults.removeObject(forKey: restTimerTotalDuration)
+        defaults.removeObject(forKey: restTimerRemainingDuration)
+        defaults.removeObject(forKey: restTimerIsPaused)
+        defaults.removeObject(forKey: restTimerPauseSource)
+    }
 }
 
 // MARK: - ActiveWorkoutViewModel
@@ -125,7 +138,7 @@ final class ActiveWorkoutViewModel {
     private var globalDefaultWarmupRestTime: Int?
 
     /// Rest timer alert mode: "off", "vibration", "sound", or "both".
-    private var restTimerAlertMode: String = "both"
+    private var restTimerAlertMode: String = HealthProfile.defaultAlertMode
 
     /// Sets grouped by exerciseId.
     var setsByExercise: [UUID: [WorkoutSet]] = [:]
@@ -143,6 +156,12 @@ final class ActiveWorkoutViewModel {
 
     /// Rest timer state between sets.
     var restTimer: RestTimerState = .idle
+
+    /// Whether Repster's own notification explainer is showing. See `RestAlarmPromptView`.
+    var showRestAlarmPrompt: Bool = false
+
+    /// True while the system permission sheet is up.
+    var isRequestingRestAlarmAuthorization: Bool = false
 
     /// Whether the workout clock is currently paused.
     var isWorkoutPaused: Bool = false
@@ -320,6 +339,11 @@ final class ActiveWorkoutViewModel {
             }
             self.workout = active
 
+            // Held weakly by the coordinator: when this ViewModel goes away with the workout
+            // cover, the reference nils itself and the rest alarm starts presenting as a banner
+            // instead of alerting into a screen nobody is looking at.
+            RestTimerAlarmCoordinator.shared.registerForegroundAlerter(self)
+
             // 2. Fetch all sets for this workout (ordered by orderInWorkout)
             let allSets = try await setService.fetchSets(for: active.id)
 
@@ -375,7 +399,7 @@ final class ActiveWorkoutViewModel {
                 )
                 self.globalDefaultRestTime = profile.defaultRestTimeSeconds ?? 150
                 self.globalDefaultWarmupRestTime = profile.defaultWarmupRestTimeSeconds
-                self.restTimerAlertMode = profile.restTimerAlert ?? "both"
+                self.restTimerAlertMode = profile.restTimerAlert ?? HealthProfile.defaultAlertMode
                 self.suggestionAdminModeEnabled = profile.prescriptionAdminModeEnabled ?? false
             }
 
@@ -1088,6 +1112,8 @@ final class ActiveWorkoutViewModel {
     func startRestTimer(duration: Int) {
         guard duration > 0 else { return }
 
+        offerRestAlarmIfNeeded()
+
         if isWorkoutPaused {
             setPausedRestTimer(
                 remaining: duration,
@@ -1097,6 +1123,38 @@ final class ActiveWorkoutViewModel {
         } else {
             startRestTimer(remaining: duration, total: duration)
         }
+    }
+
+    /// Raise Repster's own explainer the first time a rest timer runs, and only then.
+    ///
+    /// Gated on `notDetermined` as well as the one-shot flag: someone who granted or denied in
+    /// an older build has already spent the system prompt, and re-explaining would be noise.
+    private func offerRestAlarmIfNeeded() {
+        guard !RestTimerAlarmPreferences.hasBeenOffered,
+              RestTimerAlarmPreferences.lastKnownAuthorization == .notDetermined else { return }
+        showRestAlarmPrompt = true
+    }
+
+    /// The user asked for alerts. Only now does iOS get involved.
+    func enableRestAlarmAuthorization() async {
+        isRequestingRestAlarmAuthorization = true
+        defer { isRequestingRestAlarmAuthorization = false }
+
+        RestTimerAlarmPreferences.markOffered()
+        let result = await RestTimerAlarmCoordinator.requestAuthorization()
+        showRestAlarmPrompt = false
+
+        // Granting mid-rest is useless unless the alarm already ticking gets scheduled — it was
+        // skipped at start because there was no permission to schedule against.
+        if result == .authorized, case .running(let remaining, _) = restTimer {
+            scheduleRestTimerNotification(seconds: remaining)
+        }
+    }
+
+    /// "Not now". iOS is never touched, so Settings can still turn this on later.
+    func declineRestAlarmAuthorization() {
+        RestTimerAlarmPreferences.markOffered()
+        showRestAlarmPrompt = false
     }
 
     /// Add seconds to the running timer (+30s button).
@@ -1130,7 +1188,19 @@ final class ActiveWorkoutViewModel {
         switch restTimer {
         case .running(let remaining, let total):
             let newRemaining = max(1, remaining - seconds)
-            let newTotal = max(1, total - seconds)
+            // Derive the new total from elapsed + what is now displayed, rather than clamping
+            // `total` on its own. Clamping the two independently let them disagree: subtracting
+            // 15s at 0:05 showed 0:01 while `recalculateTimerAfterBackground` computed
+            // `total - elapsed` = -10 and finished the timer instantly. Same end state, but the
+            // band and the authoritative clock told different stories, and the notification was
+            // scheduled off the displayed one.
+            let elapsed: Int
+            if let timerStartDate {
+                elapsed = max(0, Int(Date().timeIntervalSince(timerStartDate)))
+            } else {
+                elapsed = max(0, total - remaining)
+            }
+            let newTotal = elapsed + newRemaining
             timerTotalDuration = newTotal
             restTimer = .running(remaining: newRemaining, total: newTotal)
             persistRunningRestTimerState(remaining: newRemaining, total: newTotal)
@@ -1231,9 +1301,18 @@ final class ActiveWorkoutViewModel {
             timerStartDate = nil
             captureRestDurationOnLastCompletedSet()
             clearPersistedRestTimerState()
-            // Don't fire the in-app alert here — the background notification
-            // already alerted the user while the app was suspended.
-            cancelRestTimerNotification()
+            // Normally the background notification already alerted the user while the app was
+            // suspended, so alerting again here would double up.
+            //
+            // When notifications are not authorized, nothing fired at all — and this branch
+            // staying quiet on the assumption that something did is what made the alarm silent
+            // in *every* state for those users. Alerting on return is late, but it is the only
+            // chance left to say the rest is over.
+            if RestTimerAlarmCoordinator.canAlertFromBackground {
+                cancelRestTimerNotification()
+            } else {
+                fireTimerAlert()
+            }
         } else {
             restTimer = .running(remaining: remaining, total: timerTotalDuration)
             persistRunningRestTimerState(remaining: remaining, total: timerTotalDuration)
@@ -1417,13 +1496,7 @@ final class ActiveWorkoutViewModel {
     }
 
     private func clearPersistedRestTimerState() {
-        let defaults = UserDefaults.standard
-        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerWorkoutId)
-        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerStartDate)
-        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerTotalDuration)
-        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerRemainingDuration)
-        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerIsPaused)
-        defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerPauseSource)
+        ActiveWorkoutSessionDefaultsKeys.clearRestTimerState()
         cancelRestTimerNotification()
     }
 
@@ -1442,6 +1515,10 @@ final class ActiveWorkoutViewModel {
 
     /// Fire haptic feedback and/or sound based on the restTimerAlertMode setting.
     private func fireTimerAlert() {
+        // Before the alert, not after: a notification already in flight for this same expiry
+        // can reach `willPresent` while this method is still running.
+        RestTimerAlarmCoordinator.shared.noteInAppAlertFired()
+
         let mode = restTimerAlertMode
         if mode == "vibration" || mode == "both" {
             AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
@@ -1454,43 +1531,20 @@ final class ActiveWorkoutViewModel {
     }
 
     // MARK: - Local Notification for Background Timer
-
-    private static let restTimerNotificationId = "restTimerComplete"
+    //
+    // Owned by `RestTimerAlarmCoordinator` — REST_TIMER_ALARM_SCOPING.md §D1/§D5. It holds the
+    // identifier where teardown paths outside this ViewModel can reach it, and it is the
+    // notification-centre delegate that decides whether a foreground alarm becomes a banner.
 
     /// Schedule a local notification to fire when the rest timer expires.
     /// This ensures the user is alerted even when the app is backgrounded.
     private func scheduleRestTimerNotification(seconds: Int) {
-        guard restTimerAlertMode != "off" else { return }
-
-        let center = UNUserNotificationCenter.current()
-        center.removePendingNotificationRequests(withIdentifiers: [Self.restTimerNotificationId])
-
-        let content = UNMutableNotificationContent()
-        content.title = "Rest Timer"
-        content.body = "Rest period is over — time for your next set!"
-        content.sound = Self.restTimerBackgroundNotificationUsesSystemSound(for: restTimerAlertMode) ? .default : nil
-
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, TimeInterval(seconds)), repeats: false)
-        let request = UNNotificationRequest(identifier: Self.restTimerNotificationId, content: content, trigger: trigger)
-        center.add(request)
+        RestTimerAlarmCoordinator.schedule(seconds: seconds, alertMode: restTimerAlertMode)
     }
 
     /// Cancel any pending rest timer notification (e.g. timer dismissed or completed in foreground).
     private func cancelRestTimerNotification() {
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [Self.restTimerNotificationId])
-    }
-
-    static func restTimerBackgroundNotificationUsesSystemSound(for alertMode: String) -> Bool {
-        switch alertMode {
-        case "off":
-            return false
-        case "vibration", "sound", "both":
-            // Local notifications do not produce a background vibration if no
-            // sound is attached, so "vibration" still needs the system alert.
-            return true
-        default:
-            return true
-        }
+        RestTimerAlarmCoordinator.cancel()
     }
 
     // MARK: - Live Activity Updates
@@ -2300,4 +2354,20 @@ extension ActiveWorkoutViewModel: SetTableDataSource {
         }
     }
 
+}
+
+// MARK: - RestTimerForegroundAlerting
+
+extension ActiveWorkoutViewModel: RestTimerForegroundAlerting {
+
+    /// A running timer has a live Combine tick that will call `fireTimerAlert()` at zero, so a
+    /// banner would be a second alert for the same event. Every other state — idle, paused,
+    /// already finished — means nothing in-app is going to speak up.
+    ///
+    /// This has to be asked rather than assumed by either side: the tick and the notification
+    /// trigger are scheduled for the same instant and genuinely race.
+    var willAlertRestTimerInApp: Bool {
+        if case .running = restTimer { return true }
+        return false
+    }
 }

@@ -131,12 +131,14 @@ struct WorkoutLiveActivityWidget: Widget {
     ///
     /// Kept separate from `restTimerSection` because that one is tuned for the
     /// Dynamic Island's expanded bottom region, where the row is narrow and the
-    /// content has to stay centered and short.
+    /// content has to stay centered and short. Both switch over the same
+    /// `ContentState.restDisplay()` so the two can only differ in chrome.
     @ViewBuilder
     private func lockScreenRestTimerSection(
         context: ActivityViewContext<WorkoutActivityAttributes>
     ) -> some View {
-        if context.state.isWorkoutPaused {
+        switch context.state.restDisplay() {
+        case .workoutPaused:
             HStack(spacing: 8) {
                 Image(systemName: "pause.circle.fill")
                     .font(.caption)
@@ -154,7 +156,8 @@ struct WorkoutLiveActivityWidget: Widget {
 
                 Spacer()
             }
-        } else if context.state.isRestTimerPaused {
+
+        case .restPaused:
             HStack(spacing: 8) {
                 Image(systemName: "pause.circle")
                     .font(.caption)
@@ -172,14 +175,15 @@ struct WorkoutLiveActivityWidget: Widget {
 
                 Spacer()
             }
-        } else if let countdown = restCountdownRange(context.state) {
+
+        case .counting(let endDate):
             // Active rest timer — countdown only (no progress bar)
             HStack(spacing: 6) {
                 Image(systemName: "timer")
                     .font(.caption)
                     .foregroundStyle(.blue)
 
-                Text(timerInterval: countdown, countsDown: true)
+                Text(timerInterval: countdownRange(to: endDate), countsDown: true)
                     .font(.caption.monospacedDigit())
                     .fontWeight(.semibold)
                     .foregroundStyle(.blue)
@@ -191,7 +195,8 @@ struct WorkoutLiveActivityWidget: Widget {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
-        } else if context.state.isRestTimerFinished {
+
+        case .complete:
             // Timer finished — prominent rest complete indicator
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
@@ -211,7 +216,8 @@ struct WorkoutLiveActivityWidget: Widget {
                     .background(.green)
                     .cornerRadius(8)
             }
-        } else {
+
+        case .ready:
             // No timer — ready for next set
             HStack(spacing: 6) {
                 Image(systemName: "arrow.right.circle")
@@ -231,7 +237,8 @@ struct WorkoutLiveActivityWidget: Widget {
     private func restTimerSection(
         context: ActivityViewContext<WorkoutActivityAttributes>
     ) -> some View {
-        if context.state.isWorkoutPaused {
+        switch context.state.restDisplay() {
+        case .workoutPaused:
             HStack(spacing: 6) {
                 Image(systemName: "pause.circle.fill")
                     .font(.caption)
@@ -248,7 +255,8 @@ struct WorkoutLiveActivityWidget: Widget {
                 }
             }
             .frame(maxWidth: .infinity)
-        } else if context.state.isRestTimerPaused {
+
+        case .restPaused:
             HStack(spacing: 6) {
                 Image(systemName: "pause.circle")
                     .font(.caption)
@@ -265,14 +273,15 @@ struct WorkoutLiveActivityWidget: Widget {
                 }
             }
             .frame(maxWidth: .infinity)
-        } else if let countdown = restCountdownRange(context.state) {
+
+        case .counting(let endDate):
             // Active rest timer — centered countdown
             HStack(spacing: 6) {
                 Image(systemName: "timer")
                     .font(.caption)
                     .foregroundStyle(.blue)
 
-                Text(timerInterval: countdown, countsDown: true)
+                Text(timerInterval: countdownRange(to: endDate), countsDown: true)
                     .font(.caption.monospacedDigit())
                     .fontWeight(.semibold)
                     .foregroundStyle(.blue)
@@ -280,7 +289,8 @@ struct WorkoutLiveActivityWidget: Widget {
                     .fixedSize()
             }
             .frame(maxWidth: .infinity)
-        } else if context.state.isRestTimerFinished {
+
+        case .complete:
             // Timer finished — prominent rest complete indicator
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
@@ -292,7 +302,8 @@ struct WorkoutLiveActivityWidget: Widget {
                     .foregroundStyle(.green)
             }
             .frame(maxWidth: .infinity)
-        } else {
+
+        case .ready:
             // No timer — ready for next set
             HStack(spacing: 6) {
                 Image(systemName: "arrow.right.circle")
@@ -312,27 +323,43 @@ struct WorkoutLiveActivityWidget: Widget {
     private func compactTrailingContent(
         context: ActivityViewContext<WorkoutActivityAttributes>
     ) -> some View {
-        if context.state.isWorkoutPaused {
+        switch context.state.restDisplay() {
+        case .workoutPaused:
             Text(formatElapsed(context.state.pausedElapsedSeconds))
                 .font(.caption2.monospacedDigit())
                 .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 32)
-        } else if context.state.isRestTimerPaused, let remaining = context.state.restTimerRemainingSeconds {
-            Text(formatTime(remaining))
-                .font(.caption2.monospacedDigit())
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .frame(minWidth: 32)
-        } else if let countdown = restCountdownRange(context.state) {
-            // Show countdown
-            Text(timerInterval: countdown, countsDown: true)
+
+        case .restPaused:
+            if let remaining = context.state.restTimerRemainingSeconds {
+                Text(formatTime(remaining))
+                    .font(.caption2.monospacedDigit())
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 32)
+            } else {
+                Text("\(context.state.currentSetNumber)/\(context.state.totalSets)")
+                    .font(.caption2.monospacedDigit())
+                    .fontWeight(.semibold)
+            }
+
+        case .counting(let endDate):
+            Text(timerInterval: countdownRange(to: endDate), countsDown: true)
                 .font(.caption2.monospacedDigit())
                 .fontWeight(.semibold)
                 .foregroundStyle(.blue)
                 .frame(minWidth: 32)
-        } else {
-            // Show set progress
+
+        case .complete:
+            // Was falling through to set progress, which is indistinguishable from having no
+            // timer at all — the one glanceable surface saying nothing at the moment it matters.
+            Image(systemName: "checkmark.circle.fill")
+                .font(.caption)
+                .foregroundStyle(.green)
+                .frame(minWidth: 32)
+
+        case .ready:
             Text("\(context.state.currentSetNumber)/\(context.state.totalSets)")
                 .font(.caption2.monospacedDigit())
                 .fontWeight(.semibold)
@@ -385,13 +412,13 @@ struct WorkoutLiveActivityWidget: Widget {
     /// long after `restTimerEndDate` if the app was suspended and never pushed a
     /// state update — so the end date has to be re-checked at render time, and `now`
     /// captured once so the comparison and the range can't disagree.
-    private func restCountdownRange(
-        _ state: WorkoutActivityAttributes.ContentState
-    ) -> ClosedRange<Date>? {
-        guard state.isRestTimerRunning, let endDate = state.restTimerEndDate else { return nil }
-        let now = Date.now
-        guard endDate > now else { return nil }
-        return now...endDate
+    /// A range safe to hand `Text(timerInterval:)`.
+    ///
+    /// `restDisplay()` already guarantees `endDate` is in the future for `.counting`, but it
+    /// samples `.now` a moment before this does. Clamping costs nothing and means a timer that
+    /// expires between the two cannot produce an inverted range, which traps.
+    private func countdownRange(to endDate: Date) -> ClosedRange<Date> {
+        min(Date.now, endDate)...endDate
     }
 
 }

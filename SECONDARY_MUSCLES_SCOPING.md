@@ -172,3 +172,7 @@ No migration. No stats rebuild. Numbers change on update.
 [COMPETITIVE_FEATURE_ANALYSIS.md](COMPETITIVE_FEATURE_ANALYSIS.md) ranks this **4th**, behind `bilateralLoadFactor` wiring, `Exercise.notes`, and custom-exercise analytics. That ranking holds — those three are smaller with larger matching demand, and items 1–3 there are independent enough to ship together.
 
 Phase 1 here is small enough to ride along with them if convenient. Phase 2 is where this earns its place.
+
+**Release target:** not 1.4. Slotted in [RELEASE_1_5_PLAN.md](RELEASE_1_5_PLAN.md)
+— Phase 1 rides 1.5 if convenient, Phase 2 is proposed as the 1.6 headline, and
+Phase 3 (the credit weighting) is deferred with no date.

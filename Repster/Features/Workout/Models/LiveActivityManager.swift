@@ -181,7 +181,12 @@ final class LiveActivityManager {
         )
 
         Task {
-            await activity.update(.init(state: updatedState, staleDate: nil))
+            // `staleDate` is the rest end date, not nil, and that is load-bearing rather than
+            // housekeeping: it is the only thing that makes WidgetKit re-render the activity at
+            // the moment rest ends. Without it nothing re-evaluates while the app is suspended,
+            // so the countdown simply froze on a spent 0:00 and the "REST COMPLETE" treatment
+            // was unreachable from the background. See `ContentState.restDisplay(at:)`.
+            await activity.update(.init(state: updatedState, staleDate: restTimerEndDate))
         }
     }
 

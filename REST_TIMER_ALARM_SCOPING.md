@@ -2,7 +2,11 @@
 
 **Date:** 2026-08-18
 **Branch:** NewMain (`42076bc` + uncommitted)
-**Status:** scoping, nothing implemented.
+**Status:** **D1–D6 implemented 2026-08-18** — see §15. **D7 (instrumentation) deliberately not
+done**: it turns on a §13.4 privacy decision that is still unanswered. D3 needs provisioning work
+that is not mine to do — §15.3.
+Suite **504, 0 failures, 4 skipped** (22 added here; the total also absorbed an 11-test net
+change from in-flight `BaselineMeterView` work that earlier runs were compiling stale — §15.5).
 **Trigger:** audit request, not a user report. No crash, no data loss — the failure mode is
 *silence*, which is why it has almost certainly been happening in production without a support
 ticket. A missed rest alarm looks like the user's own fault.
@@ -26,8 +30,9 @@ the alarm — whether the user is actually told.
    and it is never checked again — while one code path explicitly assumes it was granted. §4.
 5. **`.active` interruption level means any Focus mode silences the alarm.** Focus during a workout
    is the normal case, not an edge case. §5.
-6. **The Live Activity shows "Ready for next set" when rest ends in the background**, which is the
-   opposite of the truth. The fix is in the widget and needs no push server. §6.
+6. **The Live Activity never announces that rest is over.** It freezes on a spent countdown and
+   the "REST COMPLETE" treatment it already ships is unreachable from the background. Fixable
+   entirely in the widget, no push server. §6.
 7. **Two teardown paths can fire "Rest period is over" for a workout that no longer exists.** §7.
 8. **The suite covers none of this** — two unit tests on a string helper, nothing on the finish
    transition, the notification, or the alarm. §10.
@@ -55,11 +60,11 @@ Run every realistic scenario through that:
 | S4 | **Notification permission denied** | dead when backgrounded | never fires | stale | **SILENT** |
 | S5 | **Any Focus mode on, app backgrounded** | dead | delivered quietly — §5 | stale | **effectively SILENT** |
 | S6 | App force-quit mid-rest | dead | ✅ (OS-scheduled, survives) | activity ends at relaunch | **works** |
-| S7 | Timer ends backgrounded, user glances at Lock Screen | dead | fired already | **"Ready for next set"** | **misleading** |
+| S7 | Timer ends backgrounded, user glances at Lock Screen | dead | fired already | frozen **0:00** — §6.2 | **no completion signal** |
 
-S3, S4 and S5 are not exotic. S3 is "I tapped History to check last week's numbers." S4 is anyone
-who dismissed a permission prompt that appeared before they had seen the app. S5 is anyone who
-turns on a Focus mode to train.
+S3, S4 and S5 are not exotic. **S3 is the back button** — see §2. S4 is anyone who dismissed a
+permission prompt that appeared before they had seen the app. S5 is anyone who turns on a Focus
+mode to train.
 
 ---
 
@@ -77,6 +82,27 @@ Dismissing the cover releases the view, which releases the ViewModel, which deal
 `timerSubscription` (`AnyCancellable`) and cancels the `Timer.publish`. `timerTick()` never reaches
 zero, so `fireTimerAlert()` is never called.
 
+### 2.1 It is the back button, not a corner case
+
+The affordance that triggers this is the top-left chevron in the workout header:
+
+```swift
+// ActiveWorkoutView.swift:368-371
+// Back / dismiss button
+Button {
+    dismiss()
+}
+```
+
+No confirmation, no teardown, and the workout deliberately stays active — ContentView has a full
+resume path with its own analytics event ([:305-306](Repster/App/ContentView.swift:305)). So S3 is
+reached by the most-tapped control in iOS, doing exactly what it is designed to do.
+
+`ActiveWorkoutView` has **no `onDisappear` at all**, so nothing observes the departure. The only
+other `dismiss()` is the post-finish one at [:169](Repster/Features/Workout/Views/ActiveWorkoutView.swift:169).
+
+### 2.2 The state survives; only the alert is lost
+
 This is a supported flow, not an accident — the persistence layer exists precisely for it:
 
 ```swift
@@ -86,7 +112,8 @@ This is a supported flow, not an accident — the persistence layer exists preci
 
 `restoreRestTimerState` correctly recomputes from `restTimerStartDate` on return and lands on
 `.finished` if the timer expired ([:1372-1381](Repster/Features/Workout/ViewModels/ActiveWorkoutViewModel.swift:1372)).
-So the *state* survives the round trip perfectly. Only the alert is lost.
+So the *state* survives the round trip perfectly — come back after the timer expired and the band
+correctly reads "Rest complete". Only the alert in between is lost.
 
 ---
 
@@ -179,11 +206,16 @@ fix, and it needs to be in place before the build that depends on it goes to Tes
 The Lock Screen is where a resting lifter is actually looking. It is also the only channel that
 works with notifications denied. Today it is the weakest of the three.
 
-### 6.2 The fallthrough bug
+### 6.2 The expired timer is never announced
+
+> **Corrected.** This section first claimed the Lock Screen falls through to **"Ready for next
+> set"**. That is reachable but not what usually happens, and the claim contradicted my own
+> reasoning in D4. Both outcomes are wrong in the same way and the fix is unchanged, but the
+> severity is lower than first stated — see the end of this section.
 
 `isRestTimerFinished` is only ever set from `timerTick()`, which requires the app to be executing.
-While the app is suspended, no push happens, so the widget still holds
-`isRestTimerRunning == true` with an `restTimerEndDate` now in the past. Meanwhile:
+While the app is suspended no push happens, so the widget still holds `isRestTimerRunning == true`
+with a `restTimerEndDate` now in the past. Meanwhile:
 
 ```swift
 // WorkoutLiveActivityLiveActivity.swift:388-395
@@ -192,7 +224,7 @@ let now = Date.now
 guard endDate > now else { return nil }
 ```
 
-`restCountdownRange` returns `nil` once the end date passes. The lock-screen chain
+`restCountdownRange` returns `nil` once the end date passes, and the lock-screen chain
 ([:139-225](WorkoutLiveActivity/WorkoutLiveActivityLiveActivity.swift:139)) is:
 
 ```
@@ -200,26 +232,28 @@ if isWorkoutPaused … else if isRestTimerPaused … else if let countdown = res
 else if isRestTimerFinished … else { "Ready for next set" }
 ```
 
-so the expired timer skips the countdown branch, skips the finished branch (still `false`), and
-lands on **"Ready for next set"**. The Dynamic Island chain has the same shape and the same bug
-([:268-296](WorkoutLiveActivity/WorkoutLiveActivityLiveActivity.swift:268)).
+**But that guard only re-runs if the view body is re-evaluated**, and nothing triggers one:
+a new push is impossible while suspended, and `staleDate` is `nil`
+([LiveActivityManager.swift:184](Repster/Features/Workout/Models/LiveActivityManager.swift:184)),
+so the system has been given no date at which to reload. `Text(timerInterval:countsDown:)` is
+animated by the system without re-rendering, so it simply counts to **0:00 and stops there**.
 
-**This is fixable entirely inside the widget.** `restTimerEndDate` is already in `ContentState`
-([WorkoutActivityAttributes.swift:60](Repster/Features/Workout/Models/WorkoutActivityAttributes.swift:60))
-— the widget has everything it needs to know rest is over without being told.
+So the realistic outcome is a **frozen spent countdown reading "0:00 remaining"**. The
+"Ready for next set" branch is reachable — a system-initiated reload (Lock Screen wake, Dynamic
+Island expansion) re-evaluates the body and drops it there — but it is not deterministic, and I
+should not have stated it as the symptom.
 
-One catch worth being precise about: a bare `Date.now` comparison in the view body will not
-re-evaluate on its own when the end date passes, because nothing triggers a re-render. The
-idiomatic trigger is `staleDate`, which is currently thrown away:
+**What this changes:** a spent 0:00 does read as "rest is over", so this is *not* actively
+misleading the way "Ready for next set" would be. The real defect is narrower — **the
+"REST COMPLETE" treatment that already exists at
+[:194-213](WorkoutLiveActivity/WorkoutLiveActivityLiveActivity.swift:194) is unreachable from the
+background**, so the Lock Screen never gives a positive go signal, and the Dynamic Island chain
+([:268-296](WorkoutLiveActivity/WorkoutLiveActivityLiveActivity.swift:268)) has the same gap.
 
-```swift
-// LiveActivityManager.swift:184
-await activity.update(.init(state: updatedState, staleDate: nil))
-```
-
-Setting `staleDate` to `restTimerEndDate` makes ActivityKit re-render at that instant and flips
-`context.isStale`, which the widget can branch on. That is the whole fix: one argument in the app,
-one branch in each of the two chains.
+That lowers D4's priority (§12) but not its cost — and `restTimerEndDate` is already in
+`ContentState` ([WorkoutActivityAttributes.swift:60](Repster/Features/Workout/Models/WorkoutActivityAttributes.swift:60)),
+so the widget still has everything it needs. Setting `staleDate` to the end date is what supplies
+the missing re-render; that is the whole mechanism, and §6.3 and D4 already described it correctly.
 
 ### 6.3 `alertConfiguration` — recommend **not** doing this
 
@@ -265,19 +299,24 @@ clamps `newRemaining` and `newTotal` to 1 independently without touching `timerS
 = −10 and finishes at once. Both paths end finished, so it is cosmetic, but the displayed value and
 the authoritative value disagree, and the notification is scheduled from the displayed one.
 
-**L3 — three different fallbacks for a nil `restTimerAlert`.**
+**L3 — four sources disagree on the default `restTimerAlert`.**
 
-| Reader | Fallback |
+| Source | Says |
 |---|---|
+| `HealthProfile` doc comment ([:18](Repster/Data/Models/HealthProfile.swift:18)) | `"both"` |
+| `HealthProfile` memberwise init ([:81](Repster/Data/Models/HealthProfile.swift:81)) | `"vibration"` |
 | ViewModel ([:378](Repster/Features/Workout/ViewModels/ActiveWorkoutViewModel.swift:378)) | `"both"` |
 | Settings picker ([SettingsView.swift:771](Repster/Features/Settings/Views/SettingsView.swift:771)) | `"both"` |
 | Settings summary row ([SettingsViewModel.swift:120](Repster/Features/Settings/ViewModels/SettingsViewModel.swift:120)) | `"vibration"` |
 
-`HealthProfileRepository.fetchOrCreate()` ([:43-48](Repster/Core/Repositories/HealthProfileRepository.swift:43))
-doesn't pass the argument, so fresh profiles take the memberwise default `"vibration"` and are
-consistent. Profiles migrated from before the attribute existed hold `nil`, and those users see a
-row reading **"Vibration"** that opens a picker showing **"Both"**, with actual behaviour "Both".
-One constant, three readers.
+The model's own doc comment contradicts the initialiser three lines below it.
+
+**And the `nil` case is real, not theoretical.** `restTimerAlert` is an optional attribute added in
+`045b10b`, after the initial commit — so every profile created before that release holds `nil`
+today. `HealthProfileRepository.fetchOrCreate()` ([:43-48](Repster/Core/Repositories/HealthProfileRepository.swift:43))
+doesn't pass the argument, so *fresh* profiles take `"vibration"` and are self-consistent; migrated
+ones see a Settings row reading **"Vibration"** that opens a picker showing **"Both"**, with actual
+behaviour "Both". One constant, five readers.
 
 ---
 
@@ -359,9 +398,11 @@ Fixes **S5**. `content.interruptionLevel = .timeSensitive` plus
 profiles regenerated — same operational shape as the outstanding HealthKit App ID work, and worth
 doing in the same sitting.
 
-### D4 — Fix the widget's expired-timer rendering
+### D4 — Make the widget announce the expired timer
 
-Fixes **S7**. Two edits:
+Fixes **S7**. Per the correction in §6.2 this is "the Lock Screen never says rest is done" rather
+than "the Lock Screen lies", so it is a polish fix on the most-looked-at surface, not a defect fix.
+Two edits:
 
 1. `LiveActivityManager.updateActivity` passes `staleDate: restTimerEndDate` instead of `nil`
    when a timer is running ([:184](Repster/Features/Workout/Models/LiveActivityManager.swift:184)).
@@ -451,11 +492,12 @@ Run the suite once into a log, as usual — concurrent `xcodebuild` runs invent 
 | 1 | **D5** — cancellation reachable from outside | XS | Wants D1's object; do it in the same PR. |
 | 2 | **D2** — contextual permission, status kept, §4.2 conditional | M | The largest, and the only one with UI. |
 | 3 | **D3** — `.timeSensitive` + entitlement | XS code / M ops | Entitlement must land before the build ships. |
-| 4 | **D4** — widget expired rendering | S | Independent of everything above. |
+| 4 | **D4** — widget expired rendering | S | Independent. Demoted after the §6.2 correction — polish, not a defect. |
 | 5 | **D6** + **D7** — small fixes, instrumentation | S | D7 last, so it measures the fixed build. |
 
 Phases 0–1 together are one small PR and remove the most common silent case. Phase 4 is independent
-and could go first if you would rather ship something with a visible result.
+and could go first if you would rather ship something with a visible result — though after the §6.2
+correction it buys less than it first appeared.
 
 ---
 
@@ -485,3 +527,148 @@ and could go first if you would rather ship something with a visible result.
 - **ActivityKit push updates.** Needs a backend — see §6.3.
 - **The rest timer state machine, pause semantics, persistence and analytics.** Audited, correct,
   §9. Do not refactor them while fixing the alarm.
+
+---
+
+## 15. What shipped (2026-08-18)
+
+### 15.1 Phases 0–1 — D1 + D5
+
+New file `Repster/Core/Services/RestTimerAlarmCoordinator.swift`; six files touched; 192 insertions.
+Suite 471 → 477, 0 failures. No new compiler warnings.
+
+**One deviation from D1, deliberately.** The scope proposed tracking *view visibility* — a flag set
+from `ActiveWorkoutView.task` and cleared from `.onDisappear`. That was built instead as a **weak
+reference to the ViewModel**, which conforms to a new `RestTimerForegroundAlerting`:
+
+```swift
+var willAlertRestTimerInApp: Bool {
+    if case .running = restTimer { return true }
+    return false
+}
+```
+
+Better on three counts, and worth recording because the reasoning generalises:
+
+1. **It answers the real question.** The coordinator needs to know "will anything else alert?",
+   which is exactly "is there a live ViewModel with a running tick" — not "is a view on screen".
+2. **Deallocation clears it for free.** No teardown call to forget. The back-button case, which is
+   the entire bug, is handled by the weak reference nilling itself.
+3. **It is immune to view-lifecycle quirks.** An `onAppear`/`onDisappear` pair is fragile when the
+   screen presents its own sheets and covers — the finish sheet and the exercise picker both do.
+
+`resignForegroundAlerter` is identity-checked so a ViewModel tearing down *after* its replacement
+registered cannot clear the newer one, which SwiftUI can do across a cover transition.
+
+**Also confirmed while implementing, and worth not re-checking:** `finishWorkout` and
+`discardWorkout` both *do* cancel the alarm correctly, via `clearScreenState()` → `dismissTimer()`
+([ActiveWorkoutViewModel.swift:2150](Repster/Features/Workout/ViewModels/ActiveWorkoutViewModel.swift:2150)).
+Only the two teardown paths that run *outside* the ViewModel leaked, exactly as §7 said.
+
+**Not done, deliberately:** the `didReceive` tap-to-reopen handler mentioned under D1. It needs a
+route from the coordinator back to `ContentView.showActiveWorkout`, which is new coupling that
+belongs with the D2 permission work rather than bolted onto this change.
+
+**Still unverified on device.** Everything above is unit-tested logic; the delegate actually being
+consulted by iOS is not something the suite can prove. §11's manual matrix still stands, and rows
+S3 and §7 are the two this change is claimed to fix.
+
+### 15.2 D2, D3, D4, D6
+
+**D2 — permission.** `RestTimerAlarmCoordinator` now owns a three-valued
+`RestTimerAlarmAuthorization`, cached in `RestTimerAlarmPreferences` so view bodies and the alert
+path can read it synchronously — the same UserDefaults-backed trick `HealthKitPreferences` uses.
+
+- The request is **gone from `RepsterApp.init()`**; launch only refreshes the known status.
+- `RestAlarmPromptView` is Repster's own explainer, raised by the *first* rest timer and gated on
+  `notDetermined` as well as a one-shot flag. "Not now" never touches iOS, so the system prompt
+  stays unspent and Settings can still turn it on.
+- **§4.2 is now conditional.** `recalculateTimerAfterBackground` stays quiet only when
+  `canAlertFromBackground` is true; otherwise it fires the in-app alert, because nothing else did.
+- Granting mid-rest re-schedules the alarm already running, which would otherwise have been
+  skipped at start for want of permission.
+- Settings → Workout Preferences shows a tappable warning row when the alarm cannot reach the user.
+
+`provisional` authorization maps to `.denied`. It delivers silently to Notification Centre, and for
+"will the user be told rest is over", silent delivery is not reaching them.
+
+**D3 — code only.** `content.interruptionLevel = .timeSensitive` is set. It is **inert** until the
+entitlement lands (§15.3) — iOS silently downgrades to `.active`, today's behaviour — so this was
+safe to ship ahead of the provisioning work.
+
+**D4 — widget.** The five-way branch moved onto `ContentState.restDisplay(at:)`, shared by the Lock
+Screen, the Dynamic Island and the compact trailing view, which previously maintained three
+hand-written ladders and all carried the same gap. `staleDate` is now the rest end date rather than
+`nil` — that is what makes WidgetKit re-render at the moment rest ends, and without it nothing
+re-evaluated at all. The compact trailing view was also falling through to set progress, which is
+indistinguishable from having no timer.
+
+**D6.** `HealthProfile.defaultAlertMode` is the single nil-fallback, read by all three readers.
+**Chosen as `"both"`, not `"vibration"`** — that is what the ViewModel and picker already did, so
+no migrated user's alarm changes behaviour. The `init` default stays `"vibration"` for *new*
+profiles; the two defaults are genuinely different things and are now documented as such. §13.5 is
+therefore answered only in the safe direction — whether new profiles *should* default to `"both"`
+is still open. L2's clamp now derives the new total from elapsed + remaining so the band and the
+start-date maths agree. L1's caveat is a Settings footer line.
+
+### 15.3 Not done, and why
+
+- **The `.timeSensitive` entitlement.** Needs `com.apple.developer.usernotifications.time-sensitive`
+  enabled on the App ID and profiles regenerated — an Apple Developer portal action. Adding the key
+  to [Repster.entitlements](Repster/Repster.entitlements) *before* the capability exists breaks
+  device signing, so it was deliberately left out. **S5 stays broken until this is done.**
+- **D7 — instrumentation.** Recording notification-authorization status as an event property is the
+  unanswered §13.4 privacy question. Not a call to make silently.
+- **`didReceive` tap-to-reopen.** Still deferred; it needs a route back to
+  `ContentView.showActiveWorkout`.
+- **Device verification of D2/D3/D4.** §11's manual matrix still stands. Rows S4, S5 and S7 have
+  never been run against the fixed build.
+
+### 15.4 The double-alert race — reported and fixed same day
+
+**Reported:** one observed instance of a banner *and* the in-app alert firing together, not
+reproducible by hand. Real, and introduced by D1 — before the delegate existed nothing could ever
+present in the foreground, so a double was impossible.
+
+`timerTick()` does this, in this order:
+
+```swift
+restTimer = .finished          // ← state flips first
+…
+clearPersistedRestTimerState() // → cancelRestTimerNotification()
+fireTimerAlert()               // ← in-app alert
+```
+
+`cancelRestTimerNotification()` removes *pending* requests. Once iOS has committed to delivering,
+it is too late — so `willPresent` runs with the state already `.finished`,
+`willAlertRestTimerInApp` truthfully answers **false**, and the banner is presented on top of an
+alert that fired microseconds earlier.
+
+The predicate asked *"will anything alert?"* — future tense. The race window is exactly the moment
+something **just did**. Both channels are scheduled for the same instant, so this was always going
+to land occasionally; whether the cancel beats the delivery is a coin toss weighted by how busy the
+main thread is, which is why it appears once and then refuses to reproduce.
+
+**Fix.** The coordinator records `lastInAppAlertAt` when `fireTimerAlert()` runs — *before* it
+plays, since the notification can arrive mid-method — and suppresses anything landing within a
+five-second grace. Past tense is checked before future tense.
+
+It lives on the coordinator rather than the ViewModel on purpose: that also covers a ViewModel
+alerting while a *newer* one holds the registration, which SwiftUI can briefly produce across a
+cover transition, and which the weak reference alone does not solve.
+
+Four regression tests pin it, including one asserting the back-button case still presents — the
+grace window must not re-break what D1 fixed. `resetInAppAlertMarker()` exists purely as a test
+seam, because the coordinator is a process-wide singleton whose marker would otherwise leak
+suppression into whichever test ran next.
+
+### 15.5 A note on the suite counts
+
+The 471 baseline recorded at the start of this work was compiling **zero** Swift files — fully
+cached — and was therefore running stale test objects that predate the in-flight
+`BaselineMeterView` changes in the working tree. Ten "tick"-era geometry tests were still being
+executed from a stale object while the file on disk had already replaced them with twenty-one
+"bar/track" ones.
+
+Nothing was failing and nothing was lost, but **local incremental runs here can silently execute
+stale tests**. Worth a clean build before trusting a count.

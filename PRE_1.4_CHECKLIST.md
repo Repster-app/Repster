@@ -753,6 +753,8 @@ page converts badly, every in-app funnel is being fed pre-filtered traffic.
 
 ## 8. Reconsider the backup's scope — DEFERRED TO 1.5 (decided 2026-08-14)
 
+> **Tracked in [RELEASE_1_5_PLAN.md](RELEASE_1_5_PLAN.md) §1.1.**
+>
 > **Deferred.** Not blocking for 1.4 and explicitly postponed to get 1.4 out. The
 > `BodyweightEntry` gap is the one to do first when this is picked up. Nothing here
 > is a regression — it is all pre-existing behaviour.
@@ -811,6 +813,8 @@ different row. Cosmetic — counts and numbers are identical — and it is why
 
 ## 9. Bodyweight-style sets read differently on different screens — DEFERRED TO 1.5 (decided 2026-08-14)
 
+> **Tracked in [RELEASE_1_5_PLAN.md](RELEASE_1_5_PLAN.md) §1.2.**
+>
 > **Deferred.** Cosmetic, pre-existing, and shipping in 1.3 already. Postponed to
 > get 1.4 out. `WorkoutJourneyTests` still pins the current `10 kg` behaviour, so
 > nothing silently drifts in the meantime.

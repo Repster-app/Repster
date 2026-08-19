@@ -1,109 +1,189 @@
 // BaselineMeterGeometryTests.swift
-// The meter has to stay proportional across the whole ratio range.
+// The week-vs-usual comparison and the muscle rows have to stay proportional
+// across the whole ratio range.
 //
-// The version this replaces anchored the baseline tick at a fixed 74% and
-// clamped the fill to the track, so every week past ~1.35x baseline drew
-// identically — the failure only appeared at ratios nobody had looked at.
+// Two generations of bug live behind these tests. The first anchored the
+// baseline tick at a fixed 74% and clamped the fill, so every week past ~1.35x
+// drew identically. The second scaled the muscle rows to one shared maximum, so
+// a leg-focused week drew legs at the full track and every other group as a
+// stub — the panel went blank exactly when it had something to say.
 
 import XCTest
 @testable import Repster
 
-final class BaselineMeterGeometryTests: XCTestCase {
+final class WeekComparisonGeometryTests: XCTestCase {
 
-    // MARK: - The fill stays honest
+    // MARK: - Both bars stay honest
 
-    func testFillNeverReachesTheEdge() {
-        // Ratios spanning far below to far above the user's norm.
-        let cases: [(current: Int, baseline: Double)] = [
-            (0, 12), (2, 12), (5, 12), (12, 12), (17, 12), (24, 12), (24, 6), (60, 5),
-        ]
+    func testTheLargerBarFillsTheTrack() {
+        // Whichever side is bigger sets the scale, in both directions.
+        let heavy = WeekComparisonGeometry(current: 39, usual: 16)
+        XCTAssertEqual(heavy.currentFraction, 1.0, accuracy: 0.0001)
+        XCTAssertLessThan(heavy.usualFraction, 1.0)
 
-        for (current, baseline) in cases {
-            let geometry = BaselineMeterGeometry(current: current, baseline: baseline)
-            XCTAssertLessThan(
-                geometry.fillFraction, 1.0,
-                "fill pinned at \(current) vs \(baseline)"
-            )
-            XCTAssertLessThan(
-                geometry.tickFraction, 1.0,
-                "tick pinned at \(current) vs \(baseline)"
-            )
-        }
+        let light = WeekComparisonGeometry(current: 5, usual: 12)
+        XCTAssertEqual(light.usualFraction, 1.0, accuracy: 0.0001)
+        XCTAssertLessThan(light.currentFraction, 1.0)
     }
 
-    /// The specific regression: two different weeks well above baseline used to
-    /// render the same because both clamped.
-    func testWeeksAboveBaselineStayDistinguishable() {
-        let seventeen = BaselineMeterGeometry(current: 17, baseline: 12)
-        let twentyFour = BaselineMeterGeometry(current: 24, baseline: 12)
-
-        XCTAssertGreaterThan(twentyFour.fillFraction, seventeen.fillFraction)
+    func testBarsAreProportionalToEachOther() {
+        // 24 against a usual of 12 draws exactly twice the usual bar.
+        let geometry = WeekComparisonGeometry(current: 24, usual: 12)
+        XCTAssertEqual(geometry.currentFraction, geometry.usualFraction * 2, accuracy: 0.0001)
     }
 
-    func testFillIsProportionalToTheTick() {
-        // 24 sets against a baseline of 12 should draw exactly twice the tick.
-        let geometry = BaselineMeterGeometry(current: 24, baseline: 12)
-        XCTAssertEqual(geometry.fillFraction, geometry.tickFraction * 2, accuracy: 0.0001)
+    func testMatchingWeekAndUsualDrawTheSame() {
+        let geometry = WeekComparisonGeometry(current: 12, usual: 12)
+        XCTAssertEqual(geometry.currentFraction, geometry.usualFraction, accuracy: 0.0001)
     }
 
-    func testMatchingWeekAndBaselineLandTogether() {
-        let geometry = BaselineMeterGeometry(current: 12, baseline: 12)
-        XCTAssertEqual(geometry.fillFraction, geometry.tickFraction, accuracy: 0.0001)
-    }
-
-    // MARK: - The tick moves with the data
-
-    func testTickSitsHighWhenTheWeekIsLight() {
-        // A light week leaves the baseline out near the end of the track.
-        let geometry = BaselineMeterGeometry(current: 5, baseline: 12)
-        XCTAssertEqual(geometry.tickFraction, 1 / BaselineMeterGeometry.headroom, accuracy: 0.0001)
-        XCTAssertLessThan(geometry.fillFraction, geometry.tickFraction)
-    }
-
-    func testTickSitsLowWhenTheWeekIsHeavy() {
-        // 24 vs 12: the week sets the scale, so the tick lands near the middle.
-        let geometry = BaselineMeterGeometry(current: 24, baseline: 12)
-        XCTAssertEqual(geometry.tickFraction, 0.446, accuracy: 0.005)
+    /// The original regression, restated: two different heavy weeks must not
+    /// render identically. Both fill the track now, so the difference has to
+    /// show up in how far short of it the usual bar stops.
+    func testWeeksAboveUsualStayDistinguishable() {
+        let seventeen = WeekComparisonGeometry(current: 17, usual: 12)
+        let twentyFour = WeekComparisonGeometry(current: 24, usual: 12)
+        XCTAssertLessThan(twentyFour.usualFraction, seventeen.usualFraction)
     }
 
     // MARK: - Degenerate input
 
-    func testNothingLoggedStillPlacesTheTick() {
-        let geometry = BaselineMeterGeometry(current: 0, baseline: 12)
-        XCTAssertEqual(geometry.fillFraction, 0)
-        XCTAssertGreaterThan(geometry.tickFraction, 0)
+    func testNothingLoggedStillDrawsTheUsualBar() {
+        let geometry = WeekComparisonGeometry(current: 0, usual: 12)
+        XCTAssertEqual(geometry.currentFraction, 0)
+        XCTAssertEqual(geometry.usualFraction, 1.0, accuracy: 0.0001)
     }
 
-    func testZeroBaselineDoesNotDivideByZero() {
-        let geometry = BaselineMeterGeometry(current: 0, baseline: 0)
-        XCTAssertEqual(geometry.fillFraction, 0)
-        XCTAssertEqual(geometry.tickFraction, 0)
+    func testZeroUsualDoesNotDivideByZero() {
+        let geometry = WeekComparisonGeometry(current: 0, usual: 0)
+        XCTAssertEqual(geometry.currentFraction, 0)
+        XCTAssertEqual(geometry.usualFraction, 0)
     }
 
-    // MARK: - Caption stays inside the track
+    // MARK: - The relation in words
 
-    func testCaptionIsClampedAtBothEnds() {
-        let width: CGFloat = 300
-        let captionWidth = BaselineMeterGeometry.captionWidth
+    func testLargeGapsReadAsMultiples() {
+        XCTAssertEqual(
+            WeekComparisonGeometry.relationText(current: 39, usual: 16),
+            "2.4\u{00D7} your usual"
+        )
+    }
 
-        // Tick near the right edge (very light week) and near the left edge
-        // (very heavy week) are the two cases that could push it out of bounds.
-        for (current, baseline) in [(1, 40.0), (60, 5.0), (0, 12.0), (12, 12.0)] {
-            let offset = BaselineMeterGeometry(current: current, baseline: baseline)
-                .captionOffset(width: width)
-            XCTAssertGreaterThanOrEqual(offset, 0, "caption clipped left at \(current)/\(baseline)")
-            XCTAssertLessThanOrEqual(
-                offset, width - captionWidth,
-                "caption clipped right at \(current)/\(baseline)"
-            )
+    func testWholeMultiplesDropTheDecimal() {
+        XCTAssertEqual(
+            WeekComparisonGeometry.relationText(current: 24, usual: 12),
+            "2\u{00D7} your usual"
+        )
+    }
+
+    func testModerateGapsReadAsPercentages() {
+        XCTAssertEqual(
+            WeekComparisonGeometry.relationText(current: 15, usual: 12),
+            "25% above your usual"
+        )
+        XCTAssertEqual(
+            WeekComparisonGeometry.relationText(current: 9, usual: 12),
+            "25% below your usual"
+        )
+    }
+
+    func testSmallGapsReadAsUnremarkable() {
+        XCTAssertEqual(
+            WeekComparisonGeometry.relationText(current: 12, usual: 12.3),
+            "about your usual"
+        )
+    }
+
+    func testAnEmptyWeekSaysSoRatherThanReadingAsMinusOneHundredPercent() {
+        XCTAssertEqual(
+            WeekComparisonGeometry.relationText(current: 0, usual: 12),
+            "nothing logged this week"
+        )
+    }
+
+    func testNoUsualMeansNoRelation() {
+        XCTAssertNil(WeekComparisonGeometry.relationText(current: 12, usual: 0))
+    }
+}
+
+final class MuscleRowGeometryTests: XCTestCase {
+
+    // MARK: - Rows are read against their own usual
+
+    func testMatchingTheUsualLandsOnTheReferenceLine() {
+        let geometry = MuscleRowGeometry(current: 20, usual: 20)
+        XCTAssertEqual(
+            geometry.fillFraction, MuscleRowGeometry.usualFraction, accuracy: 0.0001
+        )
+        XCTAssertFalse(geometry.isOverCap)
+    }
+
+    /// The whole point of the change: two groups an order of magnitude apart in
+    /// absolute terms draw the same when both matched their own usual.
+    func testGroupsOfDifferentSizesDrawAlikeWhenBothAreOnTarget() {
+        let legs = MuscleRowGeometry(current: 284, usual: 284)
+        let triceps = MuscleRowGeometry(current: 12, usual: 12)
+        XCTAssertEqual(legs.fillFraction, triceps.fillFraction, accuracy: 0.0001)
+    }
+
+    /// The reported screen. Under the old shared scale legs filled the track and
+    /// shoulders drew 8% of it; the ratio scale has to leave shoulders visible
+    /// and place it below the line.
+    func testALegFocusedWeekLeavesTheOtherGroupsReadable() {
+        let legs = MuscleRowGeometry(current: 284, usual: 43)
+        let shoulders = MuscleRowGeometry(current: 24, usual: 34)
+
+        XCTAssertTrue(legs.isOverCap)
+        XCTAssertEqual(legs.fillFraction, 1.0, accuracy: 0.0001)
+
+        XCTAssertGreaterThan(shoulders.fillFraction, 0.3)
+        XCTAssertLessThan(shoulders.fillFraction, MuscleRowGeometry.usualFraction)
+    }
+
+    func testHalfTheUsualDrawsHalfwayToTheLine() {
+        let geometry = MuscleRowGeometry(current: 10, usual: 20)
+        XCTAssertEqual(
+            geometry.fillFraction, MuscleRowGeometry.usualFraction / 2, accuracy: 0.0001
+        )
+    }
+
+    func testTheCapIsMarkedRatherThanSilent() {
+        let atCap = MuscleRowGeometry(current: 40, usual: 20)
+        XCTAssertEqual(atCap.fillFraction, 1.0, accuracy: 0.0001)
+        XCTAssertFalse(atCap.isOverCap, "exactly twice is the cap, not past it")
+
+        let pastCap = MuscleRowGeometry(current: 41, usual: 20)
+        XCTAssertTrue(pastCap.isOverCap)
+    }
+
+    func testFillNeverExceedsTheTrack() {
+        for current in [0.0, 1, 19, 20, 21, 200, 5_000] {
+            let geometry = MuscleRowGeometry(current: current, usual: 20)
+            XCTAssertLessThanOrEqual(geometry.fillFraction, 1.0, "overflowed at \(current)")
+            XCTAssertGreaterThanOrEqual(geometry.fillFraction, 0.0, "underflowed at \(current)")
         }
     }
 
-    func testCaptionCentresOnTheTickWhenThereIsRoom() {
-        let width: CGFloat = 300
-        let geometry = BaselineMeterGeometry(current: 24, baseline: 12)
-        let expected = width * geometry.tickFraction - BaselineMeterGeometry.captionWidth / 2
+    // MARK: - Degenerate input
 
-        XCTAssertEqual(geometry.captionOffset(width: width), expected, accuracy: 0.01)
+    func testASkippedGroupDrawsNothing() {
+        let geometry = MuscleRowGeometry(current: 0, usual: 34)
+        XCTAssertEqual(geometry.fillFraction, 0)
+        XCTAssertFalse(geometry.isOverCap)
+        XCTAssertFalse(geometry.isUncompared)
+    }
+
+    /// A group first trained this week has no ratio behind it, so the row says
+    /// "new" rather than dividing by zero.
+    func testAGroupWithNoHistoryIsMarkedUncompared() {
+        let geometry = MuscleRowGeometry(current: 18, usual: 0)
+        XCTAssertTrue(geometry.isUncompared)
+        XCTAssertEqual(geometry.fillFraction, 1.0, accuracy: 0.0001)
+    }
+
+    func testNoBaselineAndNoWorkDrawsAnEmptyRow() {
+        let geometry = MuscleRowGeometry(current: 0, usual: nil)
+        XCTAssertEqual(geometry.fillFraction, 0)
+        XCTAssertFalse(geometry.isUncompared)
     }
 }

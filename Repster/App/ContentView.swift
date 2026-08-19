@@ -595,6 +595,12 @@ struct ContentView: View {
                 )
                 WorkoutStartContextStore.clear()
                 try await services.workoutService.deleteWorkout(activeWorkout.id)
+
+                // This discard runs without ever building `ActiveWorkoutViewModel`, so none of
+                // its teardown fires. Left alone, a rest timer running at the moment of discard
+                // would still announce itself minutes later.
+                ActiveWorkoutSessionDefaultsKeys.clearRestTimerState()
+                RestTimerAlarmCoordinator.cancel()
             }
             showDiscardConfirmation = false
             pendingCopyWorkoutId = nil

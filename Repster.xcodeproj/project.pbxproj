@@ -85,6 +85,7 @@
 		AC0011 /* ElapsedTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0011 /* ElapsedTimerView.swift */; };
 		AC0012 /* ExercisePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0012 /* ExercisePickerSheet.swift */; };
 		AC0013 /* RestTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0013 /* RestTimerView.swift */; };
+		RTA0002 /* RestAlarmPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = RTA1002 /* RestAlarmPromptView.swift */; };
 		AC0014 /* WorkoutSummarySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0014 /* WorkoutSummarySheet.swift */; };
 		AC0015 /* ExerciseInfoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0015 /* ExerciseInfoData.swift */; };
 		AC0016 /* ExerciseInfoProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0016 /* ExerciseInfoProvider.swift */; };
@@ -206,6 +207,7 @@
 		ATRB0001 /* AttributionServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = ATRB1001 /* AttributionServiceProtocol.swift */; };
 		ATRB0002 /* AttributionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ATRB1002 /* AttributionService.swift */; };
 		HK0002 /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = HK1002 /* HealthKitService.swift */; };
+		RTA0001 /* RestTimerAlarmCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = RTA1001 /* RestTimerAlarmCoordinator.swift */; };
 		HK0003 /* HealthKitEnergyEstimateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = HK1003 /* HealthKitEnergyEstimateTests.swift */; };
 		HLTH01 /* AppleHealthConnectionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = HLTH11 /* AppleHealthConnectionModel.swift */; };
 		HLTH02 /* AppleHealthPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = HLTH12 /* AppleHealthPromptView.swift */; };
@@ -387,6 +389,7 @@
 		BC0011 /* ElapsedTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElapsedTimerView.swift; sourceTree = "<group>"; };
 		BC0012 /* ExercisePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExercisePickerSheet.swift; sourceTree = "<group>"; };
 		BC0013 /* RestTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerView.swift; sourceTree = "<group>"; };
+		RTA1002 /* RestAlarmPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestAlarmPromptView.swift; sourceTree = "<group>"; };
 		BC0014 /* WorkoutSummarySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSummarySheet.swift; sourceTree = "<group>"; };
 		BC0015 /* ExerciseInfoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseInfoData.swift; sourceTree = "<group>"; };
 		BC0016 /* ExerciseInfoProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseInfoProvider.swift; sourceTree = "<group>"; };
@@ -508,6 +511,7 @@
 		ATRB1001 /* AttributionServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttributionServiceProtocol.swift; sourceTree = "<group>"; };
 		ATRB1002 /* AttributionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttributionService.swift; sourceTree = "<group>"; };
 		HK1002 /* HealthKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitService.swift; sourceTree = "<group>"; };
+		RTA1001 /* RestTimerAlarmCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerAlarmCoordinator.swift; sourceTree = "<group>"; };
 		HK1003 /* HealthKitEnergyEstimateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitEnergyEstimateTests.swift; sourceTree = "<group>"; };
 		HLTH11 /* AppleHealthConnectionModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleHealthConnectionModel.swift; sourceTree = "<group>"; };
 		HLTH12 /* AppleHealthPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleHealthPromptView.swift; sourceTree = "<group>"; };
@@ -816,6 +820,7 @@
 				BC0011 /* ElapsedTimerView.swift */,
 				BC0012 /* ExercisePickerSheet.swift */,
 				BC0013 /* RestTimerView.swift */,
+				RTA1002 /* RestAlarmPromptView.swift */,
 				BC0014 /* WorkoutSummarySheet.swift */,
 				BC0023 /* EditWorkoutView.swift */,
 			);
@@ -1064,6 +1069,7 @@
 			isa = PBXGroup;
 			children = (
 				HK1002 /* HealthKitService.swift */,
+				RTA1001 /* RestTimerAlarmCoordinator.swift */,
 				ATRB1002 /* AttributionService.swift */,
 				D60001 /* Protocols */,
 				PH1002 /* AnalyticsService.swift */,
@@ -1612,6 +1618,7 @@
 				ATRB0001 /* AttributionServiceProtocol.swift in Sources */,
 				ATRB0002 /* AttributionService.swift in Sources */,
 				HK0002 /* HealthKitService.swift in Sources */,
+				RTA0001 /* RestTimerAlarmCoordinator.swift in Sources */,
 				A10001 /* TrackingType.swift in Sources */,
 				A10002 /* SetType.swift in Sources */,
 				A10003 /* EquipmentType.swift in Sources */,
@@ -1683,6 +1690,7 @@
 				AC0011 /* ElapsedTimerView.swift in Sources */,
 				AC0012 /* ExercisePickerSheet.swift in Sources */,
 				AC0013 /* RestTimerView.swift in Sources */,
+				RTA0002 /* RestAlarmPromptView.swift in Sources */,
 				AC0014 /* WorkoutSummarySheet.swift in Sources */,
 				AC0023 /* EditWorkoutView.swift in Sources */,
 				AC0021 /* SetTableDataSource.swift in Sources */,

@@ -15,8 +15,17 @@ final class HealthProfile {
     var defaultWarmupRestTimeSeconds: Int?
 
     /// Alert mode when rest timer finishes: "off", "vibration", "sound", or "both".
-    /// Default: "both".
+    ///
+    /// Two different defaults apply and they are deliberately not the same value:
+    /// a *new* profile is created with `"vibration"` (see `init`), while a profile from before
+    /// this attribute existed reads `nil` and is treated as `defaultAlertMode` below. Changing
+    /// the latter would silently alter the alarm for every migrated user.
     var restTimerAlert: String?
+
+    /// What a `nil` `restTimerAlert` means. Read by the ViewModel and both Settings surfaces,
+    /// which previously disagreed — the picker said "Both", the summary row said "Vibration",
+    /// and the behaviour was "Both".
+    static let defaultAlertMode = "both"
 
     // MARK: - Smart Suggestions Settings (legacy field names for migration compatibility)
 

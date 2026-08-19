@@ -156,6 +156,15 @@ struct ActiveWorkoutView: View {
         .sheet(isPresented: $viewModel.showAddExerciseSheet) {
             exercisePickerSheet
         }
+        // Repster's own notification explainer, raised by the first rest timer (§D2).
+        .sheet(isPresented: $viewModel.showRestAlarmPrompt) {
+            RestAlarmPromptView(
+                onEnable: { Task { await viewModel.enableRestAlarmAuthorization() } },
+                onDecline: { viewModel.declineRestAlarmAuthorization() },
+                isRequesting: viewModel.isRequestingRestAlarmAuthorization
+            )
+            .presentationDetents([.medium, .large])
+        }
         // Finish workout summary sheet (WP07 T032)
         .sheet(isPresented: $viewModel.showFinishSheet) {
             WorkoutSummarySheet(viewModel: viewModel)

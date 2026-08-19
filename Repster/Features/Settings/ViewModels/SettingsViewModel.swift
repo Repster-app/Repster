@@ -116,13 +116,26 @@ final class SettingsViewModel {
         return "Same as working"
     }
 
+    /// Refreshed on appear. When notifications are off, the Timer Alert picker is describing
+    /// something that cannot happen once Repster is in the background — worth saying out loud
+    /// rather than leaving the user to conclude the alarm is broken.
+    var restAlarmAuthorization: RestTimerAlarmAuthorization = RestTimerAlarmPreferences.lastKnownAuthorization
+
+    var showsRestAlarmPermissionWarning: Bool {
+        restAlarmAuthorization != .authorized
+    }
+
+    func refreshRestAlarmAuthorization() async {
+        restAlarmAuthorization = await RestTimerAlarmCoordinator.refreshAuthorization()
+    }
+
     var restTimerAlertDisplayName: String {
-        switch profile?.restTimerAlert ?? "vibration" {
+        switch profile?.restTimerAlert ?? HealthProfile.defaultAlertMode {
         case "off": return "Off"
         case "vibration": return "Vibration"
         case "sound": return "Sound"
         case "both": return "Both"
-        default: return "Vibration"
+        default: return "Both"
         }
     }
 

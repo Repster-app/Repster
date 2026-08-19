@@ -227,11 +227,11 @@ actor SettingsService: SettingsServiceProtocol {
         userDefaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockAccumulatedElapsedSeconds)
         userDefaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockLastResumedAt)
         userDefaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockIsPaused)
-        userDefaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerWorkoutId)
-        userDefaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerStartDate)
-        userDefaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerTotalDuration)
-        userDefaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerRemainingDuration)
-        userDefaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerIsPaused)
-        userDefaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerPauseSource)
+        ActiveWorkoutSessionDefaultsKeys.clearRestTimerState(in: userDefaults)
+
+        // Clearing the keys is not enough on its own: the alarm is scheduled with iOS, not
+        // stored here, so wiping the state without this left a pending "rest is over" to fire
+        // for a workout that no longer exists.
+        RestTimerAlarmCoordinator.cancel()
     }
 }

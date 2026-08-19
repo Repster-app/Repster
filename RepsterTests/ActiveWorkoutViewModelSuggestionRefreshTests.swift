@@ -1,5 +1,6 @@
 import XCTest
 import SwiftData
+import UserNotifications
 @testable import Repster
 
 @MainActor
@@ -272,14 +273,421 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
 
     func testBackgroundRestTimerNotificationUsesSystemSoundForVibrationMode() {
         XCTAssertTrue(
-            ActiveWorkoutViewModel.restTimerBackgroundNotificationUsesSystemSound(for: "vibration")
+            RestTimerAlarmCoordinator.usesSystemSound(for: "vibration")
         )
     }
 
     func testBackgroundRestTimerNotificationDisablesSystemSoundWhenAlertsAreOff() {
         XCTAssertFalse(
-            ActiveWorkoutViewModel.restTimerBackgroundNotificationUsesSystemSound(for: "off")
+            RestTimerAlarmCoordinator.usesSystemSound(for: "off")
         )
+    }
+
+    // MARK: - Rest timer alarm: foreground presentation
+    //
+    // The rule these pin down: a rest alarm arriving while Repster is in the foreground becomes
+    // a banner *unless* something in-app is about to alert for the same event. The tick and the
+    // notification trigger are scheduled for the same instant and race every set, so getting
+    // this wrong is either a double alert or — as shipped — total silence.
+
+    func testForegroundAlarmIsSuppressedWhileARunningTimerWillAlertInApp() {
+        RestTimerAlarmCoordinator.shared.resetInAppAlertMarker()
+        let alerter = StubForegroundAlerter(willAlert: true)
+        RestTimerAlarmCoordinator.shared.registerForegroundAlerter(alerter)
+        defer { RestTimerAlarmCoordinator.shared.resignForegroundAlerter(alerter) }
+
+        XCTAssertEqual(RestTimerAlarmCoordinator.shared.currentPresentationOptions(), [])
+    }
+
+    func testForegroundAlarmPresentsWhenTheRegisteredHandlerWillNotAlert() {
+        RestTimerAlarmCoordinator.shared.resetInAppAlertMarker()
+        let alerter = StubForegroundAlerter(willAlert: false)
+        RestTimerAlarmCoordinator.shared.registerForegroundAlerter(alerter)
+        defer { RestTimerAlarmCoordinator.shared.resignForegroundAlerter(alerter) }
+
+        XCTAssertEqual(
+            RestTimerAlarmCoordinator.shared.currentPresentationOptions(),
+            [.banner, .sound, .list]
+        )
+    }
+
+    /// The back-button case, and the reason the reference is weak rather than a flag someone
+    /// has to remember to clear: the ViewModel simply goes away with the workout cover.
+    func testForegroundAlarmPresentsOnceTheHandlerHasBeenDeallocated() {
+        RestTimerAlarmCoordinator.shared.resetInAppAlertMarker()
+        do {
+            let alerter = StubForegroundAlerter(willAlert: true)
+            RestTimerAlarmCoordinator.shared.registerForegroundAlerter(alerter)
+            XCTAssertEqual(RestTimerAlarmCoordinator.shared.currentPresentationOptions(), [])
+        }
+
+        XCTAssertEqual(
+            RestTimerAlarmCoordinator.shared.currentPresentationOptions(),
+            [.banner, .sound, .list],
+            "A deallocated handler must not keep suppressing the alarm"
+        )
+    }
+
+    /// SwiftUI can hold the outgoing and incoming ViewModel at once across a cover transition.
+    func testResigningAnOlderHandlerDoesNotClearItsReplacement() {
+        RestTimerAlarmCoordinator.shared.resetInAppAlertMarker()
+        let outgoing = StubForegroundAlerter(willAlert: false)
+        let incoming = StubForegroundAlerter(willAlert: true)
+
+        RestTimerAlarmCoordinator.shared.registerForegroundAlerter(outgoing)
+        RestTimerAlarmCoordinator.shared.registerForegroundAlerter(incoming)
+        RestTimerAlarmCoordinator.shared.resignForegroundAlerter(outgoing)
+        defer { RestTimerAlarmCoordinator.shared.resignForegroundAlerter(incoming) }
+
+        XCTAssertEqual(RestTimerAlarmCoordinator.shared.currentPresentationOptions(), [])
+    }
+
+    // MARK: - Rest timer alarm: the double-alert race
+    //
+    // Reported after the delegate shipped: one observed instance of both a banner and the in-app
+    // alert, not reproducible by hand. `timerTick()` sets `restTimer = .finished` before firing
+    // the alert, so a notification iOS had already committed to delivering reaches `willPresent`
+    // with the state no longer `.running` — the handler truthfully answers "nothing will alert",
+    // about an alert that just happened.
+
+    func testNotificationArrivingJustAfterTheInAppAlertIsSuppressed() {
+        let alertedAt = Date()
+
+        XCTAssertEqual(
+            RestTimerAlarmCoordinator.presentationOptions(
+                // False exactly as the real handler reports it once state is `.finished`.
+                hasInAppAlerter: false,
+                lastInAppAlertAt: alertedAt,
+                now: alertedAt.addingTimeInterval(0.2)
+            ),
+            []
+        )
+    }
+
+    func testAnOldInAppAlertDoesNotSuppressALaterAlarm() {
+        let alertedAt = Date()
+
+        XCTAssertEqual(
+            RestTimerAlarmCoordinator.presentationOptions(
+                hasInAppAlerter: false,
+                lastInAppAlertAt: alertedAt,
+                now: alertedAt.addingTimeInterval(60)
+            ),
+            [.banner, .sound, .list]
+        )
+    }
+
+    /// The fix must not re-break the back-button case it was built on top of.
+    func testNoInAppAlertEverMeansTheAlarmStillPresents() {
+        XCTAssertEqual(
+            RestTimerAlarmCoordinator.presentationOptions(
+                hasInAppAlerter: false,
+                lastInAppAlertAt: nil
+            ),
+            [.banner, .sound, .list]
+        )
+    }
+
+    func testMarkingAnInAppAlertSuppressesThroughTheLiveCoordinator() {
+        RestTimerAlarmCoordinator.shared.resetInAppAlertMarker()
+        defer { RestTimerAlarmCoordinator.shared.resetInAppAlertMarker() }
+
+        // No handler registered — the back-button shape, which must present.
+        XCTAssertEqual(
+            RestTimerAlarmCoordinator.shared.currentPresentationOptions(),
+            [.banner, .sound, .list]
+        )
+
+        RestTimerAlarmCoordinator.shared.noteInAppAlertFired()
+
+        XCTAssertEqual(
+            RestTimerAlarmCoordinator.shared.currentPresentationOptions(),
+            [],
+            "A notification landing right after the in-app alert is the same event"
+        )
+    }
+
+    // MARK: - Rest timer alarm: what the ViewModel promises the coordinator
+
+    func testViewModelOnlyClaimsTheInAppAlertWhileTheTimerIsRunning() async throws {
+        clearActiveWorkoutSessionDefaults()
+        defer { clearActiveWorkoutSessionDefaults() }
+
+        let profile = HealthProfile()
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: WorkoutServiceStub(),
+            setService: SetServiceStub(),
+            exerciseService: ExerciseServiceStub(),
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+        viewModel.workout = Workout(
+            id: UUID(),
+            date: Date(),
+            startTime: Date().addingTimeInterval(-30),
+            status: .inProgress
+        )
+
+        XCTAssertFalse(viewModel.willAlertRestTimerInApp, "idle")
+
+        viewModel.startRestTimer(duration: 30)
+        XCTAssertTrue(viewModel.willAlertRestTimerInApp, "running")
+
+        viewModel.toggleRestTimerPause()
+        XCTAssertFalse(viewModel.willAlertRestTimerInApp, "paused — no tick will fire")
+
+        viewModel.toggleRestTimerPause()
+        XCTAssertTrue(viewModel.willAlertRestTimerInApp, "resumed")
+
+        viewModel.dismissTimer()
+        XCTAssertFalse(viewModel.willAlertRestTimerInApp, "dismissed")
+    }
+
+    /// L2: the band and the start-date maths used to disagree after a clamped subtraction.
+    func testSubtractingPastZeroKeepsTheDisplayedAndAuthoritativeClocksInAgreement() async throws {
+        clearActiveWorkoutSessionDefaults()
+        defer { clearActiveWorkoutSessionDefaults() }
+
+        let profile = HealthProfile()
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: WorkoutServiceStub(),
+            setService: SetServiceStub(),
+            exerciseService: ExerciseServiceStub(),
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+        viewModel.workout = Workout(
+            id: UUID(),
+            date: Date(),
+            startTime: Date().addingTimeInterval(-30),
+            status: .inProgress
+        )
+
+        viewModel.startRestTimer(duration: 5)
+        viewModel.subtractTime(15)
+
+        guard case .running(let remaining, let total) = viewModel.restTimer else {
+            return XCTFail("Expected the timer to still be running after a clamped subtraction")
+        }
+        XCTAssertEqual(remaining, 1, "clamped to the 1s floor")
+
+        // total - elapsed is what `recalculateTimerAfterBackground` recomputes from. With
+        // elapsed ~0 immediately after starting, it has to land on the displayed remaining.
+        XCTAssertEqual(total, remaining, "total must equal elapsed + remaining, and elapsed is ~0")
+    }
+
+    // MARK: - Rest alarm authorization
+
+    private func clearRestAlarmPreferences() {
+        let d = UserDefaults.standard
+        d.removeObject(forKey: RestTimerAlarmPreferences.authorizationKey)
+        d.removeObject(forKey: RestTimerAlarmPreferences.hasBeenOfferedKey)
+    }
+
+    func testAuthorizationMappingTreatsProvisionalAsUnableToAlert() {
+        XCTAssertEqual(RestTimerAlarmCoordinator.authorization(for: .notDetermined), .notDetermined)
+        XCTAssertEqual(RestTimerAlarmCoordinator.authorization(for: .denied), .denied)
+        XCTAssertEqual(RestTimerAlarmCoordinator.authorization(for: .authorized), .authorized)
+        XCTAssertEqual(RestTimerAlarmCoordinator.authorization(for: .ephemeral), .authorized)
+
+        // Provisional delivers silently to Notification Centre. For "will the user be told rest
+        // is over", silent delivery is not reaching them.
+        XCTAssertEqual(RestTimerAlarmCoordinator.authorization(for: .provisional), .denied)
+    }
+
+    /// The flag `recalculateTimerAfterBackground` consults before deciding to stay quiet.
+    func testCanAlertFromBackgroundOnlyWhenAuthorized() {
+        clearRestAlarmPreferences()
+        defer { clearRestAlarmPreferences() }
+
+        XCTAssertFalse(RestTimerAlarmCoordinator.canAlertFromBackground, "notDetermined")
+
+        RestTimerAlarmPreferences.store(.denied)
+        XCTAssertFalse(RestTimerAlarmCoordinator.canAlertFromBackground, "denied")
+
+        RestTimerAlarmPreferences.store(.authorized)
+        XCTAssertTrue(RestTimerAlarmCoordinator.canAlertFromBackground, "authorized")
+    }
+
+    private func makeTimerViewModel() -> ActiveWorkoutViewModel {
+        let profile = HealthProfile()
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: WorkoutServiceStub(),
+            setService: SetServiceStub(),
+            exerciseService: ExerciseServiceStub(),
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+        viewModel.workout = Workout(
+            id: UUID(),
+            date: Date(),
+            startTime: Date().addingTimeInterval(-30),
+            status: .inProgress
+        )
+        return viewModel
+    }
+
+    func testFirstRestTimerRaisesTheExplainerWhenPermissionIsUndecided() {
+        clearActiveWorkoutSessionDefaults()
+        clearRestAlarmPreferences()
+        defer { clearActiveWorkoutSessionDefaults(); clearRestAlarmPreferences() }
+
+        let viewModel = makeTimerViewModel()
+        viewModel.startRestTimer(duration: 30)
+
+        XCTAssertTrue(viewModel.showRestAlarmPrompt)
+    }
+
+    func testExplainerIsNotRaisedTwice() {
+        clearActiveWorkoutSessionDefaults()
+        clearRestAlarmPreferences()
+        defer { clearActiveWorkoutSessionDefaults(); clearRestAlarmPreferences() }
+
+        RestTimerAlarmPreferences.markOffered()
+
+        let viewModel = makeTimerViewModel()
+        viewModel.startRestTimer(duration: 30)
+
+        XCTAssertFalse(viewModel.showRestAlarmPrompt)
+    }
+
+    /// Someone who answered iOS's prompt in an older build has already spent it; re-explaining
+    /// would be noise with nothing to offer.
+    func testExplainerIsSkippedWhenPermissionWasAlreadyDecided() {
+        clearActiveWorkoutSessionDefaults()
+        clearRestAlarmPreferences()
+        defer { clearActiveWorkoutSessionDefaults(); clearRestAlarmPreferences() }
+
+        RestTimerAlarmPreferences.store(.denied)
+
+        let viewModel = makeTimerViewModel()
+        viewModel.startRestTimer(duration: 30)
+
+        XCTAssertFalse(viewModel.showRestAlarmPrompt)
+    }
+
+    func testDecliningTheExplainerSpendsTheOfferButNotTheSystemPrompt() {
+        clearActiveWorkoutSessionDefaults()
+        clearRestAlarmPreferences()
+        defer { clearActiveWorkoutSessionDefaults(); clearRestAlarmPreferences() }
+
+        let viewModel = makeTimerViewModel()
+        viewModel.startRestTimer(duration: 30)
+        viewModel.declineRestAlarmAuthorization()
+
+        XCTAssertFalse(viewModel.showRestAlarmPrompt)
+        XCTAssertTrue(RestTimerAlarmPreferences.hasBeenOffered)
+        XCTAssertEqual(
+            RestTimerAlarmPreferences.lastKnownAuthorization,
+            .notDetermined,
+            "iOS must not have been asked — Settings has to stay able to turn this on later"
+        )
+    }
+
+    // MARK: - Live Activity rest display
+    //
+    // The widget's two view chains are unreachable from a test (`ActivityViewContext` has no
+    // public initialiser), so the branch logic lives on `ContentState` and is pinned here.
+
+    private func restState(
+        running: Bool = false,
+        paused: Bool = false,
+        workoutPaused: Bool = false,
+        finished: Bool = false,
+        endDate: Date? = nil
+    ) -> WorkoutActivityAttributes.ContentState {
+        WorkoutActivityAttributes.ContentState(
+            exerciseName: "Bench Press",
+            currentSetNumber: 2,
+            totalSets: 4,
+            setTypeLabel: "Working",
+            elapsedTimerReferenceDate: Date(),
+            isWorkoutPaused: workoutPaused,
+            pausedElapsedSeconds: 0,
+            isRestTimerRunning: running,
+            isRestTimerPaused: paused,
+            restTimerEndDate: endDate,
+            restTimerTotalSeconds: 120,
+            restTimerRemainingSeconds: 60,
+            isRestTimerFinished: finished
+        )
+    }
+
+    /// The bug: while the app is suspended nothing pushes `isRestTimerFinished`, so a timer
+    /// whose end date has passed used to fall through to `.ready` — "Ready for next set".
+    func testExpiredRestTimerReadsAsCompleteWithoutAPush() {
+        let now = Date()
+        let state = restState(running: true, endDate: now.addingTimeInterval(-1))
+
+        XCTAssertEqual(state.restDisplay(at: now), .complete)
+    }
+
+    func testRunningRestTimerCountsDownUntilItsEndDate() {
+        let now = Date()
+        let end = now.addingTimeInterval(45)
+
+        XCTAssertEqual(
+            restState(running: true, endDate: end).restDisplay(at: now),
+            .counting(until: end)
+        )
+    }
+
+    func testPushedFinishedFlagStillReadsAsComplete() {
+        XCTAssertEqual(restState(finished: true).restDisplay(at: Date()), .complete)
+    }
+
+    func testNoTimerReadsAsReady() {
+        XCTAssertEqual(restState().restDisplay(at: Date()), .ready)
+    }
+
+    /// Pauses outrank the countdown: a paused timer has no meaningful end date.
+    func testPausedStatesOutrankAnExpiredEndDate() {
+        let now = Date()
+        let stale = now.addingTimeInterval(-30)
+
+        XCTAssertEqual(
+            restState(running: true, paused: true, endDate: stale).restDisplay(at: now),
+            .restPaused
+        )
+        XCTAssertEqual(
+            restState(running: true, paused: true, workoutPaused: true, endDate: stale).restDisplay(at: now),
+            .workoutPaused
+        )
+    }
+
+    // MARK: - Rest timer alarm: shared teardown
+
+    /// `SettingsService.clearStoredAppState` and `ContentView.discardActiveAndCopy` both clear
+    /// this state from outside the ViewModel, and disagreed about which keys existed.
+    func testClearRestTimerStateRemovesEveryRestTimerKey() {
+        let defaults = UserDefaults.standard
+        defaults.set("workout-id", forKey: ActiveWorkoutSessionDefaultsKeys.restTimerWorkoutId)
+        defaults.set(Date(), forKey: ActiveWorkoutSessionDefaultsKeys.restTimerStartDate)
+        defaults.set(180, forKey: ActiveWorkoutSessionDefaultsKeys.restTimerTotalDuration)
+        defaults.set(90, forKey: ActiveWorkoutSessionDefaultsKeys.restTimerRemainingDuration)
+        defaults.set(true, forKey: ActiveWorkoutSessionDefaultsKeys.restTimerIsPaused)
+        defaults.set("manual", forKey: ActiveWorkoutSessionDefaultsKeys.restTimerPauseSource)
+
+        ActiveWorkoutSessionDefaultsKeys.clearRestTimerState()
+
+        XCTAssertNil(defaults.object(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerWorkoutId))
+        XCTAssertNil(defaults.object(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerStartDate))
+        XCTAssertNil(defaults.object(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerTotalDuration))
+        XCTAssertNil(defaults.object(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerRemainingDuration))
+        XCTAssertNil(defaults.object(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerIsPaused))
+        XCTAssertNil(defaults.object(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerPauseSource))
     }
 
     func testFinishWorkoutForwardsSummaryMetadataAndMarksWorkoutFinished() async throws {
@@ -6470,4 +6878,11 @@ private func makeExerciseTrackingTypeServiceContext() throws -> ExerciseTracking
         exerciseRepo: exerciseRepo,
         setRepo: setRepo
     )
+}
+
+/// Stands in for `ActiveWorkoutViewModel` in the coordinator's presentation tests.
+@MainActor
+private final class StubForegroundAlerter: RestTimerForegroundAlerting {
+    let willAlertRestTimerInApp: Bool
+    init(willAlert: Bool) { self.willAlertRestTimerInApp = willAlert }
 }

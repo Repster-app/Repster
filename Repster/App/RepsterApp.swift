@@ -2,7 +2,6 @@ import ActivityKit
 import RevenueCat
 import SwiftData
 import SwiftUI
-import UserNotifications
 
 @main
 struct RepsterApp: App {
@@ -69,8 +68,19 @@ struct RepsterApp: App {
             // (e.g., user force-quit the app while a workout was active)
             LiveActivityManager().cleanupStaleActivities()
 
-            // Request notification permission for rest timer background alerts
-            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+            // Claim the notification-centre delegate slot before any notification can be
+            // delivered. Without a delegate iOS silently drops foreground notifications into
+            // Notification Centre, which is what made the rest alarm inaudible whenever the
+            // user backed out of the workout screen without leaving the app.
+            RestTimerAlarmCoordinator.shared.install()
+
+            // Deliberately does NOT request permission. This used to fire the system prompt
+            // from here, which put it on screen at cold start before onboarding had rendered a
+            // single screen — an app the user had not seen yet asking for notifications. iOS
+            // grants exactly one prompt per install, so a reflex "Don't Allow" there silently
+            // broke the rest alarm forever. It is now asked for in context, the first time a
+            // rest timer actually starts. This only learns where we already stand.
+            Task { await RestTimerAlarmCoordinator.refreshAuthorization() }
         } catch {
             fatalError("Failed to initialize ModelContainer: \(error)")
         }
