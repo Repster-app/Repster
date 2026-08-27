@@ -763,6 +763,7 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             actualReps: 10,
             actualRIR: 0,
             restDurationSeconds: 150,
+            setTypeRawValue: SetType.working.rawValue,
             createdAt: makeDate(2026, 3, 22, 8, 25)
         )
         let orphanAudit = WorkoutHistoryArchiveFatigueLearningSetAudit(
@@ -2155,4 +2156,133 @@ private func makeResetContext() throws -> SettingsResetTestContext {
         userDefaults: userDefaults,
         seededExerciseName: seededExerciseName
     )
+}
+
+/// Backward/forward compatibility for the set type added to archived fatigue observations.
+///
+/// Archives are written by one app version and read by another — including older ones, since a
+/// user can restore a new backup onto a device that has not updated. A field added here must
+/// degrade to nil rather than failing the whole restore, which would cost the user their entire
+/// history over one optional column.
+///
+/// Background: SUGGESTION_ENGINE_IMPLEMENTATION_PLAN.md G8.
+final class FatigueObservationArchiveCompatibilityTests: XCTestCase {
+
+    private func decoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }
+
+    private func encoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }
+
+    private func archiveJSON(extraFields: String = "") -> Data {
+        Data("""
+        {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "exerciseId": "22222222-2222-2222-2222-222222222222",
+          "workoutId": "33333333-3333-3333-3333-333333333333",
+          "setId": "44444444-4444-4444-4444-444444444444",
+          "setIndex": 1,
+          "predictedEffectiveE1RM": 118.0,
+          "actualE1RM": 115.0,
+          "normalizedError": 0.02,
+          "baseE1RM": 120.0,
+          "prescribedWeight": 67.5,
+          "actualWeight": 65.0,
+          "actualReps": 10,
+          "actualRIR": 0.0,
+          "restDurationSeconds": 150,
+          \(extraFields)
+          "createdAt": "2026-03-22T08:25:00Z"
+        }
+        """.utf8)
+    }
+
+    /// An archive written before per-type instrumentation existed.
+    func testLegacyArchiveWithoutSetTypeStillDecodes() throws {
+        let observation = try decoder().decode(
+            WorkoutHistoryArchiveFatigueObservation.self,
+            from: archiveJSON()
+        )
+
+        XCTAssertNil(observation.setTypeRawValue, "absent means 'not captured', never a default type")
+        XCTAssertEqual(observation.actualReps, 10, "the rest of the row must survive intact")
+    }
+
+    /// The reason this is a raw string and not `SetType?`: a backup written by a newer build may
+    /// carry a set type this build has never heard of. It must not take the restore down.
+    func testUnknownSetTypeFromANewerBuildDoesNotFailTheRestore() throws {
+        let observation = try decoder().decode(
+            WorkoutHistoryArchiveFatigueObservation.self,
+            from: archiveJSON(extraFields: "\"setTypeRawValue\": \"someFutureType\",")
+        )
+
+        XCTAssertEqual(observation.setTypeRawValue, "someFutureType")
+        XCTAssertNil(
+            observation.setTypeRawValue.flatMap(SetType.init(rawValue:)),
+            "an unrecognised type resolves to nil at the model boundary"
+        )
+    }
+
+    func testEverySetTypeSurvivesAnArchiveRoundTrip() throws {
+        for type in SetType.allCases {
+            let decoded = try decoder().decode(
+                WorkoutHistoryArchiveFatigueObservation.self,
+                from: archiveJSON(extraFields: "\"setTypeRawValue\": \"\(type.rawValue)\",")
+            )
+
+            XCTAssertEqual(decoded.setTypeRawValue.flatMap(SetType.init(rawValue:)), type)
+        }
+    }
+
+    /// The model side of the same contract: the accessor must never invent a type.
+    func testObservationModelResolvesItsStoredRawValue() {
+        let observation = FatigueObservation(
+            exerciseId: UUID(),
+            workoutId: UUID(),
+            setId: UUID(),
+            setIndex: 0,
+            predictedEffectiveE1RM: 100,
+            actualE1RM: 98,
+            normalizedError: 0.02,
+            baseE1RM: 100,
+            prescribedWeight: 75,
+            actualWeight: 75,
+            actualReps: 8,
+            actualRIR: 1,
+            setType: .dropset
+        )
+        XCTAssertEqual(observation.setType, .dropset)
+
+        observation.setTypeRawValue = "someFutureType"
+        XCTAssertNil(observation.setType)
+
+        observation.setTypeRawValue = nil
+        XCTAssertNil(observation.setType)
+    }
+
+    /// An observation recorded before instrumentation must stay distinguishable from a working set.
+    func testObservationWithoutASetTypeIsNilNotWorking() {
+        let observation = FatigueObservation(
+            exerciseId: UUID(),
+            workoutId: UUID(),
+            setId: UUID(),
+            setIndex: 0,
+            predictedEffectiveE1RM: 100,
+            actualE1RM: 98,
+            normalizedError: 0.02,
+            baseE1RM: 100,
+            prescribedWeight: 75,
+            actualWeight: 75,
+            actualReps: 8,
+            actualRIR: 1
+        )
+
+        XCTAssertNil(observation.setType)
+    }
 }

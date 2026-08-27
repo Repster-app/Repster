@@ -35,6 +35,75 @@ enum SetType: String, Codable, CaseIterable {
     }
 }
 
+// MARK: - Semantic predicates
+//
+// Ten call sites used to answer "does this set count?" with an inline comparison, and they
+// did not agree: some used the denylist (everything but warm-up and partial), some used
+// `== .working` exactly, so a drop set counted toward volume and PRs while vanishing from
+// Copy Previous and the Home card. Nobody chose that. These predicates exist so each call
+// site has to state which question it is asking.
+//
+// Background: DROP_SETS_SCOPING.md Decision 3, SUGGESTION_ENGINE_PROGRAM.md §R2.
+extension SetType {
+
+    /// Real work the lifter performed: counts toward volume, PRs, e1RM baselines and history.
+    ///
+    /// The denylist, named. Warm-ups are preparation, not work; partial-ROM reps are not
+    /// comparable to full-ROM ones. Everything else happened and counts.
+    var countsAsPerformedWork: Bool {
+        self != .warmup && self != .partial
+    }
+
+    /// An ordinary straight set, with no annotation about how it was taken.
+    ///
+    /// For the places that genuinely mean "a normal set" — e.g. rest/rep pair analysis, where
+    /// a drop set's near-zero rest is noise rather than signal.
+    var isStraightWorkingSet: Bool {
+        self == .working
+    }
+
+    /// Trustworthy evidence of *what this lifter can currently lift* — a point estimate.
+    ///
+    /// Deliberately narrower than ``countsAsPerformedWork``:
+    /// - `amrap` / `failure` are the **best** evidence available and must stay in.
+    /// - `dropset` / `backoff` are submaximal by definition.
+    /// - `myo` / `restpause` / `cluster` are fragmented reps; e1RM formulas do not apply.
+    /// - `tempo` / `isometric` / `eccentric` — a five-second isometric "rep" is not a rep.
+    var isCapacityPointEstimate: Bool {
+        switch self {
+        case .working, .amrap, .failure:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Evidence of what this lifter can *at least* lift — a lower bound, not a point estimate.
+    ///
+    /// Wider than ``isCapacityPointEstimate`` on purpose. A back-off set at RIR 5 is a poor
+    /// estimate of capacity but a perfectly good floor: it happened, with reps to spare. Used
+    /// by the suggestion floor, which may never price below a weight already completed with
+    /// reserve.
+    var isCapacityLowerBound: Bool {
+        switch self {
+        case .working, .backoff:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// The types a user may newly assign from the set-type picker.
+    ///
+    /// The enum keeps all 13 cases — raw values are persisted in SwiftData, written to the JSON
+    /// archive and produced by both CSV importers, so removing one means a migration. Only the
+    /// *offer* is narrowed, to the types that have a feature behind them. A set that already
+    /// carries a hidden type keeps it, and the picker still shows it.
+    static var userSelectable: [SetType] {
+        [.warmup, .working, .dropset]
+    }
+}
+
 enum FatigueLearningAuditStatus: String, Codable, CaseIterable, Sendable {
     case used
     case warmupNotTracked

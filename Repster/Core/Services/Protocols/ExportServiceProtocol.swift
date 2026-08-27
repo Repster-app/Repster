@@ -220,6 +220,12 @@ struct WorkoutHistoryArchiveFatigueObservation: Codable, Sendable {
     let actualReps: Int
     let actualRIR: Double
     let restDurationSeconds: Int?
+    /// Raw string rather than `SetType?` on purpose. `decodeIfPresent(SetType.self,…)` *throws*
+    /// on an unrecognised raw value, so a backup written by a newer build carrying a set type this
+    /// build doesn't know would fail the entire restore — costing the user their whole history over
+    /// one optional column. Decoding the string and resolving it at the model boundary degrades to
+    /// nil instead. Absent means "not captured", not `.working`.
+    let setTypeRawValue: String?
     let createdAt: Date
 }
 

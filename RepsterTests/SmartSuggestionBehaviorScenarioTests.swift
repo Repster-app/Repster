@@ -475,3 +475,507 @@ final class SmartSuggestionBehaviorScenarioTests: XCTestCase {
         }
     }
 }
+
+// MARK: - Golden master
+
+/// Frozen numeric snapshot of `SuggestionEngine.evaluate`.
+///
+/// `SmartSuggestionBehaviorScenarioTests` above prints its numbers for a human to judge;
+/// nothing stores them, so a change in the engine produces no reviewable artefact. This
+/// class serialises a fixed scenario matrix to
+/// `RepsterTests/Fixtures/SuggestionEngineGoldenMaster.txt` and fails on any difference.
+///
+/// Every PR in SUGGESTION_ENGINE_IMPLEMENTATION_PLAN.md is expected to either leave this
+/// file byte-identical (PR1, PR2) or change it deliberately (PR3-PR7). When it changes on
+/// purpose, regenerate and **read the diff** — that diff is the release note for the
+/// suggestion engine:
+///
+///     REGENERATE_SUGGESTION_GOLDEN_MASTER=1 xcodebuild test -scheme Repster \
+///       -only-testing:RepsterTests/SuggestionEngineGoldenMasterTests
+final class SuggestionEngineGoldenMasterTests: XCTestCase {
+
+    // MARK: Fixture location
+
+    private var fixtureURL: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/SuggestionEngineGoldenMaster.txt")
+    }
+
+    // MARK: Builders (self-contained — the class above keeps its helpers private)
+
+    private func settings(
+        rest: Double = 150,
+        fatigueEnabled: Bool = true,
+        baseFatigueRate: Double = 0.03,
+        recoveryConstant: Double = 180,
+        increment: Double = 2.5,
+        freshnessEnabled: Bool = false,
+        freshnessPercent: Double = 0.03,
+        formula: E1RMFormula = .epley,
+        policy: SessionCapabilityPolicy = .observed
+    ) -> SuggestionSettingsSnapshot {
+        SuggestionSettingsSnapshot(
+            formula: formula,
+            restTimerSeconds: rest,
+            weightIncrement: increment,
+            fatigueEnabled: fatigueEnabled,
+            freshnessEnabled: freshnessEnabled,
+            freshnessPercent: freshnessPercent,
+            baseFatigueRate: baseFatigueRate,
+            recoveryConstant: recoveryConstant,
+            sessionCapabilityPolicy: policy
+        )
+    }
+
+    private func pending(
+        count: Int,
+        reps: Int,
+        rir: Double,
+        type: SetType = .working,
+        repRange: ClosedRange<Int>? = nil,
+        startingIndex: Int = 0,
+        startingNumber: Int = 1
+    ) -> [SuggestionPendingSetInput] {
+        (0..<count).map { offset in
+            SuggestionPendingSetInput(
+                setId: UUID(),
+                setIndex: startingIndex + offset,
+                setNumber: startingNumber + offset,
+                target: SuggestionTarget(
+                    reps: reps,
+                    rir: rir,
+                    repRange: repRange,
+                    repsSource: .explicitSet,
+                    rirSource: .explicitSet
+                ),
+                setType: type
+            )
+        }
+    }
+
+    private func done(
+        _ weight: Double,
+        _ reps: Int,
+        rir: Double?,
+        type: SetType = .working,
+        rest: Int? = 150,
+        order: Int
+    ) -> SessionSetContext {
+        SessionSetContext(
+            weight: weight,
+            reps: reps,
+            rir: rir,
+            completedAt: Date(timeIntervalSince1970: 1_700_000_000 + Double(order) * 300),
+            completed: true,
+            setType: type,
+            restDurationSeconds: rest
+        )
+    }
+
+    private func evaluate(
+        baseE1RM: Double = 100,
+        baseSource: E1RMSource = .recentPerformance,
+        completed: [SessionSetContext] = [],
+        pending sets: [SuggestionPendingSetInput],
+        settings s: SuggestionSettingsSnapshot
+    ) -> [SuggestionDecision] {
+        SuggestionEngine.evaluate(
+            SuggestionEngineInput(
+                baseE1RM: baseE1RM,
+                baseSource: baseSource,
+                completedSessionSets: completed,
+                pendingSets: sets,
+                settings: s,
+                calibrationAdjustment: .neutral
+            )
+        )
+    }
+
+    // MARK: Serialisation
+
+    /// Fixed-precision so a genuine behaviour change shows up and float noise does not.
+    private func render(_ name: String, _ decisions: [SuggestionDecision]) -> String {
+        var out = "## \(name)\n"
+        for d in decisions {
+            let reps = d.bestReps.map(String.init) ?? "-"
+            out += String(
+                format: "  set %d | w %8.4f | eff %9.4f | cap %9.4f | fat %.4f | disc %.4f | if %.4f | reps %@ | policy %@ | fresh %@\n",
+                d.setNumber,
+                d.prescribedWeight,
+                d.effectiveE1RM,
+                d.sessionCapabilityE1RM,
+                d.projectedSessionFatigue,
+                d.fatigueDiscount,
+                d.intensityFactor,
+                reps,
+                d.selectionPolicy.label,
+                d.freshnessApplied ? "y" : "n"
+            )
+        }
+        return out
+    }
+
+    // MARK: The matrix
+    //
+    // Ordered by the PR expected to move each block, so a diff reads as a changelog.
+
+    private func buildSnapshot() -> String {
+        var out = """
+        Smart Suggestions engine — golden master
+        Generated by SuggestionEngineGoldenMasterTests. Do not hand-edit.
+        See SUGGESTION_ENGINE_IMPLEMENTATION_PLAN.md §1 (PF1).
+
+
+        """
+
+        // --- Baseline behaviour: expected to survive every PR unchanged -------------
+
+        out += render("A1 straight 4x8 @ RIR 2, defaults", evaluate(
+            pending: pending(count: 4, reps: 8, rir: 2), settings: settings()))
+
+        out += render("A2 same, 60 s rest", evaluate(
+            pending: pending(count: 4, reps: 8, rir: 2), settings: settings(rest: 60)))
+
+        out += render("A3 same, 420 s rest", evaluate(
+            pending: pending(count: 4, reps: 8, rir: 2), settings: settings(rest: 420)))
+
+        out += render("A4 fatigue disabled", evaluate(
+            pending: pending(count: 4, reps: 8, rir: 2), settings: settings(fatigueEnabled: false)))
+
+        out += render("A5 learned rate floor 0.01", evaluate(
+            pending: pending(count: 4, reps: 8, rir: 2), settings: settings(baseFatigueRate: 0.01)))
+
+        out += render("A6 learned rate ceiling 0.08", evaluate(
+            pending: pending(count: 4, reps: 8, rir: 2), settings: settings(baseFatigueRate: 0.08)))
+
+        out += render("A7 twelve sets — fatigue saturation", evaluate(
+            pending: pending(count: 12, reps: 8, rir: 2), settings: settings()))
+
+        out += render("A8 freshness bonus on", evaluate(
+            pending: pending(count: 3, reps: 8, rir: 2), settings: settings(freshnessEnabled: true)))
+
+        // --- PR3: baseline reads RIR ------------------------------------------------
+
+        out += render("B1 fixed target 8 @ RIR 0, no history", evaluate(
+            baseE1RM: 76.0, pending: pending(count: 3, reps: 8, rir: 0),
+            settings: settings(increment: 1.25)))
+
+        out += render("B2 fixed target 8 @ RIR 2, no history", evaluate(
+            baseE1RM: 76.0, pending: pending(count: 3, reps: 8, rir: 2),
+            settings: settings(increment: 1.25)))
+
+        // --- PR4: capability crediting and the floor --------------------------------
+
+        for rir in [0.0, 1.0, 2.0, 3.0, 4.0, 5.0] {
+            out += render("C1 one completed 75x8 @ RIR \(Int(rir)) — what set 2 prices", evaluate(
+                completed: [done(75, 8, rir: rir, order: 0)],
+                pending: pending(count: 2, reps: 8, rir: 2, startingIndex: 1, startingNumber: 2),
+                settings: settings()))
+        }
+
+        out += render("C2 the 32.5 kg leg-extension case (20x8 then 35x8, both RIR 5)", evaluate(
+            baseE1RM: 44.33,
+            completed: [done(20, 8, rir: 5, order: 0), done(35, 8, rir: 5, order: 1)],
+            pending: pending(count: 2, reps: 8, rir: 0, startingIndex: 2, startingNumber: 3),
+            settings: settings()))
+
+        out += render("C3 drop set craters capability (100x8 @ RIR 2, then 60x10 @ RIR 0)", evaluate(
+            baseE1RM: 133,
+            completed: [done(100, 8, rir: 2, order: 0),
+                        done(60, 10, rir: 0, type: .dropset, rest: 0, order: 1)],
+            pending: pending(count: 2, reps: 8, rir: 2, startingIndex: 2, startingNumber: 3),
+            settings: settings()))
+
+        out += render("C4 untagged light set craters capability (same numbers, type working)", evaluate(
+            baseE1RM: 133,
+            completed: [done(100, 8, rir: 2, order: 0),
+                        done(60, 10, rir: 0, type: .working, rest: 0, order: 1)],
+            pending: pending(count: 2, reps: 8, rir: 2, startingIndex: 2, startingNumber: 3),
+            settings: settings()))
+
+        out += render("C5 overperformance raises later sets (85x8 @ RIR 1 vs 75 suggested)", evaluate(
+            completed: [done(85, 8, rir: 1, order: 0)],
+            pending: pending(count: 3, reps: 8, rir: 2, startingIndex: 1, startingNumber: 2),
+            settings: settings()))
+
+        out += render("C6 underperformance lowers later sets (65x6 @ RIR 0)", evaluate(
+            completed: [done(65, 6, rir: 0, order: 0)],
+            pending: pending(count: 3, reps: 8, rir: 2, startingIndex: 1, startingNumber: 2),
+            settings: settings()))
+
+        out += render("C7 warm-ups are free", evaluate(
+            completed: [done(40, 10, rir: 5, type: .warmup, order: 0),
+                        done(60, 5, rir: 4, type: .warmup, order: 1)],
+            pending: pending(count: 3, reps: 8, rir: 2, startingIndex: 2, startingNumber: 1),
+            settings: settings()))
+
+        // --- PR5: missing-RIR fallback ----------------------------------------------
+
+        out += render("D1 four completed sets, no RIR recorded", evaluate(
+            completed: (0..<4).map { done(75, 8, rir: nil, order: $0) },
+            pending: pending(count: 2, reps: 8, rir: 2, startingIndex: 4, startingNumber: 5),
+            settings: settings()))
+
+        out += render("D2 same four sets at RIR 2", evaluate(
+            completed: (0..<4).map { done(75, 8, rir: 2, order: $0) },
+            pending: pending(count: 2, reps: 8, rir: 2, startingIndex: 4, startingNumber: 5),
+            settings: settings()))
+
+        // --- PR12: set-type multipliers ---------------------------------------------
+
+        for type in [SetType.backoff, .working, .dropset, .amrap, .failure, .partial] {
+            out += render("E1 one 75x8 @ RIR 1 logged as \(type.rawValue)", evaluate(
+                completed: [done(75, 8, rir: 1, type: type, order: 0)],
+                pending: pending(count: 2, reps: 8, rir: 2, startingIndex: 1, startingNumber: 2),
+                settings: settings()))
+        }
+
+        // --- Rep ranges and rounding: guard rails for the progression work ----------
+
+        out += render("F1 rep range 5-8 across four sets", evaluate(
+            pending: pending(count: 4, reps: 8, rir: 2, repRange: 5...8), settings: settings()))
+
+        out += render("F2 first-set range progression (the 58.75 / 9 reps case)", evaluate(
+            baseE1RM: 76.0,
+            pending: pending(count: 1, reps: 8, rir: 0, repRange: 6...10),
+            settings: settings(increment: 1.25)))
+
+        out += render("F3 beginner, 1 kg increment", evaluate(
+            baseE1RM: 42.5, pending: pending(count: 3, reps: 10, rir: 2),
+            settings: settings(increment: 1.0)))
+
+        out += render("F4 beginner, 2.5 kg increment", evaluate(
+            baseE1RM: 42.5, pending: pending(count: 3, reps: 10, rir: 2),
+            settings: settings(increment: 2.5)))
+
+        out += render("F5 beginner, 5 kg increment", evaluate(
+            baseE1RM: 42.5, pending: pending(count: 3, reps: 10, rir: 2),
+            settings: settings(increment: 5.0)))
+
+        out += render("F6 high rep 4x20", evaluate(
+            pending: pending(count: 4, reps: 20, rir: 2), settings: settings()))
+
+        out += render("F7 low rep 4x3", evaluate(
+            pending: pending(count: 4, reps: 3, rir: 2), settings: settings()))
+
+        return out
+    }
+
+    // MARK: The test
+
+    func testEngineOutputMatchesGoldenMaster() throws {
+        let snapshot = buildSnapshot()
+        let url = fixtureURL
+
+        if ProcessInfo.processInfo.environment["REGENERATE_SUGGESTION_GOLDEN_MASTER"] == "1" {
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try snapshot.write(to: url, atomically: true, encoding: .utf8)
+            XCTFail("""
+                Golden master regenerated at \(url.path).
+                Review the diff, commit it, then re-run without the environment variable.
+                """)
+            return
+        }
+
+        guard let expected = try? String(contentsOf: url, encoding: .utf8) else {
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try snapshot.write(to: url, atomically: true, encoding: .utf8)
+            XCTFail("""
+                No golden master existed; wrote one to \(url.path).
+                Review it, commit it, then re-run.
+                """)
+            return
+        }
+
+        guard snapshot != expected else { return }
+
+        let expectedLines = expected.components(separatedBy: "\n")
+        let actualLines = snapshot.components(separatedBy: "\n")
+        var diff: [String] = []
+        for index in 0..<max(expectedLines.count, actualLines.count) {
+            let old = index < expectedLines.count ? expectedLines[index] : "<missing>"
+            let new = index < actualLines.count ? actualLines[index] : "<missing>"
+            guard old != new else { continue }
+            diff.append("line \(index + 1):\n  - \(old)\n  + \(new)")
+            if diff.count >= 40 {
+                diff.append("… further differences truncated")
+                break
+            }
+        }
+
+        XCTFail("""
+            Smart Suggestions engine output changed.
+
+            \(diff.joined(separator: "\n"))
+
+            If this change is intended, regenerate and commit the diff:
+              REGENERATE_SUGGESTION_GOLDEN_MASTER=1 xcodebuild test -scheme Repster \\
+                -only-testing:RepsterTests/SuggestionEngineGoldenMasterTests
+            """)
+    }
+}
+
+// MARK: - Completed-set target resolution (PR2)
+
+/// Pins how a completed set's *prescribed* RIR is recovered.
+///
+/// The engine needs this for sets the lifter ticked complete without tapping the RIR chip. The
+/// obvious source — `WorkoutSet.targetRIR` — is written **only** by `TemplateService`, so it is
+/// nil on every ad-hoc set; sourcing the fallback from that field would make it a silent no-op
+/// for anyone not running templates. These tests exist to keep that mistake from being
+/// reintroduced: the resolution must survive a set that has no template behind it at all.
+///
+/// Background: SUGGESTION_ENGINE_IMPLEMENTATION_PLAN.md G1.
+final class CompletedSetTargetResolutionTests: XCTestCase {
+
+    private func makeExercise() -> Exercise {
+        Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            weightIncrement: 2.5,
+            defaultRestTime: 120
+        )
+    }
+
+    private func makeSet(
+        exerciseId: UUID,
+        reps: Int = 8,
+        rir: Double? = nil,
+        targetRIR: Int? = nil,
+        weight: Double = 75,
+        type: SetType = .working
+    ) -> WorkoutSet {
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: exerciseId,
+            completedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            weight: weight,
+            reps: reps,
+            rir: rir,
+            setType: type,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true,
+            targetRIR: targetRIR
+        )
+        return set
+    }
+
+    private func contexts(
+        _ sets: [WorkoutSet],
+        exercise: Exercise,
+        defaultTargetRIR: Int = 2
+    ) -> [SessionSetContext] {
+        let profile = HealthProfile()
+        profile.prescriptionDefaultTargetRIR = defaultTargetRIR
+        return SuggestionCoordinator.completedSessionSets(
+            from: sets,
+            exercise: ChartExerciseData(from: exercise),
+            profile: profile
+        )
+    }
+
+    /// The case the naive implementation would have missed: no template, no target on the set,
+    /// no RIR logged. The profile default must still come through.
+    func testAdHocSetWithNoRIRResolvesTheProfileDefaultTarget() {
+        let exercise = makeExercise()
+        let set = makeSet(exerciseId: exercise.id, rir: nil, targetRIR: nil)
+
+        let resolved = contexts([set], exercise: exercise, defaultTargetRIR: 2)
+
+        XCTAssertEqual(resolved.count, 1)
+        XCTAssertNil(resolved[0].rir, "no RIR was logged")
+        XCTAssertEqual(resolved[0].targetRIR, 2.0, "must fall back to the profile default target")
+    }
+
+    /// A template-driven set prefers its own target over the profile default.
+    func testTemplateTargetBeatsTheProfileDefault() {
+        let exercise = makeExercise()
+        let set = makeSet(exerciseId: exercise.id, rir: nil, targetRIR: 4)
+
+        let resolved = contexts([set], exercise: exercise, defaultTargetRIR: 2)
+
+        XCTAssertEqual(resolved[0].targetRIR, 4.0)
+    }
+
+    /// When the lifter actually reported an RIR there is nothing to fall back to, and carrying a
+    /// target as well would invite a later change to prefer the wrong one.
+    func testLoggedRIRLeavesNoTargetFallback() {
+        let exercise = makeExercise()
+        let set = makeSet(exerciseId: exercise.id, rir: 1, targetRIR: 4)
+
+        let resolved = contexts([set], exercise: exercise, defaultTargetRIR: 2)
+
+        XCTAssertEqual(resolved[0].rir, 1.0)
+        XCTAssertNil(resolved[0].targetRIR)
+    }
+
+    /// A profile with no default and no template target resolves nothing — the engine must keep
+    /// its own last-resort constant rather than be handed a fabricated number.
+    func testNoTargetAnywhereResolvesNil() {
+        let exercise = makeExercise()
+        let set = makeSet(exerciseId: exercise.id, rir: nil, targetRIR: nil)
+        let profile = HealthProfile()
+        profile.prescriptionDefaultTargetRIR = nil
+
+        let resolved = SuggestionCoordinator.completedSessionSets(
+            from: [set],
+            exercise: ChartExerciseData(from: exercise),
+            profile: profile
+        )
+
+        XCTAssertNil(resolved[0].targetRIR)
+    }
+
+    /// Warm-ups never reach the engine, so they must not appear here regardless of target.
+    func testWarmupsAreStillExcluded() {
+        let exercise = makeExercise()
+        let warmup = makeSet(exerciseId: exercise.id, rir: nil, targetRIR: 3, type: .warmup)
+        let working = makeSet(exerciseId: exercise.id, rir: nil, targetRIR: 3, type: .working)
+
+        let resolved = contexts([warmup, working], exercise: exercise)
+
+        XCTAssertEqual(resolved.count, 1)
+        XCTAssertEqual(resolved[0].setType, .working)
+    }
+
+    /// Drop sets are not capacity evidence, but they are still completed work and must still be
+    /// handed to the engine — they accrue fatigue.
+    func testDropSetsAreStillPassedToTheEngine() {
+        let exercise = makeExercise()
+        let drop = makeSet(exerciseId: exercise.id, rir: 0, type: .dropset)
+
+        let resolved = contexts([drop], exercise: exercise)
+
+        XCTAssertEqual(resolved.count, 1)
+        XCTAssertEqual(resolved[0].setType, .dropset)
+    }
+
+    /// Callers with no exercise or profile to hand still get contexts. Only the *profile default*
+    /// tier of the fallback chain goes missing — a set carrying its own target still resolves it,
+    /// because that tier reads the set, not the profile.
+    func testCallersWithoutContextStillResolveASetsOwnTarget() {
+        let exercise = makeExercise()
+        let set = makeSet(exerciseId: exercise.id, rir: nil, targetRIR: 3)
+
+        let resolved = SuggestionCoordinator.completedSessionSets(from: [set])
+
+        XCTAssertEqual(resolved.count, 1)
+        XCTAssertEqual(resolved[0].targetRIR, 3.0)
+    }
+
+    /// …but with no context *and* no target on the set, there is nothing to resolve, and the
+    /// engine must fall back to its own constant rather than be handed a fabricated number.
+    func testCallersWithoutContextAndNoSetTargetResolveNil() {
+        let exercise = makeExercise()
+        let set = makeSet(exerciseId: exercise.id, rir: nil, targetRIR: nil)
+
+        let resolved = SuggestionCoordinator.completedSessionSets(from: [set])
+
+        XCTAssertNil(resolved[0].targetRIR)
+    }
+}

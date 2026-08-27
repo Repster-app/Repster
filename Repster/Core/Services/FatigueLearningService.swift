@@ -227,7 +227,8 @@ actor FatigueLearningService {
                     actualWeight: actualWeight,
                     actualReps: actualReps,
                     actualRIR: actualRIR,
-                    restDurationSeconds: restDurationSeconds
+                    restDurationSeconds: restDurationSeconds,
+                    setType: setType
                 )
             } else {
                 status = .invalidPerformance

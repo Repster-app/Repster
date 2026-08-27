@@ -48,6 +48,20 @@ final class FatigueObservation {
     /// Rest duration before this set (from rest timer), if captured.
     var restDurationSeconds: Int?
 
+    /// The set's type, so per-type fatigue can eventually be *learned* rather than asserted.
+    ///
+    /// Optional and raw-valued so existing stores lightweight-migrate; nil means "recorded before
+    /// this was captured", not `.working`. Until this exists on enough rows, the set-type
+    /// multipliers in `SuggestionEngine.setTypeMultiplier` are unfalsifiable: a wrong multiplier's
+    /// prediction error is absorbed into that exercise's learned fatigue rate and applied to every
+    /// set of the exercise regardless of type. Instrument first, then flatten.
+    var setTypeRawValue: String?
+
+    var setType: SetType? {
+        get { setTypeRawValue.flatMap(SetType.init(rawValue:)) }
+        set { setTypeRawValue = newValue?.rawValue }
+    }
+
     var createdAt: Date
 
     init(
@@ -65,6 +79,7 @@ final class FatigueObservation {
         actualReps: Int,
         actualRIR: Double,
         restDurationSeconds: Int? = nil,
+        setType: SetType? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -81,6 +96,7 @@ final class FatigueObservation {
         self.actualReps = actualReps
         self.actualRIR = actualRIR
         self.restDurationSeconds = restDurationSeconds
+        self.setTypeRawValue = setType?.rawValue
         self.createdAt = createdAt
     }
 }

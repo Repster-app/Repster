@@ -1557,3 +1557,88 @@ final class WorkoutSetTests: XCTestCase {
         XCTAssertEqual(ExercisePrimaryGroup.displayName(for: "forearm"), "Forearms")
     }
 }
+
+/// Pins the semantic predicates on `SetType`.
+///
+/// These replaced ten inline comparisons that disagreed with each other — a drop set counted
+/// toward volume and PRs while vanishing from Copy Previous and the Home card. The predicates
+/// only help if their membership is asserted rather than assumed, and every one of them is
+/// consulted by the suggestion engine, so a silent membership change moves prescribed weight.
+///
+/// Exhaustive over `SetType.allCases` on purpose: adding a 14th case should fail here and force
+/// a decision about which questions it answers, rather than silently defaulting to "no".
+final class SetTypeSemanticPredicateTests: XCTestCase {
+
+    func testCountsAsPerformedWorkExcludesOnlyWarmupAndPartial() {
+        let expected: Set<SetType> = [
+            .working, .dropset, .restpause, .cluster, .myo, .amrap,
+            .backoff, .failure, .tempo, .isometric, .eccentric
+        ]
+        XCTAssertEqual(Set(SetType.allCases.filter(\.countsAsPerformedWork)), expected)
+        XCTAssertFalse(SetType.warmup.countsAsPerformedWork)
+        XCTAssertFalse(SetType.partial.countsAsPerformedWork)
+    }
+
+    func testIsStraightWorkingSetIsWorkingOnly() {
+        XCTAssertEqual(Set(SetType.allCases.filter(\.isStraightWorkingSet)), [.working])
+    }
+
+    func testCapacityPointEstimateAcceptsOnlyMaximalSingleEffortSets() {
+        XCTAssertEqual(
+            Set(SetType.allCases.filter(\.isCapacityPointEstimate)),
+            [.working, .amrap, .failure]
+        )
+    }
+
+    /// AMRAP and failure are the *best* capacity evidence there is; excluding them would throw
+    /// away the strongest signal the app receives.
+    func testCapacityPointEstimateKeepsAmrapAndFailure() {
+        XCTAssertTrue(SetType.amrap.isCapacityPointEstimate)
+        XCTAssertTrue(SetType.failure.isCapacityPointEstimate)
+    }
+
+    /// Submaximal or fragmented efforts must never *set* the capability estimate — this is the
+    /// membership that stops a drop set cratering the rest of the exercise.
+    func testCapacityPointEstimateRejectsSubmaximalAndFragmentedTypes() {
+        for type in [SetType.dropset, .backoff, .myo, .restpause, .cluster,
+                     .tempo, .isometric, .eccentric, .warmup, .partial] {
+            XCTAssertFalse(
+                type.isCapacityPointEstimate,
+                "\(type.rawValue) must not be treated as a capacity point estimate"
+            )
+        }
+    }
+
+    /// Wider than the point estimate on purpose: a back-off set at RIR 5 is a bad estimate of
+    /// capacity and a perfectly good floor.
+    func testCapacityLowerBoundIncludesBackoffButNotDropSets() {
+        XCTAssertEqual(
+            Set(SetType.allCases.filter(\.isCapacityLowerBound)),
+            [.working, .backoff]
+        )
+        XCTAssertFalse(SetType.dropset.isCapacityLowerBound)
+        XCTAssertFalse(SetType.partial.isCapacityLowerBound)
+    }
+
+    func testUserSelectableIsTheThreeTypesWithFeaturesBehindThem() {
+        XCTAssertEqual(SetType.userSelectable, [.warmup, .working, .dropset])
+    }
+
+    /// The enum must keep every case: raw values are persisted in SwiftData, written to the JSON
+    /// archive, and produced by both CSV importers. Narrowing the picker must never narrow this.
+    func testEveryPersistedCaseStillExists() {
+        XCTAssertEqual(SetType.allCases.count, 13)
+        for raw in ["warmup", "working", "partial", "dropset", "restpause", "cluster", "myo",
+                    "amrap", "backoff", "failure", "tempo", "isometric", "eccentric"] {
+            XCTAssertNotNil(SetType(rawValue: raw), "\(raw) must still decode")
+        }
+    }
+
+    /// Hidden types must still be representable, or an imported `failure` set would render as
+    /// something it is not.
+    func testHiddenTypesAreStillDisplayable() {
+        for type in SetType.allCases where !SetType.userSelectable.contains(type) {
+            XCTAssertFalse(type.displayName.isEmpty)
+        }
+    }
+}

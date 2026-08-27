@@ -22,6 +22,38 @@ struct SessionSetContext: Sendable {
     let setType: SetType
     /// Actual rest duration captured from the rest timer (nil = use configured rest).
     let restDurationSeconds: Int?
+    /// The RIR this set was *prescribed* at, resolved the same way a pending set's target is
+    /// (explicit entry → template → profile default).
+    ///
+    /// Only consulted when ``rir`` is nil. A lifter who ticks a set complete without tapping the
+    /// chip is far better modelled as having landed near the target they were given than as a
+    /// global constant — and the constant this replaces (`missingRIRDefault = 1.0`) modelled them
+    /// as *harder* than an explicit RIR 2, so leaving the chip blank cost them a plate.
+    ///
+    /// Deliberately not sourced from `WorkoutSet.targetRIR`: that field is written only by
+    /// `TemplateService`, so it is nil for every ad-hoc set and the fallback would silently be a
+    /// no-op for anyone not running templates. See SUGGESTION_ENGINE_IMPLEMENTATION_PLAN.md G1.
+    let targetRIR: Double?
+
+    init(
+        weight: Double,
+        reps: Int,
+        rir: Double?,
+        completedAt: Date?,
+        completed: Bool,
+        setType: SetType,
+        restDurationSeconds: Int?,
+        targetRIR: Double? = nil
+    ) {
+        self.weight = weight
+        self.reps = reps
+        self.rir = rir
+        self.completedAt = completedAt
+        self.completed = completed
+        self.setType = setType
+        self.restDurationSeconds = restDurationSeconds
+        self.targetRIR = targetRIR
+    }
 }
 
 /// Where an individual target component came from.
@@ -985,8 +1017,7 @@ enum SuggestionEngine {
         readiness: ReadinessState,
         formula: E1RMFormula
     ) -> Double? {
-        guard set.setType != .warmup,
-              set.setType != .partial,
+        guard set.setType.countsAsPerformedWork,
               set.weight > 0,
               set.reps > 0,
               let actualRIR = set.rir,
@@ -1039,8 +1070,14 @@ enum SuggestionEngine {
         )
     }
 
+    /// Whether a completed set counts as "the lifter has started working" — it arms
+    /// `hasSeenCompletedWorkSet` and therefore disarms the first-set freshness bonus.
+    ///
+    /// Deliberately the *wide* predicate. A drop set is not capacity evidence
+    /// (`isCapacityPointEstimate`), but it absolutely means the lifter is no longer fresh, so
+    /// narrowing this would let a set *after* a drop set wrongly claim the freshness bonus.
     private static func isCapabilityTrackingSetType(_ type: SetType) -> Bool {
-        type != .warmup && type != .partial
+        type.countsAsPerformedWork
     }
 
     private static func orderedCompletedSets(_ completedSets: [SessionSetContext]) -> [SessionSetContext] {

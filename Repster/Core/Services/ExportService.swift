@@ -577,6 +577,7 @@ private extension WorkoutHistoryArchiveFatigueObservation {
             actualReps: obs.actualReps,
             actualRIR: obs.actualRIR,
             restDurationSeconds: obs.restDurationSeconds,
+            setTypeRawValue: obs.setTypeRawValue,
             createdAt: obs.createdAt
         )
     }
@@ -597,6 +598,7 @@ private extension WorkoutHistoryArchiveFatigueObservation {
             actualReps: actualReps,
             actualRIR: actualRIR,
             restDurationSeconds: restDurationSeconds,
+            setType: setTypeRawValue.flatMap(SetType.init(rawValue:)),
             createdAt: createdAt
         )
     }

@@ -273,7 +273,7 @@ enum SuggestionCoordinator {
         sets: [WorkoutSet],
         profile: HealthProfile?
     ) -> SuggestionPreparation {
-        let completedSessionSets = completedSessionSets(from: sets)
+        let completedSessionSets = completedSessionSets(from: sets, exercise: exercise, profile: profile)
         let resolved = resolveWorkingSets(from: sets, exercise: exercise, profile: profile)
         let setResolutions = resolved.pending
         let completedWorkingSetSnapshots = resolved.completed
@@ -311,7 +311,18 @@ enum SuggestionCoordinator {
         )
     }
 
-    static func completedSessionSets(from sets: [WorkoutSet]) -> [SessionSetContext] {
+    /// Completed sets in engine space.
+    ///
+    /// `exercise` and `profile` are needed only to resolve `targetRIR` — the RIR the set was
+    /// prescribed at, used when the lifter completed it without filling the chip. `resolveTarget`
+    /// is the same resolver pending sets use, so the fallback chain (explicit → template →
+    /// profile default) is identical and no set is left without a target just because it was
+    /// logged ad hoc rather than from a template.
+    static func completedSessionSets(
+        from sets: [WorkoutSet],
+        exercise: ChartExerciseData? = nil,
+        profile: HealthProfile? = nil
+    ) -> [SessionSetContext] {
         sets
             .filter { $0.completed && $0.setType != .warmup }
             .map { set in
@@ -322,9 +333,26 @@ enum SuggestionCoordinator {
                     completedAt: set.completedAt,
                     completed: true,
                     setType: set.setType,
-                    restDurationSeconds: set.restDurationSeconds
+                    restDurationSeconds: set.restDurationSeconds,
+                    targetRIR: resolvedTargetRIR(for: set, exercise: exercise, profile: profile)
                 )
             }
+    }
+
+    /// The prescribed RIR for an already-completed set.
+    ///
+    /// Returns nil when the set carries its own RIR — the engine uses the real value in that
+    /// case and never consults this — and when no target can be resolved at all.
+    private static func resolvedTargetRIR(
+        for set: WorkoutSet,
+        exercise: ChartExerciseData?,
+        profile: HealthProfile?
+    ) -> Double? {
+        guard set.performanceRIR == nil else { return nil }
+        guard case let .eligible(target) = resolveTarget(for: set, exercise: exercise, profile: profile) else {
+            return nil
+        }
+        return target.rir
     }
 
     private static func supportsSuggestions(for exercise: ChartExerciseData) -> Bool {
