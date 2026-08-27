@@ -752,6 +752,218 @@ final class FatigueLearningServiceTests: XCTestCase {
                           "the epoch must advance, or the upgrade hook never fires")
     }
 
+
+    // MARK: - Non-capacity set types (PR6)
+
+    /// A drop set's prediction error is not evidence about the fatigue model — it is evidence the
+    /// set was deliberately submaximal.
+    ///
+    /// Without this the error is laundered into that exercise's learned rate and applied to every
+    /// set of the exercise regardless of type. The learning step is sign-only (+/-0.002 whatever
+    /// the magnitude) and one used set is enough to carry a session, so a single drop set could be
+    /// the entire vote.
+    func testNonCapacitySetTypesAreAuditedRatherThanLearnedFrom() async throws {
+        for setType in [SetType.dropset, .backoff, .myo, .restpause, .cluster,
+                        .tempo, .isometric, .eccentric, .partial] {
+            let service = makeService(
+                observationRepo: InMemoryFatigueObservationRepo(observations: []),
+                exerciseRepo: InMemoryExerciseRepo(exercises: []),
+                healthProfileRepo: InMemoryHealthProfileRepo(profile: HealthProfile()),
+                auditRepo: InMemoryFatigueLearningSetAuditRepo(audits: [])
+            )
+
+            let result = try await capture(
+                with: service,
+                setType: setType,
+                prediction: makePrediction(),
+                actualWeight: 110,
+                actualReps: 8,
+                actualRIR: 1
+            )
+
+            XCTAssertEqual(result.audit.status, .nonCapacitySetType,
+                           "\(setType.rawValue) must not grade the model")
+            XCTAssertNil(result.audit.normalizedError,
+                         "\(setType.rawValue) must contribute no error to learning")
+            XCTAssertNil(result.observation,
+                         "\(setType.rawValue) must not produce a learning observation")
+        }
+    }
+
+    /// The types that *are* capacity evidence keep learning normally — especially AMRAP and
+    /// failure, which are the best evidence the app receives.
+    func testCapacitySetTypesStillLearn() async throws {
+        for setType in [SetType.working, .amrap, .failure] {
+            let service = makeService(
+                observationRepo: InMemoryFatigueObservationRepo(observations: []),
+                exerciseRepo: InMemoryExerciseRepo(exercises: []),
+                healthProfileRepo: InMemoryHealthProfileRepo(profile: HealthProfile()),
+                auditRepo: InMemoryFatigueLearningSetAuditRepo(audits: [])
+            )
+
+            let result = try await capture(
+                with: service,
+                setType: setType,
+                prediction: makePrediction(),
+                actualWeight: 110,
+                actualReps: 8,
+                actualRIR: 1
+            )
+
+            XCTAssertEqual(result.audit.status, .used,
+                           "\(setType.rawValue) must still grade the model")
+        }
+    }
+
+    /// Warm-ups keep their own status — the exclusions must stay distinguishable in diagnostics,
+    /// not collapse into one bucket.
+    func testWarmupsKeepTheirOwnStatus() async throws {
+        let service = makeService(
+            observationRepo: InMemoryFatigueObservationRepo(observations: []),
+            exerciseRepo: InMemoryExerciseRepo(exercises: []),
+            healthProfileRepo: InMemoryHealthProfileRepo(profile: HealthProfile()),
+            auditRepo: InMemoryFatigueLearningSetAuditRepo(audits: [])
+        )
+
+        let result = try await capture(
+            with: service,
+            visibleSetNumber: 1,
+            setType: .warmup,
+            prediction: makePrediction(),
+            actualWeight: 40,
+            actualReps: 10,
+            actualRIR: 5
+        )
+
+        XCTAssertEqual(result.audit.status, .warmupNotTracked)
+    }
+
+    // MARK: - Suggestion adherence
+
+    /// The metric that says whether Smart Suggestions is any good. Until now the app computed
+    /// prescribed-vs-actual per set and threw it away.
+    func testAdherenceCountsFollowedHeavierAndLighter() async throws {
+        let workoutId = UUID()
+        let service = makeService(
+            observationRepo: InMemoryFatigueObservationRepo(observations: []),
+            exerciseRepo: InMemoryExerciseRepo(exercises: []),
+            healthProfileRepo: InMemoryHealthProfileRepo(profile: HealthProfile()),
+            auditRepo: InMemoryFatigueLearningSetAuditRepo(audits: [
+                makeAdherenceAudit(workoutId: workoutId, prescribed: 100, actual: 100),
+                makeAdherenceAudit(workoutId: workoutId, prescribed: 100, actual: 110),
+                makeAdherenceAudit(workoutId: workoutId, prescribed: 100, actual: 90)
+            ])
+        )
+
+        let adherence = try await service.suggestionAdherence(workoutId: workoutId)
+
+        XCTAssertEqual(adherence.comparableSets, 3)
+        XCTAssertEqual(adherence.followed, 1)
+        XCTAssertEqual(adherence.wentHeavier, 1)
+        XCTAssertEqual(adherence.wentLighter, 1)
+        XCTAssertEqual(adherence.overrideDirection, "mixed")
+    }
+
+    /// Float and unit-conversion noise counts as following; a real increment does not.
+    ///
+    /// The engine rounds every suggestion to the lifter's own increment, so following it means
+    /// logging it exactly. That is what makes a tight tolerance correct: a deliberate
+    /// one-increment bump is only 2.5% at 100 kg, and a band wide enough to absorb "plate
+    /// rounding" would hide exactly the users telling us the model undershoots.
+    func testToleranceAbsorbsNoiseButNotADeliberateBump() async throws {
+        let workoutId = UUID()
+        let service = makeService(
+            observationRepo: InMemoryFatigueObservationRepo(observations: []),
+            exerciseRepo: InMemoryExerciseRepo(exercises: []),
+            healthProfileRepo: InMemoryHealthProfileRepo(profile: HealthProfile()),
+            auditRepo: InMemoryFatigueLearningSetAuditRepo(audits: [
+                // A kg/lbs round trip lands a hair off.
+                makeAdherenceAudit(workoutId: workoutId, prescribed: 61.25, actual: 61.2501),
+                // One increment up on a 2.5 kg grid at 100 kg — 2.5%, and a real override.
+                makeAdherenceAudit(workoutId: workoutId, prescribed: 100, actual: 102.5)
+            ])
+        )
+
+        let adherence = try await service.suggestionAdherence(workoutId: workoutId)
+
+        XCTAssertEqual(adherence.followed, 1, "conversion noise is not an override")
+        XCTAssertEqual(adherence.wentHeavier, 1, "one increment up is an override")
+        XCTAssertEqual(adherence.overrideDirection, "heavier")
+    }
+
+    /// A consistent direction is the diagnostic half: all-heavier means the model undershoots.
+    func testAConsistentDirectionIsReportedAsSuch() async throws {
+        let workoutId = UUID()
+        let service = makeService(
+            observationRepo: InMemoryFatigueObservationRepo(observations: []),
+            exerciseRepo: InMemoryExerciseRepo(exercises: []),
+            healthProfileRepo: InMemoryHealthProfileRepo(profile: HealthProfile()),
+            auditRepo: InMemoryFatigueLearningSetAuditRepo(audits: [
+                makeAdherenceAudit(workoutId: workoutId, prescribed: 100, actual: 110),
+                makeAdherenceAudit(workoutId: workoutId, prescribed: 100, actual: 115)
+            ])
+        )
+
+        let adherence = try await service.suggestionAdherence(workoutId: workoutId)
+
+        XCTAssertEqual(adherence.overrideDirection, "heavier")
+        XCTAssertEqual(adherence.followedShare, 0)
+    }
+
+    /// "No suggestions to follow" and "followed none of them" are opposite findings and must not
+    /// share a value — the share is nil, never 0.
+    func testNoComparableSetsReportsNilRatherThanZero() async throws {
+        let workoutId = UUID()
+        let service = makeService(
+            observationRepo: InMemoryFatigueObservationRepo(observations: []),
+            exerciseRepo: InMemoryExerciseRepo(exercises: []),
+            healthProfileRepo: InMemoryHealthProfileRepo(profile: HealthProfile()),
+            auditRepo: InMemoryFatigueLearningSetAuditRepo(audits: [])
+        )
+
+        let adherence = try await service.suggestionAdherence(workoutId: workoutId)
+
+        XCTAssertEqual(adherence.comparableSets, 0)
+        XCTAssertNil(adherence.followedShare)
+        XCTAssertEqual(adherence.overrideDirection, "no_data")
+    }
+
+    /// Sets with no suggestion behind them are not evidence either way and must be skipped.
+    func testSetsWithoutAPrescriptionAreNotCounted() async throws {
+        let workoutId = UUID()
+        let service = makeService(
+            observationRepo: InMemoryFatigueObservationRepo(observations: []),
+            exerciseRepo: InMemoryExerciseRepo(exercises: []),
+            healthProfileRepo: InMemoryHealthProfileRepo(profile: HealthProfile()),
+            auditRepo: InMemoryFatigueLearningSetAuditRepo(audits: [
+                makeAdherenceAudit(workoutId: workoutId, prescribed: nil, actual: 100),
+                makeAdherenceAudit(workoutId: workoutId, prescribed: 100, actual: nil),
+                makeAdherenceAudit(workoutId: workoutId, prescribed: 100, actual: 100)
+            ])
+        )
+
+        let adherence = try await service.suggestionAdherence(workoutId: workoutId)
+
+        XCTAssertEqual(adherence.comparableSets, 1)
+    }
+
+    private func makeAdherenceAudit(
+        workoutId: UUID, prescribed: Double?, actual: Double?
+    ) -> FatigueLearningSetAudit {
+        FatigueLearningSetAudit(
+            workoutId: workoutId,
+            exerciseId: UUID(),
+            setId: UUID(),
+            visibleSetNumber: 1,
+            setType: .working,
+            status: .used,
+            prescribedWeight: prescribed,
+            actualWeight: actual,
+            actualReps: 8,
+            actualRIR: 1
+        )
+    }
+
 }
 
 private final class InMemoryFatigueObservationRepo: @unchecked Sendable, FatigueObservationRepositoryProtocol {

@@ -171,6 +171,20 @@ actor FatigueLearningService {
             deviationFraction = nil
             normalizedError = nil
             observation = nil
+        } else if !setType.isCapacityPointEstimate {
+            // A drop set's prediction error is not evidence about the fatigue model — it is
+            // evidence that the set was deliberately submaximal. Without this the error is
+            // laundered into that exercise's learned rate and applied to every set of the
+            // exercise regardless of type. The step is sign-only (+/-0.002 whatever the
+            // magnitude) and one used set is enough to carry a session, so a single drop set
+            // could be the entire vote.
+            //
+            // Audited rather than dropped: the row still renders in diagnostics and the export,
+            // so the exclusion is visible instead of looking like missing data.
+            status = .nonCapacitySetType
+            deviationFraction = nil
+            normalizedError = nil
+            observation = nil
         } else if prediction == nil {
             status = .suggestionUnavailable
             deviationFraction = nil
@@ -314,6 +328,73 @@ actor FatigueLearningService {
     func removeCapturedExerciseData(exerciseId: UUID) async throws {
         try await observationRepo.pruneObservations(exerciseId: exerciseId, keepRecentSessions: 0)
         try await auditRepo.deleteAudits(exerciseId: exerciseId)
+    }
+
+    // MARK: - Suggestion adherence
+
+    /// How closely the lifter followed the suggestions in one workout.
+    ///
+    /// The single most useful signal about whether Smart Suggestions is any good, and until now the
+    /// app computed it per set and then threw it away. The audit rows already hold prescribed and
+    /// actual weight side by side; this only aggregates them.
+    struct SuggestionAdherence: Sendable, Equatable {
+        var comparableSets: Int = 0
+        var followed: Int = 0
+        var wentHeavier: Int = 0
+        var wentLighter: Int = 0
+
+        /// Fraction of comparable sets logged at the suggested weight, or nil when nothing was
+        /// comparable — which is different from "nobody followed it" and must not be reported as 0.
+        var followedShare: Double? {
+            guard comparableSets > 0 else { return nil }
+            return Double(followed) / Double(comparableSets)
+        }
+
+        /// Which way overrides went, when they went anywhere.
+        ///
+        /// The direction is the diagnostic half: consistently heavier means the model is
+        /// undershooting, consistently lighter means it is asking too much, and mixed means it is
+        /// noisy rather than biased. A share alone cannot tell those apart.
+        var overrideDirection: String {
+            guard comparableSets > 0 else { return "no_data" }
+            if wentHeavier == 0 && wentLighter == 0 { return "none" }
+            if wentHeavier > 0 && wentLighter == 0 { return "heavier" }
+            if wentLighter > 0 && wentHeavier == 0 { return "lighter" }
+            return "mixed"
+        }
+    }
+
+    /// Tolerance for "followed the suggestion", as a fraction of the prescribed weight.
+    ///
+    /// Deliberately tight. The engine already rounds every suggestion to the lifter's configured
+    /// increment, so a followed suggestion is logged *exactly* — there is no plate-rounding gap to
+    /// absorb, and a wider band would swallow the signal that matters most: a deliberate
+    /// one-increment bump is 2.5% at 100 kg, and reading that as compliance would hide precisely
+    /// the users telling us the model undershoots.
+    ///
+    /// Non-zero only to survive float noise and the kg/lbs conversion round trip.
+    static let adherenceTolerance: Double = 0.005
+
+    func suggestionAdherence(workoutId: UUID) async throws -> SuggestionAdherence {
+        let audits = try await auditRepo.fetchAudits(for: workoutId)
+        var result = SuggestionAdherence()
+
+        for audit in audits {
+            guard let prescribed = audit.prescribedWeight, prescribed > 0,
+                  let actual = audit.actualWeight, actual > 0 else { continue }
+            result.comparableSets += 1
+
+            let deviation = (actual - prescribed) / prescribed
+            if abs(deviation) <= Self.adherenceTolerance {
+                result.followed += 1
+            } else if deviation > 0 {
+                result.wentHeavier += 1
+            } else {
+                result.wentLighter += 1
+            }
+        }
+
+        return result
     }
 
     // MARK: - Session-End Learning

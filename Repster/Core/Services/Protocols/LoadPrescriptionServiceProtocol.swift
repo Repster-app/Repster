@@ -35,6 +35,15 @@ struct SessionSetContext: Sendable {
     /// no-op for anyone not running templates. See SUGGESTION_ENGINE_IMPLEMENTATION_PLAN.md G1.
     let targetRIR: Double?
 
+    /// The RIR to charge this set's fatigue at: what the lifter reported, or failing that the RIR
+    /// they were prescribed.
+    ///
+    /// Only the *fatigue cost* uses this. Capability estimation and the suggestion floor both
+    /// continue to require a genuinely reported ``rir``, because a target describes what was asked
+    /// for, not what happened — crediting capacity or a floor from an assumption would let the app
+    /// invent evidence about the lifter out of its own programming.
+    var effortRIR: Double? { rir ?? targetRIR }
+
     init(
         weight: Double,
         reps: Int,
@@ -628,6 +637,13 @@ enum SuggestionEngine {
     private static let defaultBaseFatigueRate: Double = 0.03
     private static let defaultRecoveryConstant: Double = 180.0
     private static let maxFatigue: Double = 0.25
+    /// Last-resort effort assumption for a completed set with no reported RIR *and* no resolvable
+    /// target — in practice, almost nothing: the target chain ends at a profile-level default.
+    ///
+    /// It is a poor assumption on its own. An effort scale of 1.30 models an unlabelled set as
+    /// *harder* than one explicitly marked RIR 2 (1.15), so leaving the chip blank cost the lifter
+    /// an increment on the next set. It governs about a fifth of app-era sets, which is why the
+    /// prescribed target is preferred wherever one can be resolved.
     private static let missingRIRDefault: Double = 1.0
     private static let e1RMEpsilon: Double = 0.0001
 
@@ -708,6 +724,9 @@ enum SuggestionEngine {
 
     /// Compute fatigue contribution for a single set.
     /// Formula: baseFatigueRate * typeMultiplier * effortScale * repScale
+    /// - Parameter rir: the RIR to charge this set at. Callers pass the reported value, falling
+    ///   back to the RIR the set was *prescribed* at — see ``SessionSetContext/targetRIR``.
+    ///   ``missingRIRDefault`` is the last resort, for a set with neither.
     static func computeSetFatigue(
         reps: Int,
         rir: Double?,
@@ -742,7 +761,7 @@ enum SuggestionEngine {
 
             let setFatigue = computeSetFatigue(
                 reps: set.reps,
-                rir: set.rir,
+                rir: set.effortRIR,
                 setType: set.setType,
                 baseFatigueRate: baseFatigueRate
             )
@@ -1062,7 +1081,7 @@ enum SuggestionEngine {
             if input.settings.fatigueEnabled {
                 let setFatigue = computeSetFatigue(
                     reps: set.reps,
-                    rir: set.rir,
+                    rir: set.effortRIR,
                     setType: set.setType,
                     baseFatigueRate: baseFatigueRate
                 )

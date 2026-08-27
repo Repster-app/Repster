@@ -263,6 +263,9 @@ final class AnalyticsServiceTests: XCTestCase {
             remainingFreeWorkouts: 3,
             rirSetCount: 8,
             averageRIR: 2.4,
+            suggestionSetsCompared: 0,
+            suggestionFollowedShare: nil,
+            suggestionOverrideDirection: "no_data",
             interactions: [:]
         )
 
@@ -321,6 +324,9 @@ final class AnalyticsServiceTests: XCTestCase {
             remainingFreeWorkouts: nil,
             rirSetCount: 0,
             averageRIR: nil,
+            suggestionSetsCompared: 0,
+            suggestionFollowedShare: nil,
+            suggestionOverrideDirection: "no_data",
             interactions: [:]
         )
 
@@ -509,6 +515,9 @@ final class AnalyticsServiceTests: XCTestCase {
             remainingFreeWorkouts: 1,
             rirSetCount: 0,
             averageRIR: nil,
+            suggestionSetsCompared: 0,
+            suggestionFollowedShare: nil,
+            suggestionOverrideDirection: "no_data",
             interactions: [.historyViews: 4, .restTimerSkips: 2, .chartViews: 0]
         )
 

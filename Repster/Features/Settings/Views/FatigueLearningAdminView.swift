@@ -660,7 +660,9 @@ struct SessionAuditDetailView: View {
             return .orange
         case .invalidPerformance:
             return .danger
-        case .warmupNotTracked, .baselineFirstWorkingSet:
+        case .warmupNotTracked, .baselineFirstWorkingSet, .nonCapacitySetType:
+            // Neutral, not a warning: these are sets the model was never entitled to grade
+            // itself on, rather than sets where something went wrong.
             return .textSecondary
         }
     }

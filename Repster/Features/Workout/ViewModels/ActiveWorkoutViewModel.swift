@@ -2105,6 +2105,13 @@ final class ActiveWorkoutViewModel {
                 ? nil
                 : loggedRIRs.reduce(0, +) / Double(loggedRIRs.count)
 
+            // Read before learning runs: `processSessionEnd` prunes, and the audit rows are what
+            // carry prescribed-vs-actual. Failing to read them must never cost the user a finished
+            // workout, so this degrades to "no data" rather than propagating.
+            let adherence = (try? await fatigueLearningService.suggestionAdherence(
+                workoutId: workout.id
+            )) ?? .init()
+
             analyticsService.workoutCompleted(
                 durationSeconds: TimeInterval(durationSeconds),
                 completedSetCount: completedSetCount,
@@ -2122,6 +2129,9 @@ final class ActiveWorkoutViewModel {
                 remainingFreeWorkouts: accessSnapshot.remainingFreeWorkouts,
                 rirSetCount: loggedRIRs.count,
                 averageRIR: averageRIR,
+                suggestionSetsCompared: adherence.comparableSets,
+                suggestionFollowedShare: adherence.followedShare,
+                suggestionOverrideDirection: adherence.overrideDirection,
                 interactions: interactions
             )
             WorkoutStartContextStore.clear()

@@ -10,9 +10,11 @@
 | PR3 baseline reads RIR | **done** — mutation-checked: reverting the fix fails 3 tests at exactly 57.5 kg |
 | PR4 capability crediting + floor | **done** — golden master diff reviewed block by block, 590 tests green |
 | PR7 calibration epoch | **done** — rates cleared, prediction record kept and stamped |
-| PR5, PR6, PR8 | not started |
+| PR5 missing-RIR fallback | **done** — charges the prescribed target, not a global constant |
+| PR6 learning exclusions | **done** — `nonCapacitySetType` audit status |
+| PR8 release note | **done** — 1.5 WhatsNew, including the honest "give it a week" tile |
 | PF2 target-RIR coverage | **done** — see §1; confirmed G1 emphatically (122 of 123 sets would have been missed) |
-| PF3 adherence metric | still outstanding, still wants to ship a release early |
+| PF3 adherence metric | **built** — `suggestionAdherence` + 3 bucketed properties on `workout completed`. **Still wants releasing ahead of the engine changes** |
 **Companion to:** [SUGGESTION_ENGINE_PROGRAM.md](SUGGESTION_ENGINE_PROGRAM.md) (the why)
 
 This is the build order. Section 3 is the part to read before starting — it lists what none of

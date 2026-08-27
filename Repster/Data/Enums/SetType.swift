@@ -112,6 +112,7 @@ enum FatigueLearningAuditStatus: String, Codable, CaseIterable, Sendable {
     case missingRIR
     case invalidPerformance
     case weightDeviationOver20Percent
+    case nonCapacitySetType
 
     var displayTitle: String {
         switch self {
@@ -129,6 +130,8 @@ enum FatigueLearningAuditStatus: String, Codable, CaseIterable, Sendable {
             return "Invalid performance data"
         case .weightDeviationOver20Percent:
             return "Weight changed too much"
+        case .nonCapacitySetType:
+            return "Not a capacity set"
         }
     }
 
@@ -148,6 +151,8 @@ enum FatigueLearningAuditStatus: String, Codable, CaseIterable, Sendable {
             return "Valid completed reps and weight are required."
         case .weightDeviationOver20Percent:
             return "The completed weight deviated by more than 20% from the suggestion."
+        case .nonCapacitySetType:
+            return "Drop sets and other submaximal or fragmented sets don't grade the model."
         }
     }
 }

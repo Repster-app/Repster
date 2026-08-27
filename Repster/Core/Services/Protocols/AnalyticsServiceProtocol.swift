@@ -378,6 +378,9 @@ extension AnalyticsServiceProtocol {
         remainingFreeWorkouts: Int?,
         rirSetCount: Int,
         averageRIR: Double?,
+        suggestionSetsCompared: Int,
+        suggestionFollowedShare: Double?,
+        suggestionOverrideDirection: String,
         interactions: [WorkoutInteraction: Int]
     ) {
         var properties: [AnalyticsPropertyKey: AnalyticsPropertyValue] = [
@@ -392,8 +395,17 @@ extension AnalyticsServiceProtocol {
             .notesEntered: .bool(notesEntered),
             .excludedFromProgression: .bool(excludedFromProgression),
             .rirSetCountBucket: .string(AnalyticsBuckets.count(rirSetCount)),
-            .rirEntered: .bool(rirSetCount > 0)
+            .rirEntered: .bool(rirSetCount > 0),
+            .suggestionSetsComparedBucket: .string(AnalyticsBuckets.count(suggestionSetsCompared)),
+            .suggestionOverrideDirection: .string(suggestionOverrideDirection)
         ]
+        // Absent rather than 0 when nothing was comparable: "no suggestions to follow" and
+        // "followed none of them" are opposite findings and must not share a value.
+        if let suggestionFollowedShare {
+            properties[.suggestionFollowedShareBucket] = .string(
+                AnalyticsBuckets.share(suggestionFollowedShare)
+            )
+        }
         if let source {
             properties[.source] = .string(source.rawValue)
         }
@@ -860,6 +872,15 @@ enum AnalyticsPropertyKey: String, CaseIterable {
     case enabled
     case accessTier = "access_tier"
     case remainingFreeWorkouts = "remaining_free_workouts"
+    /// How many sets in the workout had both a suggestion and a logged weight.
+    case suggestionSetsComparedBucket = "suggestion_sets_compared_bucket"
+    /// Share of those logged at the suggested weight. The headline quality signal for Smart
+    /// Suggestions — without it there is no way to tell whether a model change helped.
+    case suggestionFollowedShareBucket = "suggestion_followed_share_bucket"
+    /// Which way overrides went: none / heavier / lighter / mixed. Consistently heavier means the
+    /// model undershoots; consistently lighter means it asks too much; mixed means it is noisy
+    /// rather than biased. The share alone cannot separate those.
+    case suggestionOverrideDirection = "suggestion_override_direction"
     case rirEntered = "rir_entered"
     case rirSetCountBucket = "rir_set_count_bucket"
     case averageRirBucket = "average_rir_bucket"
@@ -917,6 +938,23 @@ enum AnalyticsPropertyValue: Equatable {
 }
 
 enum AnalyticsBuckets {
+    /// Buckets a 0-1 fraction. Deliberately coarse — the question is "most, some, or none",
+    /// and a finer grain on a handful of sets per workout would be noise dressed as precision.
+    static func share(_ value: Double) -> String {
+        switch max(0, min(1, value)) {
+        case ..<0.01:
+            return "none"
+        case ..<0.34:
+            return "under_third"
+        case ..<0.67:
+            return "about_half"
+        case ..<0.99:
+            return "most"
+        default:
+            return "all"
+        }
+    }
+
     static func duration(seconds: TimeInterval) -> String {
         let minutes = max(0, seconds) / 60
         switch minutes {

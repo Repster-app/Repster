@@ -61,6 +61,31 @@ struct WhatsNewRelease {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "1.5",
+            items: [
+                WhatsNewItem(
+                    id: "smarter_suggestions",
+                    systemImage: "wand.and.stars",
+                    tint: .accent,
+                    // Written from the lifter's side of the screen. "Capacity baseline now reads
+                    // reps in reserve" is what changed; "it stops going down when you're holding
+                    // back" is what they noticed and complained about.
+                    title: "Smarter suggestions",
+                    body: "Telling the app you had reps left no longer makes it suggest less. It won't drop below a weight you just lifted with something in the tank, and drop sets no longer drag the rest of the exercise down."
+                ),
+                WhatsNewItem(
+                    id: "suggestions_recalibrating",
+                    systemImage: "arrow.triangle.2.circlepath",
+                    tint: .gold,
+                    // The honest half. Suggestions shift for everyone on the same day and the
+                    // per-exercise tuning restarts; saying so costs one tile and buys back the
+                    // trust that a week of unexplained numbers would spend.
+                    title: "Give it a week",
+                    body: "Because the maths changed, per-exercise tuning starts fresh. Your numbers may look a little different until it has seen a few sessions."
+                )
+            ]
+        ),
+        WhatsNewRelease(
             version: "1.4",
             items: [
                 WhatsNewItem(

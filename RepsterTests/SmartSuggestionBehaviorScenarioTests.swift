@@ -1327,3 +1327,145 @@ final class SessionCapabilityCreditingTests: XCTestCase {
                        "a set after a drop set must not claim the first-set freshness bonus")
     }
 }
+
+// MARK: - Missing-RIR fallback (PR5)
+
+/// What a set is charged when the lifter ticked it complete without tapping the RIR chip.
+///
+/// `missingRIRDefault = 1.0` modelled such a set as *harder* than one explicitly marked RIR 2
+/// (effort scale 1.30 vs 1.15), so leaving the chip blank cost an increment on the next set. It
+/// governs 21.4% of app-era sets. Assuming the RIR the set was *prescribed* at beats any global
+/// constant: it adapts to whatever the lifter programmed and needs no tuning.
+final class MissingRIRFallbackTests: XCTestCase {
+
+    private func settings() -> SuggestionSettingsSnapshot {
+        SuggestionSettingsSnapshot(
+            formula: .epley, restTimerSeconds: 150, weightIncrement: 2.5,
+            fatigueEnabled: true, freshnessEnabled: false, freshnessPercent: 0.03,
+            baseFatigueRate: 0.03, recoveryConstant: 180, sessionCapabilityPolicy: .observed
+        )
+    }
+
+    private func done(
+        _ weight: Double, _ reps: Int, rir: Double?, targetRIR: Double? = nil, order: Int
+    ) -> SessionSetContext {
+        SessionSetContext(
+            weight: weight, reps: reps, rir: rir,
+            completedAt: Date(timeIntervalSince1970: 1_700_000_000 + Double(order) * 300),
+            completed: true, setType: .working, restDurationSeconds: 150,
+            targetRIR: targetRIR
+        )
+    }
+
+    private func decision(after completed: [SessionSetContext]) -> SuggestionDecision {
+        SuggestionEngine.evaluate(
+            SuggestionEngineInput(
+                baseE1RM: 100, baseSource: .recentPerformance,
+                completedSessionSets: completed,
+                pendingSets: [
+                    SuggestionPendingSetInput(
+                        setId: UUID(), setIndex: 4, setNumber: 5,
+                        target: SuggestionTarget(
+                            reps: 8, rir: 2, repRange: nil,
+                            repsSource: .explicitSet, rirSource: .explicitSet
+                        ),
+                        setType: .working
+                    )
+                ],
+                settings: settings(), calibrationAdjustment: .neutral
+            )
+        )[0]
+    }
+
+    /// Fatigue is the only thing this fallback touches, so it is the only thing compared here.
+    ///
+    /// Prescribed weight would be the wrong assertion: an unlabelled set also cannot update the
+    /// capability estimate, so comparing weights measures two effects at once and the fatigue
+    /// change disappears into the larger one.
+    private func fatigue(after completed: [SessionSetContext]) -> Double {
+        decision(after: completed).projectedSessionFatigue
+    }
+
+    /// The headline: four unlabelled sets prescribed at RIR 2 are charged exactly what four sets
+    /// explicitly logged at RIR 2 are charged, rather than as if they were near failure.
+    func testUnlabelledSetsAreChargedAtTheirPrescribedRIR() {
+        let unlabelled = (0..<4).map { done(75, 8, rir: nil, targetRIR: 2, order: $0) }
+        let explicit = (0..<4).map { done(75, 8, rir: 2, order: $0) }
+
+        XCTAssertEqual(fatigue(after: unlabelled), fatigue(after: explicit), accuracy: 1e-9)
+    }
+
+    /// And that is strictly cheaper than the old constant, which is the defect: leaving the chip
+    /// blank must not cost the lifter anything.
+    func testThePrescribedTargetIsCheaperThanTheOldConstant() {
+        let withTarget = (0..<4).map { done(75, 8, rir: nil, targetRIR: 2, order: $0) }
+        let withoutTarget = (0..<4).map { done(75, 8, rir: nil, order: $0) }
+
+        XCTAssertLessThan(
+            fatigue(after: withTarget), fatigue(after: withoutTarget),
+            "missingRIRDefault = 1.0 charges an unlabelled set as harder than an explicit RIR 2"
+        )
+    }
+
+    /// A reported RIR always wins — the target describes what was asked for, not what happened.
+    func testAReportedRIRBeatsTheTarget() {
+        let reported = (0..<4).map { done(75, 8, rir: 0, targetRIR: 5, order: $0) }
+        let matching = (0..<4).map { done(75, 8, rir: 0, order: $0) }
+
+        XCTAssertEqual(fatigue(after: reported), fatigue(after: matching), accuracy: 1e-9)
+        XCTAssertEqual(
+            decision(after: reported).prescribedWeight,
+            decision(after: matching).prescribedWeight
+        )
+    }
+
+    /// With no RIR *and* no resolvable target, the engine keeps its own last-resort constant
+    /// rather than assuming anything.
+    func testNoRIRAndNoTargetFallsBackToTheConstant() {
+        let neither = (0..<4).map { done(75, 8, rir: nil, order: $0) }
+        let atRIR1 = (0..<4).map { done(75, 8, rir: 1, order: $0) }
+
+        XCTAssertEqual(fatigue(after: neither), fatigue(after: atRIR1), accuracy: 1e-9,
+                       "missingRIRDefault is 1.0, so the cost must match an explicit RIR 1")
+    }
+
+    /// The fallback is for fatigue *cost* only. Capability is evidence about the lifter, and a
+    /// target is not evidence — crediting it would let the app invent capacity from its own
+    /// programming.
+    func testTheTargetNeverMovesTheCapabilityEstimate() {
+        let decisions = SuggestionEngine.evaluate(
+            SuggestionEngineInput(
+                baseE1RM: 100, baseSource: .recentPerformance,
+                completedSessionSets: [done(120, 8, rir: nil, targetRIR: 0, order: 0)],
+                pendingSets: [
+                    SuggestionPendingSetInput(
+                        setId: UUID(), setIndex: 1, setNumber: 2,
+                        target: SuggestionTarget(
+                            reps: 8, rir: 2, repRange: nil,
+                            repsSource: .explicitSet, rirSource: .explicitSet
+                        ),
+                        setType: .working
+                    )
+                ],
+                settings: settings(), calibrationAdjustment: .neutral
+            )
+        )
+
+        XCTAssertEqual(decisions[0].sessionCapabilityE1RM, 100, accuracy: 0.01,
+                       "a 120 kg set with no reported RIR must not raise capability")
+    }
+
+    /// Nor may it establish a floor — same reasoning, and the floor design says so explicitly (D6).
+    func testTheTargetNeverEstablishesAFloor() {
+        XCTAssertNil(
+            SuggestionEngine.suggestionFloor(
+                target: SuggestionTarget(
+                    reps: 8, rir: 0, repRange: nil,
+                    repsSource: .explicitSet, rirSource: .explicitSet
+                ),
+                completedSets: [done(100, 8, rir: nil, targetRIR: 5, order: 0)],
+                increment: 2.5
+            )
+        )
+    }
+}
