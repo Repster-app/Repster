@@ -1792,6 +1792,7 @@ private actor StartupPRRebuildSettingsServiceStub: SettingsServiceProtocol {
     func updatePrescriptionDefaultTargetRIR(_ rir: Int) async throws {}
     func updatePrescriptionFreshnessBonus(enabled: Bool, percent: Double) async throws {}
     func updatePrescriptionFatigueModelingEnabled(_ enabled: Bool) async throws {}
+    func updatePrescriptionCapacityGuardsEnabled(_ enabled: Bool) async throws {}
     func updatePrescriptionDefaultRecoveryConstant(_ seconds: Double) async throws {}
     func updatePrescriptionAdminModeEnabled(_ enabled: Bool) async throws {}
     func resetAllAppData() async throws {}

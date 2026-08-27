@@ -37,6 +37,7 @@ struct SmartSuggestionsAdvancedSections: View {
     // MARK: - State
 
     @State private var fatigueEnabled: Bool
+    @State private var capacityGuardsEnabled: Bool
     @State private var recencyWeeks: Int
     @State private var defaultTargetReps: Int
     @State private var defaultTargetRIR: Int
@@ -58,6 +59,7 @@ struct SmartSuggestionsAdvancedSections: View {
          isAdminModeEnabled: Bool = false,
          firstSectionTitle: String? = nil) {
         _fatigueEnabled = State(initialValue: profile.prescriptionFatigueModelingEnabled ?? true)
+        _capacityGuardsEnabled = State(initialValue: profile.prescriptionCapacityGuardsEnabled ?? true)
         _recencyWeeks = State(initialValue: profile.prescriptionRecencyWeeks ?? 6)
         _defaultTargetReps = State(initialValue: profile.prescriptionDefaultTargetReps ?? 8)
         _defaultTargetRIR = State(initialValue: profile.prescriptionDefaultTargetRIR ?? 2)
@@ -151,6 +153,14 @@ struct SmartSuggestionsAdvancedSections: View {
                     Task { try? await settingsService.updatePrescriptionFatigueModelingEnabled(newValue) }
                 }
 
+            if isAdminModeEnabled {
+                Toggle("Capacity Guards", isOn: $capacityGuardsEnabled)
+                    .foregroundColor(.textPrimary)
+                    .onChange(of: capacityGuardsEnabled) { _, newValue in
+                        Task { try? await settingsService.updatePrescriptionCapacityGuardsEnabled(newValue) }
+                    }
+            }
+
             if fatigueEnabled && isAdminModeEnabled {
                 NavigationLink {
                     FatigueLearningAdminView(fatigueLearningService: fatigueLearningService)
@@ -162,7 +172,7 @@ struct SmartSuggestionsAdvancedSections: View {
         } footer: {
             Text(
                 isAdminModeEnabled
-                    ? "When enabled, suggested weights decrease across sets to account for accumulated fatigue. Uses your rest timer duration to model recovery between sets."
+                    ? "When enabled, suggested weights decrease across sets to account for accumulated fatigue. Uses your rest timer duration to model recovery between sets.\n\nCapacity Guards: hold suggestions above a weight you completed with reps to spare, ignore drop sets when judging capacity, and limit how far one set can lower the estimate. Turning it off restores the older behaviour."
                     : "When enabled, suggested weights decrease across sets to account for accumulated fatigue. Turn on Admin Mode to access troubleshooting diagnostics."
             )
                 .foregroundColor(.textTertiary)

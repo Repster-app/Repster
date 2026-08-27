@@ -149,6 +149,13 @@ actor SettingsService: SettingsServiceProtocol {
         try await healthProfileRepository.save(profile)
     }
 
+    func updatePrescriptionCapacityGuardsEnabled(_ enabled: Bool) async throws {
+        let profile = try await healthProfileRepository.fetchOrCreate()
+        profile.prescriptionCapacityGuardsEnabled = enabled
+        profile.updatedAt = Date()
+        try await healthProfileRepository.save(profile)
+    }
+
     func updatePrescriptionDefaultRecoveryConstant(_ seconds: Double) async throws {
         let profile = try await healthProfileRepository.fetchOrCreate()
         profile.prescriptionDefaultRecoveryConstant = max(60, min(600, seconds))

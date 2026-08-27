@@ -4980,6 +4980,7 @@ private final class SettingsServiceStub: @unchecked Sendable, SettingsServicePro
         let _ = percent
     }
     func updatePrescriptionFatigueModelingEnabled(_ enabled: Bool) async throws { let _ = enabled }
+    func updatePrescriptionCapacityGuardsEnabled(_ enabled: Bool) async throws {}
     func updatePrescriptionDefaultRecoveryConstant(_ seconds: Double) async throws { let _ = seconds }
     func updatePrescriptionAdminModeEnabled(_ enabled: Bool) async throws { let _ = enabled }
     func resetAllAppData() async throws {}

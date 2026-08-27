@@ -32,6 +32,9 @@ protocol SettingsServiceProtocol: Sendable {
     func updatePrescriptionDefaultTargetRIR(_ rir: Int) async throws
     func updatePrescriptionFreshnessBonus(enabled: Bool, percent: Double) async throws
     func updatePrescriptionFatigueModelingEnabled(_ enabled: Bool) async throws
+    /// Kill switch for the epoch-2 capacity guards. See
+    /// ``HealthProfile/prescriptionCapacityGuardsEnabled``.
+    func updatePrescriptionCapacityGuardsEnabled(_ enabled: Bool) async throws
     func updatePrescriptionDefaultRecoveryConstant(_ seconds: Double) async throws
     func updatePrescriptionAdminModeEnabled(_ enabled: Bool) async throws
 
