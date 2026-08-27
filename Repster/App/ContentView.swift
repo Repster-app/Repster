@@ -39,6 +39,37 @@ enum StartupPRRebuildMaintenance {
     }
 }
 
+/// Clears the learned fatigue rates once, on the first launch after the suggestion model changes.
+///
+/// The rates are calibrated *around* the engine's constants, so a model change makes them answers
+/// to a question the engine no longer asks — keeping them would apply a correction tuned for the
+/// old model to the new one. Every behaviour change in the epoch trips this, which is precisely why
+/// they ship as one release: done separately, the calibration is burned once per change and no
+/// regression can be attributed to anything.
+///
+/// It calls the *preserving* reset. The prediction record — what the model said next to what
+/// actually happened — is kept and stamped with its epoch. Rates rebuild themselves from future
+/// sessions; that record cannot be recomputed from anything once deleted.
+enum StartupSuggestionModelMaintenance {
+    static let userDefaultsKey = "suggestionModelEpochApplied"
+
+    static func runIfNeeded(
+        fatigueLearningService: FatigueLearningService,
+        userDefaults: UserDefaults = .standard
+    ) async {
+        guard userDefaults.integer(forKey: userDefaultsKey) < SuggestionModelEpoch.current else { return }
+
+        do {
+            try await fatigueLearningService.resetLearnedRatesPreservingHistory()
+            userDefaults.set(SuggestionModelEpoch.current, forKey: userDefaultsKey)
+        } catch {
+            // Epoch stays unstamped, so this retries on the next launch. Retrying is harmless:
+            // clearing already-cleared rates is a no-op.
+            dbg("[ContentView] Suggestion model maintenance failed: \(error)")
+        }
+    }
+}
+
 struct ContentView: View {
 
     // MARK: - Environment
@@ -298,8 +329,12 @@ struct ContentView: View {
             if !hasScheduledStartupPRMaintenance {
                 hasScheduledStartupPRMaintenance = true
                 let settingsService = services.settingsService
+                let fatigueLearningService = services.fatigueLearningService
                 Task(priority: .utility) {
                     await StartupPRRebuildMaintenance.runIfNeeded(settingsService: settingsService)
+                    await StartupSuggestionModelMaintenance.runIfNeeded(
+                        fatigueLearningService: fatigueLearningService
+                    )
                 }
             }
 

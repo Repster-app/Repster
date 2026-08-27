@@ -9,7 +9,8 @@
 | PR2 input enrichment | **done** — golden master unchanged |
 | PR3 baseline reads RIR | **done** — mutation-checked: reverting the fix fails 3 tests at exactly 57.5 kg |
 | PR4 capability crediting + floor | **done** — golden master diff reviewed block by block, 590 tests green |
-| PR5-PR8 | not started |
+| PR7 calibration epoch | **done** — rates cleared, prediction record kept and stamped |
+| PR5, PR6, PR8 | not started |
 | PF2 target-RIR coverage | **done** — see §1; confirmed G1 emphatically (122 of 123 sets would have been missed) |
 | PF3 adherence metric | still outstanding, still wants to ship a release early |
 **Companion to:** [SUGGESTION_ENGINE_PROGRAM.md](SUGGESTION_ENGINE_PROGRAM.md) (the why)
@@ -371,7 +372,7 @@ PR5 does not fix this; only prompting for RIR would.
 | 4 | What "5+" means | **Accept the truncation, cap the credit, say so.** Extend the chip later; never inflate |
 | 5 | Kill switch | **Yes.** One `Bool` on `HealthProfile`, defaulted on, one admin-drawer row. PostHog flags are the remote option if wanted — needs setting up outside this repo |
 | 6 | Systemic (cross-exercise) fatigue | **Out of this release, but don't wall it off.** When PR4 opens the capability path, structure the accumulator so cross-exercise carry-over is later a change, not a rewrite (**C3**, **G6**) |
-| 7 | Calibration epoch (**C1**) | **Keep the history.** Stamp rows with a model version and reset the rates only. Blocks PR7; the one irreversible item |
+| 7 | Calibration epoch (**C1**) | **Keep the history** — decided 2026-08-27, built. `SuggestionModelEpoch` stamps every row; `resetLearnedRatesPreservingHistory()` clears rates only; `resetAllLearning()` stays destructive for the diagnostics "start clean" action |
 
 ### Why the damping factor is no longer on this list
 
@@ -380,6 +381,40 @@ routinely go *heavier* than the floor — which is direct field evidence of how 
 actually had, from real users, rather than a backtest against the 6.4% of RIR values that are ≥ 3.
 If that evidence later justifies a damped point estimate on top of the floor, it will come with a
 number attached instead of a guess. **Revisit after one release of adherence data.**
+
+### Seeding v2 rates from history rather than starting from the default
+
+Raised 2026-08-27: could the retained data derive the new model's starting values instead of
+everyone re-converging from 0.03?
+
+**Yes — and the better source is not the retained learning data at all.** Three tables were
+candidates, and they are not equivalent:
+
+| Source | Coverage | Survives? |
+|---|---|---|
+| `FatigueObservation` | Only sets where a suggestion existed; pruned to 30 sessions per exercise | Yes, now |
+| `FatigueLearningSetAudit` | Every set in a session with a suggestion; no routine pruning | Yes, now |
+| **`WorkoutSet`** | **Every set ever logged — 11,785 rows here, including 11,055 imported** | **Always; never pruned** |
+
+The fatigue rate describes how demonstrated capability decays within a session. That is fittable
+from **actuals alone** — `weight`, `reps`, `rir`, `restDurationSeconds` and `orderInExercise` across
+a workout — with no dependence on what the old model predicted or which baseline convention it
+used. So the replay corpus is the workout history, which is richer than either learning table and
+was never at risk.
+
+This sharpens why the record is worth keeping, because the two arguments are different:
+
+- **Rates** can be re-derived from history. Losing them costs re-convergence time, nothing permanent.
+- **Predictions** cannot. `predictedEffectiveE1RM` beside `actualE1RM` is model *output*; delete it
+  and no amount of history brings it back. That is the coaching substrate, and it is the reason
+  PR7 preserves rather than deletes.
+
+**Not built.** Seeding would mean replaying recent sessions per exercise through the new engine at
+launch to fit a starting rate — real work, with a startup cost across 171 exercises, and it needs a
+fitting method the current learner does not have (today's learner is a sign-following nudge of
+±0.002, not a fit). Worth doing: it would turn "your suggestions may look different for a week
+while it re-learns" into no release note at all. Size it before the epoch-2 release ships, because
+after that the re-convergence has already been paid.
 
 ### Still open, but scheduling rather than blocking
 

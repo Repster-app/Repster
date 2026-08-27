@@ -1,6 +1,32 @@
 import Foundation
 import SwiftData
 
+/// Which generation of the suggestion model a stored prediction came from.
+///
+/// The learned fatigue rates are calibrated *around* the engine's constants, so a change to the
+/// model invalidates them — they are answers to a question the engine no longer asks. The usual
+/// remedy is a reset, and the reset that already existed also deleted every observation and audit.
+///
+/// That is the wrong trade. Learned rates are cheap to rebuild: the learner re-derives them from
+/// future sessions, and the raw workout history needed to seed them is never deleted. Predictions
+/// are not. `predictedEffectiveE1RM` next to `actualE1RM` is the app's only record of how well it
+/// has been calling the shot, it cannot be recomputed from anything once thrown away, and it is
+/// exactly what a coaching surface would be built on.
+///
+/// So: clear the rates, keep the record, and stamp it — learning reads only the current epoch,
+/// while diagnostics and coaching can read across the boundary and compare generations.
+enum SuggestionModelEpoch {
+    /// Epoch 1 — the shipped 1.x model. Written as nil, since it predates stamping.
+    static let legacy: Int = 1
+
+    /// Epoch 2 — capacity baseline reads reps in reserve (PR3); RIR >= 3 credited as a floor,
+    /// capacity restricted to point-estimate set types, downward moves clamped (PR4).
+    static let current: Int = 2
+
+    /// Rows written before stamping existed belong to epoch 1.
+    static func resolved(_ stored: Int?) -> Int { stored ?? legacy }
+}
+
 /// Records the prediction error for a single completed set during a workout session.
 /// Used by FatigueLearningService to adaptively tune per-exercise fatigue parameters.
 @Model
@@ -62,6 +88,17 @@ final class FatigueObservation {
         set { setTypeRawValue = newValue?.rawValue }
     }
 
+    /// Which version of the suggestion model produced ``predictedEffectiveE1RM``.
+    ///
+    /// A prediction is only meaningful next to the model that made it. When the model changes, the
+    /// learned rates calibrated around the old constants have to be cleared — but the *record* of
+    /// what was predicted and what actually happened must not be, because it is model output and
+    /// once deleted it cannot be recomputed from anything. Stamping the epoch lets learning read
+    /// only the current one while diagnostics and coaching read across all of them.
+    ///
+    /// nil means epoch 1 — recorded before stamping existed.
+    var modelEpoch: Int?
+
     var createdAt: Date
 
     init(
@@ -80,6 +117,7 @@ final class FatigueObservation {
         actualRIR: Double,
         restDurationSeconds: Int? = nil,
         setType: SetType? = nil,
+        modelEpoch: Int? = SuggestionModelEpoch.current,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -97,6 +135,7 @@ final class FatigueObservation {
         self.actualRIR = actualRIR
         self.restDurationSeconds = restDurationSeconds
         self.setTypeRawValue = setType?.rawValue
+        self.modelEpoch = modelEpoch
         self.createdAt = createdAt
     }
 }
@@ -122,6 +161,8 @@ final class FatigueLearningSetAudit {
     var actualRIR: Double?
     var deviationFraction: Double?
     var normalizedError: Double?
+    /// See ``FatigueObservation/modelEpoch``. nil means epoch 1.
+    var modelEpoch: Int?
     var createdAt: Date
 
     var suggestionUnavailableReason: SuggestionUnavailableReason? {
@@ -151,6 +192,7 @@ final class FatigueLearningSetAudit {
         actualRIR: Double? = nil,
         deviationFraction: Double? = nil,
         normalizedError: Double? = nil,
+        modelEpoch: Int? = SuggestionModelEpoch.current,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -169,6 +211,7 @@ final class FatigueLearningSetAudit {
         self.actualRIR = actualRIR
         self.deviationFraction = deviationFraction
         self.normalizedError = normalizedError
+        self.modelEpoch = modelEpoch
         self.createdAt = createdAt
     }
 }

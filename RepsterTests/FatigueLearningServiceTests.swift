@@ -624,6 +624,134 @@ final class FatigueLearningServiceTests: XCTestCase {
             actualRIR: 0
         )
     }
+
+    // MARK: - Model epoch
+
+    /// The reset that runs on a model upgrade must clear the rates and keep the record.
+    ///
+    /// Learned rates are calibrated around the engine's constants, so a model change makes them
+    /// stale and they have to go — but they rebuild themselves from future sessions. The
+    /// prediction record does not: `predictedEffectiveE1RM` beside `actualE1RM` is the app's only
+    /// account of how well it has been calling the shot, it cannot be recomputed from anything
+    /// once deleted, and it is what a coaching surface would be built on.
+    func testResetPreservingHistory_clearsRatesButKeepsThePredictionRecord() async throws {
+        let workoutId = UUID()
+        let exercise = Exercise(
+            name: "Leg Extension",
+            equipmentType: .machinePin,
+            trackingType: .weightReps,
+            fatigueRate: 0.05
+        )
+        exercise.fatigueRateSourceRawValue = ExerciseFatigueRateSource.learned.rawValue
+        exercise.fatigueLearningSessionCount = 3
+        exercise.fatigueLearningCumulativeError = -0.02
+
+        let profile = HealthProfile(
+            prescriptionLearnedFatigueRate: 0.047,
+            prescriptionFatigueLearningSessionCount: 2,
+            prescriptionFatigueLearningCumulativeError: -0.01
+        )
+        let observationRepo = InMemoryFatigueObservationRepo(
+            observations: [makeObservation(exerciseId: exercise.id, workoutId: workoutId)]
+        )
+        let auditRepo = InMemoryFatigueLearningSetAuditRepo(
+            audits: [makeUsedAudit(
+                exerciseId: exercise.id, workoutId: workoutId,
+                visibleSetNumber: 2, normalizedError: -0.05
+            )]
+        )
+        let profileRepo = InMemoryHealthProfileRepo(profile: profile)
+        let service = makeService(
+            observationRepo: observationRepo,
+            exerciseRepo: InMemoryExerciseRepo(exercises: [exercise]),
+            healthProfileRepo: profileRepo,
+            auditRepo: auditRepo
+        )
+
+        try await service.resetLearnedRatesPreservingHistory()
+
+        // The rates go.
+        XCTAssertNil(exercise.fatigueRate)
+        XCTAssertNil(exercise.fatigueRateSourceRawValue)
+        XCTAssertNil(exercise.fatigueLearningSessionCount)
+        XCTAssertNil(exercise.fatigueLearningCumulativeError)
+
+        let persistedProfile = try await profileRepo.fetchOrCreate()
+        XCTAssertNil(persistedProfile.prescriptionLearnedFatigueRate)
+        XCTAssertNil(persistedProfile.prescriptionFatigueLearningSessionCount)
+        XCTAssertNil(persistedProfile.prescriptionFatigueLearningCumulativeError)
+
+        // The record stays. This is the whole point of the method.
+        XCTAssertEqual(observationRepo.observations.count, 1,
+                       "observations must survive a model upgrade")
+        XCTAssertEqual(auditRepo.audits.count, 1,
+                       "audits must survive a model upgrade")
+    }
+
+    /// Running it twice must be safe: the startup hook only stamps the epoch on success, so a
+    /// failure retries on the next launch.
+    func testResetPreservingHistoryIsIdempotent() async throws {
+        let exercise = Exercise(
+            name: "Leg Extension", equipmentType: .machinePin,
+            trackingType: .weightReps, fatigueRate: 0.05
+        )
+        let profileRepo = InMemoryHealthProfileRepo(profile: HealthProfile(
+            prescriptionLearnedFatigueRate: 0.047
+        ))
+        let observationRepo = InMemoryFatigueObservationRepo(
+            observations: [makeObservation(exerciseId: exercise.id, workoutId: UUID())]
+        )
+        let service = makeService(
+            observationRepo: observationRepo,
+            exerciseRepo: InMemoryExerciseRepo(exercises: [exercise]),
+            healthProfileRepo: profileRepo,
+            auditRepo: InMemoryFatigueLearningSetAuditRepo(audits: [])
+        )
+
+        try await service.resetLearnedRatesPreservingHistory()
+        try await service.resetLearnedRatesPreservingHistory()
+
+        XCTAssertNil(exercise.fatigueRate)
+        XCTAssertEqual(observationRepo.observations.count, 1)
+    }
+
+    /// The destructive reset stays destructive — it is the diagnostics-screen "start clean"
+    /// action, and a user asking for that must actually get it.
+    func testResetAllLearningStillDeletesEverything() async throws {
+        let exercise = Exercise(
+            name: "Leg Extension", equipmentType: .machinePin,
+            trackingType: .weightReps, fatigueRate: 0.05
+        )
+        let observationRepo = InMemoryFatigueObservationRepo(
+            observations: [makeObservation(exerciseId: exercise.id, workoutId: UUID())]
+        )
+        let service = makeService(
+            observationRepo: observationRepo,
+            exerciseRepo: InMemoryExerciseRepo(exercises: [exercise]),
+            healthProfileRepo: InMemoryHealthProfileRepo(profile: HealthProfile()),
+            auditRepo: InMemoryFatigueLearningSetAuditRepo(audits: [])
+        )
+
+        try await service.resetAllLearning()
+
+        XCTAssertTrue(observationRepo.observations.isEmpty)
+    }
+
+    /// New rows carry the current epoch so the two generations of prediction stay separable.
+    func testNewRecordsAreStampedWithTheCurrentEpoch() {
+        let observation = makeObservation(exerciseId: UUID(), workoutId: UUID())
+        XCTAssertEqual(observation.modelEpoch, SuggestionModelEpoch.current)
+    }
+
+    /// Rows written before stamping existed resolve to epoch 1 rather than being mistaken for
+    /// current-model predictions.
+    func testUnstampedRecordsResolveToTheLegacyEpoch() {
+        XCTAssertEqual(SuggestionModelEpoch.resolved(nil), SuggestionModelEpoch.legacy)
+        XCTAssertEqual(SuggestionModelEpoch.resolved(2), 2)
+        XCTAssertNotEqual(SuggestionModelEpoch.current, SuggestionModelEpoch.legacy,
+                          "the epoch must advance, or the upgrade hook never fires")
+    }
+
 }
 
 private final class InMemoryFatigueObservationRepo: @unchecked Sendable, FatigueObservationRepositoryProtocol {

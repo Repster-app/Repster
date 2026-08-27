@@ -375,7 +375,45 @@ actor FatigueLearningService {
         try await auditRepo.deleteAudits(exerciseId: exerciseId)
     }
 
-    /// Reset learning state for all exercises.
+    /// Clear every learned rate while keeping the prediction record intact.
+    ///
+    /// This is what runs when the model changes, and it is deliberately not ``resetAllLearning()``.
+    /// The rates must go: they were tuned around constants the engine no longer uses. The
+    /// observations and audits must stay: `predictedEffectiveE1RM` beside `actualE1RM` is the only
+    /// record of how well the app has been calling the shot, it cannot be recomputed once deleted,
+    /// and new rows are stamped with a later ``SuggestionModelEpoch`` so the two generations stay
+    /// distinguishable rather than blended.
+    ///
+    /// Learning is unaffected by the retained rows: `processSessionEnd` grades the workout that
+    /// just finished, so it only ever reads audits written under the current model.
+    func resetLearnedRatesPreservingHistory() async throws {
+        let exercises = try await exerciseRepo.fetchAll()
+        for exercise in exercises {
+            guard exercise.fatigueRate != nil ||
+                exercise.fatigueRateSourceRawValue != nil ||
+                exercise.fatigueLearningSessionCount != nil ||
+                exercise.fatigueLearningCumulativeError != nil else { continue }
+            exercise.fatigueRate = nil
+            exercise.fatigueRateSourceRawValue = nil
+            exercise.fatigueLearningSessionCount = nil
+            exercise.fatigueLearningCumulativeError = nil
+            exercise.updatedAt = Date()
+            try await exerciseRepo.save(exercise)
+        }
+
+        let profile = try await healthProfileRepo.fetchOrCreate()
+        profile.prescriptionLearnedFatigueRate = nil
+        profile.prescriptionFatigueLearningSessionCount = nil
+        profile.prescriptionFatigueLearningCumulativeError = nil
+        profile.updatedAt = Date()
+        try await healthProfileRepo.save(profile)
+    }
+
+    /// Reset learning state for all exercises, **including** the prediction record.
+    ///
+    /// Destructive: this deletes every observation and audit. Reachable only from the diagnostics
+    /// screen, where the user is explicitly asking to start clean. Model upgrades must use
+    /// ``resetLearnedRatesPreservingHistory()`` instead.
     func resetAllLearning() async throws {
         let exercises = try await exerciseRepo.fetchAll()
         for exercise in exercises {
