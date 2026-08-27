@@ -137,10 +137,14 @@ final class PostHogAnalyticsClient: AnalyticsClientProtocol {
         config.errorTrackingConfig.autoCapture = true
     }
 
-    /// Session replay is deliberately configured so that no workout data can leave
-    /// the device. Repster is SwiftUI, so `maskAllTextInputs` masks *every* text
-    /// layer (PostHog masks `SwiftUI.CGDrawingView`), not just editable fields —
-    /// recordings show layout, navigation and taps with all text redacted.
+    /// Session replay masks everything by default. Repster is SwiftUI, so
+    /// `maskAllTextInputs` masks *every* text layer (PostHog masks
+    /// `SwiftUI.CGDrawingView`), not just editable fields.
+    ///
+    /// Screens opt out of that default one at a time via `replayVisible()`, and free-text
+    /// fields opt back in via `replayMasked()` — `Repster/Core/Extensions/ReplayPrivacy.swift`
+    /// holds both, the reasoning, and the list of files that must change alongside them.
+    /// `grep -r replayVisible` is the complete inventory of what a recording can show.
     ///
     /// Keep this in sync with `docs/privacy.html` and
     /// `marketing/app-store/privacy-review-checklist.md`.

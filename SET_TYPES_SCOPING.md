@@ -1,6 +1,12 @@
 # Set Types — Scoping
 
-**Status:** scoping only, nothing built
+**Status:** background survey. Superseded in part by [DROP_SETS_SCOPING.md](DROP_SETS_SCOPING.md)
+(2026-08-26), which is the build scope for the decision taken: hide the unbuilt types, ship drop
+sets as a visible annotation, and fix the engine defects first. Phase 1 and Decision 4 below are
+superseded by that doc. **Correction:** the tier table's claim that the 11 non-warmup, non-partial
+types are "identical to `working` everywhere except one fatigue constant" is wrong — ten call sites
+filter on `setType == .working` exactly, so those types silently vanish from Insights, Copy
+Previous, the Home card, and ExerciseInfoProvider. See DROP_SETS_SCOPING.md.
 **Date:** 2026-08-16
 
 ## The problem, stated properly

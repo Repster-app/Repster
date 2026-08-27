@@ -40,6 +40,17 @@ enum HealthKitPreferences {
     static func markOffered() {
         UserDefaults.standard.set(true, forKey: hasBeenOfferedKey)
     }
+
+    /// The offer rule, as a pure function so it can be tested without writing to
+    /// `UserDefaults.standard` (which the Settings screen binds to via `@AppStorage`).
+    ///
+    /// One-shot by construction: `hasBeenOffered` is set by both `decline()` and
+    /// `connect()` in `AppleHealthConnectionModel`, and by the workout-finish sheet's
+    /// `onDismiss` for the user who swipes it away without answering. So a surface that
+    /// raises the offer on its own initiative gets exactly one attempt, ever.
+    static func shouldOffer(isAvailable: Bool, isEnabled: Bool, hasBeenOffered: Bool) -> Bool {
+        isAvailable && !isEnabled && !hasBeenOffered
+    }
 }
 
 actor HealthKitService: HealthKitServiceProtocol {
@@ -80,7 +91,11 @@ actor HealthKitService: HealthKitServiceProtocol {
     }
 
     nonisolated var shouldOfferConnection: Bool {
-        isAvailable && !isEnabled && !HealthKitPreferences.hasBeenOffered
+        HealthKitPreferences.shouldOffer(
+            isAvailable: isAvailable,
+            isEnabled: isEnabled,
+            hasBeenOffered: HealthKitPreferences.hasBeenOffered
+        )
     }
 
     /// Types Repster writes. Requested together so enabling the energy estimate later

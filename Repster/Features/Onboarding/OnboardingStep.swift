@@ -1,5 +1,5 @@
 // OnboardingStep.swift
-// View-layer step progression tracker for the 4-screen onboarding flow.
+// View-layer step progression tracker for the 3-screen onboarding flow.
 // Spec: FR-010, User Story 5
 // Feature: 010-settings-and-onboarding WP04 T019
 
@@ -10,12 +10,10 @@ enum OnboardingStep: Int, CaseIterable {
     /// Units and bodyweight share a screen. A bodyweight figure is meaningless without a
     /// unit, so separated, the second screen had to silently assume the first's answer.
     case unitsAndBodyweight = 1
-    /// Placed after bodyweight because the calorie estimate depends on it, and late
-    /// enough that someone who bounces here has already set everything that matters.
-    /// Dropped from the flow entirely when HealthKit is unavailable — see
-    /// `OnboardingViewModel.visibleSteps`.
-    case appleHealth        = 2
-    case importPrompt       = 3
+    /// Was index 3, behind an Apple Health step that 1.4 shipped here and 1.5 moved to
+    /// the first workout finish. `step_index` therefore drops by one across that release;
+    /// `step` is the stable dimension to funnel on.
+    case importPrompt       = 2
 
     static var totalSteps: Int { allCases.count }
 
@@ -28,7 +26,7 @@ enum OnboardingStep: Int, CaseIterable {
             // bodyweight field is optional within the screen. There is nothing here that
             // skipping would let you avoid answering.
             return false
-        case .appleHealth, .importPrompt:
+        case .importPrompt:
             return true
         }
     }

@@ -168,6 +168,9 @@ struct ActiveWorkoutView: View {
         // Finish workout summary sheet (WP07 T032)
         .sheet(isPresented: $viewModel.showFinishSheet) {
             WorkoutSummarySheet(viewModel: viewModel)
+                // A sheet is a separate presentation, so it does not inherit the
+                // `replayVisible()` above.
+                .replayVisible()
                 .onAppear {
                     services.analyticsService.screen(.workoutSummary)
                 }
@@ -178,6 +181,10 @@ struct ActiveWorkoutView: View {
                 dismiss()
             }
         }
+        // Sets, reps and RIR — the same figures the event stream already carries in
+        // bucketed form. No free-text field lives on this screen; the two that exist are
+        // on the summary sheet, which masks them individually.
+        .replayVisible()
     }
 
     // MARK: - Sub-Tab Picker (T025)

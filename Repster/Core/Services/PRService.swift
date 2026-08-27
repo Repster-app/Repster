@@ -423,32 +423,23 @@ actor PRService: PRServiceProtocol {
             recordType: .repMax
         )
 
-        // Sort by reps DESCENDING (highest rep count first)
-        let sorted = records.sorted { ($0.reps ?? 0) > ($1.reps ?? 0) }
-
-        // Apply suffix-max filter (specdoc S7.4)
-        // Walk from highest reps to lowest, tracking max weight seen.
-        // Only include entries that exceed the running max — these form the capability frontier.
-        var maxWeightSeenGrams = 0
-        var result: [PRTableEntry] = []
-
-        for record in sorted {
-            let valueGrams = UnitConversion.toGrams(record.value)
-            if valueGrams > maxWeightSeenGrams {
-                // This entry is on the capability frontier — include it
-                result.append(PRTableEntry(
-                    reps: record.reps ?? 0,
-                    value: record.value,
-                    setId: record.setId,
-                    date: record.date
-                ))
-                maxWeightSeenGrams = valueGrams
-            }
-            // Else: dominated by a higher-rep entry — skip
-        }
+        // Apply suffix-max filter (specdoc S7.4) — dominated entries are hidden
+        let frontierReps = PRFrontier.frontierReps(
+            records.map { (reps: $0.reps ?? 0, value: $0.value) }
+        )
 
         // Return sorted by reps ASCENDING for display
-        return result.sorted { $0.reps < $1.reps }
+        return records
+            .filter { frontierReps.contains($0.reps ?? 0) }
+            .map {
+                PRTableEntry(
+                    reps: $0.reps ?? 0,
+                    value: $0.value,
+                    setId: $0.setId,
+                    date: $0.date
+                )
+            }
+            .sorted { $0.reps < $1.reps }
     }
 
     // MARK: - Bulk Rebuild (FR-011)
@@ -615,22 +606,12 @@ actor PRService: PRServiceProtocol {
             return (frontierReps: [], affectedSets: [:])
         }
 
-        // 2. Sort by reps DESCENDING (highest rep count first)
-        let sorted = records.sorted { ($0.reps ?? 0) > ($1.reps ?? 0) }
+        // 2. Suffix-max walk — same frontier the PR table and Home's Recent PRs use
+        let frontierReps = PRFrontier.frontierReps(
+            records.map { (reps: $0.reps ?? 0, value: $0.value) }
+        )
 
-        // 3. Suffix-max walk — same algorithm as fetchPRTable (specdoc S7.4)
-        var maxWeightSeenGrams = 0
-        var frontierReps = Set<Int>()
-
-        for record in sorted {
-            let valueGrams = UnitConversion.toGrams(record.value)
-            if valueGrams > maxWeightSeenGrams {
-                frontierReps.insert(record.reps ?? 0)
-                maxWeightSeenGrams = valueGrams
-            }
-        }
-
-        // 4. Update owning sets: .current if on frontier, .dominated if not
+        // 3. Update owning sets: .current if on frontier, .dominated if not
         var affectedSets: [UUID: CachedPRStatus?] = [:]
 
         for record in records {

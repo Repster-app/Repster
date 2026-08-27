@@ -138,6 +138,7 @@ actor StatsService: StatsServiceProtocol {
         let formula = E1RMFormula(rawValue: profile.e1RMFormula) ?? .epley
 
         var seen = Set<UUID>()
+        var repMaxesByExercise: [UUID: [PerformanceRecordSummaryData]] = [:]
         var result: [PerformanceRecordSummaryData] = []
         for record in records {
             guard let exercise = try await exerciseRepo.fetchChartExercise(byId: record.exerciseId),
@@ -146,17 +147,35 @@ actor StatsService: StatsServiceProtocol {
                   recordReps > 0 else {
                 continue
             }
-            guard seen.insert(record.exerciseId).inserted else { continue }
+            // One card per exercise — an exercise only counts as seen once a
+            // record of its own actually made the list, so a dominated newest
+            // record falls through to the last PR that still stands.
+            guard !seen.contains(record.exerciseId) else { continue }
 
-            if scope == .e1RMOnly {
-                // Only include the record if its e1RM is the best across all rep buckets
+            let validRepMaxes: [PerformanceRecordSummaryData]
+            if let cached = repMaxesByExercise[record.exerciseId] {
+                validRepMaxes = cached
+            } else {
                 let allRepMaxes = try await performanceRecordRepo.fetchAllSummaries(
                     for: record.exerciseId,
                     recordType: .repMax
                 )
-                let validRepMaxes = allRepMaxes.filter { ($0.reps ?? 0) > 0 }
-                guard !validRepMaxes.isEmpty else { continue }
+                validRepMaxes = allRepMaxes.filter { ($0.reps ?? 0) > 0 }
+                repMaxesByExercise[record.exerciseId] = validRepMaxes
+            }
+            guard !validRepMaxes.isEmpty else { continue }
 
+            // A rep-bucket record dominated by a higher-rep record at the same or
+            // greater weight is not a PR anywhere else in the app — its own set
+            // carries no badge (CachedPRStatus.dominated), so Home must not claim
+            // one either. 60 kg x 7 says nothing new once 60 kg x 8 is on the board.
+            let frontierReps = PRFrontier.frontierReps(
+                validRepMaxes.map { (reps: $0.reps ?? 0, value: $0.value) }
+            )
+            guard frontierReps.contains(recordReps) else { continue }
+
+            if scope == .e1RMOnly {
+                // Only include the record if its e1RM is the best across all rep buckets
                 let recordE1RM = formula.calculate(weight: record.value, reps: recordReps)
                 let bestE1RM = validRepMaxes.map {
                     formula.calculate(weight: $0.value, reps: $0.reps ?? 1)
@@ -165,6 +184,7 @@ actor StatsService: StatsServiceProtocol {
                 guard recordE1RM >= bestE1RM else { continue }
             }
 
+            seen.insert(record.exerciseId)
             result.append(record)
             if result.count >= limit { break }
         }

@@ -166,7 +166,10 @@ struct WeightSuggestionCardView: View {
                 iconTile(systemName: "wand.and.stars", tint: primaryAccent)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    // Line 1 — "Set N · 54 kg for 6–8 reps"
+                    // Line 1 — "Set N · 54 kg for 7 reps".
+                    // Names the rep count the weight was priced for, not the
+                    // target range: at a range's lower bound the same weight
+                    // would read as a step backwards.
                     HStack(spacing: 0) {
                         Text("Set \(suggestion.setNumber) · ")
                             .font(.system(size: 15, weight: .semibold))
@@ -176,7 +179,7 @@ struct WeightSuggestionCardView: View {
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(primaryAccent)
 
-                        Text(" for \(suggestion.targetDisplayLabel)")
+                        Text(" for \(suggestion.prescribedDisplayLabel)")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(Color.textSecondary)
                     }
@@ -214,7 +217,7 @@ struct WeightSuggestionCardView: View {
                             Text(formatWeight(suggestion.suggestedWeight))
                                 .font(.system(size: 13, weight: .bold, design: .monospaced))
                                 .foregroundStyle(Color.info)
-                            Text(" × \(suggestion.targetDisplayLabel) @ RIR \(formatSimpleNumber(suggestion.targetRIR))")
+                            Text(" × \(suggestion.prescribedDisplayLabel) @ RIR \(formatSimpleNumber(suggestion.targetRIR))")
                                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
                                 .foregroundStyle(Color.textPrimary)
                         }

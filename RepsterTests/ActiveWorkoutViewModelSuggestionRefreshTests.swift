@@ -2713,6 +2713,150 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         XCTAssertNil(allowed.unavailableReason)
     }
 
+    func testFirstSetRepRangeProgressionPricesNineRepsNotEight() throws {
+        // Reported 2026-08-26: after 60 kg x 8 @ RIR 0 in two consecutive
+        // sessions, widening the target to 6-10 suggested 58.75 kg, which reads
+        // as a step down from 60. It is not: the engine priced 9 reps, where
+        // 58.75 implies an e1RM of 76.375 against the 76.0 baseline.
+        let setId = UUID()
+        let target = SuggestionTarget(
+            reps: 8,
+            rir: 0,
+            repRange: 6...10,
+            repsSource: .explicitSet,
+            rirSource: .explicitSet
+        )
+        let pendingSet = SuggestionPendingSetInput(
+            setId: setId,
+            setIndex: 0,
+            setNumber: 1,
+            target: target,
+            setType: .working
+        )
+        let input = SuggestionEngineInput(
+            baseE1RM: 76.0, // Epley from 60 kg x 8
+            baseSource: .recentPerformance,
+            completedSessionSets: [],
+            pendingSets: [pendingSet],
+            settings: SuggestionSettingsSnapshot(
+                formula: .epley,
+                restTimerSeconds: 120,
+                weightIncrement: 1.25,
+                fatigueEnabled: true,
+                freshnessEnabled: false,
+                freshnessPercent: 0.03,
+                baseFatigueRate: 0.04,
+                recoveryConstant: 180.0,
+                sessionCapabilityPolicy: .observed
+            ),
+            calibrationAdjustment: .neutral
+        )
+
+        let decision = try XCTUnwrap(SuggestionEngine.evaluate(input).first)
+
+        XCTAssertEqual(decision.prescribedWeight, 58.75, accuracy: 0.001)
+        XCTAssertEqual(decision.bestReps, 9)
+        XCTAssertEqual(decision.selectionPolicy, .firstSetProgressionAboveRecentPeak)
+    }
+
+    func testRepRangeSuggestionLabelsThePrescribedRepCountNotTheRange() throws {
+        let setId = UUID()
+        let target = SuggestionTarget(
+            reps: 8,
+            rir: 0,
+            repRange: 6...10,
+            repsSource: .explicitSet,
+            rirSource: .explicitSet
+        )
+        let suggestion = try makeSuggestion(setId: setId, target: target, bestReps: 9)
+
+        XCTAssertEqual(suggestion.prescribedDisplayLabel, "9 reps")
+        XCTAssertEqual(suggestion.targetDisplayLabel, "6-10 reps")
+        XCTAssertEqual(suggestion.targetReps, 9)
+    }
+
+    func testFixedRepTargetLabelsAreUnchangedByThePrescribedRepCount() throws {
+        let setId = UUID()
+        let target = SuggestionTarget(
+            reps: 8,
+            rir: 0,
+            repRange: nil,
+            repsSource: .explicitSet,
+            rirSource: .explicitSet
+        )
+        let suggestion = try makeSuggestion(setId: setId, target: target, bestReps: nil)
+
+        XCTAssertEqual(suggestion.prescribedDisplayLabel, "8 reps")
+        XCTAssertEqual(suggestion.targetDisplayLabel, "8 reps")
+    }
+
+    func testUnilateralRepRangeSuggestionKeepsPerSideWordingOnThePrescribedCount() throws {
+        let setId = UUID()
+        let target = SuggestionTarget(
+            reps: 8,
+            rir: 0,
+            repRange: 6...10,
+            repsSource: .template,
+            rirSource: .template,
+            displayReps: 8,
+            displayRepRange: 6...10,
+            repTargetMode: .perSide
+        )
+        let suggestion = try makeSuggestion(setId: setId, target: target, bestReps: 9)
+
+        XCTAssertEqual(suggestion.prescribedDisplayLabel, "9 reps each side")
+        XCTAssertEqual(suggestion.targetDisplayLabel, "6-10 reps each side")
+    }
+
+    private func makeSuggestion(
+        setId: UUID,
+        target: SuggestionTarget,
+        bestReps: Int?
+    ) throws -> SetSuggestion {
+        let pendingSet = SuggestionPendingSetInput(
+            setId: setId,
+            setIndex: 0,
+            setNumber: 1,
+            target: target,
+            setType: .working
+        )
+        let preparation = SuggestionPreparation(
+            cacheKey: "prescribed-rep-label",
+            completedSessionSets: [],
+            setResolutions: [
+                SuggestionSetResolution(
+                    setId: setId,
+                    setIndex: 0,
+                    setNumber: 1,
+                    eligibility: .eligible(target: target),
+                    setType: .working
+                )
+            ],
+            pendingSets: [pendingSet],
+            unavailableReason: nil
+        )
+        let evaluation = SuggestionEvaluation(
+            input: makeInput(pendingSets: [pendingSet]),
+            decisions: [
+                makeDecision(
+                    setId: setId,
+                    setIndex: 0,
+                    setNumber: 1,
+                    target: target,
+                    bestReps: bestReps
+                )
+            ],
+            unavailableReason: nil
+        )
+
+        let data = SuggestionExplainer.makeWeightSuggestionData(
+            preparation: preparation,
+            evaluation: evaluation,
+            unitPreference: .metric
+        )
+        return try XCTUnwrap(data.suggestion(for: setId))
+    }
+
     private func makeInput(pendingSets: [SuggestionPendingSetInput]) -> SuggestionEngineInput {
         SuggestionEngineInput(
             baseE1RM: 100,
@@ -2746,7 +2890,8 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         freshnessApplied: Bool = false,
         selectionPolicy: SuggestionSelectionPolicy = .closestMatch,
         selectionReferenceE1RM: Double? = nil,
-        projectedSessionFatigue: Double = 0.0
+        projectedSessionFatigue: Double = 0.0,
+        bestReps: Int? = nil
     ) -> SuggestionDecision {
         SuggestionDecision(
             setId: setId,
@@ -2767,7 +2912,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
             e1RMSourceWorkoutDate: nil,
             e1RMSourceTopSet: nil,
             sessionCapabilitySourceLabel: SessionCapabilityPolicy.observed.label,
-            bestReps: nil,
+            bestReps: bestReps,
             selectionPolicy: selectionPolicy,
             selectionReferenceE1RM: selectionReferenceE1RM,
             calibrationAdjustment: .neutral,

@@ -1139,6 +1139,190 @@ final class SetServiceTests: XCTestCase {
         XCTAssertEqual(recentPRs.map(\.exerciseId), [supported.exercise.id])
     }
 
+    func testFetchRecentPRsSkipsDominatedRepBucketRecords() async throws {
+        let context = try makeContext()
+        let firstDate = makeDate(2026, 3, 20, 10, 0)
+        let secondDate = makeDate(2026, 3, 22, 10, 0)
+
+        // Session 1: 60 kg x 8 sets the 8-rep record.
+        let seeded = try await insertExerciseAndWorkout(
+            in: context,
+            name: "T-Bar Row",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "back",
+            date: firstDate
+        )
+        _ = try await context.setService.save(WorkoutSet(
+            workoutId: seeded.workout.id,
+            exerciseId: seeded.exercise.id,
+            date: firstDate,
+            completedAt: firstDate.addingTimeInterval(240),
+            weight: 60,
+            reps: 8,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        ))
+
+        // Session 2: 60 kg x 8 only matches, then 60 kg x 7 opens the 7-rep bucket.
+        let secondWorkout = Workout(
+            date: secondDate,
+            title: "T-Bar Row",
+            startTime: secondDate,
+            endTime: secondDate.addingTimeInterval(1_800),
+            duration: 1_800,
+            status: .completed
+        )
+        try await context.workoutRepo.save(secondWorkout)
+
+        let matchingResult = try await context.setService.save(WorkoutSet(
+            workoutId: secondWorkout.id,
+            exerciseId: seeded.exercise.id,
+            date: secondDate,
+            completedAt: secondDate.addingTimeInterval(240),
+            weight: 60,
+            reps: 8,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        ))
+        let dominatedResult = try await context.setService.save(WorkoutSet(
+            workoutId: secondWorkout.id,
+            exerciseId: seeded.exercise.id,
+            date: secondDate,
+            completedAt: secondDate.addingTimeInterval(420),
+            weight: 60,
+            reps: 7,
+            setType: .working,
+            orderInWorkout: 2,
+            orderInExercise: 2,
+            completed: true
+        ))
+
+        // The 7-rep set owns a record but carries no badge — it is dominated by 60 kg x 8.
+        let persistedMatch = try await context.setRepo.fetch(byId: matchingResult.setId)
+        let persistedDominated = try await context.setRepo.fetch(byId: dominatedResult.setId)
+        XCTAssertEqual(persistedMatch?.prStatus, .matched)
+        XCTAssertEqual(persistedDominated?.prStatus, .dominated)
+
+        let recentPRs = try await context.statsService.fetchRecentPRs(
+            since: firstDate.addingTimeInterval(-3_600),
+            limit: 3,
+            scope: .anyPR
+        )
+
+        // Home must not advertise the dominated 7-rep record; it falls through
+        // to the 8-rep record that still stands.
+        XCTAssertEqual(recentPRs.count, 1)
+        XCTAssertEqual(recentPRs.first?.reps, 8)
+        XCTAssertEqual(recentPRs.first?.value, 60)
+    }
+
+    func testFetchRecentPRsPrefersFrontierRecordWhenBothLandInOneSession() async throws {
+        let context = try makeContext()
+        let workoutDate = makeDate(2026, 3, 22, 10, 0)
+
+        // Both rep buckets open in the same session, so both records carry the
+        // same date — the frontier decides which one Home shows, not the sort.
+        let seeded = try await insertExerciseAndWorkout(
+            in: context,
+            name: "T-Bar Row",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "back",
+            date: workoutDate
+        )
+        for (order, reps) in [(1, 7), (2, 8)] {
+            _ = try await context.setService.save(WorkoutSet(
+                workoutId: seeded.workout.id,
+                exerciseId: seeded.exercise.id,
+                date: workoutDate,
+                completedAt: workoutDate.addingTimeInterval(Double(order) * 180),
+                weight: 60,
+                reps: reps,
+                setType: .working,
+                orderInWorkout: order,
+                orderInExercise: order,
+                completed: true
+            ))
+        }
+
+        let recentPRs = try await context.statsService.fetchRecentPRs(
+            since: workoutDate.addingTimeInterval(-3_600),
+            limit: 3,
+            scope: .anyPR
+        )
+
+        XCTAssertEqual(recentPRs.count, 1)
+        XCTAssertEqual(recentPRs.first?.reps, 8)
+    }
+
+    func testFetchRecentPRsKeepsLowerRepRecordAtHeavierWeight() async throws {
+        let context = try makeContext()
+        let firstDate = makeDate(2026, 3, 20, 10, 0)
+        let secondDate = makeDate(2026, 3, 22, 10, 0)
+
+        // Session 1: 60 kg x 8.
+        let seeded = try await insertExerciseAndWorkout(
+            in: context,
+            name: "T-Bar Row",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "back",
+            date: firstDate
+        )
+        _ = try await context.setService.save(WorkoutSet(
+            workoutId: seeded.workout.id,
+            exerciseId: seeded.exercise.id,
+            date: firstDate,
+            completedAt: firstDate.addingTimeInterval(240),
+            weight: 60,
+            reps: 8,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        ))
+
+        // Session 2: 65 kg x 5 is not dominated by 60 kg x 8 — it is heavier, so
+        // it stays on the frontier and must still reach Home.
+        let secondWorkout = Workout(
+            date: secondDate,
+            title: "T-Bar Row",
+            startTime: secondDate,
+            endTime: secondDate.addingTimeInterval(1_800),
+            duration: 1_800,
+            status: .completed
+        )
+        try await context.workoutRepo.save(secondWorkout)
+        _ = try await context.setService.save(WorkoutSet(
+            workoutId: secondWorkout.id,
+            exerciseId: seeded.exercise.id,
+            date: secondDate,
+            completedAt: secondDate.addingTimeInterval(240),
+            weight: 65,
+            reps: 5,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        ))
+
+        let recentPRs = try await context.statsService.fetchRecentPRs(
+            since: firstDate.addingTimeInterval(-3_600),
+            limit: 3,
+            scope: .anyPR
+        )
+
+        // One card per exercise, and the heavier low-rep record is a real PR.
+        XCTAssertEqual(recentPRs.count, 1)
+        XCTAssertEqual(recentPRs.first?.reps, 5)
+        XCTAssertEqual(recentPRs.first?.value, 65)
+    }
+
     func testStartupPRRebuildMaintenanceRunsOnceOnSuccess() async throws {
         let suiteName = "StartupPRRebuildMaintenanceRunsOnce-\(UUID().uuidString)"
         let userDefaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

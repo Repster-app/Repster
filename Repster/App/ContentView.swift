@@ -125,6 +125,13 @@ struct ContentView: View {
     /// Whether the What's New sheet is presented.
     @State private var showWhatsNew = false
 
+    /// Repster's own Apple Health offer, raised on the first return to Home after a
+    /// workout has been completed. Held rather than built inline so a connect that is
+    /// still in flight survives the view re-rendering underneath it.
+    @State private var healthOffer: AppleHealthConnectionModel?
+
+    @State private var showAppleHealthOffer = false
+
     // MARK: - Tab Selection
 
     /// Custom binding that detects re-selecting the home tab to pop its navigation to root.
@@ -255,6 +262,10 @@ struct ContentView: View {
                 Task {
                     await refreshActiveWorkoutState()
                     await refreshMonetizationState(forceSubscriptionRefresh: true)
+                    // Both want the same moment, so only one may have it. Health goes
+                    // first because it can only ever be claimed once, while the review
+                    // prompt has two more milestones behind it.
+                    guard !offerAppleHealthIfEarned() else { return }
                     await requestReviewIfEarned()
                 }
             }
@@ -328,6 +339,25 @@ struct ContentView: View {
                     healthKitService: services.healthKitService,
                     analyticsService: services.analyticsService
                 )
+            }
+        }
+        // Marked offered on any dismissal, swipe included. `decline()` and `connect()`
+        // already spend the offer, so this only catches the user who swipes the sheet away
+        // without answering — and an unanswered offer that returns after every workout is
+        // worse than one that was ignored once.
+        .sheet(isPresented: $showAppleHealthOffer, onDismiss: {
+            HealthKitPreferences.markOffered()
+            healthOffer = nil
+        }) {
+            if let healthOffer {
+                AppleHealthPromptView(
+                    model: healthOffer,
+                    onConnected: { showAppleHealthOffer = false },
+                    onDecline: { showAppleHealthOffer = false }
+                )
+                // Fixed copy, and the decline rate here is the thing being watched.
+                .replayVisible()
+                .onAppear { healthOffer.promptShown() }
             }
         }
         // Both follow-on flows wait for this sheet to finish dismissing. Presenting while
@@ -692,6 +722,41 @@ struct ContentView: View {
     /// is the best moment Repster has: the user just finished training and the
     /// summary is behind them.
     ///
+    /// Raise Repster's own Apple Health explainer once, on the first return to Home after
+    /// a workout has been completed.
+    ///
+    /// Deliberately not in onboarding. 1.4 asked there and converted 2 of 9, while the
+    /// same prompt raised from the What's New sheet converted both times it appeared —
+    /// an offer to send *finished workouts* somewhere lands once there is a finished
+    /// workout to send. Same treatment notification permission already got, for the same
+    /// reason: see the `RestTimerAlarmCoordinator` note in `RepsterApp.init`.
+    ///
+    /// `shouldOfferConnection` is the one-shot gate — false once the user has connected,
+    /// answered either way, or is on hardware without HealthKit — so this can never ask a
+    /// second time. The completed-workout floor is what keeps a first-ever *discard* from
+    /// spending it, since backing out of a workout lands here too.
+    ///
+    /// - Returns: whether the offer took this moment, so the caller can stand down.
+    @MainActor
+    private func offerAppleHealthIfEarned() -> Bool {
+        guard services.healthKitService.shouldOfferConnection,
+              reviewPrompt.completedWorkoutCount >= 1,
+              !hasActiveWorkout else { return false }
+
+        healthOffer = AppleHealthConnectionModel(
+            healthKitService: services.healthKitService,
+            analyticsService: services.analyticsService,
+            source: .workoutFinish
+        )
+        // Milestone 3 is the earliest the rating request can fire, so the two normally
+        // can't meet — but a device that only becomes eligible later could land both in
+        // one session, and asking for five stars right after asking for permission is how
+        // you earn one.
+        reviewPrompt.suppressForThisSession()
+        showAppleHealthOffer = true
+        return true
+    }
+
     /// `ReviewPromptService` owns the "is this earned" decision — milestone,
     /// once-per-version, and a 60-day floor on top of StoreKit's own 3-per-year
     /// throttle. The short delay lets the fullScreenCover finish dismissing so the

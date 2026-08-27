@@ -357,6 +357,9 @@ struct WorkoutSummarySheet: View {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .stroke(Color.border, lineWidth: 1)
                 }
+                // The one field on a workout screen whose contents cannot be predicted
+                // from its purpose. Stays black inside a `replayVisible()` sheet.
+                .replayMasked()
             }
         }
     }

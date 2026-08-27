@@ -88,13 +88,21 @@ struct SuggestionTarget: Sendable {
             }
         }
 
+        return displayLabel(forReps: displayReps)
+    }
+
+    /// Names a single rep count in the same wording `displayTargetLabel` uses.
+    /// When a set carries a rep range the engine prices one count inside it,
+    /// and the prescribed weight only means anything against that count — so
+    /// the card names it rather than echoing the range back.
+    func displayLabel(forReps reps: Int) -> String {
         switch repTargetMode {
         case .totalAcrossSides:
-            return "\(displayReps) total reps"
+            return "\(reps) total reps"
         case .perSide:
-            return "\(displayReps) reps each side"
+            return "\(reps) reps each side"
         case nil:
-            return "\(displayReps) reps"
+            return "\(reps) reps"
         }
     }
 

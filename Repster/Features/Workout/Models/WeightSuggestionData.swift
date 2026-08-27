@@ -114,6 +114,11 @@ struct SetSuggestion: Identifiable, Sendable {
     /// Optional user-facing maximum target reps when the set is prescribed as a range.
     let targetRepMax: Int?
     let targetDisplayLabel: String
+    /// The rep count the prescribed weight was actually priced for. When the set
+    /// carries a rep range the engine picks one count inside it, and the weight
+    /// is only a progression against that count — echoing the whole range back
+    /// reads as a regression at the bottom of it.
+    let prescribedDisplayLabel: String
     let normalizedTargetLabel: String?
     /// Structured explanation shown in summary and details.
     let explanation: SuggestionExplanation
@@ -779,6 +784,7 @@ enum SuggestionExplainer {
             targetRepMin: decision.displayRepRange?.lowerBound,
             targetRepMax: decision.displayRepRange?.upperBound,
             targetDisplayLabel: decision.targetDisplayLabel,
+            prescribedDisplayLabel: decision.target.displayLabel(forReps: chosenDisplayReps),
             normalizedTargetLabel: decision.normalizedTargetLabel,
             explanation: explanation(for: decision, unitPreference: unitPreference),
             diagnostics: diagnostics(

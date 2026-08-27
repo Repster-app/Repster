@@ -73,6 +73,7 @@
 		A80005 /* WorkoutService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80005 /* WorkoutService.swift */; };
 		A80006 /* ExerciseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80006 /* ExerciseService.swift */; };
 		AC0001 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0001 /* DesignTokens.swift */; };
+		RPLY01 /* ReplayPrivacy.swift in Sources */ = {isa = PBXBuildFile; fileRef = RPLY11 /* ReplayPrivacy.swift */; };
 		AC0002 /* SetInputField.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0002 /* SetInputField.swift */; };
 		AC0003 /* PRBadgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0003 /* PRBadgeView.swift */; };
 		AC0004 /* SetNumberBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0004 /* SetNumberBadge.swift */; };
@@ -145,6 +146,7 @@
 		AK0005 /* UnitsBodyweightStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0005 /* UnitsBodyweightStepView.swift */; };
 		AK0008 /* ImportStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0008 /* ImportStepView.swift */; };
 		AL0001 /* CSVParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BL0001 /* CSVParser.swift */; };
+		PF0001 /* PRFrontier.swift in Sources */ = {isa = PBXBuildFile; fileRef = PF0002 /* PRFrontier.swift */; };
 		AL0002 /* ImportServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = BL0002 /* ImportServiceProtocol.swift */; };
 		AL0003 /* ExportServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = BL0003 /* ExportServiceProtocol.swift */; };
 		AL0004 /* ExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BL0004 /* ExportService.swift */; };
@@ -202,6 +204,7 @@
 		FL0003 /* FatigueObservationRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1003 /* FatigueObservationRepository.swift */; };
 		FL0004 /* FatigueLearningService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1004 /* FatigueLearningService.swift */; };
 		FL0005 /* FatigueLearningServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1005 /* FatigueLearningServiceTests.swift */; };
+		SB0001 /* SmartSuggestionBehaviorScenarioTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SB1001 /* SmartSuggestionBehaviorScenarioTests.swift */; };
 		FL0006 /* FatigueLearningAdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1006 /* FatigueLearningAdminView.swift */; };
 		HK0001 /* HealthKitServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = HK1001 /* HealthKitServiceProtocol.swift */; };
 		ATRB0001 /* AttributionServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = ATRB1001 /* AttributionServiceProtocol.swift */; };
@@ -224,6 +227,7 @@
 		IN0031 /* ExerciseWorkoutCountTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1031 /* ExerciseWorkoutCountTests.swift */; };
 		IN0033 /* BaselineMeterGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1033 /* BaselineMeterGeometryTests.swift */; };
 		WN0004 /* WhatsNewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WN1004 /* WhatsNewTests.swift */; };
+		AHO001 /* AppleHealthOfferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AHO011 /* AppleHealthOfferTests.swift */; };
 		IN0010 /* TrainingStatusCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1010 /* TrainingStatusCardView.swift */; };
 		IN0011 /* MuscleVolumePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1011 /* MuscleVolumePanelView.swift */; };
 		IN0032 /* BaselineMeterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = IN1032 /* BaselineMeterView.swift */; };
@@ -377,6 +381,7 @@
 		B80006 /* ExerciseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseService.swift; sourceTree = "<group>"; };
 		B90001 /* Repster.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Repster.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC0001 /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
+		RPLY11 /* ReplayPrivacy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplayPrivacy.swift; sourceTree = "<group>"; };
 		BC0002 /* SetInputField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetInputField.swift; sourceTree = "<group>"; };
 		BC0003 /* PRBadgeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PRBadgeView.swift; sourceTree = "<group>"; };
 		BC0004 /* SetNumberBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetNumberBadge.swift; sourceTree = "<group>"; };
@@ -449,6 +454,7 @@
 		BK0005 /* UnitsBodyweightStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnitsBodyweightStepView.swift; sourceTree = "<group>"; };
 		BK0008 /* ImportStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportStepView.swift; sourceTree = "<group>"; };
 		BL0001 /* CSVParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVParser.swift; sourceTree = "<group>"; };
+		PF0002 /* PRFrontier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PRFrontier.swift; sourceTree = "<group>"; };
 		BL0002 /* ImportServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportServiceProtocol.swift; sourceTree = "<group>"; };
 		BL0003 /* ExportServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportServiceProtocol.swift; sourceTree = "<group>"; };
 		BL0004 /* ExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportService.swift; sourceTree = "<group>"; };
@@ -506,6 +512,7 @@
 		FL1003 /* FatigueObservationRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueObservationRepository.swift; sourceTree = "<group>"; };
 		FL1004 /* FatigueLearningService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningService.swift; sourceTree = "<group>"; };
 		FL1005 /* FatigueLearningServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningServiceTests.swift; sourceTree = "<group>"; };
+		SB1001 /* SmartSuggestionBehaviorScenarioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSuggestionBehaviorScenarioTests.swift; sourceTree = "<group>"; };
 		FL1006 /* FatigueLearningAdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueLearningAdminView.swift; sourceTree = "<group>"; };
 		HK1001 /* HealthKitServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitServiceProtocol.swift; sourceTree = "<group>"; };
 		ATRB1001 /* AttributionServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttributionServiceProtocol.swift; sourceTree = "<group>"; };
@@ -528,6 +535,7 @@
 		IN1031 /* ExerciseWorkoutCountTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseWorkoutCountTests.swift; sourceTree = "<group>"; };
 		IN1033 /* BaselineMeterGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaselineMeterGeometryTests.swift; sourceTree = "<group>"; };
 		WN1004 /* WhatsNewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNewTests.swift; sourceTree = "<group>"; };
+		AHO011 /* AppleHealthOfferTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleHealthOfferTests.swift; sourceTree = "<group>"; };
 		IN1010 /* TrainingStatusCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingStatusCardView.swift; sourceTree = "<group>"; };
 		IN1011 /* MuscleVolumePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuscleVolumePanelView.swift; sourceTree = "<group>"; };
 		IN1032 /* BaselineMeterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaselineMeterView.swift; sourceTree = "<group>"; };
@@ -1126,6 +1134,7 @@
 			children = (
 				B30003 /* UnitConversion.swift */,
 				BC0001 /* DesignTokens.swift */,
+				RPLY11 /* ReplayPrivacy.swift */,
 				BC9999 /* DebugLog.swift */,
 				BH0003 /* MuscleGroupColors.swift */,
 			);
@@ -1299,6 +1308,7 @@
 			isa = PBXGroup;
 			children = (
 				BL0001 /* CSVParser.swift */,
+				PF0002 /* PRFrontier.swift */,
 				ZB0001 /* TrendLineCalculator.swift */,
 			);
 			path = Utilities;
@@ -1428,10 +1438,12 @@
 				TT2010 /* AnalyticsServiceTests.swift */,
 				ATRB2001 /* AttributionServiceTests.swift */,
 				FL1005 /* FatigueLearningServiceTests.swift */,
+				SB1001 /* SmartSuggestionBehaviorScenarioTests.swift */,
 				IN1009 /* InsightsServiceTests.swift */,
 				IN1031 /* ExerciseWorkoutCountTests.swift */,
 				IN1033 /* BaselineMeterGeometryTests.swift */,
 				WN1004 /* WhatsNewTests.swift */,
+				AHO011 /* AppleHealthOfferTests.swift */,
 			);
 			path = RepsterTests;
 			sourceTree = "<group>";
@@ -1677,6 +1689,7 @@
 				A80005 /* WorkoutService.swift in Sources */,
 				A80006 /* ExerciseService.swift in Sources */,
 				AC0001 /* DesignTokens.swift in Sources */,
+				RPLY01 /* ReplayPrivacy.swift in Sources */,
 				AC9999 /* DebugLog.swift in Sources */,
 				AC0002 /* SetInputField.swift in Sources */,
 				AC0003 /* PRBadgeView.swift in Sources */,
@@ -1791,6 +1804,7 @@
 				AK0008 /* ImportStepView.swift in Sources */,
 				AIM001 /* ImportService.swift in Sources */,
 				AL0001 /* CSVParser.swift in Sources */,
+				PF0001 /* PRFrontier.swift in Sources */,
 				0823BFAB2F5D621200A513BE /* LiveActivityManager.swift in Sources */,
 				AL0002 /* ImportServiceProtocol.swift in Sources */,
 				AL0003 /* ExportServiceProtocol.swift in Sources */,
@@ -1864,6 +1878,7 @@
 				IN0031 /* ExerciseWorkoutCountTests.swift in Sources */,
 				IN0033 /* BaselineMeterGeometryTests.swift in Sources */,
 				WN0004 /* WhatsNewTests.swift in Sources */,
+				AHO001 /* AppleHealthOfferTests.swift in Sources */,
 				TT0003 /* ChartDataServiceTests.swift in Sources */,
 				TT0004 /* WorkoutHistoryBackupTests.swift in Sources */,
 				TT0005 /* SetServiceTests.swift in Sources */,
@@ -1879,6 +1894,7 @@
 				TT0009 /* AnalyticsServiceTests.swift in Sources */,
 				ATRB0003 /* AttributionServiceTests.swift in Sources */,
 				FL0005 /* FatigueLearningServiceTests.swift in Sources */,
+				SB0001 /* SmartSuggestionBehaviorScenarioTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

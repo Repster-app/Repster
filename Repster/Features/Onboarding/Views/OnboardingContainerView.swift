@@ -7,7 +7,6 @@ import SwiftUI
 
 struct OnboardingContainerView: View {
     @State private var viewModel: OnboardingViewModel
-    @State private var healthConnection: AppleHealthConnectionModel
     @Environment(ServiceContainer.self) private var services
     let importService: any ImportServiceProtocol
     let onComplete: () -> Void
@@ -16,18 +15,11 @@ struct OnboardingContainerView: View {
          bodyweightService: any BodyweightServiceProtocol,
          importService: any ImportServiceProtocol,
          analyticsService: any AnalyticsServiceProtocol,
-         healthKitService: any HealthKitServiceProtocol,
          onComplete: @escaping () -> Void) {
         _viewModel = State(initialValue: OnboardingViewModel(
             settingsService: settingsService,
             bodyweightService: bodyweightService,
-            analyticsService: analyticsService,
-            isHealthKitAvailable: healthKitService.isAvailable
-        ))
-        _healthConnection = State(initialValue: AppleHealthConnectionModel(
-            healthKitService: healthKitService,
-            analyticsService: analyticsService,
-            source: .onboarding
+            analyticsService: analyticsService
         ))
         self.importService = importService
         self.onComplete = onComplete
@@ -49,16 +41,6 @@ struct OnboardingContainerView: View {
                     onNext: { viewModel.next() }
                 )
                 .tag(OnboardingStep.unitsAndBodyweight)
-
-                // Absent from `visibleSteps` when HealthKit is unavailable, so the tab
-                // is unreachable rather than conditionally built — a conditional child
-                // would re-tag the TabView mid-flow.
-                AppleHealthPromptView(
-                    model: healthConnection,
-                    onConnected: { viewModel.next() },
-                    onDecline: { viewModel.skip() }
-                )
-                .tag(OnboardingStep.appleHealth)
 
                 ImportStepView(
                     importService: importService,
@@ -86,19 +68,17 @@ struct OnboardingContainerView: View {
             .animation(.easeInOut, value: viewModel.currentStep)
         }
         .background(Color.bg)
+        // The screens the activation question is actually about. All fixed copy except
+        // the bodyweight field, which masks itself — see `UnitsBodyweightStepView`.
+        .replayVisible()
         .onAppear { trackStep(viewModel.currentStep) }
         .onChange(of: viewModel.currentStep) { _, step in
             trackStep(step)
         }
     }
 
-    /// The Apple Health prompt reports its own impression, so the connect funnel can be
-    /// read the same way whichever surface raised it.
     private func trackStep(_ step: OnboardingStep) {
         viewModel.trackStepViewed(step)
-        if step == .appleHealth {
-            healthConnection.promptShown()
-        }
     }
 
     // MARK: - Progress Dots

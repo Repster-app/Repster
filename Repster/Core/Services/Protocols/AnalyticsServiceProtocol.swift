@@ -719,9 +719,14 @@ extension AnalyticsServiceProtocol {
 /// Where Repster offered the Apple Health integration. Keep the raw values
 /// stable — they're the breakdown dimension on the prompt funnel.
 enum AppleHealthPromptSource: String {
+    /// Retired in 1.5 and kept so the historical funnel still reads: 1.4 asked here and
+    /// converted 2 of 9, against 2 of 2 for the same prompt raised from What's New.
     case onboarding
     case settings
     case whatsNew = "whats_new"
+    /// The first return to Home after a workout has been completed. An offer to send
+    /// finished workouts somewhere means something once there is a finished workout.
+    case workoutFinish = "workout_finish"
 }
 
 /// The outcome of one offer. `notNow` is Repster's own decline button, which
@@ -754,7 +759,9 @@ extension OnboardingStep {
         // no longer exists. Funnels spanning the release that merged them will show the
         // old names before it and this one after.
         case .unitsAndBodyweight: return "units_bodyweight"
-        case .appleHealth: return "apple_health"
+        // No `apple_health` case any more: 1.4 had a step here, 1.5 moved the offer to
+        // the first workout finish. Historical `onboarding step viewed` rows still carry
+        // it, which is why the funnel breaks down on `step` rather than `step_index`.
         case .importPrompt: return "import_prompt"
         }
     }

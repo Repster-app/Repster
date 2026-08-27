@@ -181,7 +181,7 @@ Every event carries `rule_id`, one of: `strengthTrend`, `consistency`,
 ### Apple Health
 | Event | Key properties | Meaning |
 |---|---|---|
-| `apple health prompt shown` | `source` | Repster's own ask, before HealthKit's. Sources: `onboarding`, `settings`, `whats_new`. Only fires where Repster raises the offer itself — the Settings toggle is already a decision, so it goes straight to `answered`. Idempotent per surface. |
+| `apple health prompt shown` | `source` | Repster's own ask, before HealthKit's. Sources: `workout_finish`, `settings`, `whats_new`, and `onboarding` (retired in 1.5 — 1.4 asked during onboarding and converted 2 of 9, so the offer moved to the first completed workout). Only fires where Repster raises the offer itself — the Settings toggle is already a decision, so it goes straight to `answered`. Idempotent per surface. |
 | `apple health prompt answered` | `source`, `result` | `result` is `not_now` (declined in Repster, iOS never asked), `authorized`, `denied`, `unavailable`, or `failed`. |
 | `apple health disabled` | `source` | Switched off again later. Always `settings`. |
 

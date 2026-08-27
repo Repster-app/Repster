@@ -59,6 +59,8 @@ struct UnitsBodyweightStepView: View {
                     RoundedRectangle(cornerRadius: 11)
                         .stroke(Color.border, lineWidth: 1)
                 )
+                // Onboarding is `replayVisible()`; a bodyweight figure is not.
+                .replayMasked()
 
                 Text("Used for accurate tracking of bodyweight exercises.")
                     .font(.caption)

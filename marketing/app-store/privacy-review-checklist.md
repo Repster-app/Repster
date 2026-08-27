@@ -139,8 +139,13 @@ actively states that replay and surveys are disabled. See `PRE_1.4_CHECKLIST.md`
 
 The three commitments that must stay literally true in the app:
 
-1. All text and images are masked on device before a recording is uploaded
-   (`maskAllTextInputs` / `maskAllImages` in `AnalyticsService.configureSessionReplay`).
+1. Free-text fields the user types — workout notes and bodyweight entries — are masked
+   on device before a recording is uploaded, wherever they appear. Masking is the global
+   default (`maskAllTextInputs` / `maskAllImages` in
+   `AnalyticsService.configureSessionReplay`); individual screens opt out via
+   `replayVisible()` and free-text fields opt back in via `replayMasked()`, both in
+   `Repster/Core/Extensions/ReplayPrivacy.swift`. `grep -r replayVisible` is the complete
+   list of screens a recording can show legibly.
 2. The Share Anonymous Analytics toggle disables events, replay, surveys, and crash
    reports together (`optOut` is applied at SDK setup, not after it, and
    `AnalyticsService.captureError` checks `isCollectionEnabled`).
@@ -164,13 +169,13 @@ Use this in the App Review Notes field:
 >
 > The app uses anonymous PostHog EU product analytics for aggregate usage statistics only. It does not use IDFA, advertising, tracking, autocapture, or heatmaps. Users can turn all analytics off in Settings -> Data & Backups -> Share Anonymous Analytics, which disables events, session recordings, surveys, crash and error diagnostics, and Apple Search Ads attribution together.
 >
-> The app captures masked session recordings to diagnose usability problems. All text and all images are masked on device before any recording is uploaded, so recordings show only layout, navigation, and tap locations. Analytics and recordings do not include exercise names, weights, reps, notes, CSV contents, bodyweight values, or raw workout logs.
+> The app captures anonymous session recordings to diagnose usability problems, and users can turn them off with everything else under Settings -> Data & Backups -> Share Anonymous Analytics. All images are masked on device. Text the user types in their own words — workout notes and bodyweight entries — is masked on device before any recording is uploaded and is never received. Recordings do show the app's own fixed interface text and the training figures on screen, such as sets, reps and weights, which is what makes them useful for finding where people get stuck. Recordings are not linked to any account, name or email address, because the app has no accounts. Analytics events themselves carry only bucketed counts and never exact figures, notes, CSV contents, bodyweight values, or raw workout logs.
 >
 > The app sends crash and error diagnostics (exception type, stack trace, device model, OS and app version) so crashes can be found and fixed. These contain no workout data and are covered by the same Share Anonymous Analytics toggle.
 >
 > The app shows occasional optional multiple-choice in-app surveys about the user's experience. No free-text survey responses are collected. Repster has no user accounts, so all analytics data is grouped under a random identifier generated on device at install time and is not linked to any real-world identity.
 >
-> APPLE HEALTH: Repster writes finished workouts to Apple Health. It requests write access only — `requestAuthorization` is called with an empty read set, so no read authorization for any health data type is ever requested. The permission prompt is never shown at launch or during onboarding: it appears only when the user turns on an explicit toggle at Settings -> Body -> Apple Health, so a reviewer must enable that toggle to see any Health behaviour at all. `NSHealthShareUsageDescription` is present in Info.plist for one reason only: when a user deletes a workout in Repster, the app looks up the matching workout it previously wrote so it can remove that entry from Health too. That lookup can only return samples Repster itself created. Active energy is a separate opt-in, off by default, and is a MET-based estimate calculated on device rather than a measurement.
+> APPLE HEALTH: Repster writes finished workouts to Apple Health. It requests write access only — `requestAuthorization` is called with an empty read set, so no read authorization for any health data type is ever requested. The iOS permission prompt is never shown at launch or during onboarding. Repster explains the integration in its own screen first and reaches HealthKit only if the user taps Connect there. That screen appears in two places: once, on returning to the home screen after the first completed workout, and any time the user opens Settings -> Body -> Apple Health. A reviewer who wants to see any Health behaviour should use the Settings toggle. `NSHealthShareUsageDescription` is present in Info.plist for one reason only: when a user deletes a workout in Repster, the app looks up the matching workout it previously wrote so it can remove that entry from Health too. That lookup can only return samples Repster itself created. Active energy is a separate opt-in, off by default, and is a MET-based estimate calculated on device rather than a measurement.
 >
 > ATTRIBUTION: Repster uses Apple's own AdServices framework (`AAAttribution`) for first-party Apple Search Ads attribution only, once per install. No App Tracking Transparency prompt is shown because no IDFA is requested, no advertising profile is built, and no data is shared with third parties for tracking or ad targeting. The corresponding App Privacy answer is Identifiers -> Advertising Data, with purpose Analytics, not linked to the user, and not used for tracking. It is covered by the same Share Anonymous Analytics toggle: with analytics off, no request to Apple's attribution endpoint is made at all.
 >

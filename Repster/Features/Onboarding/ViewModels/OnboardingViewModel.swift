@@ -36,32 +36,26 @@ final class OnboardingViewModel {
     private let bodyweightService: any BodyweightServiceProtocol
     private let analyticsService: any AnalyticsServiceProtocol
 
-    /// Fixed for the lifetime of the flow so steps can't appear or vanish mid-run.
-    /// Note this is availability only, not `shouldOfferConnection`: an onboarding run
-    /// that's abandoned halfway must still show the step when the user starts over.
-    private let isHealthKitAvailable: Bool
-
     /// Steps already reported as viewed, so swiping back and forth in the page
     /// TabView doesn't inflate the funnel denominator.
     private var reportedStepViews: Set<OnboardingStep> = []
 
     init(settingsService: any SettingsServiceProtocol,
          bodyweightService: any BodyweightServiceProtocol,
-         analyticsService: any AnalyticsServiceProtocol,
-         isHealthKitAvailable: Bool) {
+         analyticsService: any AnalyticsServiceProtocol) {
         self.settingsService = settingsService
         self.bodyweightService = bodyweightService
         self.analyticsService = analyticsService
-        self.isHealthKitAvailable = isHealthKitAvailable
     }
 
     // MARK: - Computed Helpers
 
     var isLastStep: Bool { currentStep == .importPrompt }
 
-    var visibleSteps: [OnboardingStep] {
-        OnboardingStep.allCases.filter { $0 != .appleHealth || isHealthKitAvailable }
-    }
+    /// Every step is unconditional now that the Apple Health step — the only one that
+    /// could be absent on a given device — has moved out of the flow. Kept as a property
+    /// rather than inlined because the container and the progress dots both count off it.
+    var visibleSteps: [OnboardingStep] { OnboardingStep.allCases }
 
     var stepProgress: Double {
         guard let index = visibleSteps.firstIndex(of: currentStep) else { return 0 }

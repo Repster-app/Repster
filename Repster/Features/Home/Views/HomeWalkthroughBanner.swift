@@ -15,42 +15,49 @@ struct HomeWalkthroughBanner: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        HStack(spacing: 11) {
-            Image(systemName: "questionmark.circle")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(.accent)
-                .frame(width: 30, height: 30)
-                .background(Color.accentSoft)
-                .cornerRadius(9)
+        HStack(spacing: 0) {
+            Button(action: onTap) {
+                HStack(spacing: 11) {
+                    Image(systemName: "questionmark.circle")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.accent)
+                        .frame(width: 30, height: 30)
+                        .background(Color.accentSoft)
+                        .cornerRadius(9)
 
-            Text("New to Repster? See how it works")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.textPrimary)
-                .fixedSize(horizontal: false, vertical: true)
+                    Text("New to Repster? See how it works")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
 
-            Spacer(minLength: 6)
+                    Spacer(minLength: 6)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
 
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.textTertiary)
-        }
-        .padding(12)
-        .background(Color.bgCard)
-        .cornerRadius(14)
-        .contentShape(Rectangle())
-        .onTapGesture(perform: onTap)
-        .overlay(alignment: .topTrailing) {
-            // Outside the row's tap target so dismissing can't be mistaken for opening.
+            // Inside the card, in the slot the chevron used to hold. The dismiss used to
+            // be an overlay hung off the top-right corner at `offset(x: 6, y: -6)`, which
+            // put a bare glyph outside the rounded edge with the page behind it — it read
+            // as a rendering fault rather than a control. There's no chevron to lose:
+            // the whole row left of this button is already the tap target for opening.
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.textTertiary)
                     .frame(width: 30, height: 30)
                     .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .accessibilityLabel("Dismiss")
-            .offset(x: 6, y: -6)
         }
-        .accessibilityElement(children: .combine)
+        .padding(.vertical, 12)
+        .padding(.leading, 12)
+        // Trailing inset is smaller than the leading one on purpose: the dismiss button's
+        // own 30pt frame supplies the rest, so the glyph sits optically level with the
+        // leading icon while keeping a full-size tap target.
+        .padding(.trailing, 6)
+        .background(Color.bgCard)
+        .cornerRadius(14)
     }
 }
