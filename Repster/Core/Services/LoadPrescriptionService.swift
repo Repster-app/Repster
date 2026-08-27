@@ -124,7 +124,8 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
                 freshnessPercent: freshnessPercent,
                 baseFatigueRate: baseFatigueRate,
                 recoveryConstant: recoveryConstant,
-                sessionCapabilityPolicy: .observed
+                sessionCapabilityPolicy: .observed,
+                capacityGuardsEnabled: profile.prescriptionCapacityGuardsEnabled ?? true
             ),
             calibrationAdjustment: calibrationAdjustment
         )

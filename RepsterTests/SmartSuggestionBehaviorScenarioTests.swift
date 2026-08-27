@@ -1469,3 +1469,233 @@ final class MissingRIRFallbackTests: XCTestCase {
         )
     }
 }
+
+// MARK: - Kill switch
+
+/// Turning the capacity guards off must restore 1.x behaviour exactly.
+///
+/// This is the first change in the feature's history that can make the app ask for *more* weight.
+/// Every previous failure mode was "too light" — a disappointment. This one's is "too heavy" — a
+/// failed rep. Without a lever the only remedy for a bad interaction in the field is an App Store
+/// release, so the lever has to be verified, not assumed.
+final class CapacityGuardsKillSwitchTests: XCTestCase {
+
+    private func settings(guardsEnabled: Bool) -> SuggestionSettingsSnapshot {
+        SuggestionSettingsSnapshot(
+            formula: .epley, restTimerSeconds: 150, weightIncrement: 2.5,
+            fatigueEnabled: true, freshnessEnabled: false, freshnessPercent: 0.03,
+            baseFatigueRate: 0.03, recoveryConstant: 180, sessionCapabilityPolicy: .observed,
+            capacityGuardsEnabled: guardsEnabled
+        )
+    }
+
+    private func done(
+        _ weight: Double, _ reps: Int, rir: Double?, type: SetType = .working, order: Int
+    ) -> SessionSetContext {
+        SessionSetContext(
+            weight: weight, reps: reps, rir: rir,
+            completedAt: Date(timeIntervalSince1970: 1_700_000_000 + Double(order) * 300),
+            completed: true, setType: type, restDurationSeconds: 150
+        )
+    }
+
+    private func decide(
+        baseE1RM: Double, completed: [SessionSetContext], guardsEnabled: Bool, targetRIR: Double = 0
+    ) -> SuggestionDecision {
+        SuggestionEngine.evaluate(
+            SuggestionEngineInput(
+                baseE1RM: baseE1RM, baseSource: .recentPerformance,
+                completedSessionSets: completed,
+                pendingSets: [
+                    SuggestionPendingSetInput(
+                        setId: UUID(), setIndex: 2, setNumber: 3,
+                        target: SuggestionTarget(
+                            reps: 8, rir: targetRIR, repRange: nil,
+                            repsSource: .explicitSet, rirSource: .explicitSet
+                        ),
+                        setType: .working
+                    )
+                ],
+                settings: settings(guardsEnabled: guardsEnabled),
+                calibrationAdjustment: .neutral
+            )
+        )[0]
+    }
+
+    /// Off, the floor does not fire — the reported leg-extension case returns to 32.5 kg.
+    func testDisablingTheGuardsRestoresTheOldFloorlessAnswer() {
+        let completed = [done(20, 8, rir: 5, order: 0), done(35, 8, rir: 5, order: 1)]
+
+        XCTAssertEqual(decide(baseE1RM: 44.33, completed: completed, guardsEnabled: true)
+            .prescribedWeight, 37.5)
+        XCTAssertEqual(decide(baseE1RM: 44.33, completed: completed, guardsEnabled: false)
+            .prescribedWeight, 32.5)
+    }
+
+    /// Off, a drop set sets the capability estimate again, exactly as it used to.
+    func testDisablingTheGuardsRestoresDropSetCapabilityBehaviour() {
+        let completed = [
+            done(100, 8, rir: 2, order: 0),
+            done(60, 10, rir: 0, type: .dropset, order: 1)
+        ]
+
+        let guarded = decide(baseE1RM: 133, completed: completed, guardsEnabled: true, targetRIR: 2)
+        let unguarded = decide(baseE1RM: 133, completed: completed, guardsEnabled: false, targetRIR: 2)
+
+        XCTAssertEqual(guarded.sessionCapabilityE1RM, 133.333, accuracy: 0.01,
+                       "guarded: the drop set is ignored for capacity")
+        XCTAssertLessThan(unguarded.sessionCapabilityE1RM, 100,
+                          "unguarded: the drop set craters it, as in 1.x")
+    }
+
+    /// Off, one light set may pull capability down without limit again.
+    func testDisablingTheGuardsRemovesTheDownwardClamp() {
+        let completed = [
+            done(100, 8, rir: 2, order: 0),
+            done(60, 10, rir: 0, type: .working, order: 1)
+        ]
+
+        let guarded = decide(baseE1RM: 133, completed: completed, guardsEnabled: true, targetRIR: 2)
+        let unguarded = decide(baseE1RM: 133, completed: completed, guardsEnabled: false, targetRIR: 2)
+
+        XCTAssertGreaterThan(guarded.sessionCapabilityE1RM, unguarded.sessionCapabilityE1RM)
+        XCTAssertEqual(guarded.sessionCapabilityE1RM, 133.333 * 0.8, accuracy: 0.5,
+                       "the clamp bounds the fall at 20%")
+    }
+
+    /// The switch must default to on: a profile that predates it is a normal user who should get
+    /// the fix, not a silent opt-out.
+    func testGuardsDefaultToOnForProfilesThatPredateTheSetting() {
+        let profile = HealthProfile()
+        profile.prescriptionCapacityGuardsEnabled = nil
+
+        XCTAssertTrue(profile.prescriptionCapacityGuardsEnabled ?? true)
+    }
+}
+
+// MARK: - Unilateral exercises
+
+/// One-sided exercises carry two rep counts and two RIRs, and the engine works in normalized
+/// per-side space while the card shows display space.
+///
+/// That gap is where this kind of change goes wrong quietly: a `.totalAcrossSides` target of 16 is
+/// 8 per side by the time the engine sees it, so anything comparing a target against a completed
+/// set must use `target.reps` and never `target.displayReps`. A floor computed against 16 would
+/// never fire; a target-RIR resolved from the wrong side would charge the wrong effort.
+final class UnilateralSuggestionTests: XCTestCase {
+
+    private func makeExercise(mode: UnilateralRepTargetMode) -> Exercise {
+        Exercise(
+            name: "Bulgarian Split Squat",
+            equipmentType: .dumbbell,
+            trackingType: .weightReps,
+            unilateral: true,
+            unilateralRepTargetMode: mode,
+            weightIncrement: 2.5,
+            defaultRestTime: 120
+        )
+    }
+
+    private func makeSet(
+        exerciseId: UUID, leftReps: Int, rightReps: Int,
+        leftRIR: Double?, rightRIR: Double?, targetRIR: Int? = nil
+    ) -> WorkoutSet {
+        WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: exerciseId,
+            completedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            weight: 30,
+            leftReps: leftReps,
+            rightReps: rightReps,
+            leftRIR: leftRIR,
+            rightRIR: rightRIR,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true,
+            targetRIR: targetRIR
+        )
+    }
+
+    /// `performanceRIR` is the harder side's, and that is the value the engine must see — not an
+    /// average, and not the easier side.
+    func testTheHarderSidesRIRIsWhatReachesTheEngine() {
+        let exercise = makeExercise(mode: .perSide)
+        let set = makeSet(
+            exerciseId: exercise.id, leftReps: 8, rightReps: 8,
+            leftRIR: 4, rightRIR: 1
+        )
+
+        let contexts = SuggestionCoordinator.completedSessionSets(
+            from: [set],
+            exercise: ChartExerciseData(from: exercise),
+            profile: HealthProfile()
+        )
+
+        XCTAssertEqual(contexts[0].rir, 1, "the harder side governs")
+        XCTAssertNil(contexts[0].targetRIR, "a reported RIR leaves nothing to fall back to")
+    }
+
+    /// With no RIR on either side, the prescribed target must still resolve — the same fallback
+    /// bilateral sets get.
+    func testUnilateralSetWithNoRIRStillResolvesItsTarget() {
+        let exercise = makeExercise(mode: .perSide)
+        let set = makeSet(
+            exerciseId: exercise.id, leftReps: 8, rightReps: 8,
+            leftRIR: nil, rightRIR: nil, targetRIR: 3
+        )
+
+        let contexts = SuggestionCoordinator.completedSessionSets(
+            from: [set],
+            exercise: ChartExerciseData(from: exercise),
+            profile: HealthProfile()
+        )
+
+        XCTAssertNil(contexts[0].rir)
+        XCTAssertEqual(contexts[0].targetRIR, 3)
+    }
+
+    /// `prReps` is `max(L, R)`, so an uneven set reports the better side's reps.
+    func testRepsReachTheEngineAsTheMaxAcrossSides() {
+        let exercise = makeExercise(mode: .perSide)
+        let set = makeSet(
+            exerciseId: exercise.id, leftReps: 6, rightReps: 9,
+            leftRIR: 2, rightRIR: 2
+        )
+
+        let contexts = SuggestionCoordinator.completedSessionSets(
+            from: [set],
+            exercise: ChartExerciseData(from: exercise),
+            profile: HealthProfile()
+        )
+
+        XCTAssertEqual(contexts[0].reps, 9)
+    }
+
+    /// The trap the floor design calls out by name: a `.totalAcrossSides` target of 16 normalizes
+    /// to 8 per side, and the floor must compare against 8. Against 16 the surplus goes negative
+    /// and the floor silently never fires for half the app's exercises.
+    func testFloorComparesAgainstNormalizedRepsNotDisplayReps() {
+        let target = SuggestionTarget(
+            reps: 8,
+            rir: 0,
+            repRange: nil,
+            repsSource: .explicitSet,
+            rirSource: .explicitSet,
+            displayReps: 16,
+            displayRepRange: nil,
+            repTargetMode: .totalAcrossSides
+        )
+        let completed = SessionSetContext(
+            weight: 30, reps: 8, rir: 5,
+            completedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            completed: true, setType: .working, restDurationSeconds: 150
+        )
+
+        let floor = SuggestionEngine.suggestionFloor(
+            target: target, completedSets: [completed], increment: 2.5
+        )
+
+        XCTAssertEqual(floor?.weight, 32.5,
+                       "8 per side + RIR 5 = 13 vs a target of 8 — surplus 5, so the floor fires")
+    }
+}

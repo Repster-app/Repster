@@ -59,6 +59,17 @@ final class HealthProfile {
     /// Whether Smart Suggestions admin diagnostics are enabled. Default: false.
     var prescriptionAdminModeEnabled: Bool?
 
+    /// Kill switch for the epoch-2 capacity changes: crediting reps in reserve as a floor,
+    /// restricting capacity evidence to point-estimate set types, and clamping downward moves.
+    ///
+    /// Defaults to on. It exists because this is the first change in the feature's history that can
+    /// make the app ask for *more* weight rather than less — every previous failure mode was "too
+    /// light", which is a disappointment, and this one's is "too heavy", which is a failed rep.
+    /// Without a lever the only remedy for a bad interaction in the field is an App Store release.
+    ///
+    /// Off restores the 1.x behaviour exactly: no floor, capacity from any non-warmup set, no clamp.
+    var prescriptionCapacityGuardsEnabled: Bool?
+
     /// User-wide learned fatigue rate. Nil = use fixed default (0.03) when no exercise override exists.
     var prescriptionLearnedFatigueRate: Double? = nil
 
@@ -98,6 +109,7 @@ final class HealthProfile {
         prescriptionFatigueModelingEnabled: Bool = true,
         prescriptionDefaultRecoveryConstant: Double = 180,
         prescriptionAdminModeEnabled: Bool = false,
+        prescriptionCapacityGuardsEnabled: Bool = true,
         prescriptionLearnedFatigueRate: Double? = nil,
         prescriptionFatigueLearningSessionCount: Int? = nil,
         prescriptionFatigueLearningCumulativeError: Double? = nil,
@@ -121,6 +133,7 @@ final class HealthProfile {
         self.prescriptionFatigueModelingEnabled = prescriptionFatigueModelingEnabled
         self.prescriptionDefaultRecoveryConstant = prescriptionDefaultRecoveryConstant
         self.prescriptionAdminModeEnabled = prescriptionAdminModeEnabled
+        self.prescriptionCapacityGuardsEnabled = prescriptionCapacityGuardsEnabled
         self.prescriptionLearnedFatigueRate = prescriptionLearnedFatigueRate
         self.prescriptionFatigueLearningSessionCount = prescriptionFatigueLearningSessionCount
         self.prescriptionFatigueLearningCumulativeError = prescriptionFatigueLearningCumulativeError

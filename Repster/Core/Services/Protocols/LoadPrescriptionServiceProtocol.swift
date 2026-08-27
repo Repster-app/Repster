@@ -348,6 +348,10 @@ struct SuggestionSettingsSnapshot: Sendable {
     let recoveryConstant: Double
     /// Policy for incorporating completed-set capability into the current workout baseline.
     let sessionCapabilityPolicy: SessionCapabilityPolicy
+    /// Kill switch for the epoch-2 capacity guards — the floor, the capacity-type allowlist and the
+    /// downward clamp. Off restores 1.x behaviour exactly. See
+    /// ``HealthProfile/prescriptionCapacityGuardsEnabled``.
+    var capacityGuardsEnabled: Bool = true
 }
 
 /// Normalized engine input after app-model resolution.
@@ -865,7 +869,7 @@ enum SuggestionEngine {
             // numbers further out are the model's claim, not an observation. This does flatten the
             // projected decline, which is intended.
             var appliedFloor: SuggestionFloor?
-            if let floor = suggestionFloor(
+            if input.settings.capacityGuardsEnabled, let floor = suggestionFloor(
                 target: setSpec.target,
                 completedSets: input.completedSessionSets,
                 increment: input.settings.weightIncrement
@@ -1061,16 +1065,16 @@ enum SuggestionEngine {
             if let normalizedObservedCapability = normalizedObservedCapability(
                 for: set,
                 readiness: readiness,
-                formula: input.settings.formula
+                formula: input.settings.formula,
+                capacityGuardsEnabled: input.settings.capacityGuardsEnabled
             ) {
                 let blended = input.settings.sessionCapabilityPolicy.blend(
                     observedCapability: normalizedObservedCapability,
                     priorCapability: sessionCapabilityE1RM
                 )
-                sessionCapabilityE1RM = clampDownwardCapabilityMove(
-                    from: sessionCapabilityE1RM,
-                    to: blended
-                )
+                sessionCapabilityE1RM = input.settings.capacityGuardsEnabled
+                    ? clampDownwardCapabilityMove(from: sessionCapabilityE1RM, to: blended)
+                    : blended
                 usedSessionCapabilityBlend = true
             }
 
@@ -1099,9 +1103,13 @@ enum SuggestionEngine {
     private static func normalizedObservedCapability(
         for set: SessionSetContext,
         readiness: ReadinessState,
-        formula: E1RMFormula
+        formula: E1RMFormula,
+        capacityGuardsEnabled: Bool
     ) -> Double? {
-        guard set.setType.isCapacityPointEstimate,
+        let typeQualifies = capacityGuardsEnabled
+            ? set.setType.isCapacityPointEstimate
+            : set.setType.countsAsPerformedWork
+        guard typeQualifies,
               set.weight > 0,
               set.reps > 0,
               let actualRIR = set.rir,
