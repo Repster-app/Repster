@@ -73,25 +73,25 @@ See SUGGESTION_ENGINE_IMPLEMENTATION_PLAN.md §1 (PF1).
   set 2 | w  72.5000 | eff   97.0000 | cap  100.0000 | fat 0.0300 | disc 0.9700 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
   set 3 | w  72.5000 | eff   95.2462 | cap  100.0000 | fat 0.0475 | disc 0.9525 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
 ## C1 one completed 75x8 @ RIR 5 — what set 2 prices
-  set 2 | w  72.5000 | eff   97.0000 | cap  100.0000 | fat 0.0300 | disc 0.9700 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
-  set 3 | w  72.5000 | eff   95.2462 | cap  100.0000 | fat 0.0475 | disc 0.9525 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
+  set 2 | w  77.5000 | eff   97.0000 | cap  100.0000 | fat 0.0300 | disc 0.9700 | if 0.7500 | reps - | policy held above a completed set with reps to spare | fresh n
+  set 3 | w  77.5000 | eff   95.2462 | cap  100.0000 | fat 0.0475 | disc 0.9525 | if 0.7500 | reps - | policy held above a completed set with reps to spare | fresh n
 ## C2 the 32.5 kg leg-extension case (20x8 then 35x8, both RIR 5)
-  set 3 | w  32.5000 | eff   42.4221 | cap   44.3300 | fat 0.0430 | disc 0.9570 | if 0.7895 | reps - | policy closest match to effective e1RM | fresh n
-  set 4 | w  32.5000 | eff   41.5725 | cap   44.3300 | fat 0.0622 | disc 0.9378 | if 0.7895 | reps - | policy closest match to effective e1RM | fresh n
+  set 3 | w  37.5000 | eff   42.4221 | cap   44.3300 | fat 0.0430 | disc 0.9570 | if 0.7895 | reps - | policy held above a completed set with reps to spare | fresh n
+  set 4 | w  37.5000 | eff   41.5725 | cap   44.3300 | fat 0.0622 | disc 0.9378 | if 0.7895 | reps - | policy held above a completed set with reps to spare | fresh n
 ## C3 drop set craters capability (100x8 @ RIR 2, then 60x10 @ RIR 0)
-  set 3 | w  55.0000 | eff   73.8173 | cap   81.2177 | fat 0.0911 | disc 0.9089 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
-  set 4 | w  57.5000 | eff   75.1995 | cap   81.2177 | fat 0.0741 | disc 0.9259 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
+  set 3 | w  90.0000 | eff  121.1842 | cap  133.3333 | fat 0.0911 | disc 0.9089 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
+  set 4 | w  92.5000 | eff  123.4533 | cap  133.3333 | fat 0.0741 | disc 0.9259 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
 ## C4 untagged light set craters capability (same numbers, type working)
-  set 3 | w  57.5000 | eff   75.5838 | cap   81.2177 | fat 0.0694 | disc 0.9306 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
-  set 4 | w  57.5000 | eff   75.9672 | cap   81.2177 | fat 0.0646 | disc 0.9354 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
+  set 3 | w  75.0000 | eff   99.2673 | cap  106.6667 | fat 0.0694 | disc 0.9306 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
+  set 4 | w  75.0000 | eff   99.7709 | cap  106.6667 | fat 0.0646 | disc 0.9354 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
 ## C5 overperformance raises later sets (85x8 @ RIR 1 vs 75 suggested)
   set 2 | w  80.0000 | eff  106.1905 | cap  110.5000 | fat 0.0390 | disc 0.9610 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
   set 3 | w  77.5000 | eff  104.8148 | cap  110.5000 | fat 0.0514 | disc 0.9486 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
   set 4 | w  77.5000 | eff  104.2170 | cap  110.5000 | fat 0.0569 | disc 0.9431 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
 ## C6 underperformance lowers later sets (65x6 @ RIR 0)
-  set 2 | w  57.5000 | eff   75.4552 | cap   78.0000 | fat 0.0326 | disc 0.9674 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
-  set 3 | w  55.0000 | eff   74.2031 | cap   78.0000 | fat 0.0487 | disc 0.9513 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
-  set 4 | w  55.0000 | eff   73.6589 | cap   78.0000 | fat 0.0557 | disc 0.9443 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
+  set 2 | w  57.5000 | eff   77.3900 | cap   80.0000 | fat 0.0326 | disc 0.9674 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
+  set 3 | w  57.5000 | eff   76.1057 | cap   80.0000 | fat 0.0487 | disc 0.9513 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
+  set 4 | w  57.5000 | eff   75.5475 | cap   80.0000 | fat 0.0557 | disc 0.9443 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
 ## C7 warm-ups are free
   set 1 | w  75.0000 | eff  100.0000 | cap  100.0000 | fat 0.0000 | disc 1.0000 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
   set 2 | w  72.5000 | eff   96.5500 | cap  100.0000 | fat 0.0345 | disc 0.9655 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
@@ -103,14 +103,14 @@ See SUGGESTION_ENGINE_IMPLEMENTATION_PLAN.md §1 (PF1).
   set 5 | w  72.5000 | eff   96.4639 | cap  102.4949 | fat 0.0588 | disc 0.9412 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
   set 6 | w  72.5000 | eff   96.3378 | cap  102.4949 | fat 0.0601 | disc 0.9399 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
 ## E1 one 75x8 @ RIR 1 logged as backoff
-  set 2 | w  70.0000 | eff   94.8383 | cap   97.5000 | fat 0.0273 | disc 0.9727 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
-  set 3 | w  70.0000 | eff   92.9795 | cap   97.5000 | fat 0.0464 | disc 0.9536 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
+  set 2 | w  72.5000 | eff   97.2700 | cap  100.0000 | fat 0.0273 | disc 0.9727 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
+  set 3 | w  72.5000 | eff   95.3635 | cap  100.0000 | fat 0.0464 | disc 0.9536 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
 ## E1 one 75x8 @ RIR 1 logged as working
   set 2 | w  70.0000 | eff   93.6975 | cap   97.5000 | fat 0.0390 | disc 0.9610 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
   set 3 | w  70.0000 | eff   92.4837 | cap   97.5000 | fat 0.0514 | disc 0.9486 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
 ## E1 one 75x8 @ RIR 1 logged as dropset
-  set 2 | w  70.0000 | eff   92.1765 | cap   97.5000 | fat 0.0546 | disc 0.9454 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
-  set 3 | w  70.0000 | eff   91.8227 | cap   97.5000 | fat 0.0582 | disc 0.9418 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
+  set 2 | w  70.0000 | eff   94.5400 | cap  100.0000 | fat 0.0546 | disc 0.9454 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
+  set 3 | w  70.0000 | eff   94.1771 | cap  100.0000 | fat 0.0582 | disc 0.9418 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
 ## E1 one 75x8 @ RIR 1 logged as amrap
   set 2 | w  70.0000 | eff   91.7963 | cap   97.5000 | fat 0.0585 | disc 0.9415 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n
   set 3 | w  67.5000 | eff   91.6574 | cap   97.5000 | fat 0.0599 | disc 0.9401 | if 0.7500 | reps - | policy closest match to effective e1RM | fresh n

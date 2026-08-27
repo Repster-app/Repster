@@ -865,9 +865,13 @@ enum SuggestionExplainer {
         )
     }
 
-    /// Picks one of four contextual one-liners based on which engine signal
-    /// most explains the prescribed weight. Priority: progression bump >
+    /// Picks one of five contextual one-liners based on which engine signal
+    /// most explains the prescribed weight. Priority: floor > progression bump >
     /// session fatigue > in-session readjustment > generic baseline.
+    ///
+    /// The floor outranks everything because it *overrode* everything. A suggestion the floor
+    /// pushed upward that still read "easing off slightly to manage session fatigue" would be
+    /// describing the opposite of what just happened.
     private static func contextualUserSummary(for decision: SuggestionDecision) -> String {
         let hasProgressionBump = decision.freshnessApplied
             || decision.selectionPolicy == .firstSetProgressionAboveRecentPeak
@@ -876,7 +880,15 @@ enum SuggestionExplainer {
         let sessionAdjusted = abs(decision.sessionCapabilityE1RM - decision.historicalBaseE1RM) > 0.05
 
         let base: String
-        if hasProgressionBump {
+        if let floor = decision.appliedFloor {
+            // No weight in this string: this layer is kg-only and the views own unit conversion
+            // (see `SetSuggestion.suggestedWeight`), so a hardcoded "kg" would lie to lbs users.
+            // Reps carry the same evidence and read the same in any unit.
+            let reps = Int(floor.completedRIR)
+            base = reps == 1
+                ? "Holding above your last set — you had a rep left in it."
+                : "Holding above your last set — you had \(reps) reps left in it."
+        } else if hasProgressionBump {
             base = "Nudging up from your last workout's peak."
         } else if meaningfulFatigue {
             base = "Easing off slightly to manage session fatigue."

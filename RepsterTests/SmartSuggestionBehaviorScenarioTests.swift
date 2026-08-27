@@ -490,8 +490,13 @@ final class SmartSuggestionBehaviorScenarioTests: XCTestCase {
 /// purpose, regenerate and **read the diff** — that diff is the release note for the
 /// suggestion engine:
 ///
-///     REGENERATE_SUGGESTION_GOLDEN_MASTER=1 xcodebuild test -scheme Repster \
+///     touch RepsterTests/Fixtures/Local/REGENERATE_GOLDEN_MASTER
+///     xcodebuild test -scheme Repster -destination 'id=<sim>' \
 ///       -only-testing:RepsterTests/SuggestionEngineGoldenMasterTests
+///
+/// A marker file rather than an environment variable, matching `CrossContextRaceTests`: tests run
+/// inside the simulator, so a shell variable never reaches them. The marker is consumed on use, so
+/// a regeneration can't be left switched on by accident. `Fixtures/Local/` is gitignored.
 final class SuggestionEngineGoldenMasterTests: XCTestCase {
 
     // MARK: Fixture location
@@ -768,13 +773,17 @@ final class SuggestionEngineGoldenMasterTests: XCTestCase {
         let snapshot = buildSnapshot()
         let url = fixtureURL
 
-        if ProcessInfo.processInfo.environment["REGENERATE_SUGGESTION_GOLDEN_MASTER"] == "1" {
+        let marker = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/Local/REGENERATE_GOLDEN_MASTER")
+        if FileManager.default.fileExists(atPath: marker.path) {
             try FileManager.default.createDirectory(
                 at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try snapshot.write(to: url, atomically: true, encoding: .utf8)
+            try? FileManager.default.removeItem(at: marker)
             XCTFail("""
-                Golden master regenerated at \(url.path).
-                Review the diff, commit it, then re-run without the environment variable.
+                Golden master regenerated at \(url.path), and the marker consumed.
+                Review `git diff` on the fixture, commit it, then re-run.
                 """)
             return
         }
@@ -812,7 +821,8 @@ final class SuggestionEngineGoldenMasterTests: XCTestCase {
             \(diff.joined(separator: "\n"))
 
             If this change is intended, regenerate and commit the diff:
-              REGENERATE_SUGGESTION_GOLDEN_MASTER=1 xcodebuild test -scheme Repster \\
+              touch RepsterTests/Fixtures/Local/REGENERATE_GOLDEN_MASTER
+              xcodebuild test -scheme Repster -destination 'id=<sim>' \\
                 -only-testing:RepsterTests/SuggestionEngineGoldenMasterTests
             """)
     }
@@ -977,5 +987,343 @@ final class CompletedSetTargetResolutionTests: XCTestCase {
         let resolved = SuggestionCoordinator.completedSessionSets(from: [set])
 
         XCTAssertNil(resolved[0].targetRIR)
+    }
+}
+
+// MARK: - The suggestion floor (PR4)
+
+/// The floor: never price below a weight already completed this session with reps to spare.
+///
+/// This is how RIR >= 3 sets are credited. The alternative — letting them raise the capability
+/// point estimate at some damped weight — needs a constant nobody can justify: only 5.0% of
+/// app-era logged RIR values are >= 3 (29 sets), which cannot separate 30% damping from 50%. The
+/// floor needs no constant and cannot overshoot: it can never exceed one increment above a weight
+/// the lifter actually completed.
+///
+/// Cases follow SUGGESTION_FLOOR_GUARDRAIL_DESIGN.md D1-D9.
+final class SuggestionFloorTests: XCTestCase {
+
+    private func target(reps: Int, rir: Double) -> SuggestionTarget {
+        SuggestionTarget(
+            reps: reps, rir: rir, repRange: nil,
+            repsSource: .explicitSet, rirSource: .explicitSet
+        )
+    }
+
+    private func done(
+        _ weight: Double, _ reps: Int, rir: Double?,
+        type: SetType = .working, order: Int = 0
+    ) -> SessionSetContext {
+        SessionSetContext(
+            weight: weight, reps: reps, rir: rir,
+            completedAt: Date(timeIntervalSince1970: 1_700_000_000 + Double(order) * 300),
+            completed: true, setType: type, restDurationSeconds: 150
+        )
+    }
+
+    private func floor(
+        _ completed: [SessionSetContext],
+        reps: Int = 8, rir: Double = 0, increment: Double = 2.5
+    ) -> SuggestionEngine.SuggestionFloor? {
+        SuggestionEngine.suggestionFloor(
+            target: target(reps: reps, rir: rir),
+            completedSets: completed,
+            increment: increment
+        )
+    }
+
+    /// The reported regression: 20x8 then 35x8, both at the top-of-scale "5+" chip, against a
+    /// target of 8 @ RIR 0. The app suggested 32.5 kg — below a weight just completed with five
+    /// reps to spare. Real capacity that session was 45 x 10.
+    func testTheReportedLegExtensionCaseIsFloored() {
+        let result = floor([done(20, 8, rir: 5, order: 0), done(35, 8, rir: 5, order: 1)])
+
+        XCTAssertEqual(result?.weight, 37.5, "one increment above the 35 kg that was demonstrably too light")
+        XCTAssertEqual(result?.completedWeight, 35)
+    }
+
+    /// D2, lower edge: no reserve, no floor. The model may legitimately go lighter.
+    func testNoSurplusMeansNoFloor() {
+        XCTAssertNil(floor([done(35, 8, rir: 0)]))
+    }
+
+    /// D2: two reps of reserve is ~2.6% of load and does not clear the fatigue the model is
+    /// entitled to claim between sets.
+    func testSurplusBelowThresholdDoesNotFloor() {
+        XCTAssertNil(floor([done(35, 8, rir: 2)]))
+    }
+
+    /// D2, exactly at the threshold.
+    func testSurplusOfExactlyThreeFloors() {
+        XCTAssertEqual(floor([done(35, 8, rir: 3)])?.weight, 37.5)
+    }
+
+    /// D1: the comparison is on *total* reps, so a harder target can outrun a demonstrated set
+    /// even when the performed reps were fewer.
+    func testTargetHarderThanDemonstratedDoesNotFloor() {
+        // 35 x 8 @ RIR 5 demonstrates 13 total; a target of 15 @ RIR 0 asks for more.
+        XCTAssertNil(floor([done(35, 8, rir: 5)], reps: 15, rir: 0))
+    }
+
+    /// D1: …and a target inside what was demonstrated still floors even when it asks for *more
+    /// performed reps* than the set did — 10 > 8 — because the comparison is on totals.
+    ///
+    /// Note the interaction with D2, which the design doc's D1 example glosses over: 35 x 8 @ RIR 5
+    /// demonstrates 13 total, so a target of 12 @ RIR 0 has a surplus of only 1 and does **not**
+    /// floor. D2's threshold governs. A target of 10 @ RIR 0 clears it at surplus 3.
+    func testTargetInsideWhatWasDemonstratedFloorsOnceTheSurplusClearsTheThreshold() {
+        XCTAssertEqual(floor([done(35, 8, rir: 5)], reps: 10, rir: 0)?.weight, 37.5)
+        XCTAssertNil(floor([done(35, 8, rir: 5)], reps: 12, rir: 0),
+                     "surplus of 1 does not beat the fatigue the model may claim")
+    }
+
+    /// D4: every qualifying set contributes and the maximum wins — an earlier heavier set still
+    /// bounds the answer when the most recent one was lighter.
+    func testTheHighestQualifyingFloorWins() {
+        let result = floor([done(40, 8, rir: 3, order: 0), done(35, 8, rir: 5, order: 1)])
+
+        XCTAssertEqual(result?.weight, 42.5, "42.5 from the 40 kg set beats 37.5 from the 35 kg one")
+    }
+
+    /// D6: `missingRIRDefault` must not leak in here. Assuming a reserve nobody reported would
+    /// invent a floor out of nothing.
+    func testMissingRIRContributesNoFloor() {
+        XCTAssertNil(floor([done(35, 8, rir: nil)]))
+    }
+
+    /// D3: expressed as "next grid value above", so an off-grid entry floors correctly.
+    func testOffGridWeightFloorsToTheNextGridValue() {
+        XCTAssertEqual(floor([done(33, 8, rir: 5)])?.weight, 35.0, "not 37.5")
+    }
+
+    /// D3: a weight already exactly on the grid still moves strictly up — the surplus proves that
+    /// weight was too light.
+    func testOnGridWeightFloorsStrictlyAbove() {
+        XCTAssertEqual(floor([done(35, 8, rir: 5)])?.weight, 37.5)
+    }
+
+    /// D5: a drop set's trailing RIR does not describe its opening weight; a partial's reps are
+    /// not comparable to a full-ROM target.
+    func testExcludedSetTypesContributeNoFloor() {
+        for type in [SetType.dropset, .partial, .myo, .restpause, .cluster, .warmup] {
+            XCTAssertNil(
+                floor([done(35, 8, rir: 5, type: type)]),
+                "\(type.rawValue) must not establish a floor"
+            )
+        }
+    }
+
+    /// D5: back-off sets *do* qualify. A back-off at RIR 5 is a poor point estimate of capacity
+    /// and a perfectly good lower bound — the distinction the two predicates exist to name.
+    func testBackoffSetsDoEstablishAFloor() {
+        XCTAssertEqual(floor([done(35, 8, rir: 5, type: .backoff)])?.weight, 37.5)
+    }
+
+    /// A set at RIR 5 on a 5 kg grid floors a whole increment, not a fractional one.
+    func testFloorRespectsTheConfiguredIncrement() {
+        XCTAssertEqual(floor([done(35, 8, rir: 5)], increment: 5.0)?.weight, 40.0)
+        XCTAssertEqual(floor([done(35, 8, rir: 5)], increment: 1.0)?.weight, 36.0)
+    }
+
+    /// D9 + D7 end-to-end: the floor reaches the prescription and says so, rather than being
+    /// applied silently behind the fatigue explanation.
+    func testFloorReachesThePrescriptionAndIsNamed() {
+        let pending = (0..<2).map { offset in
+            SuggestionPendingSetInput(
+                setId: UUID(), setIndex: 2 + offset, setNumber: 3 + offset,
+                target: target(reps: 8, rir: 0), setType: .working
+            )
+        }
+        let decisions = SuggestionEngine.evaluate(
+            SuggestionEngineInput(
+                baseE1RM: 44.33,
+                baseSource: .recentPerformance,
+                completedSessionSets: [done(20, 8, rir: 5, order: 0), done(35, 8, rir: 5, order: 1)],
+                pendingSets: pending,
+                settings: SuggestionSettingsSnapshot(
+                    formula: .epley, restTimerSeconds: 150, weightIncrement: 2.5,
+                    fatigueEnabled: true, freshnessEnabled: false, freshnessPercent: 0.03,
+                    baseFatigueRate: 0.03, recoveryConstant: 180, sessionCapabilityPolicy: .observed
+                ),
+                calibrationAdjustment: .neutral
+            )
+        )
+
+        XCTAssertEqual(decisions[0].prescribedWeight, 37.5, "was 32.5 — below a set just completed")
+        XCTAssertEqual(decisions[0].selectionPolicy, .floorHeldAboveCompletedSet)
+        XCTAssertEqual(decisions[0].appliedFloor?.completedWeight, 35)
+
+        // D9: applies to every pending set, not only the next one.
+        XCTAssertEqual(decisions[1].prescribedWeight, 37.5)
+        XCTAssertEqual(decisions[1].selectionPolicy, .floorHeldAboveCompletedSet)
+    }
+
+    /// The floor must not fire when the model is already above it — it is a guardrail, not a
+    /// target, and it must never *lower* an answer.
+    func testFloorNeverLowersAnAnswerTheModelPutHigher() {
+        let pending = [
+            SuggestionPendingSetInput(
+                setId: UUID(), setIndex: 1, setNumber: 2,
+                target: target(reps: 8, rir: 0), setType: .working
+            )
+        ]
+        let decisions = SuggestionEngine.evaluate(
+            SuggestionEngineInput(
+                baseE1RM: 150,
+                baseSource: .recentPerformance,
+                completedSessionSets: [done(35, 8, rir: 5, order: 0)],
+                pendingSets: pending,
+                settings: SuggestionSettingsSnapshot(
+                    formula: .epley, restTimerSeconds: 150, weightIncrement: 2.5,
+                    fatigueEnabled: true, freshnessEnabled: false, freshnessPercent: 0.03,
+                    baseFatigueRate: 0.03, recoveryConstant: 180, sessionCapabilityPolicy: .observed
+                ),
+                calibrationAdjustment: .neutral
+            )
+        )
+
+        XCTAssertGreaterThan(decisions[0].prescribedWeight, 37.5)
+        XCTAssertNotEqual(decisions[0].selectionPolicy, .floorHeldAboveCompletedSet)
+        XCTAssertNil(decisions[0].appliedFloor)
+    }
+
+    func testNoCompletedSetsMeansNoFloor() {
+        XCTAssertNil(floor([]))
+    }
+}
+
+// MARK: - Capability crediting (PR4)
+
+/// What may *set* the session capability estimate, and how far one set may move it.
+///
+/// `.observed` replaces the estimate outright rather than blending, so a single unrepresentative
+/// set becomes the capability figure for every remaining set of the exercise. Two guards: a type
+/// allowlist for the labelled cases, and a downward clamp for the far commoner unlabelled ones.
+final class SessionCapabilityCreditingTests: XCTestCase {
+
+    private func settings(increment: Double = 2.5) -> SuggestionSettingsSnapshot {
+        SuggestionSettingsSnapshot(
+            formula: .epley, restTimerSeconds: 150, weightIncrement: increment,
+            fatigueEnabled: true, freshnessEnabled: false, freshnessPercent: 0.03,
+            baseFatigueRate: 0.03, recoveryConstant: 180, sessionCapabilityPolicy: .observed
+        )
+    }
+
+    private func done(
+        _ weight: Double, _ reps: Int, rir: Double?,
+        type: SetType = .working, order: Int = 0
+    ) -> SessionSetContext {
+        SessionSetContext(
+            weight: weight, reps: reps, rir: rir,
+            completedAt: Date(timeIntervalSince1970: 1_700_000_000 + Double(order) * 300),
+            completed: true, setType: type, restDurationSeconds: 150
+        )
+    }
+
+    private func capability(after completed: [SessionSetContext], baseE1RM: Double = 133) -> Double {
+        SuggestionEngine.evaluate(
+            SuggestionEngineInput(
+                baseE1RM: baseE1RM,
+                baseSource: .recentPerformance,
+                completedSessionSets: completed,
+                pendingSets: [
+                    SuggestionPendingSetInput(
+                        setId: UUID(), setIndex: 9, setNumber: 10,
+                        target: SuggestionTarget(
+                            reps: 8, rir: 2, repRange: nil,
+                            repsSource: .explicitSet, rirSource: .explicitSet
+                        ),
+                        setType: .working
+                    )
+                ],
+                settings: settings(),
+                calibrationAdjustment: .neutral
+            )
+        )[0].sessionCapabilityE1RM
+    }
+
+    /// A drop set is submaximal by definition; it must not become the capability figure. Before
+    /// this, a 100 x 8 @ RIR 2 top set followed by a 60 x 10 drop had the engine concluding
+    /// capacity fell ~38% mid-exercise.
+    func testADropSetDoesNotReplaceTheCapabilityEstimate() {
+        let withDrop = capability(after: [
+            done(100, 8, rir: 2, order: 0),
+            done(60, 10, rir: 0, type: .dropset, order: 1)
+        ])
+        let withoutDrop = capability(after: [done(100, 8, rir: 2, order: 0)])
+
+        XCTAssertEqual(withDrop, withoutDrop, accuracy: 0.01,
+                       "the drop set must leave the estimate exactly where the top set put it")
+    }
+
+    /// AMRAP and failure sets are the *best* capacity evidence available and must keep counting.
+    func testAmrapAndFailureStillSetTheEstimate() {
+        for type in [SetType.amrap, .failure] {
+            let after = capability(after: [done(110, 8, rir: 0, type: type, order: 0)])
+            XCTAssertGreaterThan(after, 133, "\(type.rawValue) must still raise capability")
+        }
+    }
+
+    /// The same numbers logged as a plain working set — the unlabelled case the allowlist cannot
+    /// catch — are held to the clamp instead of cratering the estimate.
+    func testAnUntaggedLightSetIsClampedRatherThanReplacingTheEstimate() {
+        let after = capability(after: [
+            done(100, 8, rir: 2, order: 0),
+            done(60, 10, rir: 0, type: .working, order: 1)
+        ])
+
+        // The 100 kg set puts capability at 133.3; the light set alone would imply ~80.
+        XCTAssertGreaterThanOrEqual(after, 133.3 * 0.8 - 0.5,
+                                    "one set may not pull capability down more than 20%")
+        XCTAssertLessThan(after, 133.4, "it should still move down — the clamp bounds it, not blocks it")
+    }
+
+    /// Upward moves are deliberately uncapped: a set that beats the estimate is direct evidence
+    /// the estimate was low. This is why no upward clamp exists.
+    func testUpwardMovesAreNotClamped() {
+        let after = capability(after: [done(150, 8, rir: 0, order: 0)], baseE1RM: 100)
+
+        XCTAssertEqual(after, 190.0, accuracy: 1.0,
+                       "Epley on 150 x 8 is 190 — a 90% jump, and it must pass through")
+    }
+
+    /// Sets at RIR >= 3 still do not move the point estimate. That is deliberate and unchanged:
+    /// the floor covers them instead, which is the half of the signal that is trustworthy.
+    func testHighRIRSetsStillDoNotMoveThePointEstimate() {
+        let after = capability(after: [done(100, 8, rir: 4, order: 0)], baseE1RM: 100)
+
+        XCTAssertEqual(after, 100, accuracy: 0.01)
+    }
+
+    /// The freshness bonus must not be re-armed by narrowing what counts as capacity evidence: a
+    /// set *after* a drop set is not a first set, whatever the drop set contributed.
+    func testADropSetStillCountsAsHavingStartedWorking() {
+        let settings = SuggestionSettingsSnapshot(
+            formula: .epley, restTimerSeconds: 150, weightIncrement: 2.5,
+            fatigueEnabled: true, freshnessEnabled: true, freshnessPercent: 0.03,
+            baseFatigueRate: 0.03, recoveryConstant: 180, sessionCapabilityPolicy: .observed
+        )
+        let decisions = SuggestionEngine.evaluate(
+            SuggestionEngineInput(
+                baseE1RM: 100,
+                baseSource: .recentPerformance,
+                completedSessionSets: [done(60, 10, rir: 0, type: .dropset, order: 0)],
+                pendingSets: [
+                    SuggestionPendingSetInput(
+                        setId: UUID(), setIndex: 1, setNumber: 2,
+                        target: SuggestionTarget(
+                            reps: 8, rir: 2, repRange: nil,
+                            repsSource: .explicitSet, rirSource: .explicitSet
+                        ),
+                        setType: .working
+                    )
+                ],
+                settings: settings,
+                calibrationAdjustment: .neutral
+            )
+        )
+
+        XCTAssertFalse(decisions[0].freshnessApplied,
+                       "a set after a drop set must not claim the first-set freshness bonus")
     }
 }

@@ -8,8 +8,9 @@
 | PR1 predicates | **done** — golden master unchanged, so provably behaviour-neutral |
 | PR2 input enrichment | **done** — golden master unchanged |
 | PR3 baseline reads RIR | **done** — mutation-checked: reverting the fix fails 3 tests at exactly 57.5 kg |
-| PR4-PR8 | not started |
-| PF2 target-RIR coverage | still outstanding, still the only measurement on the critical path |
+| PR4 capability crediting + floor | **done** — golden master diff reviewed block by block, 590 tests green |
+| PR5-PR8 | not started |
+| PF2 target-RIR coverage | **done** — see §1; confirmed G1 emphatically (122 of 123 sets would have been missed) |
 | PF3 adherence metric | still outstanding, still wants to ship a release early |
 **Companion to:** [SUGGESTION_ENGINE_PROGRAM.md](SUGGESTION_ENGINE_PROGRAM.md) (the why)
 
@@ -25,11 +26,30 @@ stores nothing. Dump all 22 scenarios to a committed fixture first, so every lat
 reviewable diff instead of an eyeballed one. Without this you cannot tell an intended change from
 a regression, and five PRs in a row change these numbers.
 
-**PF2 · Measure target-RIR coverage.** The missing-RIR fix (PR5) depends on knowing what RIR a set
-was prescribed at. Query `real-history.repsterbackup` for what fraction of completed app-era sets
-can resolve a target. If it's low, PR5's value drops sharply — see **G1**, which already changes the
-design. *This is the only measurement still on the critical path; the constants backtest was
-removed by decision 1.*
+**PF2 · Measure target-RIR coverage · DONE 2026-08-27.** Measured against
+`real-history.repsterbackup` (11,785 sets, 575 app-era completed working sets):
+
+| | Imported era | App era |
+|---|---|---|
+| Completed working sets | 11,055 | 575 |
+| No RIR — the population PR5's fallback governs | **100%** | **21.4%** (123 sets) |
+| Of those, carrying a `WorkoutSet.targetRIR` | — | **1 set** |
+| RIR ≥ 3 — the population the floor fires on | — | **5.0%** (29 sets) |
+| RIR distribution (app era) | — | 0: 67%, 1: 15%, 2: 12%, 3: 2%, 4: 1%, 5: 3% |
+
+Three conclusions:
+
+1. **G1 is confirmed emphatically.** Sourcing the fallback from `WorkoutSet.targetRIR` would have
+   been a no-op on **122 of the 123 sets that need it**. The shipped implementation resolves through
+   `resolveTarget`, whose chain ends at the profile default, so coverage is effectively 100%.
+2. **PR5 is worth building** — it governs about a fifth of app-era sets.
+3. **Decision 1 is vindicated.** 29 sets at RIR ≥ 3 could never have separated a 30% damping factor
+   from a 50% one. Choosing the design with no constant was the only honest option available.
+
+*Open question this raised:* with 67% of logged RIR values at 0, a no-RIR set from a
+train-to-failure lifter may be better modelled by their own recent median RIR than by their
+programmed target. Not built — it adds a tuning surface, and the target is the defensible default.
+Revisit if adherence data suggests it.
 
 **PF3 · Ship the adherence metric in the *current* release, not this one.** There is no way today to
 tell whether suggestions are good — see **G2**. It has to land at least one release *ahead* of the

@@ -2916,7 +2916,8 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
             selectionPolicy: selectionPolicy,
             selectionReferenceE1RM: selectionReferenceE1RM,
             calibrationAdjustment: .neutral,
-            projectedSessionFatigue: projectedSessionFatigue
+            projectedSessionFatigue: projectedSessionFatigue,
+            appliedFloor: nil
         )
     }
 }

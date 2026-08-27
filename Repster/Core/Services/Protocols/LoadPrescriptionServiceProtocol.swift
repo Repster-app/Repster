@@ -408,6 +408,10 @@ struct SuggestionDecision: Sendable {
     let calibrationAdjustment: SuggestionCalibrationAdjustment
     /// Projected cumulative session fatigue at the point this set would be performed.
     let projectedSessionFatigue: Double
+    /// Set when the suggestion floor overrode the model's answer, carrying the completed set that
+    /// proved it. Surfaced in the explanation — a suggestion the floor pushed *up* must never still
+    /// claim it eased off to manage fatigue.
+    let appliedFloor: SuggestionEngine.SuggestionFloor?
 
     var targetReps: Int { target.reps }
     var displayTargetReps: Int { target.displayReps }
@@ -596,6 +600,10 @@ enum E1RMSource: Sendable {
 enum SuggestionSelectionPolicy: Sendable, Equatable {
     case closestMatch
     case firstSetProgressionAboveRecentPeak
+    /// The model's answer was below a weight already completed this session with reps to spare,
+    /// so the floor replaced it. Never silent: a clamped suggestion that still explained itself as
+    /// "easing off to manage session fatigue" would be saying the opposite of what it just did.
+    case floorHeldAboveCompletedSet
 
     var label: String {
         switch self {
@@ -603,6 +611,8 @@ enum SuggestionSelectionPolicy: Sendable, Equatable {
             return "closest match to effective e1RM"
         case .firstSetProgressionAboveRecentPeak:
             return "biased above recent top workout"
+        case .floorHeldAboveCompletedSet:
+            return "held above a completed set with reps to spare"
         }
     }
 }
@@ -620,6 +630,37 @@ enum SuggestionEngine {
     private static let maxFatigue: Double = 0.25
     private static let missingRIRDefault: Double = 1.0
     private static let e1RMEpsilon: Double = 0.0001
+
+    /// The most one completed set may pull the session capability estimate *down*, as a fraction
+    /// of the running estimate.
+    ///
+    /// `.observed` replaces the estimate outright rather than blending, so a single light set
+    /// becomes the capability figure for every remaining set of the exercise. A 100 kg x 8 @ RIR 2
+    /// top set followed by an untagged 60 kg x 10 back-off had the engine concluding capacity fell
+    /// ~38% mid-exercise. Type filtering (`isCapacityPointEstimate`) catches the *labelled* cases;
+    /// this catches the far commoner unlabelled ones.
+    ///
+    /// Asymmetric on purpose: upward moves replace freely, because a set that beats the estimate is
+    /// direct evidence the estimate was low. Only the downward direction is capped.
+    ///
+    /// 0.20 mirrors the learning path's existing weight-deviation guard
+    /// (`FatigueLearningService.maxWeightDeviationFraction`), which already treats a >20% departure
+    /// from the prescription as "not evidence about the model". Failure mode is benign: too tight
+    /// and capability tracks a genuine decline more slowly, which costs a lighter suggestion, never
+    /// a failed rep.
+    private static let maxDownwardCapabilityMove: Double = 0.20
+
+    /// Reps of surplus a completed set must show before it establishes a floor.
+    ///
+    /// The surplus has to beat the fatigue the model is entitled to claim. At an 8-rep target three
+    /// reps of reserve is ~8% of load, while accumulated fatigue between adjacent sets at normal
+    /// rest is 2-5%; one rep of reserve is ~2.6% and does not clear that bar.
+    ///
+    /// Three also lands on a useful symmetry: where target reps match what was performed, the
+    /// surplus *is* the completed set's RIR — so the floor activates on precisely the sets
+    /// `normalizedObservedCapability` discards at `actualRIR >= 3`. The two are complementary
+    /// rather than redundant, which is why the RIR gate stays.
+    private static let floorMinimumRepSurplus: Int = 3
 
     private struct CompletedSessionState: Sendable {
         let sessionCapabilityE1RM: Double
@@ -766,9 +807,9 @@ enum SuggestionEngine {
             let bestReps: Int?
             let intensityFactor: Double
             let rawWeight: Double
-            let prescribedWeight: Double
-            let selectionPolicy: SuggestionSelectionPolicy
-            let selectionReferenceE1RM: Double?
+            var prescribedWeight: Double
+            var selectionPolicy: SuggestionSelectionPolicy
+            var selectionReferenceE1RM: Double?
 
             if let range = setSpec.repRange, range.lowerBound < range.upperBound {
                 let candidates = repRangeCandidates(
@@ -800,6 +841,25 @@ enum SuggestionEngine {
                 selectionReferenceE1RM = nil
             }
 
+            // D9: applies to every pending set, not only the next one. The argument holds
+            // identically further down the projection — reserve was demonstrated, and the lower
+            // numbers further out are the model's claim, not an observation. This does flatten the
+            // projected decline, which is intended.
+            var appliedFloor: SuggestionFloor?
+            if let floor = suggestionFloor(
+                target: setSpec.target,
+                completedSets: input.completedSessionSets,
+                increment: input.settings.weightIncrement
+            ), floor.weight > prescribedWeight {
+                // D8: no cap on how far the floor may raise the answer. A large gap between the
+                // floor and the model *is* the signal that the model is wrong, and the floor is the
+                // better-evidenced of the two.
+                prescribedWeight = floor.weight
+                selectionPolicy = .floorHeldAboveCompletedSet
+                selectionReferenceE1RM = nil
+                appliedFloor = floor
+            }
+
             decisions.append(SuggestionDecision(
                 setId: setSpec.setId,
                 setIndex: setSpec.setIndex,
@@ -823,7 +883,8 @@ enum SuggestionEngine {
                 selectionPolicy: selectionPolicy,
                 selectionReferenceE1RM: selectionReferenceE1RM,
                 calibrationAdjustment: input.calibrationAdjustment,
-                projectedSessionFatigue: projectedFatigue
+                projectedSessionFatigue: projectedFatigue,
+                appliedFloor: appliedFloor
             ))
         }
 
@@ -983,9 +1044,13 @@ enum SuggestionEngine {
                 readiness: readiness,
                 formula: input.settings.formula
             ) {
-                sessionCapabilityE1RM = input.settings.sessionCapabilityPolicy.blend(
+                let blended = input.settings.sessionCapabilityPolicy.blend(
                     observedCapability: normalizedObservedCapability,
                     priorCapability: sessionCapabilityE1RM
+                )
+                sessionCapabilityE1RM = clampDownwardCapabilityMove(
+                    from: sessionCapabilityE1RM,
+                    to: blended
                 )
                 usedSessionCapabilityBlend = true
             }
@@ -1017,7 +1082,7 @@ enum SuggestionEngine {
         readiness: ReadinessState,
         formula: E1RMFormula
     ) -> Double? {
-        guard set.setType.countsAsPerformedWork,
+        guard set.setType.isCapacityPointEstimate,
               set.weight > 0,
               set.reps > 0,
               let actualRIR = set.rir,
@@ -1034,6 +1099,86 @@ enum SuggestionEngine {
             return observedEffectiveE1RM
         }
         return observedEffectiveE1RM / readiness.normalizationMultiplier
+    }
+
+    /// Cap a downward move in the session capability estimate. Upward moves pass through.
+    ///
+    /// See ``maxDownwardCapabilityMove``.
+    private static func clampDownwardCapabilityMove(from prior: Double, to proposed: Double) -> Double {
+        guard prior > 0, proposed < prior else { return proposed }
+        return max(proposed, prior * (1.0 - Self.maxDownwardCapabilityMove))
+    }
+
+    // MARK: - Suggestion floor
+
+    /// A weight already completed in this session with reps to spare, and the set that proved it.
+    struct SuggestionFloor: Sendable, Equatable {
+        let weight: Double
+        let completedWeight: Double
+        let completedReps: Int
+        let completedRIR: Double
+    }
+
+    /// The highest weight this session has already demonstrated the lifter can exceed.
+    ///
+    /// Makes a class of answer unreachable no matter what the model computes: if you lifted a
+    /// weight several minutes ago *with reps left over*, you can lift that weight. That is a report
+    /// of something that physically happened, and it is more trustworthy than anything the model
+    /// infers from it — so where the two disagree, this wins.
+    ///
+    /// This is how RIR >= 3 sets are credited. `normalizedObservedCapability` still refuses them as
+    /// a *point estimate*, for the reason stated there: RIR self-report is unreliable far from
+    /// failure. But refusing them entirely meant a lifter reporting "five left in the tank" got a
+    /// *lower* suggestion than the set they had just finished — the fatigue cost of the set was
+    /// charged while its evidence of capacity was thrown away. Reading them as a lower bound takes
+    /// the half of the signal that is trustworthy and needs no tuning constant to do it: the answer
+    /// can never exceed one increment above a weight the lifter actually completed.
+    ///
+    /// Design: SUGGESTION_FLOOR_GUARDRAIL_DESIGN.md (D1-D9).
+    static func suggestionFloor(
+        target: SuggestionTarget,
+        completedSets: [SessionSetContext],
+        increment: Double
+    ) -> SuggestionFloor? {
+        // D1: compare on total reps — a set of 35 x 8 @ RIR 5 demonstrates capacity for 13 reps,
+        // so a target of "12 @ RIR 0" is inside what was shown even though 12 > 8. Normalized
+        // reps, never display reps: a `.totalAcrossSides` target is halved by the time it gets here.
+        let targetTotal = target.reps + Int(target.rir)
+
+        return completedSets
+            .filter(\.completed)
+            .compactMap { set -> SuggestionFloor? in
+                // D5: only clean single-effort types. A drop set's trailing RIR does not describe
+                // its opening weight; a partial's reps are not comparable to a full-ROM target.
+                guard set.setType.isCapacityLowerBound else { return nil }
+                // D6: no RIR, no floor. `missingRIRDefault` must not be reused here — assuming a
+                // reserve nobody reported would invent a floor out of nothing.
+                guard let rir = set.rir, rir >= 0 else { return nil }
+                guard set.weight > 0, set.reps > 0 else { return nil }
+
+                // D2: the surplus must beat the fatigue the model is entitled to claim.
+                let surplus = (set.reps + Int(rir)) - targetTotal
+                guard surplus >= Self.floorMinimumRepSurplus else { return nil }
+
+                // D3: the next grid value strictly above — not the weight itself, which the
+                // surplus proves was too light, and not an extrapolation of how much more, which
+                // is the model's job and the model is what is under suspicion here. Expressed as
+                // "next grid value" so an off-grid entry floors correctly: 33 kg on a 2.5 kg grid
+                // gives 35, not 37.5.
+                guard increment > 0 else { return nil }
+                let steps = (set.weight + Self.e1RMEpsilon) / increment
+                let floorWeight = (steps.rounded(.down) + 1) * increment
+
+                return SuggestionFloor(
+                    weight: floorWeight,
+                    completedWeight: set.weight,
+                    completedReps: set.reps,
+                    completedRIR: rir
+                )
+            }
+            // D4: every qualifying set contributes; take the maximum. An earlier heavier set still
+            // bounds the answer when the most recent one was lighter.
+            .max { $0.weight < $1.weight }
     }
 
     private static func readinessState(
