@@ -326,13 +326,17 @@ final class WorkoutJourneyTests: XCTestCase {
     private func completeNextSet(
         _ viewModel: ActiveWorkoutViewModel,
         weight: Double,
-        reps: Int
+        reps: Int,
+        rir: Double? = nil
     ) async throws {
         let pending = try XCTUnwrap(
             viewModel.currentSets.first(where: { !$0.completed }),
             "no pending set to complete"
         )
-        await viewModel.completeSet(pending, input: SetCompletionInput(weight: weight, reps: reps))
+        await viewModel.completeSet(
+            pending,
+            input: SetCompletionInput(weight: weight, reps: reps, rir: rir)
+        )
     }
 
     // MARK: - Journey: logging sets
@@ -1110,4 +1114,131 @@ extension WorkoutJourneyTests {
         )
         _ = try await stack.setService.save(set)
     }
+
+    // MARK: - Journey: the capacity baseline reads reps in reserve
+
+    /// Logging a set with reps to spare must not make the app ask for *less* next time.
+    ///
+    /// This is the round trip no other test covers, because the two halves live on opposite sides
+    /// of a wall: `SetService` stores `e1RM` from reps alone, while every engine calculation uses
+    /// `reps + RIR`. The suggestion scenario harness injects `baseE1RM` directly, so it is
+    /// structurally blind to the seam. Only a real logged set, read back through the real service,
+    /// exercises it.
+    ///
+    /// Before the fix: 60 x 8 @ RIR 2 stored an e1RM of 76.0, and a fixed target of 8 @ RIR 2
+    /// priced at 76.0 / (1 + 10/30) = 57.0 -> 57.5 kg. Follow that and next session it says 55.0.
+    /// A ratchet down of about 4% per session, on the first set of every session, for anyone who
+    /// does not train to failure.
+    func testASetLoggedWithRepsInReserveDoesNotLowerTheNextSuggestion() async throws {
+        let stack = try Stack()
+        let exercise = Fixture.barbell()
+        let viewModel = try await startWorkout(stack, with: [exercise])
+
+        try await completeNextSet(viewModel, weight: 60, reps: 8, rir: 2)
+
+        // The stored value keeps the display convention — charts and PRs must not move.
+        let committed = try XCTUnwrap(stack.committedSets(for: XCTUnwrap(viewModel.workout?.id)).first)
+        XCTAssertEqual(try XCTUnwrap(committed.e1RM), 76.0, accuracy: 0.01,
+                       "stored e1RM stays reps-only: it is what charts and PRs render")
+
+        // The capacity baseline must read the reserve.
+        let estimate = try await stack.loadPrescriptionService.estimateBaseE1RM(
+            exerciseId: exercise.id,
+            completedSessionSets: []
+        )
+        XCTAssertEqual(try XCTUnwrap(estimate.value), 80.0, accuracy: 0.01,
+                       "capacity is Epley over reps + RIR = 10, not reps = 8")
+    }
+
+    /// The user-visible half of the same round trip: what the card would say next session.
+    func testNextSessionDoesNotPriceBelowTheWeightJustCompleted() async throws {
+        let stack = try Stack()
+        let exercise = Fixture.barbell()
+        let viewModel = try await startWorkout(stack, with: [exercise])
+
+        try await completeNextSet(viewModel, weight: 60, reps: 8, rir: 2)
+
+        // Empty completed sets = a fresh session, so this is entirely the historical baseline.
+        let evaluation = try await stack.loadPrescriptionService.evaluateSuggestions(
+            exerciseId: exercise.id,
+            pendingSets: [
+                SuggestionPendingSetInput(
+                    setId: UUID(),
+                    setIndex: 0,
+                    setNumber: 1,
+                    target: SuggestionTarget(
+                        reps: 8,
+                        rir: 2,
+                        repRange: nil,
+                        repsSource: .explicitSet,
+                        rirSource: .explicitSet
+                    ),
+                    setType: .working
+                )
+            ],
+            completedSessionSets: []
+        )
+
+        let prescribed = try XCTUnwrap(evaluation.decisions.first?.prescribedWeight)
+        XCTAssertGreaterThanOrEqual(
+            prescribed, 60.0,
+            "prescribing under 60 kg for the same 8 @ RIR 2 the lifter just did is a regression, "
+            + "not a suggestion (was 57.5 before the capacity baseline read RIR)"
+        )
+    }
+
+    /// A history with no RIR must be completely unaffected — the fallback is the stored value,
+    /// which is the same number as before, so imported Strong/Hevy data does not shift.
+    func testHistoryWithoutRIRIsUnchanged() async throws {
+        let stack = try Stack()
+        let exercise = Fixture.barbell()
+        let viewModel = try await startWorkout(stack, with: [exercise])
+
+        try await completeNextSet(viewModel, weight: 60, reps: 8, rir: nil)
+
+        let estimate = try await stack.loadPrescriptionService.estimateBaseE1RM(
+            exerciseId: exercise.id,
+            completedSessionSets: []
+        )
+        XCTAssertEqual(try XCTUnwrap(estimate.value), 76.0, accuracy: 0.01,
+                       "no RIR, no reserve to credit — identical to the old behaviour")
+    }
+
+    /// A set taken to failure is already at its capacity, so RIR 0 must change nothing either.
+    func testRIRZeroIsUnchanged() async throws {
+        let stack = try Stack()
+        let exercise = Fixture.barbell()
+        let viewModel = try await startWorkout(stack, with: [exercise])
+
+        try await completeNextSet(viewModel, weight: 60, reps: 8, rir: 0)
+
+        let estimate = try await stack.loadPrescriptionService.estimateBaseE1RM(
+            exerciseId: exercise.id,
+            completedSessionSets: []
+        )
+        XCTAssertEqual(try XCTUnwrap(estimate.value), 76.0, accuracy: 0.01)
+    }
+
+    /// The peak must be chosen on capacity, not on the stored figure: a lighter set with more
+    /// reserve can genuinely be the better evidence, and ranking on one number while reporting
+    /// another would let a set win the comparison and then contribute a different value.
+    func testThePeakIsChosenOnCapacityNotOnTheStoredValue() async throws {
+        let stack = try Stack()
+        let exercise = Fixture.barbell()
+        let viewModel = try await startWorkout(stack, with: [exercise])
+
+        // Stored: 80 x 5 -> 93.3, beats 70 x 8 -> 88.7.
+        // Capacity: 80 x 5 @ RIR 0 -> 93.3, but 70 x 8 @ RIR 4 -> 70 x (1 + 12/30) = 98.0.
+        try await completeNextSet(viewModel, weight: 80, reps: 5, rir: 0)
+        await viewModel.addSet(for: exercise.id)
+        try await completeNextSet(viewModel, weight: 70, reps: 8, rir: 4)
+
+        let estimate = try await stack.loadPrescriptionService.estimateBaseE1RM(
+            exerciseId: exercise.id,
+            completedSessionSets: []
+        )
+        XCTAssertEqual(try XCTUnwrap(estimate.value), 98.0, accuracy: 0.01,
+                       "the set with reserve is the stronger capacity evidence")
+    }
+
 }

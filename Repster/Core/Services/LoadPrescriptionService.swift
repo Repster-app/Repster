@@ -214,7 +214,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
     private func estimateCapacityBaseE1RM(
         exerciseId: UUID,
         recencyWeeks: Int,
-        formula _: E1RMFormula
+        formula: E1RMFormula
     ) async throws -> BaseE1RMEstimate {
 
         let now = Date()
@@ -234,7 +234,8 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
 
         if let inWindow = peakAcrossRecentWorkouts(
             inWindowEligible,
-            limit: Self.recentWorkoutPeakWindow
+            limit: Self.recentWorkoutPeakWindow,
+            formula: formula
         ) {
             return BaseE1RMEstimate(
                 value: inWindow.value,
@@ -256,7 +257,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         )
         let allEligible = allSets.filter { isEligibleForCapacity(set: $0, excludedWorkoutIds: allExcluded) }
 
-        if let mostRecent = peakAcrossRecentWorkouts(allEligible, limit: 1) {
+        if let mostRecent = peakAcrossRecentWorkouts(allEligible, limit: 1, formula: formula) {
             // A set logged at bodyweight can never be eligible: every e1RM formula is
             // `weight * repFactor`, so 0 kg yields 0 and fails the `> 0` test above. Without
             // this check the fallback reaches straight past a bodyweight era to the last
@@ -307,41 +308,66 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
     private func isEligibleForCapacity(set: WorkoutSet, excludedWorkoutIds: Set<UUID>) -> Bool {
         return set.completed &&
             !excludedWorkoutIds.contains(set.workoutId) &&
-            set.setType != .warmup &&
-            set.setType != .partial &&
+            set.setType.countsAsPerformedWork &&
             (set.e1RM ?? 0) > 0
     }
 
-    /// Group eligible sets by workout, take each workout's peak e1RM, sort
+    /// Group eligible sets by workout, take each workout's peak capacity, sort
     /// most-recent-first, and return the highest peak across the first `limit`
     /// workouts along with the date of the workout that produced that peak.
     private func peakAcrossRecentWorkouts(
         _ eligibleSets: [WorkoutSet],
-        limit: Int
+        limit: Int,
+        formula: E1RMFormula
     ) -> (value: Double, workoutDate: Date, topSet: HistoricalSetSnapshot)? {
         guard !eligibleSets.isEmpty, limit > 0 else { return nil }
 
         let workouts = Dictionary(grouping: eligibleSets, by: \.workoutId)
             .compactMap { (_, sets) -> (date: Date, value: Double, topSet: HistoricalSetSnapshot)? in
                 guard let workoutDate = sets.map(\.date).max() else { return nil }
-                // Find the actual set with the highest e1RM in this workout — this
-                // is the set the UI surfaces as the "last top set" reference.
-                guard let topSet = sets.max(by: { ($0.e1RM ?? 0) < ($1.e1RM ?? 0) }),
-                      let topE1RM = topSet.e1RM,
-                      topE1RM > 0 else { return nil }
+                // Rank on capacity, not on the stored e1RM — see `capacityE1RM`. Ranking on one
+                // and reporting the other would let a set win the comparison and then contribute
+                // a different number.
+                guard let topSet = sets.max(by: {
+                          capacityE1RM(for: $0, formula: formula) < capacityE1RM(for: $1, formula: formula)
+                      }),
+                      case let topCapacity = capacityE1RM(for: topSet, formula: formula),
+                      topCapacity > 0 else { return nil }
                 let snapshot = HistoricalSetSnapshot(
                     weight: topSet.effectiveWeight ?? topSet.weight ?? 0,
                     reps: topSet.prReps,
                     rir: topSet.performanceRIR,
                     date: workoutDate
                 )
-                return (date: workoutDate, value: topE1RM, topSet: snapshot)
+                return (date: workoutDate, value: topCapacity, topSet: snapshot)
             }
             .sorted { $0.date > $1.date }
 
         let candidates = Array(workouts.prefix(limit))
         guard let winner = candidates.max(by: { $0.value < $1.value }) else { return nil }
         return (value: winner.value, workoutDate: winner.date, topSet: winner.topSet)
+    }
+
+    /// What this set says the lifter can lift — reps **plus reps in reserve**.
+    ///
+    /// The stored `WorkoutSet.e1RM` is computed from reps alone (`SetService`), so it is a display
+    /// figure, not a capacity figure: 60 kg x 8 @ RIR 2 stores 76.0 while the engine's own
+    /// in-session estimator reads the same set as 80.0. Seeding the cross-session baseline from the
+    /// stored value therefore understated capacity for anyone who trains with reps in reserve, and
+    /// because a fixed rep target prices at `e1RM x intensityFactor(reps + targetRIR)`, the result
+    /// was not a plateau but a ratchet *down* — roughly 4% per session at RIR 2.
+    ///
+    /// Recomputed here rather than by rewriting stored rows: no migration, and charts, PRs and
+    /// history keep the display convention they have always used.
+    ///
+    /// Falls back to the stored value when no RIR was recorded, which is the same number as before
+    /// — so histories with no RIR are unaffected.
+    private func capacityE1RM(for set: WorkoutSet, formula: E1RMFormula) -> Double {
+        guard let rir = set.performanceRIR, rir >= 0 else { return set.e1RM ?? 0 }
+        let weight = set.effectiveWeight ?? set.weight ?? 0
+        let reps = set.prReps
+        guard weight > 0, reps > 0 else { return set.e1RM ?? 0 }
+        return formula.calculate(weight: weight, reps: reps + Int(rir))
     }
 
     private func excludedWorkoutIds(
