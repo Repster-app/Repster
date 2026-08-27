@@ -492,7 +492,7 @@ private extension WorkoutHistoryArchiveSet {
             rir: set.rir,
             leftRIR: set.leftRIR,
             rightRIR: set.rightRIR,
-            setType: set.setType,
+            setType: set.setType.rawValue,
             pauseDuration: set.pauseDuration,
             side: set.side,
             notes: set.notes,
@@ -536,7 +536,7 @@ private extension WorkoutHistoryArchiveSet {
             rir: rir,
             leftRIR: leftRIR,
             rightRIR: rightRIR,
-            setType: setType,
+            setType: SetType(rawValue: setType) ?? .working,
             pauseDuration: pauseDuration,
             side: side,
             notes: notes,
@@ -577,6 +577,7 @@ private extension WorkoutHistoryArchiveFatigueObservation {
             actualReps: obs.actualReps,
             actualRIR: obs.actualRIR,
             restDurationSeconds: obs.restDurationSeconds,
+            modelEpoch: obs.modelEpoch,
             setTypeRawValue: obs.setTypeRawValue,
             createdAt: obs.createdAt
         )
@@ -599,6 +600,7 @@ private extension WorkoutHistoryArchiveFatigueObservation {
             actualRIR: actualRIR,
             restDurationSeconds: restDurationSeconds,
             setType: setTypeRawValue.flatMap(SetType.init(rawValue:)),
+            modelEpoch: modelEpoch,
             createdAt: createdAt
         )
     }
@@ -612,8 +614,8 @@ private extension WorkoutHistoryArchiveFatigueLearningSetAudit {
             exerciseId: audit.exerciseId,
             setId: audit.setId,
             visibleSetNumber: audit.visibleSetNumber,
-            setType: audit.setType,
-            status: audit.status,
+            setType: audit.setType.rawValue,
+            status: audit.status.archiveRawValue,
             suggestionUnavailableReasonRawValue: audit.suggestionUnavailableReasonRawValue,
             predictedEffectiveE1RM: audit.predictedEffectiveE1RM,
             baseE1RM: audit.baseE1RM,
@@ -623,6 +625,7 @@ private extension WorkoutHistoryArchiveFatigueLearningSetAudit {
             actualRIR: audit.actualRIR,
             deviationFraction: audit.deviationFraction,
             normalizedError: audit.normalizedError,
+            modelEpoch: audit.modelEpoch,
             createdAt: audit.createdAt
         )
     }
@@ -634,8 +637,8 @@ private extension WorkoutHistoryArchiveFatigueLearningSetAudit {
             exerciseId: exerciseId,
             setId: setId,
             visibleSetNumber: visibleSetNumber,
-            setType: setType,
-            status: status,
+            setType: SetType(rawValue: setType) ?? .working,
+            status: FatigueLearningAuditStatus(rawValue: status) ?? .suggestionUnavailable,
             suggestionUnavailableReason: suggestionUnavailableReasonRawValue.flatMap(SuggestionUnavailableReason.init(rawValue:)),
             predictedEffectiveE1RM: predictedEffectiveE1RM,
             baseE1RM: baseE1RM,
@@ -645,6 +648,7 @@ private extension WorkoutHistoryArchiveFatigueLearningSetAudit {
             actualRIR: actualRIR,
             deviationFraction: deviationFraction,
             normalizedError: normalizedError,
+            modelEpoch: modelEpoch,
             createdAt: createdAt
         )
     }

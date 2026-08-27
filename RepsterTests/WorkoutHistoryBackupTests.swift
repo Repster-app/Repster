@@ -99,7 +99,7 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
         XCTAssertEqual(archive.exercises.first?.bodyweightFactor, 0.35)
 
         let exportedWarmup = try XCTUnwrap(archive.sets.first(where: { $0.id == warmupSet.id }))
-        XCTAssertEqual(exportedWarmup.setType, .warmup)
+        XCTAssertEqual(exportedWarmup.setType, SetType.warmup.rawValue)
         XCTAssertEqual(exportedWarmup.excludeFromPRs, true)
         XCTAssertEqual(exportedWarmup.restDurationSeconds, 90)
 
@@ -763,6 +763,7 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             actualReps: 10,
             actualRIR: 0,
             restDurationSeconds: 150,
+            modelEpoch: SuggestionModelEpoch.current,
             setTypeRawValue: SetType.working.rawValue,
             createdAt: makeDate(2026, 3, 22, 8, 25)
         )
@@ -772,8 +773,8 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             exerciseId: exercise.id,
             setId: set.id,
             visibleSetNumber: 2,
-            setType: .working,
-            status: .used,
+            setType: SetType.working.rawValue,
+            status: FatigueLearningAuditStatus.used.rawValue,
             suggestionUnavailableReasonRawValue: nil,
             predictedEffectiveE1RM: 118,
             baseE1RM: 120,
@@ -783,6 +784,7 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             actualRIR: 0,
             deviationFraction: 0.01,
             normalizedError: -0.01,
+            modelEpoch: SuggestionModelEpoch.current,
             createdAt: makeDate(2026, 3, 22, 8, 25)
         )
         let mutatedArchive = WorkoutHistoryArchive(
@@ -2284,5 +2286,136 @@ final class FatigueObservationArchiveCompatibilityTests: XCTestCase {
         )
 
         XCTAssertNil(observation.setType)
+    }
+}
+
+/// Backups must survive schema growth in both directions.
+///
+/// The archive decodes in a single call, so one unrecognised enum raw value anywhere fails the
+/// *entire* restore — the user loses their history because a newer build had one extra label. And
+/// the version guard cannot save them: it runs after the decode, so the failure reports a perfectly
+/// good file as corrupt.
+///
+/// Two defences, and they solve different halves. Reading is lenient, which protects this build
+/// from future ones. Writing is conservative, which protects already-shipped builds from this one —
+/// nothing can be retrofitted into 1.4's decoder, so 1.5 must not emit values it cannot parse.
+final class ArchiveEnumCompatibilityTests: XCTestCase {
+
+    /// A status added after 1.4 must reach the archive as something 1.4 can decode.
+    func testNewAuditStatusIsWrittenAsAValueOlderBuildsUnderstand() {
+        let shippedIn1_4: Set<String> = [
+            "used", "warmupNotTracked", "baselineFirstWorkingSet", "suggestionUnavailable",
+            "missingRIR", "invalidPerformance", "weightDeviationOver20Percent"
+        ]
+
+        for status in FatigueLearningAuditStatus.allCases {
+            XCTAssertTrue(
+                shippedIn1_4.contains(status.archiveRawValue),
+                "\(status.rawValue) reaches an archive as '\(status.archiveRawValue)', which 1.4 "
+                + "cannot decode — that fails the whole restore, not just this column"
+            )
+        }
+    }
+
+    /// Specifically the case PR6 added.
+    func testNonCapacityStatusIsDowngradedForTheArchive() {
+        XCTAssertEqual(
+            FatigueLearningAuditStatus.nonCapacitySetType.archiveRawValue,
+            FatigueLearningAuditStatus.suggestionUnavailable.rawValue
+        )
+        XCTAssertEqual(FatigueLearningAuditStatus.used.archiveRawValue, "used")
+    }
+
+    /// Reading is the other half: an unknown value from a *newer* build costs one column, never
+    /// the archive.
+    func testUnknownEnumValuesDecodeRatherThanThrowing() throws {
+        let json = """
+        {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "workoutId": "22222222-2222-2222-2222-222222222222",
+          "exerciseId": "33333333-3333-3333-3333-333333333333",
+          "setId": "44444444-4444-4444-4444-444444444444",
+          "visibleSetNumber": 2,
+          "setType": "aTypeFromTheFuture",
+          "status": "aStatusFromTheFuture",
+          "createdAt": "2026-03-22T08:25:00Z"
+        }
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let audit = try decoder.decode(
+            WorkoutHistoryArchiveFatigueLearningSetAudit.self,
+            from: Data(json.utf8)
+        )
+
+        XCTAssertEqual(audit.setType, "aTypeFromTheFuture", "the raw value survives verbatim")
+        XCTAssertEqual(audit.status, "aStatusFromTheFuture")
+    }
+
+    /// The same protection over the core data. `SET_TYPES_SCOPING.md` contemplates adding a
+    /// `deload` case; if that ever ships, every existing build must still restore the backup.
+    func testAnUnknownSetTypeOnACoreSetDoesNotFailTheDecode() throws {
+        let json = """
+        {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "workoutId": "22222222-2222-2222-2222-222222222222",
+          "exerciseId": "33333333-3333-3333-3333-333333333333",
+          "date": "2026-03-22T08:25:00Z",
+          "setType": "deload",
+          "orderInWorkout": 1,
+          "orderInExercise": 1,
+          "completed": true,
+          "createdAt": "2026-03-22T08:25:00Z",
+          "updatedAt": "2026-03-22T08:25:00Z"
+        }
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let archived = try decoder.decode(WorkoutHistoryArchiveSet.self, from: Data(json.utf8))
+
+        XCTAssertEqual(archived.setType, "deload")
+    }
+
+    /// Every currently-known type must still round-trip exactly — leniency must not become sloppy.
+    func testKnownSetTypesStillRoundTripExactly() throws {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        for type in SetType.allCases {
+            let audit = FatigueLearningSetAudit(
+                workoutId: UUID(), exerciseId: UUID(), setId: UUID(),
+                visibleSetNumber: 1, setType: type, status: .used
+            )
+            let archived = WorkoutHistoryArchiveFatigueLearningSetAudit(
+                id: audit.id,
+                workoutId: audit.workoutId,
+                exerciseId: audit.exerciseId,
+                setId: audit.setId,
+                visibleSetNumber: audit.visibleSetNumber,
+                setType: audit.setType.rawValue,
+                status: audit.status.archiveRawValue,
+                suggestionUnavailableReasonRawValue: nil,
+                predictedEffectiveE1RM: nil,
+                baseE1RM: nil,
+                prescribedWeight: nil,
+                actualWeight: nil,
+                actualReps: nil,
+                actualRIR: nil,
+                deviationFraction: nil,
+                normalizedError: nil,
+                modelEpoch: nil,
+                createdAt: audit.createdAt
+            )
+            let encoded = try encoder.encode(archived)
+            let decoded = try decoder.decode(
+                WorkoutHistoryArchiveFatigueLearningSetAudit.self, from: encoded
+            )
+
+            XCTAssertEqual(SetType(rawValue: decoded.setType), type)
+        }
     }
 }

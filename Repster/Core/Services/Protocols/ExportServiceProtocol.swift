@@ -220,6 +220,8 @@ struct WorkoutHistoryArchiveFatigueObservation: Codable, Sendable {
     let actualReps: Int
     let actualRIR: Double
     let restDurationSeconds: Int?
+    /// See ``FatigueLearningSetAudit/modelEpoch``.
+    let modelEpoch: Int?
     /// Raw string rather than `SetType?` on purpose. `decodeIfPresent(SetType.self,…)` *throws*
     /// on an unrecognised raw value, so a backup written by a newer build carrying a set type this
     /// build doesn't know would fail the entire restore — costing the user their whole history over
@@ -235,8 +237,12 @@ struct WorkoutHistoryArchiveFatigueLearningSetAudit: Codable, Sendable {
     let exerciseId: UUID
     let setId: UUID
     let visibleSetNumber: Int
-    let setType: SetType
-    let status: FatigueLearningAuditStatus
+    /// Raw strings, not typed enums. A `Codable` enum throws on an unrecognised raw value, and
+    /// because the whole archive decodes in one call, a single unknown value fails the *entire*
+    /// restore — the user loses their history over one diagnostic column. Resolved leniently at
+    /// the model boundary instead.
+    let setType: String
+    let status: String
     let suggestionUnavailableReasonRawValue: String?
     let predictedEffectiveE1RM: Double?
     let baseE1RM: Double?
@@ -246,6 +252,10 @@ struct WorkoutHistoryArchiveFatigueLearningSetAudit: Codable, Sendable {
     let actualRIR: Double?
     let deviationFraction: Double?
     let normalizedError: Double?
+    /// Optional Int, so it is safe in both directions: older archives simply lack it and resolve
+    /// to the legacy epoch. Without it a restored epoch-2 prediction would be mislabelled as
+    /// having come from the 1.x model.
+    let modelEpoch: Int?
     let createdAt: Date
 }
 
@@ -275,7 +285,9 @@ struct WorkoutHistoryArchiveSet: Codable, Sendable {
     let rir: Double?
     let leftRIR: Double?
     let rightRIR: Double?
-    let setType: SetType
+    /// Raw string for the same reason as the audit's: an unrecognised type must cost one column,
+    /// never the whole restore. This is the core data path, so it matters most here.
+    let setType: String
     let pauseDuration: Int?
     let side: Side?
     let notes: String?

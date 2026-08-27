@@ -4166,7 +4166,7 @@ final class WorkoutHistoryBackupServiceTests: XCTestCase {
         XCTAssertEqual(archive.exercises.first?.bodyweightFactor, 0.35)
 
         let exportedWarmup = try XCTUnwrap(archive.sets.first(where: { $0.id == warmupSet.id }))
-        XCTAssertEqual(exportedWarmup.setType, .warmup)
+        XCTAssertEqual(exportedWarmup.setType, SetType.warmup.rawValue)
         XCTAssertEqual(exportedWarmup.excludeFromPRs, true)
         XCTAssertEqual(exportedWarmup.restDurationSeconds, 90)
 

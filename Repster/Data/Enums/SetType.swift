@@ -135,6 +135,26 @@ enum FatigueLearningAuditStatus: String, Codable, CaseIterable, Sendable {
         }
     }
 
+    /// The raw value written into a backup archive.
+    ///
+    /// Deliberately not always `rawValue`. Shipped builds decode this field as a typed enum, so a
+    /// value they have never heard of fails their *entire* restore — a user would lose their whole
+    /// history because a newer build had one extra diagnostic label. Cases added after 1.4 are
+    /// therefore written as the nearest value 1.4 already knows.
+    ///
+    /// The local database keeps the true status; only the archived copy is conservative, and the
+    /// cost is one diagnostics label on restored rows. Once no supported build predates a case,
+    /// its mapping can be dropped.
+    var archiveRawValue: String {
+        switch self {
+        case .nonCapacitySetType:
+            // Added in 1.5. Closest thing 1.4 understands: the model made no comparison here.
+            return FatigueLearningAuditStatus.suggestionUnavailable.rawValue
+        default:
+            return rawValue
+        }
+    }
+
     var detail: String {
         switch self {
         case .used:
