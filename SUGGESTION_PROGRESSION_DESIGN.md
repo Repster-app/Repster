@@ -1,5 +1,13 @@
 # Suggestion progression — diagnosis & design
 
+> **Superseded in part, 2026-08-27.** P1 shipped. The O4 ladder analysis below is retained for its
+> reasoning, but its framing is corrected in
+> [SUGGESTION_OPEN_QUESTIONS.md](SUGGESTION_OPEN_QUESTIONS.md) §1: "a fixed target can never
+> progress" is wrong — capacity is the peak of the last 3 workouts and *does* rise when performance
+> does, so the plateau is a feedback loop created by the card anchoring the lifter to an exact rep
+> count. O2's attribution of the 32.5 kg case to the censored "5+" chip is also wrong; see the
+> behaviour audit §2.1. Start from the open-questions doc.
+
 **Date:** 2026-08-26 · **Branch:** NewMain
 **Status:** P1 fixed and shipped to the branch. P2 open. O2/O3/O4 undecided.
 

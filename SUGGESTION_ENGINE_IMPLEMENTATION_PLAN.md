@@ -15,7 +15,8 @@
 | PR8 release note | **done** — 1.5 WhatsNew, including the honest "give it a week" tile |
 | PF2 target-RIR coverage | **done** — see §1; confirmed G1 emphatically (122 of 123 sets would have been missed) |
 | PF3 adherence metric | **built** — `suggestionAdherence` + 3 bucketed properties on `workout completed`. **Still wants releasing ahead of the engine changes** |
-**Companion to:** [SUGGESTION_ENGINE_PROGRAM.md](SUGGESTION_ENGINE_PROGRAM.md) (the why)
+**Companion to:** [SUGGESTION_ENGINE_PROGRAM.md](SUGGESTION_ENGINE_PROGRAM.md) (the why) ·
+[SUGGESTION_OPEN_QUESTIONS.md](SUGGESTION_OPEN_QUESTIONS.md) (what is still undecided)
 
 This is the build order. Section 3 is the part to read before starting — it lists what none of
 the four source docs considered, including two items that change the design.
