@@ -257,6 +257,12 @@ struct WorkoutSnapshot: Sendable, Equatable, Identifiable {
     let duration: Int?
     let status: WorkoutStatus
     let createdAt: Date
+    /// Mirrors `Workout.excludesEntireWorkoutFromProgressionHistory`.
+    /// Read-only UI needs this to say a session is not counted; without it the flag is
+    /// invisible everywhere outside the Progression sheet that sets it.
+    let excludesEntireWorkoutFromProgressionHistory: Bool
+    /// Mirrors `Workout.excludedExerciseIdsForProgressionHistory`.
+    let excludedExerciseIdsForProgressionHistory: Set<UUID>
 
     init(from workout: Workout) {
         self.id = workout.id
@@ -268,6 +274,16 @@ struct WorkoutSnapshot: Sendable, Equatable, Identifiable {
         self.duration = workout.duration
         self.status = workout.status
         self.createdAt = workout.createdAt
+        self.excludesEntireWorkoutFromProgressionHistory =
+            workout.excludesEntireWorkoutFromProgressionHistory
+        self.excludedExerciseIdsForProgressionHistory =
+            workout.excludedExerciseIdsForProgressionHistory
+    }
+
+    /// Mirrors `Workout.excludesFromProgressionHistory(exerciseId:)`.
+    func excludesFromProgressionHistory(exerciseId: UUID) -> Bool {
+        excludesEntireWorkoutFromProgressionHistory
+            || excludedExerciseIdsForProgressionHistory.contains(exerciseId)
     }
 }
 

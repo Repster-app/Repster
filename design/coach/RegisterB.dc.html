@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; background: #111113; color: #EAEAEF;
+      font-family: -apple-system, "SF Pro Text", system-ui, "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased; }
+    a { color: #5B8DEF; } a:hover { color: #7BA4F2; }
+  </style>
+</helmet>
+<div style="min-height: 560px; background: #111113; padding: 26px 16px; display: flex; flex-direction: column; gap: 12px;">
+
+  <div style="display: flex; align-items: center; gap: 8px;">
+    <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.8px; color: #5C5C6E;">TODAY</div>
+    <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: #D4A23A; background: rgba(212,162,58,0.12); border-radius: 5px; padding: 3px 7px;">TELLS</div>
+  </div>
+
+  <div style="background: #1B1B1F; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 12px;">
+    <div style="font-size: 16px; font-weight: 600; letter-spacing: -0.2px; color: #EAEAEF; line-height: 1.35; text-wrap: pretty;">Train legs today — squat first</div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 10px;">
+        <div style="font-size: 13px; font-weight: 500; color: #EAEAEF;">Back Squat</div>
+        <div style="font-size: 13px; font-weight: 600; color: #9999A8; font-variant-numeric: tabular-nums;">4 × 5 @ 140 kg</div>
+      </div>
+      <div style="height: 1px; background: rgba(255,255,255,0.06);"></div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 10px;">
+        <div style="font-size: 13px; font-weight: 500; color: #EAEAEF;">Romanian Deadlift</div>
+        <div style="font-size: 13px; font-weight: 600; color: #9999A8; font-variant-numeric: tabular-nums;">3 × 8 @ 100 kg</div>
+      </div>
+      <div style="height: 1px; background: rgba(255,255,255,0.06);"></div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 10px;">
+        <div style="font-size: 13px; font-weight: 500; color: #EAEAEF;">Leg Extension</div>
+        <div style="font-size: 13px; font-weight: 600; color: #9999A8; font-variant-numeric: tabular-nums;">3 × 12 @ 45 kg</div>
+      </div>
+    </div>
+
+    <div style="font-size: 13px; font-weight: 500; line-height: 1.45; color: #9999A8; text-wrap: pretty;">Built from your usual legs session, with squat first because it costs you the most per set.</div>
+
+    <div style="background: #5B8DEF; border-radius: 11px; padding: 12px; text-align: center; font-size: 14px; font-weight: 600; color: #111113;">Load this session</div>
+  </div>
+
+  <div style="padding: 4px 2px; display: flex; flex-direction: column; gap: 5px;">
+    <div style="font-size: 12px; font-weight: 600; color: #EAEAEF;">The version a lifter would actually use</div>
+    <div style="font-size: 12px; font-weight: 500; line-height: 1.5; color: #5C5C6E; text-wrap: pretty;">One tap and you are training. The ordering claim is still the user's own data — squat really does cost them most.</div>
+    <div style="font-size: 12px; font-weight: 500; line-height: 1.5; color: #5C5C6E; text-wrap: pretty;">Against it: the app now owns the recommendation, it needs a write path that does not exist, and the sets and reps come from somewhere the user has not agreed to.</div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

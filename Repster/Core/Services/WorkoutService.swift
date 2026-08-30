@@ -225,6 +225,20 @@ actor WorkoutService: WorkoutServiceProtocol {
         }
     }
 
+    func excludedWorkoutIdsForProgressionHistory(
+        workoutIds: Set<UUID>,
+        exerciseId: UUID
+    ) async throws -> Set<UUID> {
+        guard !workoutIds.isEmpty else { return [] }
+
+        let workouts = try await workoutRepo.fetch(byIds: workoutIds)
+        return Set(
+            workouts.compactMap { workout in
+                workout.excludesFromProgressionHistory(exerciseId: exerciseId) ? workout.id : nil
+            }
+        )
+    }
+
     // MARK: - Deletion (FR-010)
 
     /// Delete a workout with full cascade.

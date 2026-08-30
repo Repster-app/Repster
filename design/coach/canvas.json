@@ -1,0 +1,20 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html",             "x": 0,    "y": 0,    "w": 402, "h": 874,  "title": "Home — the Coach line" },
+    { "file": "CoachDestination.dc.html", "x": 502,  "y": 0,    "w": 402, "h": 874,  "title": "Coach — the destination" },
+    { "file": "Review.dc.html",           "x": 1004, "y": 0,    "w": 402, "h": 874,  "title": "History — how that went" },
+    { "file": "Cards.dc.html",            "x": 1506, "y": 0,    "w": 402, "h": 1160, "title": "Card catalogue" },
+    { "file": "RegisterA.dc.html",        "x": 0,    "y": 1020, "w": 402, "h": 620,  "title": "Open call — states" },
+    { "file": "RegisterB.dc.html",        "x": 502,  "y": 1020, "w": 402, "h": 620,  "title": "Open call — tells" },
+    { "file": "ColdStart.dc.html",        "x": 1004, "y": 1020, "w": 402, "h": 620,  "title": "Week one" }
+  ],
+  "annotations": [
+    { "id": "note-line", "x": 0, "y": -150, "w": 402, "text": "The Coach line replaces the Training Insights teaser one-for-one — same slot, same height band.\n\nThe difference is that it always says something. The old teaser was blank until a rule fired, which is what taught people to stop tapping it." },
+    { "id": "note-dest", "x": 502, "y": -150, "w": 402, "text": "One tap down, not a tab. Charts keeps its slot.\n\nTODAY is register A. WORTH KNOWING holds the cards. INSIGHTS is the describing layer, kept as its own word so a declining chart reads as a mirror rather than criticism." },
+    { "id": "note-review", "x": 1004, "y": -150, "w": 402, "text": "Performance-vs-expected lives here first, not on the summary sheet — you are browsing days later rather than being handed a verdict while you pack your bag.\n\nEvery sentence has the app as its subject. Below plan = the app was high. Above = you were strong." },
+    { "id": "note-cards", "x": 1506, "y": -150, "w": 402, "text": "Five cards in the existing InsightCardView grammar.\n\nThe third is the one the whole design rests on: it acquires intent by naming an observed pattern and asking whether it is wanted — no onboarding questionnaire." },
+    { "id": "note-reg", "x": 0, "y": 1700, "w": 904, "text": "Decision C in the scoping doc, drawn rather than argued. Same scenario, two voices.\n\nStates is shippable now and stops one step short of useful. Tells is what a lifter would actually use, and it needs a write path that does not exist yet — plus it makes the app the author of the recommendation." },
+    { "id": "note-cold", "x": 1004, "y": 1700, "w": 402, "text": "Week one, and the honest cost of dropping the onboarding questions: nothing here comments on training shape, because there is nothing yet to comment on.\n\nNo findings section at all — absent, not empty-stated. No progress bars toward unlocking." }
+  ],
+  "launch": { "view": "canvas" }
+}

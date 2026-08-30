@@ -559,20 +559,24 @@ private struct SetRowWrapper: View {
 
     private func setNoteAlert(for content: AnyView) -> AnyView {
         AnyView(
-            content.alert("Set Note", isPresented: $showNoteAlert) {
-                TextField("Add a note…", text: $noteText)
-                Button("Save") {
-                    saveEditedNote()
-                }
-                Button("Cancel", role: .cancel) {}
-                if set.notes != nil && !(set.notes?.isEmpty ?? true) {
-                    Button("Remove Note", role: .destructive) {
-                        removeExistingNote()
+            // Free text, and an alert's field is built by `UIAlertController`, so a mask
+            // never reaches it — see `ReplayPrivacy.swift`.
+            content
+                .replayPaused(while: showNoteAlert)
+                .alert("Set Note", isPresented: $showNoteAlert) {
+                    TextField("Add a note…", text: $noteText)
+                    Button("Save") {
+                        saveEditedNote()
                     }
+                    Button("Cancel", role: .cancel) {}
+                    if set.notes != nil && !(set.notes?.isEmpty ?? true) {
+                        Button("Remove Note", role: .destructive) {
+                            removeExistingNote()
+                        }
+                    }
+                } message: {
+                    Text("Add a note to this set")
                 }
-            } message: {
-                Text("Add a note to this set")
-            }
         )
     }
 

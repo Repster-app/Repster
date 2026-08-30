@@ -34,9 +34,20 @@ struct ExerciseHistoryView: View {
 
     private func workoutSessionCard(_ group: WorkoutHistoryGroup) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(formatDate(group.date))
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.textSecondary)
+            HStack(spacing: 8) {
+                Text(formatDate(group.date))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.textSecondary)
+
+                // The set rows below are deliberately left alone — no dimming, no strike. They
+                // are a true record of what was lifted, and those sets are still in the charts
+                // and the volume total. Only the session header carries the exception.
+                if group.isExcludedFromProgression {
+                    ProgressionExclusionChip()
+                }
+
+                Spacer(minLength: 0)
+            }
 
             VStack(spacing: 0) {
                 ForEach(Array(group.sets.enumerated()), id: \.element.id) { index, set in

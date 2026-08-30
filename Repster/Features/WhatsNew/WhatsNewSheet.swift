@@ -103,8 +103,6 @@ struct WhatsNewSheet: View {
             .padding(.bottom, 8)
         }
         .onPreferenceChange(ContentHeightKey.self) { measuredContentHeight = $0 }
-        // Every string here is hand-written in `WhatsNewRelease`.
-        .replayVisible()
         .presentationDetents([.height(detentHeight)])
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.bgCard)

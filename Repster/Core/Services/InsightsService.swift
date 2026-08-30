@@ -151,13 +151,21 @@ extension InsightRule {
 actor InsightsService: InsightsServiceProtocol {
 
     /// Bump when rule logic changes so existing users get a fresh analysis.
-    static let analysisVersion = 2
-    static let maxVisibleInsights = 3
+    static let analysisVersion = 3
+    /// Ten rules compete for these slots, and the ranking is a fixed weight per
+    /// rule, so a narrow feed doesn't rotate — it locks. At three, the top two
+    /// diagnostics and the top progress rule won every week and the other seven
+    /// rules were unreachable no matter how long someone trained. Widening it
+    /// is safe because every rule already gates itself: a finding only exists
+    /// once it has cleared its own minimum-effect bar, so there is no pile of
+    /// weak findings that the cap was holding back.
+    static let maxVisibleInsights = 6
     static let snoozeDays = 21
-    /// At most two of three cards may be diagnostic, so the feed is never all
-    /// criticism. v1 had no such cap and a catalog that was entirely
-    /// diagnostic, which is most of why it read as a weekly grading.
-    static let maxDiagnosticInsights = 2
+    /// At most half the feed may be diagnostic, so it is never all criticism.
+    /// v1 had no such cap and a catalog that was entirely diagnostic, which is
+    /// most of why it read as a weekly grading. Proportional rather than a
+    /// fixed count so widening the feed doesn't widen the criticism with it.
+    static let maxDiagnosticInsights = maxVisibleInsights / 2
 
     private static let lastAnalysisSignatureKey = "insightsLastAnalysisSignature"
     private static let lastFiredKey = "insightsLastFiredByRule"
@@ -238,6 +246,68 @@ actor InsightsService: InsightsServiceProtocol {
         try modelContext.save()
     }
 
+    func ruleDiagnostics() async throws -> [RuleDiagnostic] {
+        try ruleDiagnostics(referenceDate: Date())
+    }
+
+    // MARK: - Rule diagnostics
+
+    /// Internal so tests can drive it with a fixed reference date.
+    ///
+    /// "In the feed" is read from the persisted records rather than by re-running
+    /// curation: a second curate pass would disagree with the real feed for any
+    /// rule holding a refire cooldown, because the run that put it on screen also
+    /// stamped the cooldown that a re-run then trips over.
+    func ruleDiagnostics(referenceDate: Date) throws -> [RuleDiagnostic] {
+        let context = try buildContext(referenceDate: referenceDate)
+        let lastFired = Self.loadLastFired()
+        let liveRuleIds = Set(try activeRecords().map(\.ruleId))
+
+        return Self.rules.map { rule in
+            let normal = rule.evaluate(context)
+            let isShown = liveRuleIds.contains(rule.ruleId)
+
+            // A cooldown only explains silence when the rule actually has a
+            // finding being held back.
+            let held = normal.first {
+                !Self.refireAllowed(
+                    $0, rule: rule, lastFired: lastFired, referenceDate: referenceDate
+                )
+            }
+            let refireAvailableAt = held.flatMap { finding -> Date? in
+                guard let interval = rule.minimumRefireInterval,
+                      let last = lastFired[Self.firedKey(finding)]
+                else { return nil }
+                return last.addingTimeInterval(interval)
+            }
+
+            return RuleDiagnostic(
+                ruleId: rule.ruleId,
+                actionability: rule.actionability,
+                findings: Self.candidates(normal, rule: rule),
+                relaxedFindings: Self.candidates(rule.evaluateRelaxed(context), rule: rule),
+                survivedCuration: isShown,
+                refireAvailableAt: isShown ? nil : refireAvailableAt
+            )
+        }
+    }
+
+    private static func candidates(
+        _ findings: [InsightFinding], rule: any InsightRule
+    ) -> [RuleDiagnostic.Candidate] {
+        findings
+            .map { finding in
+                RuleDiagnostic.Candidate(
+                    subjectName: finding.subjectName,
+                    headline: finding.headline,
+                    score: finding.effectSize * rule.actionability,
+                    effectSize: finding.effectSize,
+                    isDiagnostic: finding.tone == .diagnostic
+                )
+            }
+            .sorted { $0.score > $1.score }
+    }
+
     // MARK: - Analysis
 
     /// Runs the full pipeline against the current store. Internal so tests can
@@ -249,13 +319,10 @@ actor InsightsService: InsightsServiceProtocol {
         func scored(_ evaluate: (any InsightRule) -> [InsightFinding]) -> [Scored] {
             Self.rules.flatMap { rule in
                 evaluate(rule)
-                    .filter { finding in
-                        // Rules with a refire interval stay quiet until it
-                        // lapses, even when the finding still holds.
-                        guard let interval = rule.minimumRefireInterval,
-                              let last = lastFired[Self.firedKey(finding)]
-                        else { return true }
-                        return referenceDate.timeIntervalSince(last) >= interval
+                    .filter {
+                        Self.refireAllowed(
+                            $0, rule: rule, lastFired: lastFired, referenceDate: referenceDate
+                        )
                     }
                     .map { Scored(finding: $0, score: $0.effectSize * rule.actionability) }
             }
@@ -314,6 +381,21 @@ actor InsightsService: InsightsServiceProtocol {
 
     private static func firedKey(_ finding: InsightFinding) -> String {
         "\(finding.ruleId)|\(finding.subjectId?.uuidString ?? "-")"
+    }
+
+    /// Rules with a refire interval stay quiet until it lapses, even when the
+    /// finding still holds. Shared with the admin diagnostics so the two can't
+    /// disagree about why a rule is silent.
+    private static func refireAllowed(
+        _ finding: InsightFinding,
+        rule: any InsightRule,
+        lastFired: [String: Date],
+        referenceDate: Date
+    ) -> Bool {
+        guard let interval = rule.minimumRefireInterval,
+              let last = lastFired[firedKey(finding)]
+        else { return true }
+        return referenceDate.timeIntervalSince(last) >= interval
     }
 
     /// Refire timestamps live in UserDefaults rather than on InsightRecord:

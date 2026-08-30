@@ -68,9 +68,6 @@ struct OnboardingContainerView: View {
             .animation(.easeInOut, value: viewModel.currentStep)
         }
         .background(Color.bg)
-        // The screens the activation question is actually about. All fixed copy except
-        // the bodyweight field, which masks itself — see `UnitsBodyweightStepView`.
-        .replayVisible()
         .onAppear { trackStep(viewModel.currentStep) }
         .onChange(of: viewModel.currentStep) { _, step in
             trackStep(step)

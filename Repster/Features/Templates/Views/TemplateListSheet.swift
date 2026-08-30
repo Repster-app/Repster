@@ -579,6 +579,8 @@ private struct AITemplateHelperSheet: View {
                 .foregroundStyle(Color.textSecondary)
 
             TextEditor(text: $draftText)
+                // A pasted LLM response: whatever the user asked for is in here.
+                .replayMasked()
                 .font(.system(size: 12, weight: .regular, design: .monospaced))
                 .foregroundColor(.textPrimary)
                 .frame(minHeight: 220)
@@ -736,6 +738,8 @@ private struct TemplateImportReviewSheet: View {
                     Text(notes)
                         .font(.subheadline)
                         .foregroundStyle(Color.textSecondary)
+                        // Free text, whether it was typed here or arrived in an import.
+                        .replayMasked()
                 }
                 .padding(.vertical, 4)
             }
@@ -804,6 +808,7 @@ private struct TemplateImportReviewSheet: View {
                         Text("Notes: \(notes)")
                             .font(.footnote)
                             .foregroundStyle(Color.textTertiary)
+                            .replayMasked()
                     }
                 }
                 .padding(.vertical, 6)

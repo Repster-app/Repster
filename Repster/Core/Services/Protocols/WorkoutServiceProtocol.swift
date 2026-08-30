@@ -133,6 +133,21 @@ protocol WorkoutServiceProtocol: Sendable {
         excludedExerciseIds: Set<UUID>
     ) async throws
 
+    /// Which of `workoutIds` are ignored for progression history *for this exercise*.
+    ///
+    /// Resolves both forms of the flag — whole-workout and exercise-scoped — so a caller never
+    /// has to know which one is set. Returns ids rather than models: this exists for the history
+    /// screens, and a live `Workout` on the main actor is the EXC_BAD_ACCESS crash class above.
+    ///
+    /// Mirrors `PRService.excludedWorkoutIds(for:workoutIds:)`, which asks the same question on
+    /// the write path. Two copies of the rule would be free to drift, so if one changes, change
+    /// both — the shared behaviour is pinned by
+    /// `SetServiceTests.testHistoryExclusionLookupMatchesWhatPRServiceExcludes`.
+    func excludedWorkoutIdsForProgressionHistory(
+        workoutIds: Set<UUID>,
+        exerciseId: UUID
+    ) async throws -> Set<UUID>
+
     // MARK: - Deletion (FR-010)
 
     /// Delete a workout with full cascade.

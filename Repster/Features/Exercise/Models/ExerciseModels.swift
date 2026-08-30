@@ -18,4 +18,10 @@ struct WorkoutHistoryGroup: Identifiable {
     let id: UUID
     let date: Date
     let sets: [ChartSetData]
+    /// Whether this session is ignored for PRs and future suggestions **for the exercise being
+    /// viewed** — the whole-workout flag or an exercise-scoped one naming it.
+    ///
+    /// Resolved per exercise rather than per workout: a session excluded for only some of its
+    /// exercises must mark those and leave the rest clean.
+    let isExcludedFromProgression: Bool
 }

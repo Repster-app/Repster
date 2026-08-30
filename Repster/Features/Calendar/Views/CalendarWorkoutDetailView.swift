@@ -12,6 +12,9 @@ struct CalendarWorkoutDetailView: View {
     let onSaveAsTemplate: ((WorkoutSnapshot) -> Void)?
     let onEditWorkout: ((WorkoutSnapshot) -> Void)?
     let onDeleteWorkout: ((WorkoutSnapshot) -> Void)?
+    /// Tapping the "not counted toward PRs" banner. Nil hides the banner's affordance but not
+    /// the banner — the fact is worth stating even where the caller offers no way to change it.
+    let onEditProgression: ((WorkoutSnapshot) -> Void)?
     let onExerciseTapped: (UUID) -> Void
 
     init(
@@ -21,6 +24,7 @@ struct CalendarWorkoutDetailView: View {
         onSaveAsTemplate: ((WorkoutSnapshot) -> Void)?,
         onEditWorkout: ((WorkoutSnapshot) -> Void)?,
         onDeleteWorkout: ((WorkoutSnapshot) -> Void)? = nil,
+        onEditProgression: ((WorkoutSnapshot) -> Void)? = nil,
         onExerciseTapped: @escaping (UUID) -> Void
     ) {
         self.workoutDetails = workoutDetails
@@ -29,6 +33,7 @@ struct CalendarWorkoutDetailView: View {
         self.onSaveAsTemplate = onSaveAsTemplate
         self.onEditWorkout = onEditWorkout
         self.onDeleteWorkout = onDeleteWorkout
+        self.onEditProgression = onEditProgression
         self.onExerciseTapped = onExerciseTapped
     }
 
@@ -74,6 +79,15 @@ struct CalendarWorkoutDetailView: View {
                 duration: detail.workout.duration,
                 unitPreference: unitPreference
             )
+
+            // Whole-workout exclusions only. An exercise-scoped one belongs on that exercise's
+            // card — a banner speaking for the session would overstate it.
+            if detail.workout.excludesEntireWorkoutFromProgressionHistory {
+                ProgressionExclusionBanner {
+                    onEditProgression?(detail.workout)
+                }
+                .disabled(onEditProgression == nil)
+            }
 
             ForEach(detail.exerciseGroups, id: \.exercise.id) { group in
                 CalendarExerciseCard(

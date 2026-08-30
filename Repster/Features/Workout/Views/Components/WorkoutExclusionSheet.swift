@@ -1,7 +1,11 @@
 import SwiftUI
 
 struct WorkoutProgressionSheet: View {
-    let workout: Workout
+    /// Snapshot, not the live model. The sheet only ever reads the two exclusion fields for its
+    /// initial toggle state, and it is presented from Calendar and Home where no live `Workout`
+    /// exists — handing one to a main-actor view is the EXC_BAD_ACCESS class this app already
+    /// fought once.
+    let workout: WorkoutSnapshot
     let exercises: [ChartExerciseData]
     let showsExerciseOverrides: Bool
     let onSave: @Sendable (Bool, Set<UUID>) async throws -> Void
@@ -14,7 +18,7 @@ struct WorkoutProgressionSheet: View {
     @State private var errorMessage: String?
 
     init(
-        workout: Workout,
+        workout: WorkoutSnapshot,
         exercises: [ChartExerciseData],
         showsExerciseOverrides: Bool = true,
         onSave: @escaping @Sendable (Bool, Set<UUID>) async throws -> Void
@@ -100,11 +104,18 @@ struct WorkoutProgressionSheet: View {
     }
 
     private var wholeWorkoutFooterCopy: String {
+        // Naming what exclusion does *not* touch matters: PRs, suggestions and insights honour
+        // this flag, but charts and volume totals ignore it. Without this sentence the setting
+        // reads as "erase this session", which would put people off using it correctly.
+        let scope = "Excluded sessions still appear in your history, charts and volume totals — "
+            + "they just don't set PRs or feed future Smart Suggestions."
+
         if showsExerciseOverrides {
-            return "Use this for travel, hotel, or mismatched-equipment sessions. Live Smart Suggestions still work during the workout."
+            return "Use this for travel, hotel, or mismatched-equipment sessions. Live Smart "
+                + "Suggestions still work during the workout. \(scope)"
         }
 
-        return "Historic edits only let you decide whether the full workout should count toward PRs and future Smart Suggestions."
+        return "Historic edits only let you decide whether the full workout should count. \(scope)"
     }
 
     private func binding(for exerciseId: UUID) -> Binding<Bool> {

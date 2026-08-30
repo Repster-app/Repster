@@ -209,6 +209,46 @@ final class InsightsServiceTests: XCTestCase {
         XCTAssertEqual(trend?.chartKind, .series)
     }
 
+    // MARK: - Rule diagnostics
+
+    /// The admin panel's whole job is telling "produced nothing" apart from
+    /// "produced something and lost the ranking", so both have to be reachable
+    /// and its idea of the feed has to match the real one.
+    @MainActor
+    func testRuleDiagnosticsAccountForEveryRuleAndMatchTheLiveFeed() async throws {
+        let service = makeService()
+        let now = Date()
+        let squat = makeExercise(name: "Back Squat", primaryMuscle: "legs")
+        try seed([squat])
+
+        for (days, e1RM) in [(50, 100.0), (35, 101.0), (20, 110.0), (5, 112.0)] {
+            try seedSession(date: daysAgo(days, from: now), exercises: [squat], e1RM: e1RM)
+        }
+
+        try await service.runAnalysis(referenceDate: now)
+        let diagnostics = try await service.ruleDiagnostics(referenceDate: now)
+
+        XCTAssertEqual(
+            diagnostics.count,
+            InsightsService.rules.count,
+            "Every rule must be accounted for — the silent ones are the point"
+        )
+        XCTAssertTrue(
+            diagnostics.contains { $0.status == .silent },
+            "One exercise over 50 days can't clear every gate"
+        )
+
+        let feedRuleIds = Set(try await service.fetchActiveInsights().map(\.ruleId))
+        XCTAssertEqual(
+            Set(diagnostics.filter(\.survivedCuration).map(\.ruleId)),
+            feedRuleIds,
+            "A diagnostic that disagrees with the feed is worse than none"
+        )
+        for diagnostic in diagnostics where feedRuleIds.contains(diagnostic.ruleId) {
+            XCTAssertEqual(diagnostic.status, .shown)
+        }
+    }
+
     // MARK: - Deload readiness
 
     /// Builds a fatigued-looking history: three lifts regressing ~6% over the
@@ -327,19 +367,34 @@ final class InsightsServiceTests: XCTestCase {
     }
 
     func testCurationCapsDiagnosticCards() {
+        // More diagnostics than the budget allows, so the cap has to bite.
         let curated = InsightsService.curate([
             scored("a", .diagnostic, 0.9),
-            scored("b", .diagnostic, 0.8),
-            scored("c", .diagnostic, 0.7),
-            scored("d", .progress, 0.2)
+            scored("b", .diagnostic, 0.85),
+            scored("c", .diagnostic, 0.8),
+            scored("d", .diagnostic, 0.75),
+            scored("e", .diagnostic, 0.7),
+            scored("f", .progress, 0.2)
         ])
 
-        XCTAssertEqual(curated.count, 3)
-        XCTAssertEqual(curated.filter { $0.finding.tone == .diagnostic }.count, 2)
-        XCTAssertTrue(
-            curated.contains { $0.finding.ruleId == "d" },
-            "A lower-scoring progress card should claim the last slot once the diagnostic budget is spent"
+        XCTAssertEqual(
+            curated.filter { $0.finding.tone == .diagnostic }.count,
+            InsightsService.maxDiagnosticInsights
         )
+        XCTAssertTrue(
+            curated.contains { $0.finding.ruleId == "f" },
+            "A lower-scoring progress card should claim a slot once the diagnostic budget is spent"
+        )
+    }
+
+    /// The cap is what makes rules unreachable when it's tight, so it's worth
+    /// pinning: enough qualifying findings must fill the feed, not a fixed few.
+    func testCurationFillsTheFeedWhenEnoughFindingsQualify() {
+        let curated = InsightsService.curate(
+            (0..<12).map { scored("rule\($0)", .progress, 0.9 - Double($0) * 0.05) }
+        )
+
+        XCTAssertEqual(curated.count, InsightsService.maxVisibleInsights)
     }
 
     func testCurationKeepsOneCardPerRule() {

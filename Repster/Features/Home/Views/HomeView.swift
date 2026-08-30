@@ -144,10 +144,6 @@ struct HomeView: View {
             viewModel.lastLoadTime = nil
             Task { await viewModel.loadData() }
         }
-        // Section headers, the walkthrough banner, empty states and the Start Workout
-        // card are the whole activation question, and they sit alongside the user's own
-        // counts and workout titles. No free text is entered on this screen.
-        .replayVisible()
     }
 
     private func refreshAfterWorkoutDeletion() {

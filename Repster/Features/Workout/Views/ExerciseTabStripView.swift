@@ -24,6 +24,9 @@ struct ExerciseTabStripView: View {
     /// The data source providing exercise data and actions.
     var dataSource: any SetTableDataSource
 
+    /// Needed only to build the replacement picker, which reuses `ExerciseListView` in browse mode.
+    var services: ServiceContainer
+
     // MARK: - State
 
     /// Whether the delete confirmation alert is showing.
@@ -31,6 +34,18 @@ struct ExerciseTabStripView: View {
 
     /// The index of the exercise being deleted (set before showing confirmation).
     @State private var exerciseToDeleteIndex = 0
+
+    /// The index of the exercise being replaced, or nil when no replace is in flight.
+    ///
+    /// Carried across the confirmation *and* the picker, so it is resolved to an identity at the
+    /// moment the replacement is chosen rather than held as a stale integer.
+    @State private var exerciseToReplaceIndex: Int?
+
+    /// Whether the replacement picker is showing.
+    @State private var showReplacePicker = false
+
+    /// Whether the "this will remove logged sets" confirmation is showing.
+    @State private var showReplaceConfirmation = false
 
     // MARK: - Body
 
@@ -77,6 +92,12 @@ struct ExerciseTabStripView: View {
                                 }
                             }
 
+                            Button {
+                                beginReplace(at: index)
+                            } label: {
+                                Label("Replace Exercise…", systemImage: "arrow.triangle.2.circlepath")
+                            }
+
                             Divider()
 
                             // Delete Exercise (only if more than 1 exercise)
@@ -92,13 +113,38 @@ struct ExerciseTabStripView: View {
                 .padding(.horizontal, 18)
                 .padding(.vertical, 5)
             }
-            .onChange(of: dataSource.selectedExerciseIndex) { _, newIndex in
-                // Auto-scroll to keep active tab visible
-                if newIndex >= 0, newIndex < dataSource.exercises.count {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        proxy.scrollTo(dataSource.exercises[newIndex].id, anchor: .center)
-                    }
-                }
+            // Auto-scroll needs *both* triggers, and neither subsumes the other:
+            // the index moves when the selected tab changes position (a reorder), and the identity
+            // changes when a different exercise takes the same slot (reorder past the selection, or
+            // a replace). Keying on one alone leaves the active tab parked off-screen in the other
+            // case. See EXERCISE_REPLACE_AND_REORDER_DESIGN.md §3.
+            .onChange(of: dataSource.selectedExerciseIndex) { _, _ in
+                scrollToSelectedExercise(proxy: proxy)
+            }
+            .onChange(of: dataSource.selectedExerciseId) { _, _ in
+                scrollToSelectedExercise(proxy: proxy)
+            }
+        }
+        .alert("Replace \(replaceTargetName)?", isPresented: $showReplaceConfirmation) {
+            Button("Cancel", role: .cancel) { exerciseToReplaceIndex = nil }
+            Button("Replace", role: .destructive) { showReplacePicker = true }
+        } message: {
+            Text("\(replaceTargetCompletedSetCount) logged \(replaceTargetCompletedSetCount == 1 ? "set" : "sets") will be removed.")
+        }
+        .sheet(isPresented: $showReplacePicker, onDismiss: { exerciseToReplaceIndex = nil }) {
+            NavigationStack {
+                ExerciseListView(
+                    mode: .browse,
+                    onExercisesSelected: { selectedIds in
+                        guard let newId = selectedIds.first,
+                              let index = exerciseToReplaceIndex else { return }
+                        Task {
+                            await dataSource.replaceExercise(at: index, with: newId)
+                            showReplacePicker = false
+                        }
+                    },
+                    services: services
+                )
             }
         }
         .alert("Delete Exercise?", isPresented: $showDeleteConfirmation) {
@@ -110,6 +156,45 @@ struct ExerciseTabStripView: View {
             }
         } message: {
             Text("This will remove the exercise and all its sets from this workout.")
+        }
+    }
+
+    /// Open the replacement flow for `index`.
+    ///
+    /// Silent when nothing is logged — substituting a movement you have not started is the common
+    /// case and a confirmation there is friction for nothing. Confirms, naming the count, once any
+    /// set is completed, because those rows are about to be deleted.
+    private func beginReplace(at index: Int) {
+        exerciseToReplaceIndex = index
+        if completedSetCount(at: index) > 0 {
+            showReplaceConfirmation = true
+        } else {
+            showReplacePicker = true
+        }
+    }
+
+    private func completedSetCount(at index: Int) -> Int {
+        guard index >= 0, index < dataSource.exercises.count else { return 0 }
+        let exerciseId = dataSource.exercises[index].id
+        return dataSource.setsByExercise[exerciseId]?.filter(\.completed).count ?? 0
+    }
+
+    private var replaceTargetName: String {
+        guard let index = exerciseToReplaceIndex,
+              index >= 0, index < dataSource.exercises.count else { return "Exercise" }
+        return dataSource.exercises[index].name
+    }
+
+    private var replaceTargetCompletedSetCount: Int {
+        completedSetCount(at: exerciseToReplaceIndex ?? -1)
+    }
+
+    /// Keep the active tab visible. Safe to call twice for one selection change — `scrollTo` on an
+    /// already-centred id is a no-op.
+    private func scrollToSelectedExercise(proxy: ScrollViewProxy) {
+        guard let selectedId = dataSource.selectedExerciseId else { return }
+        withAnimation(.easeInOut(duration: 0.25)) {
+            proxy.scrollTo(selectedId, anchor: .center)
         }
     }
 

@@ -31,7 +31,8 @@ struct ExerciseDetailView: View {
             exerciseService: services.exerciseService,
             prService: services.prService,
             setService: services.setService,
-            statsService: services.statsService
+            statsService: services.statsService,
+            workoutService: services.workoutService
         ))
     }
 

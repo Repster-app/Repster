@@ -1,9 +1,9 @@
 # App Privacy and Review Checklist
 
-Last checked: August 14, 2026
+Last checked: August 29, 2026
 
 > **Changed in the analytics expansion (August 2026):** PostHog person profiles,
-> application lifecycle events, masked session replay, and multiple-choice surveys
+> application lifecycle events, session replay, and multiple-choice surveys
 > are now enabled. Previous versions of this document and the privacy policy stated
 > that replay, surveys, and person profiles were disabled — that is no longer true,
 > and both the live policy and the App Review notes below were updated together.
@@ -15,6 +15,14 @@ Last checked: August 14, 2026
 > Both now have policy copy in `docs/privacy.html` and paragraphs in
 > the App Review Notes below. **Neither is live yet** — the deployed page is still
 > the May 16, 2026 one. See `PRE_1.4_CHECKLIST.md` §1.1.
+>
+> **Changed again on August 29, 2026:** session replay masking was inverted. 1.4
+> masked every screen and opted a handful back in, which left six sections and 41 of
+> the app's 45 sheets rendered as solid black and made the recordings useless. From
+> 1.5 the recording is legible and a named list of values is masked instead — see
+> "The commitments that must stay literally true" below. The policy copy and the App
+> Review note in this file were rewritten in the same change; `PrivacyInfo.xcprivacy`
+> needed nothing, `Other Usage Data` already covers it.
 
 ## App Store Connect Privacy Answers
 
@@ -34,8 +42,8 @@ Also select:
 - `Diagnostics` -> `Other Diagnostic Data`
 
 `Other Usage Data` is now required because session replay captures screen imagery
-(masked) and surveys capture multiple-choice answers, neither of which is cleanly
-covered by `Product Interaction`.
+and surveys capture multiple-choice answers, neither of which is cleanly covered by
+`Product Interaction`.
 
 The two `Diagnostics` types are required as of 1.4, which enables PostHog's crash
 and exception capture (`errorTrackingConfig.autoCapture`). They were already
@@ -78,7 +86,9 @@ declaration has to come from `Repster/PrivacyInfo.xcprivacy` (already done).
 - Purpose: `Analytics`
 - Linked to user: `No`
 - Used for tracking: `No`
-- Reason: masked session recordings (screen imagery with all text and images obscured on device before upload) and multiple-choice in-app survey responses.
+- Reason: session recordings (screen imagery, with notes, bodyweight and import
+  previews obscured on device before upload) and multiple-choice in-app survey
+  responses.
 
 `Crash Data`
 
@@ -126,7 +136,7 @@ Add a section like this to the live privacy policy:
 `docs/privacy.html` **is** the deployed page — as of 2026-08-17 there is only one
 copy, and GitHub Pages serves this folder directly. As of August 17, 2026 it
 covers, in addition to the original event list: onboarding progression, workout
-abandonment, in-workout interaction counts, masked session recordings,
+abandonment, in-workout interaction counts, session recordings,
 multiple-choice surveys, the anonymous per-install identifier behind person
 profiles, Apple Health, crash and error diagnostics, and Apple Search Ads
 attribution. Do not paraphrase it here — read the file.
@@ -139,13 +149,22 @@ actively states that replay and surveys are disabled. See `PRE_1.4_CHECKLIST.md`
 
 The three commitments that must stay literally true in the app:
 
-1. Free-text fields the user types — workout notes and bodyweight entries — are masked
-   on device before a recording is uploaded, wherever they appear. Masking is the global
-   default (`maskAllTextInputs` / `maskAllImages` in
-   `AnalyticsService.configureSessionReplay`); individual screens opt out via
-   `replayVisible()` and free-text fields opt back in via `replayMasked()`, both in
-   `Repster/Core/Extensions/ReplayPrivacy.swift`. `grep -r replayVisible` is the complete
-   list of screens a recording can show legibly.
+1. Notes (workout, set and template), bodyweight wherever it is shown, the import
+   preview of the user's own training file, and text pasted into the AI template box
+   are hidden on device before a recording is uploaded. As of 1.5 the recording is
+   legible by default (`maskAllTextInputs = false` in
+   `AnalyticsService.configureSessionReplay`) and those values are masked at the field
+   via `replayMasked()`; the three text fields that live inside a `.alert` cannot be
+   masked — `UIAlertController` builds them, not SwiftUI — so recording stops while the
+   dialogue is open, via `replayPaused(while:)`. Both are in
+   `Repster/Core/Extensions/ReplayPrivacy.swift`, and
+   `RepsterTests/ReplayMaskCoverageTests.swift` fails the build if a new text field is
+   added without a decision recorded against it.
+
+   Note what this deliberately does **not** cover: exercise names, workout titles and
+   template names appear in recordings, because they are the content of nearly every
+   screen. Their entry fields are masked while being typed, but the saved name is
+   visible afterwards. The privacy policy and the App Review note below both say so.
 2. The Share Anonymous Analytics toggle disables events, replay, surveys, and crash
    reports together (`optOut` is applied at SDK setup, not after it, and
    `AnalyticsService.captureError` checks `isCollectionEnabled`).
@@ -169,7 +188,7 @@ Use this in the App Review Notes field:
 >
 > The app uses anonymous PostHog EU product analytics for aggregate usage statistics only. It does not use IDFA, advertising, tracking, autocapture, or heatmaps. Users can turn all analytics off in Settings -> Data & Backups -> Share Anonymous Analytics, which disables events, session recordings, surveys, crash and error diagnostics, and Apple Search Ads attribution together.
 >
-> The app captures anonymous session recordings to diagnose usability problems, and users can turn them off with everything else under Settings -> Data & Backups -> Share Anonymous Analytics. All images are masked on device. Text the user types in their own words — workout notes and bodyweight entries — is masked on device before any recording is uploaded and is never received. Recordings do show the app's own fixed interface text and the training figures on screen, such as sets, reps and weights, which is what makes them useful for finding where people get stuck. Recordings are not linked to any account, name or email address, because the app has no accounts. Analytics events themselves carry only bucketed counts and never exact figures, notes, CSV contents, bodyweight values, or raw workout logs.
+> The app captures anonymous session recordings to diagnose usability problems, and users can turn them off with everything else under Settings -> Data & Backups -> Share Anonymous Analytics. Recordings show the app's own interface text and the training content on screen — exercise names, workout and template names, and the sets, reps and weights of a workout — which is what makes them useful for finding where people get stuck. The app has no photo picker and no user-supplied imagery, so every image in a recording is one the app ships. Four things are masked on device before any recording is uploaded and are never received: workout, set and template notes; the user's bodyweight wherever it is displayed, including the bodyweight log; the preview of a training file being imported; and text pasted into the AI template box. Text typed inside a pop-up dialogue cannot be masked that way, so recording stops entirely while such a dialogue is open. Recordings are not linked to any account, name or email address, because the app has no accounts. Analytics events themselves carry only bucketed counts and never exact figures, notes, CSV contents, bodyweight values, or raw workout logs.
 >
 > The app sends crash and error diagnostics (exception type, stack trace, device model, OS and app version) so crashes can be found and fixed. These contain no workout data and are covered by the same Share Anonymous Analytics toggle.
 >

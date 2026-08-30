@@ -17,7 +17,7 @@ build; this says why the obvious version wasn't built.
 | Feature area | Status | Scoping doc | Session |
 |---|---|---|---|
 | [Muscle coverage](#muscle-coverage) | Scoping only, Phase 1 may ride 1.5 | [SECONDARY_MUSCLES_SCOPING.md](SECONDARY_MUSCLES_SCOPING.md) | "Secondary muscle group" |
-| [Exercise replace & reorder](#exercise-replace--reorder) | Scoping only; two live defects found | [EXERCISE_REPLACE_AND_REORDER_DESIGN.md](EXERCISE_REPLACE_AND_REORDER_DESIGN.md) | "Improve exercise replacement and move left UI" |
+| [Exercise replace & reorder](#exercise-replace--reorder) | **Built 2026-08-29** — steps 1–4 shipped, 4 defects fixed; only the deferred reorder sheet remains | [EXERCISE_REPLACE_AND_REORDER_DESIGN.md](EXERCISE_REPLACE_AND_REORDER_DESIGN.md) | "Improve exercise replacement and move left UI" |
 | [Set types](#set-types) | Scoping only, not proposed for 1.5 | [SET_TYPES_SCOPING.md](SET_TYPES_SCOPING.md) | "Available set types" |
 | [Workout blocks](#workout-blocks) | Interaction design in progress, nothing built | none yet — artifacts only | "Workout tracking in Repster" |
 | [Unperformed sets & exercise removal](#unperformed-sets--exercise-removal) | Scoping only; live data defect on shipped builds | [UNPERFORMED_SETS_SCOPING.md](UNPERFORMED_SETS_SCOPING.md) | "Incomplete workout logging behavior" |
@@ -354,13 +354,170 @@ persisted resume state diverging from the screen, and the keypad left bound to a
   `editedSetIds`, so it pins the implementation being removed. It fails *by design* in step 2 —
   rewrite against `SetServiceStub.orderingBatches`, which the stub already records. Flagged so the
   failure is not read as a regression
-- Five decisions open at §10 of the scoping doc
+- ~~Five decisions open at §10 of the scoping doc~~ — **all five resolved 2026-08-29; see the addendum below**
 
 **Open question that matters most:** confirm that replace **deletes** the outgoing exercise's logged
 sets rather than carrying them over. Everything in §4.4 is ordered around it, and the alternative
 isn't a variation on the design — it's a different feature with data-integrity consequences that
 reach the PR table, e1RM series and fatigue model.
 
+---
+
+### Addendum — 2026-08-29: decisions taken, nothing built
+
+**Session:** "1.5 scoping — exercise replace & reorder", branch `NewMain`
+
+The scoping doc was re-verified line by line against the tree twelve days on. **Every substantive
+claim still holds and both defects are still live** — `reorderExercises` still runs per-set
+`setService.edit()` in an unawaited `Task`, and selection is still slot-based in both view models.
+Only line references had drifted (~+42 in `ActiveWorkoutViewModel`); they have been refreshed in the
+scoping doc, along with a wrong path (`Features/Exercises/` → `Features/Exercise/`).
+
+**All five §10 decisions resolved, each on the recommendation:**
+
+1. Replace **deletes** the outgoing sets and seeds one empty set — the open question above, now closed
+2. Confirm only when ≥1 set is logged, naming the count; silent otherwise
+3. Replacing with an exercise already in the workout is **rejected**, not merged
+4. The reorder sheet stays **deferred** — ship replace, see whether the complaint survives
+5. Sequencing confirmed: steps 1–3 strictly before step 4
+
+**One new finding, folded into the scoping doc §3.** The original write-up named two sites guarded by
+the unchanged index. There is a third: the tab strip's own auto-scroll
+([ExerciseTabStripView.swift:95](Repster/Features/Workout/Views/ExerciseTabStripView.swift:95)) is
+also `onChange(of: dataSource.selectedExerciseIndex)`, so the strip does not scroll the newly-current
+tab into view either. Cosmetic on a short workout; not on a ten-exercise one. It does not change the
+fix — identity-based selection covers all three sites at once — but it is a third symptom to assert.
+
+**Greying out already-present exercises in the picker** — *rejected.* Raised as a third option for
+decision 3. It prevents the duplicate at source rather than rejecting after, but it pushes
+workout-specific state into `ExerciseListView`'s browse mode for a case the step-4.4.1 guard already
+covers, and browse mode is shared with screens that have no workout.
+
+**Scope addition — "maintain the order" made an explicit requirement.** Asked directly whether the
+ordering problem makes the strip jump around. Tracing it produced a **correction to this entry's own
+framing**: the original scoping doc said the damage was "invisible until relaunch" three times and
+named the journey tests `...SurvivesRelaunch`. Wrong, and it understated severity.
+`ActiveWorkoutView` is a `fullScreenCover` holding its view model in `@State`, so the header's back
+chevron destroys it and resuming from the FAB builds a fresh one that re-sorts from the store. **The
+jump is a back-tap and a resume away — routine, mid-workout — not a relaunch away.** Backgrounding
+the app is *not* a rebuild; only that round trip, a force-quit, and three deliberate error-path
+re-reads are.
+
+That turned an implicit assumption into a stated requirement, now scoped in three new subsections:
+
+- **§1.1 — the ordering invariant.** For exercises at array positions `i < j`, `MIN(orderInWorkout)`
+  over `i`'s sets is strictly less than over `j`'s. Auditing every mutation site against it shows
+  most set writes *cannot* break it (adding a set only raises an exercise's MAX; deleting is safe
+  while ≥1 set remains; appending an exercise is safe because array-tail and number-tail agree).
+  Exactly two operations can: moving an exercise in the array, and introducing one at a non-tail
+  position whose whole set list is at the global tail. Reorder is the first. **Replace is the second,
+  and the only operation in the app that has ever been the second.**
+- **§1.2 — the rebuild boundary**, with the correction above.
+- **§1.3 — a DEBUG `assertOrderingInvariant`** called from every mutation site, sequenced as new step
+  2a. Ordering bugs are invisible on screen by construction, so this is the only place they can be
+  caught when introduced rather than after the next rebuild.
+
+Sequencing gained step 2a; the journey tests are renamed to the **resume** boundary rather than
+"relaunch", plus a new `testOrderingInvariantHoldsAfterEveryStripMutation`. The requirement is
+satisfied by three things together — the mandatory reindex (mechanism), the assertion (catches a
+forgetful call site), the resume journey tests (prove it against the real store) — and no one of
+them is sufficient.
+
+**Step 1 implemented 2026-08-29** — identity-based selection, the first thing built in this feature
+area. `selectedExerciseId` added to `SetTableDataSource`; a `setSelectedExercise(id:)` helper in both
+view models; the three observer sites (`ActiveWorkoutView` sub-tab/cache/keypad, `EditWorkoutView`
+keypad, `ExerciseTabStripView` auto-scroll) rekeyed off identity. The strip keeps *both* triggers,
+since index and identity each catch a case the other misses.
+
+**A third affected call site turned up during implementation: `removeExercise`,** in both view
+models. Deleting an exercise positioned before the selected one shifts the array left while the
+index stays in range, so the user lands on the exercise after the one they were on — and because the
+integer doesn't move either, the `didSet` never fires and the persisted resume state still names the
+*right* exercise while the screen shows the wrong one. Screen and store disagree with nothing to
+signal it. Recorded because the original write-up named reorder only, and this is the same defect one
+call site over — the identical way `reorderExercises` fell outside the Stage 2 migration's scope.
+
+Four ViewModel tests added. The two that assert the fix were **verified failing against the old
+logic** before being kept, and the two regression guards pass on both — a test that passes either way
+proves nothing. Full suite green: 636 tests, 4 skipped, 0 failures. The pinned
+`testReorderExercisesPreservesMovedSelectionAndPersistsContiguousOrder` still passes, as predicted —
+step 1 does not touch the persist loop, so its `editedSetIds` assertion only breaks at step 2.
+
+**Steps 2 and 2a implemented 2026-08-29.** `reorderExercises` now renumbers synchronously via
+`reindexOrderInWorkout()` and persists through one `applyOrdering` — the last caller running the
+per-set `edit()` fan-out is gone. The pinned test was rewritten against `orderingBatches` and now
+asserts `editedSetIds.isEmpty`, so it pins the *correct* implementation instead of the removed one.
+The DEBUG `assertOrderingInvariant` is wired into `reorderExercises`, `removeExercise` and
+`addExercises`.
+
+**A fourth finding, and the one worth remembering: `EditWorkoutViewModel.reorderExercises` never
+wrote `orderInWorkout` at all.** Reordering exercises on the historic-edit screen was purely
+cosmetic — it reverted on the next rebuild. The original write-up said that view model "does not have
+Defect A … so it needs the selection fix only," which was right about the fan-out and wrong about the
+outcome: it has no fan-out because it had no persistence on that path whatsoever. One-line fix,
+calling the `reindexOrderInWorkout()` already in the file.
+
+**That is four defects found in a feature area that was opened to build a feature**, none of which
+were in the original ask, and three of which were invisible until someone traced the store rather
+than the screen.
+
+**Step 3 implemented 2026-08-29.** Reorder went from *no journey test at all* to four, plus two
+shared helpers — `committedExerciseOrder` (reproduces `loadActiveWorkout`'s sort key through a
+separate `ModelContext`) and `assertStripOrderMatchesStore` (the §1.1 invariant as *what the strip
+shows equals what a rebuild would show*).
+
+**Each was verified to fail against the broken implementation before being kept.** With the reindex
+removed, all four fail on "the strip and the store disagree — the order will change on the next
+rebuild". With slot-based selection restored, the Defect B journey fails with the user's logged set
+reading `[]` instead of `[100.0]` — their work gone from the screen. Worth doing deliberately: a
+journey test that passes against the bug it was written for is worse than no test, because it reads
+as coverage. This is the same discipline applied at step 1.
+
+**Step 4 implemented 2026-08-29 — the feature is built.** `replaceExercise(at:with:)` on both view
+models, plus the shared context-menu item, threshold confirmation and browse-mode picker in
+`ExerciseTabStripView` (which gained a `services` dependency for it). All four decisions honoured:
+outgoing sets deleted and one empty set seeded, confirm only when ≥1 set is logged, duplicates
+rejected, position held by the mandatory reindex.
+
+**The sequencing argument paid off literally.** Removing the reindex from `replaceExercise` was
+verified to fail `testReplacingAMiddleExerciseKeepsItsPositionAcrossResume` — the replacement sat at
+index 1 on screen and index 2 in the store. The net written at step 3 caught the step 4 headline risk
+exactly as designed.
+
+**And the §1.3 assertion earned itself.** In that same experiment it trapped with `ordering invariant
+violated at removeExercise: [3, 3]` — two exercises sharing a MIN. Worth noting: `[3, 3]` **is**
+sorted, so the `mins == mins.sorted()` formulation in the original §1.3 draft would have waved it
+through. The strict zip check it was tightened to is what caught it. One tradeoff surfaced: a tripped
+`assert` kills the test process, so that run aborted at 12 of 33 tests. Kept anyway — a silent
+ordering bug is what shipped twice — but the alternative of recording a failure instead of trapping
+is a live option.
+
+**A third correction to the scoping doc, made while implementing.** §4.4 ordered the *deletes* before
+the *swap*. That is backwards and it is the crash pattern: the delete loop suspends and the strip
+reads every exercise's sets on every render, so deleting first hands deleted models to the main
+actor. `removeExercise`'s own doc comment records this. Screen state first, store second — §4.4 now
+says so.
+
+**One thing §4.4 asked for turned out to be free.** Step 3 wanted an explicit keypad hide before the
+deletes, and flagged that it needed a new view-model→view hook. Step 1's `selectedExerciseId` already
+does it: re-anchoring selection onto the replacement fires `setKeyboardManager.hide()` on its own.
+
+**Final tally: four defects found in a feature area opened to build a feature** — slot-based
+selection (3 call sites), the `edit()` fan-out, historic-edit reorder never persisting, and the
+delete/swap ordering hazard caught before it was written. Suite 643 → **650 tests, 0 failures**.
+
+**Still open: only the reorder sheet (step 5), deferred by decision 4** until the tab-walking
+complaint is shown to survive replace. **Not done and worth a decision: analytics.** Replace has no
+`WorkoutInteraction` event, so picker opens and replacements are uncounted. Deliberately left out —
+adding a case touches the tally design and was outside this scope.
+
+**Note on the test run.** A concurrent session-replay-masking workstream was landing in the same
+working tree during this work — a new untracked `RepsterTests/ReplayMaskCoverageTests.swift`, a
+`pbxproj` change wiring it in, and edits across ~15 view files. One suite run failed in
+`testEveryTextInputIsClassified` on a `TextField("Coach note", …)` in `RestTimerView.swift` that no
+longer exists on disk and was never part of this work. Re-running after it settled: 639 tests, 4
+skipped, 0 failures. Recorded so the transient red is not later mistaken for something this change
+caused.
 ---
 
 ## Set types

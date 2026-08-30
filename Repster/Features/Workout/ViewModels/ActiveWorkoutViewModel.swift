@@ -126,10 +126,15 @@ final class ActiveWorkoutViewModel {
     var selectedExerciseIndex: Int = 0 {
         didSet {
             guard selectedExerciseIndex != oldValue else { return }
-            persistSelectedExerciseState()
-            updateLiveActivityState()
+            notifySelectedExerciseChangedIfNeeded()
         }
     }
+
+    /// The exercise the last selection side effects were fired for.
+    ///
+    /// Lets `notifySelectedExerciseChangedIfNeeded()` be called from both the index `didSet` and the
+    /// explicit re-anchor path without double-firing on the common tap-a-tab case, where both run.
+    private var lastNotifiedExerciseId: UUID?
 
     /// Global default rest time from HealthProfile (fallback when exercise has none).
     private var globalDefaultRestTime: Int?
@@ -270,6 +275,13 @@ final class ActiveWorkoutViewModel {
               selectedExerciseIndex < exercises.count else { return nil }
         return exercises[selectedExerciseIndex]
     }
+
+    /// `SetTableDataSource` conformance — identity of the selected exercise.
+    ///
+    /// Views observe this rather than `selectedExerciseIndex` so that reordering past the selection
+    /// or replacing in place, both of which change the exercise without moving the integer, still
+    /// reset the sub-tab, clear the derived caches and dismiss the keypad.
+    var selectedExerciseId: UUID? { currentExercise?.id }
 
     /// Sets for the current exercise (derived from currentExercise + setsByExercise).
     /// Sorted by orderInExercise to maintain warmup-first ordering.
@@ -803,6 +815,8 @@ final class ActiveWorkoutViewModel {
             selectedExerciseIndex = firstAddedIndex
         }
 
+        assertOrderingInvariant("addExercises")
+
         // Update Live Activity (exercise and set counts changed)
         updateLiveActivityState()
     }
@@ -818,18 +832,22 @@ final class ActiveWorkoutViewModel {
         let exercise = exercises[index]
         let exerciseSets = setsByExercise[exercise.id] ?? []
 
+        // Anchor before the array shrinks — same reason as `reorderExercises`. Removing an exercise
+        // *before* the selected one shifts the array left underneath a fixed integer, which used to
+        // land the user on the exercise after the one they were on. When the anchor is the exercise
+        // being removed, `setSelectedExercise` falls back to clamping, which is the old behaviour
+        // and the right one for that case.
+        let anchorId = currentExercise?.id
+
         // Remove from local state
         exercises.remove(at: index)
         setsByExercise.removeValue(forKey: exercise.id)
 
-        // Clamp selectedExerciseIndex to valid range
-        if exercises.isEmpty {
-            selectedExerciseIndex = 0
-        } else if selectedExerciseIndex >= exercises.count {
-            selectedExerciseIndex = exercises.count - 1
-        }
+        setSelectedExercise(id: anchorId)
+        assertOrderingInvariant("removeExercise")
 
-        // Update Live Activity (exercise changed)
+        // Update Live Activity — unconditionally, because the exercise *count* changed even when
+        // the selected exercise did not, and `setSelectedExercise` only fires on an identity change.
         updateLiveActivityState()
 
         // Delete all sets for this exercise
@@ -853,40 +871,119 @@ final class ActiveWorkoutViewModel {
         }
     }
 
+    /// Swap the exercise at `index` for `newExerciseId`, keeping its position in the strip.
+    ///
+    /// The outgoing exercise's sets are **deleted**, and one empty working set is seeded for the
+    /// replacement. That makes replace exactly equivalent in data terms to the delete-then-add the
+    /// user does today — the feature removes the tab-walking, not the semantics. Reassigning
+    /// `exerciseId` onto the existing rows was rejected: 80 kg × 8 logged for Incline DB Press is
+    /// not a Cable Fly set, and carrying it over would write fabricated history into the new
+    /// exercise's PR table, e1RM series, charts and fatigue model.
+    ///
+    /// See EXERCISE_REPLACE_AND_REORDER_DESIGN.md §4.
+    func replaceExercise(at index: Int, with newExerciseId: UUID) async {
+        guard index >= 0, index < exercises.count else { return }
+        let outgoing = exercises[index]
+        guard outgoing.id != newExerciseId else { return }
+
+        // The strip's `ForEach` is keyed by exercise ID, so a duplicate gives undefined selection
+        // and animation. Rejected rather than merged — merging raises ordering questions that would
+        // get answered implicitly.
+        guard !exercises.contains(where: { $0.id == newExerciseId }) else { return }
+
+        // Fetch before mutating anything. A failed fetch must leave the workout untouched rather
+        // than punch a hole in it.
+        let fetched: ChartExerciseData?
+        do {
+            fetched = try await exerciseService.fetchExerciseSnapshot(newExerciseId)
+        } catch {
+            #if DEBUG
+            dbg("[ActiveWorkoutViewModel] Failed to fetch replacement exercise \(newExerciseId): \(error)")
+            #endif
+            return
+        }
+        guard let snapshot = fetched else { return }
+
+        // That fetch suspended, so `index` is no longer trustworthy — never hold an index across an
+        // await on this screen. Re-resolve by identity, the same discipline
+        // `refreshCurrentExerciseSnapshot` follows.
+        guard let slot = exercises.firstIndex(where: { $0.id == outgoing.id }) else { return }
+
+        let outgoingSets = setsByExercise[outgoing.id] ?? []
+        let selectedIdBefore = currentExercise?.id
+
+        // Screen state first, store second. The rows must leave the screen *before* they leave the
+        // store: the delete loop below awaits once per set, and `ExerciseTabStripView` reads every
+        // exercise's sets on every render, so a deleted model would otherwise be handed to a view
+        // body mid-loop. Same ordering, and the same reason, as `removeExercise`.
+        exercises[slot] = snapshot
+        setsByExercise[outgoing.id] = nil
+        setsByExercise[snapshot.id] = []
+
+        // Re-anchor before the awaits so the screen is coherent for the whole loop. When the
+        // replaced slot was the selected one, the *identity* changed while the integer did not —
+        // precisely the case `setSelectedExercise` exists for, and what dismisses the keypad still
+        // bound to a row that is about to be deleted.
+        setSelectedExercise(id: selectedIdBefore == outgoing.id ? snapshot.id : selectedIdBefore)
+
+        for set in outgoingSets {
+            do {
+                // Ignored deliberately, as in `removeExercise`: PR badges are per-exercise, so no
+                // set of any *other* exercise on screen can be affected by these deletions.
+                _ = try await setService.delete(set)
+            } catch {
+                #if DEBUG
+                dbg("[ActiveWorkoutViewModel] Failed to delete set \(set.id) during replace: \(error)")
+                #endif
+            }
+        }
+
+        // An exercise with no sets does not exist — it cannot be ordered and will not survive a
+        // rebuild. `addSet` also handles the Live Activity, the sub-tab caches and the suggestion
+        // refresh for the now-current exercise.
+        await addSet(for: snapshot.id)
+
+        // Mandatory, not tidy-up. `addSet` assigns the *global tail*, so the replacement's only set
+        // has the highest `orderInWorkout` in the workout while sitting at position `slot` in the
+        // array. Order is reconstructed from `MIN(orderInWorkout)` per exercise, so without this the
+        // replacement looks correct on screen and jumps to the end of the strip the next time the
+        // array is rebuilt — which is a back-tap and a resume away.
+        let updates = reindexOrderInWorkout()
+        assertOrderingInvariant("replaceExercise")
+        await persistSetOrdering(updates)
+    }
+
     /// Reorder exercises via drag gesture on tab strip.
     ///
     /// Rearranges the local exercises array and persists the new order
     /// by updating orderInWorkout on all sets so order survives screen transitions.
     func reorderExercises(from source: IndexSet, to destination: Int) {
+        // Anchor on identity before the array moves. The old code corrected the index only when the
+        // *moved* exercise was the selected one, so moving any other exercise past the selection
+        // shifted the array underneath a fixed integer and silently switched the user to a different
+        // exercise mid-set. One rule covers both cases: stay on the exercise you were on.
+        let anchorId = currentExercise?.id
+
         exercises.move(fromOffsets: source, toOffset: destination)
 
-        // Keep the moved exercise selected (mirrors EditWorkoutViewModel behavior).
-        if let sourceIndex = source.first, sourceIndex == selectedExerciseIndex {
-            selectedExerciseIndex = destination > sourceIndex ? destination - 1 : destination
-        }
+        setSelectedExercise(id: anchorId)
 
-        // Persist new order: update orderInWorkout on all sets to reflect new exercise order.
-        // Iterate each exercise's sets in orderInExercise order so warmups keep the lowest
-        // orderInWorkout within their exercise.
-        Task {
-            var globalOrder = 1
-            for exercise in exercises {
-                guard let sets = setsByExercise[exercise.id] else { continue }
-                let orderedSets = sets.sorted { $0.orderInExercise < $1.orderInExercise }
-                for set in orderedSets {
-                    set.orderInWorkout = globalOrder
-                    set.updatedAt = Date()
-                    do {
-                        _ = try await setService.edit(set)
-                    } catch {
-                        #if DEBUG
-                        dbg("[ActiveWorkoutViewModel] Failed to persist reorder for set \(set.id): \(error)")
-                        #endif
-                    }
-                    globalOrder += 1
-                }
-            }
-        }
+        // Renumber synchronously, persist once. `reindexOrderInWorkout` produces exactly the
+        // numbering the old loop did — walk `exercises` in array order, each exercise's sets in
+        // `orderInExercise` order so warmups keep the lowest number within their exercise — but it
+        // returns only what changed and hands it to a single transactional write.
+        //
+        // The loop this replaces ran the full `SetService.edit` pipeline once per set, inside an
+        // unawaited `Task`, to change one integer. That is the pattern the SwiftData crash work
+        // removed everywhere else (SWIFTDATA_CONCURRENCY_CRASH_ANALYSIS.md §5.3 names it as the
+        // concurrent writer that armed shipped crash B); the migration was scoped as "reindex after
+        // a set insert/delete", so this caller fell outside it and was the last one left. It was
+        // also the worst instance: reorder touches every set in the workout rather than one
+        // exercise's, and Move Left is tapped repeatedly, so four taps spawned four overlapping
+        // renumbering passes racing each other's `globalOrder` assignments.
+        let updates = reindexOrderInWorkout()
+        assertOrderingInvariant("reorderExercises")
+        Task { await persistSetOrdering(updates) }
     }
 
     // MARK: - Workout Clock
@@ -1650,11 +1747,16 @@ final class ActiveWorkoutViewModel {
             let sets = try await setService.fetchSetSnapshots(for: exercise.id, limit: nil)
                 .filter(\.completed)
             let grouped = Dictionary(grouping: sets) { $0.workoutId }
+            let excludedWorkoutIds = try await workoutService.excludedWorkoutIdsForProgressionHistory(
+                workoutIds: Set(grouped.keys),
+                exerciseId: exercise.id
+            )
             subTabHistory = grouped.map { workoutId, workoutSets in
                 WorkoutHistoryGroup(
                     id: workoutId,
                     date: workoutSets.first?.date ?? Date(),
-                    sets: workoutSets.sorted { $0.orderInExercise < $1.orderInExercise }
+                    sets: workoutSets.sorted { $0.orderInExercise < $1.orderInExercise },
+                    isExcludedFromProgression: excludedWorkoutIds.contains(workoutId)
                 )
             }
             .sorted { $0.date > $1.date }
@@ -2282,6 +2384,68 @@ final class ActiveWorkoutViewModel {
             }
         }
         return updates
+    }
+
+    /// Trap in debug when the array order and the stored order disagree.
+    ///
+    /// The invariant: for exercises at array positions `i < j`, `MIN(orderInWorkout)` over `i`'s sets
+    /// is strictly less than over `j`'s. `loadActiveWorkout` sorts on exactly that key, so the
+    /// invariant holding in the store *is* "the strip reloads in the order the user left it".
+    ///
+    /// Worth asserting rather than trusting each call site, because a violation is invisible on
+    /// screen by construction — the strip renders the in-memory array, so the damage only appears
+    /// once that array is rebuilt from the store, which is a back-tap and a resume away. This is the
+    /// only place it can be caught at the moment it is introduced.
+    ///
+    /// A trip here means either the mutation just made is wrong, or the workout's stored ordering
+    /// was already corrupt on load — the shipped reorder race could leave it that way.
+    /// See EXERCISE_REPLACE_AND_REORDER_DESIGN.md §1.1–1.3.
+    private func assertOrderingInvariant(_ context: StaticString) {
+        #if DEBUG
+        let mins = exercises.compactMap { setsByExercise[$0.id]?.map(\.orderInWorkout).min() }
+        // Strictly increasing, not merely sorted: two exercises sharing a MIN is also a violation,
+        // and `sorted()` would wave it through.
+        assert(
+            zip(mins, mins.dropFirst()).allSatisfy(<),
+            "ordering invariant violated at \(context): \(mins)"
+        )
+        #endif
+    }
+
+    /// Re-anchor the selection onto `exerciseId` after `exercises` has been mutated.
+    ///
+    /// Selection is identity-based, not positional. Reordering or replacing must keep the user on
+    /// the exercise they were looking at, and must fire the switch side effects whenever the
+    /// *exercise* changes — including when the resolved index lands on the same integer, which the
+    /// `didSet` cannot see. See EXERCISE_REPLACE_AND_REORDER_DESIGN.md §3 and §5.
+    ///
+    /// Falls back to clamping the existing index when the anchor is gone (it was the exercise that
+    /// was just removed), which keeps the user as close as possible to where they were.
+    private func setSelectedExercise(id exerciseId: UUID?) {
+        let resolvedIndex = exerciseId.flatMap { id in exercises.firstIndex(where: { $0.id == id }) }
+            ?? min(max(0, selectedExerciseIndex), max(0, exercises.count - 1))
+
+        selectedExerciseIndex = resolvedIndex       // didSet fires only if the integer moved
+        notifySelectedExerciseChangedIfNeeded()     // fires if the exercise moved, integer or not
+    }
+
+    /// Fire the "the user is now looking at a different exercise" side effects exactly once.
+    ///
+    /// Selection changes arrive two ways: the index moves (tap a tab, clamp after a removal), or the
+    /// index stays put while the exercise under it changes (reorder past the selection, replace in
+    /// place). Both call through here, and `lastNotifiedExerciseId` keeps the common path — where
+    /// both the index and the exercise changed — from firing twice.
+    ///
+    /// Neither side effect depends on the index: `persistSelectedExerciseState` stores the exercise
+    /// *ID*, and the Live Activity shows the exercise name. So a pure position change correctly
+    /// no-ops here, where the old `didSet` reissued both writes.
+    private func notifySelectedExerciseChangedIfNeeded() {
+        let currentId = currentExercise?.id
+        guard currentId != lastNotifiedExerciseId else { return }
+        lastNotifiedExerciseId = currentId
+
+        persistSelectedExerciseState()
+        updateLiveActivityState()
     }
 
     /// Persist a reindex in one transaction.

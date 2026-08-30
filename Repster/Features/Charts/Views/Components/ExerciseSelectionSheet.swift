@@ -65,6 +65,9 @@ struct ExerciseSelectionSheet: View {
             }
             .background(Color.bgCard)
             .onAppear { presets = presetStore.loadPresets() }
+            // An alert's text field is built by `UIAlertController`, out of reach of a
+            // mask — see `ReplayPrivacy.swift`.
+            .replayPaused(while: showSavePresetAlert)
             .alert("Save Preset", isPresented: $showSavePresetAlert) {
                 TextField("Preset name", text: $presetName)
                 Button("Save") {

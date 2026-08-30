@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; background: #111113; color: #EAEAEF;
+      font-family: -apple-system, "SF Pro Text", system-ui, "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased; }
+    a { color: #5B8DEF; } a:hover { color: #7BA4F2; }
+  </style>
+</helmet>
+<div style="min-height: 560px; background: #111113; padding: 26px 16px; display: flex; flex-direction: column; gap: 12px;">
+
+  <div style="display: flex; align-items: center; gap: 8px;">
+    <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.8px; color: #5C5C6E;">TODAY</div>
+    <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: #5B8DEF; background: rgba(91,141,239,0.12); border-radius: 5px; padding: 3px 7px;">STATES</div>
+  </div>
+
+  <div style="background: #1B1B1F; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 12px;">
+    <div style="font-size: 16px; font-weight: 600; letter-spacing: -0.2px; color: #EAEAEF;">Legs is your freshest group</div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 10px;">
+        <div style="font-size: 12px; font-weight: 500; color: #9999A8;">Last legs session</div>
+        <div style="font-size: 13px; font-weight: 600; color: #EAEAEF; font-variant-numeric: tabular-nums;">16 days ago</div>
+      </div>
+      <div style="height: 1px; background: rgba(255,255,255,0.06);"></div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 10px;">
+        <div style="font-size: 12px; font-weight: 500; color: #9999A8;">Your usual gap</div>
+        <div style="font-size: 13px; font-weight: 600; color: #EAEAEF; font-variant-numeric: tabular-nums;">5 days</div>
+      </div>
+      <div style="height: 1px; background: rgba(255,255,255,0.06);"></div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 10px;">
+        <div style="font-size: 12px; font-weight: 500; color: #9999A8;">Legs sets this week</div>
+        <div style="font-size: 13px; font-weight: 600; color: #EAEAEF; font-variant-numeric: tabular-nums;">0 of your usual 14</div>
+      </div>
+    </div>
+
+    <div style="font-size: 13px; font-weight: 500; line-height: 1.45; color: #9999A8; text-wrap: pretty;">Everything else has been trained in the last four days.</div>
+
+    <div style="border: 1px solid rgba(91,141,239,0.35); border-radius: 11px; padding: 11px; text-align: center; font-size: 14px; font-weight: 600; color: #5B8DEF;">Start a legs session</div>
+  </div>
+
+  <div style="padding: 4px 2px; display: flex; flex-direction: column; gap: 5px;">
+    <div style="font-size: 12px; font-weight: 600; color: #EAEAEF;">Ships today, with no new decisions</div>
+    <div style="font-size: 12px; font-weight: 500; line-height: 1.5; color: #5C5C6E; text-wrap: pretty;">Every number is arithmetic on the user's own history, so nothing here is an opinion about training. The call stays with the lifter.</div>
+    <div style="font-size: 12px; font-weight: 500; line-height: 1.5; color: #5C5C6E; text-wrap: pretty;">Against it: it stops one step short of useful. It knows which group to train and will not say what to do.</div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

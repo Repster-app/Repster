@@ -223,6 +223,69 @@ struct MuscleVolumeRow: Sendable, Equatable, Identifiable {
     }
 }
 
+// MARK: - Rule diagnostics
+
+/// Admin-only account of what every rule did against the user's real data.
+///
+/// The feed only shows what survived curation, which makes two very different
+/// failures look identical from the outside: a rule whose gates never clear for
+/// this user, and a rule that produces a finding every week but loses the
+/// ranking. Those need opposite fixes — one is a gate to loosen, the other a
+/// weight to change — so the diagnostic reports them apart.
+struct RuleDiagnostic: Sendable, Identifiable {
+    let ruleId: String
+    /// The rule's fixed ranking weight, so a rule that is silent despite a high
+    /// weight stands out.
+    let actionability: Double
+    /// Findings from the normal pass, best-scoring first.
+    let findings: [Candidate]
+    /// Findings from the lower-bar pass. Only progress rules implement it, and
+    /// it only runs when the whole normal pass came back empty.
+    let relaxedFindings: [Candidate]
+    /// True when one of this rule's findings is in the live feed.
+    let survivedCuration: Bool
+    /// When a cooling rule may fire again. Nil for every rule without a refire
+    /// interval, which is all but one of them.
+    let refireAvailableAt: Date?
+
+    var id: String { ruleId }
+
+    /// One candidate finding, with the score curation actually ranked it on.
+    struct Candidate: Sendable, Identifiable {
+        let id = UUID()
+        let subjectName: String?
+        let headline: String
+        /// `effectSize * actionability` — what `curate` sorts by.
+        let score: Double
+        let effectSize: Double
+        let isDiagnostic: Bool
+    }
+
+    /// Why this rule is or isn't on screen.
+    enum Status: Sendable {
+        /// In the feed right now.
+        case shown
+        /// Produced a finding that lost the ranking — a weighting problem.
+        case rankedOut
+        /// Produced a finding but is inside its refire cooldown.
+        case cooling
+        /// Only the relaxed pass produced anything, so it appears solely when
+        /// the feed would otherwise be empty.
+        case relaxedOnly
+        /// Produced nothing — its gates never cleared. A rules problem, and no
+        /// amount of re-ranking will surface it.
+        case silent
+    }
+
+    var status: Status {
+        if survivedCuration { return .shown }
+        if refireAvailableAt != nil { return .cooling }
+        if !findings.isEmpty { return .rankedOut }
+        if !relaxedFindings.isEmpty { return .relaxedOnly }
+        return .silent
+    }
+}
+
 protocol InsightsServiceProtocol: Sendable {
     /// Re-runs the analysis if workout data changed since the last run.
     /// Cheap when nothing changed — safe to call on every Home appearance.
@@ -249,4 +312,9 @@ protocol InsightsServiceProtocol: Sendable {
 
     /// Hides an insight for the cooldown period.
     func snooze(insightId: UUID) async throws
+
+    /// Runs every rule against the current data and reports what each produced,
+    /// including the findings curation discarded. Admin diagnostics only — this
+    /// evaluates the whole rule set and persists nothing.
+    func ruleDiagnostics() async throws -> [RuleDiagnostic]
 }

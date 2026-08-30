@@ -346,18 +346,67 @@ final class EditWorkoutViewModel {
 
     /// Reorder exercises by moving from source indices to destination.
     func reorderExercises(from source: IndexSet, to destination: Int) {
+        let anchorId = currentExercise?.id
         exercises.move(fromOffsets: source, toOffset: destination)
+        setSelectedExercise(id: anchorId)
 
-        // Update selectedExerciseIndex to follow the moved exercise
-        if let sourceIndex = source.first {
-            if sourceIndex == selectedExerciseIndex {
-                if destination > sourceIndex {
-                    selectedExerciseIndex = destination - 1
-                } else {
-                    selectedExerciseIndex = destination
-                }
+        // Without this the move was purely cosmetic. Exercise order on this screen is reconstructed
+        // from each exercise's first `orderInWorkout` (see `loadWorkout` step 5), and nothing here
+        // was writing it — so reordering looked right until the screen was rebuilt, then reverted.
+        // These are live models, so the renumbering persists with the rest of the edit, which is the
+        // same thing `addWarmupSet` relies on.
+        reindexOrderInWorkout()
+    }
+
+    /// Swap the exercise at `index` for `newExerciseId`, keeping its position in the strip.
+    ///
+    /// Mirrors `ActiveWorkoutViewModel.replaceExercise(at:with:)` — same semantics, same ordering
+    /// discipline. Built rather than conditionally hidden: this view model shares the protocol and
+    /// the strip, so the menu item appears here for free, and letting the two diverge is exactly the
+    /// drift `PRBadgeApplier`'s doc comment records as a prior near-miss.
+    func replaceExercise(at index: Int, with newExerciseId: UUID) async {
+        guard index >= 0, index < exercises.count else { return }
+        let outgoing = exercises[index]
+        guard outgoing.id != newExerciseId else { return }
+        guard !exercises.contains(where: { $0.id == newExerciseId }) else { return }
+
+        let fetched: ChartExerciseData?
+        do {
+            fetched = try await exerciseService.fetchExerciseSnapshot(newExerciseId)
+        } catch {
+            #if DEBUG
+            dbg("[EditWorkoutViewModel] Failed to fetch replacement exercise \(newExerciseId): \(error)")
+            #endif
+            return
+        }
+        guard let snapshot = fetched else { return }
+
+        // Index is not trustworthy across the await — re-resolve by identity.
+        guard let slot = exercises.firstIndex(where: { $0.id == outgoing.id }) else { return }
+
+        let outgoingSets = setsByExercise[outgoing.id] ?? []
+        let selectedIdBefore = currentExercise?.id
+
+        // Out of screen state before it leaves the store — see `removeExercise`.
+        exercises[slot] = snapshot
+        setsByExercise[outgoing.id] = nil
+        setsByExercise[snapshot.id] = []
+        setSelectedExercise(id: selectedIdBefore == outgoing.id ? snapshot.id : selectedIdBefore)
+
+        for set in outgoingSets {
+            do {
+                _ = try await setService.delete(set)
+            } catch {
+                #if DEBUG
+                dbg("[EditWorkoutViewModel] Failed to delete set \(set.id) during replace: \(error)")
+                #endif
             }
         }
+
+        await addSet(for: snapshot.id)
+
+        // The seeded set is at the global tail; without this the replacement sorts last on reload.
+        reindexOrderInWorkout()
     }
 
     /// Remove the exercise at the given index and delete all its sets.
@@ -370,14 +419,13 @@ final class EditWorkoutViewModel {
         let exercise = exercises[index]
         let exerciseSets = setsByExercise[exercise.id] ?? []
 
+        let anchorId = currentExercise?.id
+
         // Remove from local state
         exercises.remove(at: index)
         setsByExercise.removeValue(forKey: exercise.id)
 
-        // Clamp selectedExerciseIndex
-        if selectedExerciseIndex >= exercises.count {
-            selectedExerciseIndex = max(0, exercises.count - 1)
-        }
+        setSelectedExercise(id: anchorId)
 
         // Delete all sets for this exercise
         var deleteFailed = false
@@ -516,6 +564,20 @@ final class EditWorkoutViewModel {
         dirtySetIds.removeAll()
     }
 
+    /// Re-anchor the selection onto `exerciseId` after `exercises` has been mutated.
+    ///
+    /// Mirrors `ActiveWorkoutViewModel.setSelectedExercise(id:)` — selection is identity-based, not
+    /// positional, so a mutation must keep the user on the exercise they were looking at rather than
+    /// on whatever the old integer now points to. This screen is a draft model with no Live Activity
+    /// and no persisted selection, so there are no side effects to fire; the view observes
+    /// `selectedExerciseId` for the keypad. See EXERCISE_REPLACE_AND_REORDER_DESIGN.md §3.
+    ///
+    /// Falls back to clamping when the anchor is gone — it was the exercise just removed.
+    private func setSelectedExercise(id exerciseId: UUID?) {
+        selectedExerciseIndex = exerciseId.flatMap { id in exercises.firstIndex(where: { $0.id == id }) }
+            ?? min(max(0, selectedExerciseIndex), max(0, exercises.count - 1))
+    }
+
     // MARK: - Computed
 
     var currentExercise: ChartExerciseData? {
@@ -523,6 +585,11 @@ final class EditWorkoutViewModel {
               selectedExerciseIndex < exercises.count else { return nil }
         return exercises[selectedExerciseIndex]
     }
+
+    /// `SetTableDataSource` conformance — identity of the selected exercise.
+    ///
+    /// See the protocol for why views key off this rather than `selectedExerciseIndex`.
+    var selectedExerciseId: UUID? { currentExercise?.id }
 
     /// Sets for the current exercise, sorted by orderInExercise to maintain warmup-first ordering.
     var currentSets: [WorkoutSet] {

@@ -90,6 +90,8 @@ struct CreateEditTemplateView: View {
                 .kerning(0.8)
 
             TextField("e.g. Push Day, Upper Body A...", text: $viewModel.templateName)
+                // Masked while typed; the saved name is content, shown in every list.
+                .replayMasked()
                 .font(.system(size: 17, weight: .medium))
                 .foregroundColor(.textPrimary)
                 .padding(14)
@@ -536,6 +538,8 @@ private struct TemplateExerciseCard: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.border, lineWidth: 1)
         )
+        // Free text: the same category as a workout note.
+        .replayMasked()
         .overlay(alignment: .topLeading) {
             if exercise.notes == nil || exercise.notes?.isEmpty == true {
                 Text("Exercise notes (e.g., use close grip, pause at bottom...)")

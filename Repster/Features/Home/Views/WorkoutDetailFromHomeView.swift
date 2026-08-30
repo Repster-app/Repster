@@ -19,6 +19,7 @@ struct WorkoutDetailFromHomeView: View {
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
     @State private var showEditWorkout = false
+    @State private var workoutToEditProgression: WorkoutSnapshot? = nil
     @State private var selectedExerciseId: UUID?
     @State private var saveAsTemplateController = SaveWorkoutAsTemplateController()
     @State private var templateFeedback: TemplateSaveFeedback? = nil
@@ -54,6 +55,9 @@ struct WorkoutDetailFromHomeView: View {
                     unitPreference: services.unitPreference,
                     onSaveAsTemplate: nil,
                     onEditWorkout: nil,
+                    onEditProgression: { workout in
+                        workoutToEditProgression = workout
+                    },
                     onExerciseTapped: { exerciseId in
                         selectedExerciseId = exerciseId
                     }
@@ -160,6 +164,24 @@ struct WorkoutDetailFromHomeView: View {
         }
         .navigationDestination(item: $selectedExerciseId) { exerciseId in
             ExerciseDetailView(exerciseId: exerciseId, services: services)
+        }
+        .sheet(item: $workoutToEditProgression) { workout in
+            WorkoutProgressionSheet(
+                workout: workout,
+                exercises: [],
+                showsExerciseOverrides: false
+            ) { excludeWorkout, excludedExerciseIds in
+                try await workoutService.updateProgressionHistoryExclusions(
+                    workout.id,
+                    excludeWorkout: excludeWorkout,
+                    excludedExerciseIds: excludedExerciseIds
+                )
+            }
+        }
+        .onChange(of: workoutToEditProgression) { oldValue, newValue in
+            // Reload so the banner disappears (or appears) without leaving the screen.
+            guard oldValue != nil, newValue == nil else { return }
+            Task { await loadDetail() }
         }
     }
 

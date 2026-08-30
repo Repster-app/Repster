@@ -452,6 +452,319 @@ final class WorkoutJourneyTests: XCTestCase {
         XCTAssertEqual(relaunched.currentSets.map(\.orderInExercise), [1, 2])
     }
 
+    // MARK: - Exercise ordering (EXERCISE_REPLACE_AND_REORDER_DESIGN.md §1, §2, §3)
+    //
+    // There was no journey test for reorder at all until 2026-08-29, which is why both of its
+    // defects shipped: the ViewModel tests use `SetServiceStub`, which always "saves", and the
+    // damage from a bad reorder is invisible on screen by construction — the strip renders the
+    // in-memory array, so the store and the screen only have to agree once the array is rebuilt.
+
+    /// The exercise order the strip will show after a rebuild: exercises sorted by the lowest
+    /// `orderInWorkout` among their sets, which is exactly `loadActiveWorkout`'s sort key.
+    private func committedExerciseOrder(_ stack: Stack, workoutId: UUID) throws -> [UUID] {
+        let sets = try stack.committedSets(for: workoutId)
+        return Dictionary(grouping: sets, by: \.exerciseId)
+            .mapValues { $0.map(\.orderInWorkout).min() ?? Int.max }
+            .sorted { $0.value < $1.value }
+            .map(\.key)
+    }
+
+    /// `reorderExercises` renumbers synchronously but persists in an unawaited `Task`, so the
+    /// screen leads the store by a beat. Poll rather than sleep — neither flaky nor slow.
+    private func waitForCommittedExerciseOrder(
+        _ stack: Stack,
+        workoutId: UUID,
+        equals expected: [UUID],
+        timeout: TimeInterval = 2,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        var last: [UUID] = []
+        while Date() < deadline {
+            last = try committedExerciseOrder(stack, workoutId: workoutId)
+            if last == expected { return }
+            try await Task.sleep(nanoseconds: 5_000_000)
+        }
+        XCTFail(
+            "ordering never committed. expected \(expected), store has \(last)",
+            file: file,
+            line: line
+        )
+    }
+
+    /// What the strip shows must equal what a rebuild would show. This is the §1.1 invariant in
+    /// its user-facing form, and the single assertion that would have caught both defects.
+    private func assertStripOrderMatchesStore(
+        _ viewModel: ActiveWorkoutViewModel,
+        _ stack: Stack,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let workoutId = try XCTUnwrap(viewModel.workout?.id, file: file, line: line)
+        XCTAssertEqual(
+            try committedExerciseOrder(stack, workoutId: workoutId),
+            viewModel.exercises.map(\.id),
+            "the strip and the store disagree — the order will change on the next rebuild",
+            file: file,
+            line: line
+        )
+    }
+
+    /// The headline ordering journey. A reorder that renumbers only in memory looks perfect until
+    /// the array is rebuilt from the store — which is a back-tap and a resume away, not a relaunch
+    /// away (§1.2). Building a fresh ViewModel over the same container is exactly that round trip.
+    func testReorderingExercisesSurvivesResume() async throws {
+        let stack = try Stack()
+        let a = Fixture.barbell()
+        let b = Fixture.bodyweightStyle()
+        let c = Fixture.unilateral()
+        let viewModel = try await startWorkout(stack, with: [a, b, c])
+        let workoutId = try XCTUnwrap(viewModel.workout?.id)
+
+        XCTAssertEqual(viewModel.exercises.map(\.id), [a.id, b.id, c.id], "precondition")
+
+        // Walk the last exercise to the front — what Move Left does, twice over.
+        viewModel.reorderExercises(from: IndexSet(integer: 2), to: 0)
+        XCTAssertEqual(viewModel.exercises.map(\.id), [c.id, a.id, b.id], "screen updates at once")
+
+        try await waitForCommittedExerciseOrder(stack, workoutId: workoutId, equals: [c.id, a.id, b.id])
+        try assertStripOrderMatchesStore(viewModel, stack)
+
+        let resumed = stack.makeViewModel()
+        await resumed.loadActiveWorkout()
+        XCTAssertEqual(
+            resumed.exercises.map(\.id),
+            [c.id, a.id, b.id],
+            "order must survive backing out of the workout and resuming it"
+        )
+    }
+
+    /// Defect B as a journey. Moving an exercise the user never touched, past the one they are
+    /// working on, used to shift the array underneath a fixed index and swap the set table to a
+    /// different exercise mid-set — taking their logged rows off screen with it.
+    func testReorderingAnEarlierExerciseKeepsTheUserOnTheirCurrentSet() async throws {
+        let stack = try Stack()
+        let a = Fixture.barbell()
+        let b = Fixture.bodyweightStyle()
+        let c = Fixture.unilateral()
+        let viewModel = try await startWorkout(stack, with: [a, b, c])
+        let workoutId = try XCTUnwrap(viewModel.workout?.id)
+
+        // The user is on the first exercise and has logged a set there.
+        viewModel.selectedExerciseIndex = 0
+        try await completeNextSet(viewModel, weight: 100, reps: 5)
+        XCTAssertEqual(viewModel.currentExercise?.id, a.id, "precondition")
+
+        // They now move the *last* exercise to the front. They never touched the one they are on.
+        viewModel.reorderExercises(from: IndexSet(integer: 2), to: 0)
+
+        XCTAssertEqual(
+            viewModel.currentExercise?.id,
+            a.id,
+            "the user must stay on the exercise they were logging"
+        )
+        XCTAssertEqual(viewModel.selectedExerciseIndex, 1, "index re-derived from identity")
+        XCTAssertEqual(
+            viewModel.currentSets.compactMap(\.weight),
+            [100],
+            "their logged set must still be the one on screen"
+        )
+
+        try await waitForCommittedExerciseOrder(stack, workoutId: workoutId, equals: [c.id, a.id, b.id])
+
+        // And the resume lands them back on the same exercise, because selection persists by ID.
+        let resumed = stack.makeViewModel()
+        await resumed.loadActiveWorkout()
+        XCTAssertEqual(resumed.currentExercise?.id, a.id, "persisted selection must agree with the screen")
+    }
+
+    /// The §8 migration risk. Reorder used to run the full `SetService.edit` pipeline per set,
+    /// which re-evaluated PRs; it now writes ordering only. `SetRepository.applyOrdering`'s doc
+    /// comment argues that pipeline was a no-op with unchanged values — but "documented as a
+    /// no-op" is exactly what `PRBadgeApplier` said about a rule that turned out never to fire,
+    /// so this pins the badges rather than trusting the argument.
+    func testReorderingDoesNotDisturbPRBadges() async throws {
+        let stack = try Stack()
+        let a = Fixture.barbell()
+        let b = Fixture.unilateral()
+        let viewModel = try await startWorkout(stack, with: [a, b])
+        let workoutId = try XCTUnwrap(viewModel.workout?.id)
+
+        // Log real work on both, including a heavier second set so at least one badge moves.
+        viewModel.selectedExerciseIndex = 0
+        try await completeNextSet(viewModel, weight: 100, reps: 5)
+        await viewModel.addSet(for: a.id)
+        try await completeNextSet(viewModel, weight: 120, reps: 5)
+
+        viewModel.selectedExerciseIndex = 1
+        try await completeNextSet(viewModel, weight: 40, reps: 10)
+
+        let before = try stack.committedSets(for: workoutId)
+            .sorted { $0.id.uuidString < $1.id.uuidString }
+            .map { ($0.id, $0.prStatus) }
+        XCTAssertTrue(
+            before.contains { $0.1 != nil },
+            "fixture must actually produce a badge, or this test proves nothing"
+        )
+
+        viewModel.reorderExercises(from: IndexSet(integer: 1), to: 0)
+        try await waitForCommittedExerciseOrder(stack, workoutId: workoutId, equals: [b.id, a.id])
+
+        let after = try stack.committedSets(for: workoutId)
+            .sorted { $0.id.uuidString < $1.id.uuidString }
+            .map { ($0.id, $0.prStatus) }
+
+        XCTAssertEqual(before.map(\.0), after.map(\.0), "no set may appear or vanish")
+        XCTAssertEqual(
+            before.map(\.1),
+            after.map(\.1),
+            "reordering must not re-evaluate PRs"
+        )
+        XCTAssertEqual(try stack.committedRecordCount(), 2, "no PerformanceRecord churn")
+    }
+
+    /// The §1.1 invariant across the whole strip API, in one journey. Only two operations can
+    /// break it — moving an exercise, and introducing one whose sets are all at the global tail —
+    /// but the cheapest guard against a future mutation site forgetting is to drive them all and
+    /// assert screen-equals-store after each.
+    func testOrderingInvariantHoldsAfterEveryStripMutation() async throws {
+        let stack = try Stack()
+        let a = Fixture.barbell()
+        let b = Fixture.bodyweightStyle()
+        let c = Fixture.unilateral()
+
+        let viewModel = try await startWorkout(stack, with: [a, b])
+        let workoutId = try XCTUnwrap(viewModel.workout?.id)
+        try assertStripOrderMatchesStore(viewModel, stack)
+
+        // add
+        try await stack.exerciseRepo.save(c)
+        await viewModel.addExercises([c.id])
+        XCTAssertEqual(viewModel.exercises.map(\.id), [a.id, b.id, c.id])
+        try assertStripOrderMatchesStore(viewModel, stack)
+
+        // reorder
+        viewModel.reorderExercises(from: IndexSet(integer: 2), to: 0)
+        try await waitForCommittedExerciseOrder(stack, workoutId: workoutId, equals: [c.id, a.id, b.id])
+        try assertStripOrderMatchesStore(viewModel, stack)
+
+        // replace — the only operation that introduces an exercise at a non-tail position whose
+        // whole set list is at the global tail, i.e. the second of the two §1.1 breakers
+        let d = Exercise(
+            name: "Cable Fly",
+            equipmentType: .cable,
+            trackingType: .weightReps,
+            primaryMuscle: "chest",
+            weightIncrement: 2.5,
+            defaultRestTime: 60
+        )
+        try await stack.exerciseRepo.save(d)
+        await viewModel.replaceExercise(at: 1, with: d.id)
+        XCTAssertEqual(viewModel.exercises.map(\.id), [c.id, d.id, b.id])
+        try assertStripOrderMatchesStore(viewModel, stack)
+
+        // remove — deliberately one *before* the selection, the case that used to move the user
+        viewModel.selectedExerciseIndex = 1
+        await viewModel.removeExercise(at: 0)
+        XCTAssertEqual(viewModel.exercises.map(\.id), [d.id, b.id])
+        XCTAssertEqual(viewModel.currentExercise?.id, d.id, "selection follows the exercise")
+        try assertStripOrderMatchesStore(viewModel, stack)
+
+        // Removal leaves gaps in `orderInWorkout` and that is fine — the invariant is about the
+        // *relative* order of each exercise's minimum, not contiguity. The resume proves it.
+        let resumed = stack.makeViewModel()
+        await resumed.loadActiveWorkout()
+        XCTAssertEqual(resumed.exercises.map(\.id), [d.id, b.id])
+        _ = a
+    }
+
+    /// The §8 headline risk, and the reason replace needed a journey test rather than a unit test.
+    ///
+    /// `addSet` seeds at the **global tail**, so the replacement's only set has the highest
+    /// `orderInWorkout` in the workout while sitting mid-array. Order is reconstructed from
+    /// `MIN(orderInWorkout)` per exercise, so a replace that skips the reindex renders perfectly and
+    /// then jumps to the end of the strip the next time the array is rebuilt. A ViewModel test
+    /// cannot see this — `SetServiceStub` always "saves".
+    func testReplacingAMiddleExerciseKeepsItsPositionAcrossResume() async throws {
+        let stack = try Stack()
+        let a = Fixture.barbell()
+        let b = Fixture.bodyweightStyle()
+        let c = Fixture.unilateral()
+        let replacement = Exercise(
+            name: "Cable Fly",
+            equipmentType: .cable,
+            trackingType: .weightReps,
+            primaryMuscle: "chest",
+            weightIncrement: 2.5,
+            defaultRestTime: 60
+        )
+        let viewModel = try await startWorkout(stack, with: [a, b, c])
+        let workoutId = try XCTUnwrap(viewModel.workout?.id)
+        try await stack.exerciseRepo.save(replacement)
+
+        await viewModel.replaceExercise(at: 1, with: replacement.id)
+
+        XCTAssertEqual(
+            viewModel.exercises.map(\.id),
+            [a.id, replacement.id, c.id],
+            "the replacement holds the middle slot on screen"
+        )
+        try assertStripOrderMatchesStore(viewModel, stack)
+
+        let resumed = stack.makeViewModel()
+        await resumed.loadActiveWorkout()
+        XCTAssertEqual(
+            resumed.exercises.map(\.id),
+            [a.id, replacement.id, c.id],
+            "and holds it across a resume — this is the assertion the whole reindex exists for"
+        )
+        _ = workoutId
+    }
+
+    /// Replace deletes the outgoing exercise's rows rather than retargeting them, so nothing the
+    /// user logged for the old movement can end up attributed to the new one. Verified through a
+    /// separate `ModelContext`, so it is the store talking and not the screen.
+    func testReplacingAnExerciseRemovesItsSetsFromTheStore() async throws {
+        let stack = try Stack()
+        let a = Fixture.barbell()
+        let b = Fixture.unilateral()
+        let replacement = Exercise(
+            name: "Cable Fly",
+            equipmentType: .cable,
+            trackingType: .weightReps,
+            primaryMuscle: "chest",
+            weightIncrement: 2.5,
+            defaultRestTime: 60
+        )
+        let viewModel = try await startWorkout(stack, with: [a, b])
+        let workoutId = try XCTUnwrap(viewModel.workout?.id)
+        try await stack.exerciseRepo.save(replacement)
+
+        // Log real work on the exercise that is about to be replaced.
+        viewModel.selectedExerciseIndex = 1
+        try await completeNextSet(viewModel, weight: 60, reps: 8)
+        let doomed = try stack.committedSets(for: workoutId).filter { $0.exerciseId == b.id }
+        XCTAssertEqual(doomed.count, 1, "precondition: the outgoing exercise has a committed row")
+
+        await viewModel.replaceExercise(at: 1, with: replacement.id)
+
+        let committed = try stack.committedSets(for: workoutId)
+        XCTAssertTrue(
+            committed.allSatisfy { $0.exerciseId != b.id },
+            "no row may survive attributed to the replaced exercise"
+        )
+        XCTAssertFalse(
+            committed.contains { $0.exerciseId == replacement.id && $0.weight != nil },
+            "and none of the old numbers may be carried over onto the replacement"
+        )
+        XCTAssertEqual(
+            committed.filter { $0.exerciseId == replacement.id }.count,
+            1,
+            "exactly one empty seeded set — an exercise with no sets does not exist"
+        )
+    }
+
     // MARK: - Journey: discarding and removing
 
     /// Discarding takes the whole session with it, PR records included.
@@ -1239,6 +1552,151 @@ extension WorkoutJourneyTests {
         )
         XCTAssertEqual(try XCTUnwrap(estimate.value), 98.0, accuracy: 0.01,
                        "the set with reserve is the stronger capacity evidence")
+    }
+
+    // MARK: - Journey: an excluded session says so, on both history screens
+
+    /// `WorkoutHistoryGroup` is built in two places — `ExerciseDetailViewModel.loadHistory` and
+    /// `ActiveWorkoutViewModel.loadHistoryForCurrentExercise` — that render the *same*
+    /// `ExerciseHistoryView`. Two independent groupings feeding one view is exactly the shape
+    /// that drifts, and a chip that appears on one screen but not the other is worse than none:
+    /// it teaches people the signal is unreliable.
+    ///
+    /// So this asserts both loaders, on one store, agree per session.
+    func testBothHistoryLoadersMarkTheSameExcludedSession() async throws {
+        let stack = try Stack()
+        let exercise = Fixture.barbell()
+        try await stack.exerciseRepo.save(exercise)
+
+        let excludedDate = Date().addingTimeInterval(-14 * 86_400)
+        let countedDate = Date().addingTimeInterval(-7 * 86_400)
+        let excludedWorkoutId = try await seedSession(
+            stack, exercise: exercise, date: excludedDate, weight: 55, reps: 8,
+            excludeFromProgressionHistory: true
+        )
+        let countedWorkoutId = try await seedSession(
+            stack, exercise: exercise, date: countedDate, weight: 55, reps: 6,
+            excludeFromProgressionHistory: false
+        )
+
+        // Loader 1 — the exercise detail screen.
+        let detailViewModel = ExerciseDetailViewModel(
+            exerciseId: exercise.id,
+            exerciseService: stack.exerciseService,
+            prService: stack.prService,
+            setService: stack.setService,
+            statsService: stack.statsService,
+            workoutService: stack.workoutService
+        )
+        await detailViewModel.loadHistory()
+
+        // Loader 2 — the same view, rendered inside a live workout.
+        let activeViewModel = try await startWorkout(stack, with: [exercise])
+        await activeViewModel.loadHistoryForCurrentExercise()
+
+        func flags(_ groups: [WorkoutHistoryGroup]) -> [UUID: Bool] {
+            Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0.isExcludedFromProgression) })
+        }
+
+        let detailFlags = flags(detailViewModel.historyWorkouts)
+        let activeFlags = flags(activeViewModel.subTabHistory)
+
+        XCTAssertEqual(detailFlags[excludedWorkoutId], true)
+        XCTAssertEqual(detailFlags[countedWorkoutId], false)
+        XCTAssertEqual(
+            activeFlags[excludedWorkoutId], detailFlags[excludedWorkoutId],
+            "the two history loaders disagree about the excluded session"
+        )
+        XCTAssertEqual(
+            activeFlags[countedWorkoutId], detailFlags[countedWorkoutId],
+            "the two history loaders disagree about the counted session"
+        )
+    }
+
+    /// The chip is resolved per exercise, so a session excluded for *one* exercise must leave the
+    /// others in that same session unmarked.
+    func testExerciseScopedExclusionMarksOnlyTheNamedExercise() async throws {
+        let stack = try Stack()
+        let bench = Fixture.barbell()
+        let row = Exercise(
+            name: "Barbell Row",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "back"
+        )
+        try await stack.exerciseRepo.save(bench)
+        try await stack.exerciseRepo.save(row)
+
+        let date = Date().addingTimeInterval(-10 * 86_400)
+        let workout = Workout(
+            date: date, startTime: date, endTime: date.addingTimeInterval(1_800),
+            duration: 1_800, status: .completed,
+            excludedExerciseIdsFromProgressionHistory: [bench.id]
+        )
+        try await stack.workoutRepo.save(workout)
+        for (index, exercise) in [bench, row].enumerated() {
+            _ = try await stack.setService.save(WorkoutSet(
+                workoutId: workout.id, exerciseId: exercise.id, date: date, completedAt: date,
+                weight: 60, reps: 8, setType: .working,
+                orderInWorkout: index + 1, orderInExercise: 1, completed: true
+            ))
+        }
+
+        func historyFlag(for exerciseId: UUID) async -> Bool? {
+            let viewModel = ExerciseDetailViewModel(
+                exerciseId: exerciseId,
+                exerciseService: stack.exerciseService,
+                prService: stack.prService,
+                setService: stack.setService,
+                statsService: stack.statsService,
+                workoutService: stack.workoutService
+            )
+            await viewModel.loadHistory()
+            return viewModel.historyWorkouts.first { $0.id == workout.id }?.isExcludedFromProgression
+        }
+
+        let benchFlag = await historyFlag(for: bench.id)
+        let rowFlag = await historyFlag(for: row.id)
+
+        XCTAssertEqual(benchFlag, true)
+        XCTAssertEqual(
+            rowFlag, false,
+            "the row's history must stay unmarked — the exclusion did not name it"
+        )
+    }
+
+    @discardableResult
+    private func seedSession(
+        _ stack: Stack,
+        exercise: Exercise,
+        date: Date,
+        weight: Double,
+        reps: Int,
+        excludeFromProgressionHistory: Bool
+    ) async throws -> UUID {
+        let workout = Workout(
+            date: date,
+            startTime: date,
+            endTime: date.addingTimeInterval(1_800),
+            duration: 1_800,
+            status: .completed,
+            excludeFromProgressionHistory: excludeFromProgressionHistory
+        )
+        try await stack.workoutRepo.save(workout)
+
+        _ = try await stack.setService.save(WorkoutSet(
+            workoutId: workout.id,
+            exerciseId: exercise.id,
+            date: date,
+            completedAt: date,
+            weight: weight,
+            reps: reps,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        ))
+        return workout.id
     }
 
 }

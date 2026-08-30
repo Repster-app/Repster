@@ -137,14 +137,17 @@ final class PostHogAnalyticsClient: AnalyticsClientProtocol {
         config.errorTrackingConfig.autoCapture = true
     }
 
-    /// Session replay masks everything by default. Repster is SwiftUI, so
-    /// `maskAllTextInputs` masks *every* text layer (PostHog masks
-    /// `SwiftUI.CGDrawingView`), not just editable fields.
+    /// Session replay records the app legibly and masks named values, rather than the
+    /// other way round. Until 1.5 the default was to mask everything and opt screens in
+    /// one at a time; that left six whole sections and 41 of the app's 45 sheets black,
+    /// because a sheet is a separate presentation and does not inherit an enclosing
+    /// unmask. What survived was too patchy to diagnose anything with.
     ///
-    /// Screens opt out of that default one at a time via `replayVisible()`, and free-text
-    /// fields opt back in via `replayMasked()` — `Repster/Core/Extensions/ReplayPrivacy.swift`
-    /// holds both, the reasoning, and the list of files that must change alongside them.
-    /// `grep -r replayVisible` is the complete inventory of what a recording can show.
+    /// So `maskAllTextInputs` is off, and the values that must never leave the device
+    /// are masked at the field via `replayMasked()` — `Repster/Core/Extensions/ReplayPrivacy.swift`
+    /// holds the modifier and the reasoning. `grep -r replayMasked` is the complete list
+    /// of what a recording hides, and `ReplayMaskCoverageTests` fails the build when a
+    /// new free-text field is added without one.
     ///
     /// Keep this in sync with `docs/privacy.html` and
     /// `marketing/app-store/privacy-review-checklist.md`.
@@ -155,8 +158,18 @@ final class PostHogAnalyticsClient: AnalyticsClientProtocol {
         // mode is the supported path, and is only safe because of the masking below.
         config.sessionReplayConfig.screenshotMode = true
 
-        config.sessionReplayConfig.maskAllTextInputs = true
-        config.sessionReplayConfig.maskAllImages = true
+        // Off: see the note above. Free text and bodyweight are masked per field.
+        config.sessionReplayConfig.maskAllTextInputs = false
+
+        // Repster has no photo picker and no remote imagery — every image in the app is
+        // one Repster ships or an SF Symbol. PostHog spares those for `UIImageView`, but
+        // SwiftUI images arrive as `SwiftUI.ImageLayer`, where `isSwiftUIImageSensitive`
+        // cannot tell an asset from a photo and blacks out all of them. Nothing here is
+        // user content, so the flag only cost us the icons.
+        config.sessionReplayConfig.maskAllImages = false
+
+        // Stays on: `_UIRemoteView` is drawn by another process — the share sheet, the
+        // Health permission sheet — and its contents are not ours to record.
         config.sessionReplayConfig.maskAllSandboxedViews = true
 
         // Nothing about network traffic or logs is worth the disclosure surface.

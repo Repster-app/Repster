@@ -37,6 +37,9 @@ struct BodyweightLogView: View {
                     entryListSection
                 }
                 .listStyle(.insetGrouped)
+                // Every figure on this screen is the user's bodyweight. The title and
+                // the add button stay visible so the screen is still recognisable.
+                .replayMasked()
             }
         }
         .navigationTitle("Bodyweight Log")

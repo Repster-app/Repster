@@ -300,6 +300,9 @@ struct WorkoutSummarySheet: View {
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
                     .submitLabel(.done)
+                    // Masked while it is being typed. The saved title is content, and
+                    // shows up across Home, Calendar and history like any other.
+                    .replayMasked()
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
                     .background(Color.bgInput)
@@ -358,7 +361,7 @@ struct WorkoutSummarySheet: View {
                         .stroke(Color.border, lineWidth: 1)
                 }
                 // The one field on a workout screen whose contents cannot be predicted
-                // from its purpose. Stays black inside a `replayVisible()` sheet.
+                // from its purpose — an injury, a medication, anything.
                 .replayMasked()
             }
         }
@@ -898,16 +901,20 @@ private struct SaveWorkoutAsTemplatePromptModifier: ViewModifier {
     let onError: (Error) -> Void
 
     func body(content: Content) -> some View {
-        content.alert("Save as Template", isPresented: $controller.showPrompt) {
-            TextField("Template name", text: $controller.templateName)
-            Button("Cancel", role: .cancel) { }
-            Button("Save") {
-                guard let workoutId else { return }
-                Task { await handleSave(workoutId: workoutId) }
+        // An alert's text field is built by `UIAlertController`, so `replayMasked()`
+        // never reaches it — see `ReplayPrivacy.swift`.
+        content
+            .replayPaused(while: controller.showPrompt)
+            .alert("Save as Template", isPresented: $controller.showPrompt) {
+                TextField("Template name", text: $controller.templateName)
+                Button("Cancel", role: .cancel) { }
+                Button("Save") {
+                    guard let workoutId else { return }
+                    Task { await handleSave(workoutId: workoutId) }
+                }
+            } message: {
+                Text("Save this workout's exercises and set structure as a reusable template. Weights are not included.")
             }
-        } message: {
-            Text("Save this workout's exercises and set structure as a reusable template. Weights are not included.")
-        }
     }
 
     private func handleSave(workoutId: UUID) async {

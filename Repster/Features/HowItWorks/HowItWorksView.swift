@@ -73,8 +73,6 @@ struct HowItWorksView: View {
             .padding(.bottom, 20)
         }
         .background(Color.bg)
-        // Six pages of copy from `HowItWorksPage` and nothing else.
-        .replayVisible()
         .onAppear { reportPage() }
         .onChange(of: index) { _, _ in reportPage() }
     }

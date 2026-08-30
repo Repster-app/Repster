@@ -95,7 +95,7 @@ struct ActiveWorkoutView: View {
             headerBar
 
             // Exercise tab strip (WP04)
-            ExerciseTabStripView(dataSource: viewModel)
+            ExerciseTabStripView(dataSource: viewModel, services: services)
 
             if viewModel.currentExercise != nil {
                 // Sub-tab picker: [Sets | History | Charts] (T025)
@@ -127,8 +127,12 @@ struct ActiveWorkoutView: View {
                 viewModel.recalculateTimerAfterBackground()
             }
         }
-        // Reset sub-tab to .sets when switching exercises (T028)
-        .onChange(of: viewModel.selectedExerciseIndex) { _, _ in
+        // Reset sub-tab to .sets when switching exercises (T028).
+        // Keyed on identity, not index: reordering past the selection or replacing in place changes
+        // the exercise while the integer stays put, and this must still run — the keypad especially,
+        // which lives outside the `.id()`-keyed set table and would otherwise stay bound to a row
+        // that is no longer on screen.
+        .onChange(of: viewModel.selectedExerciseId) { _, _ in
             selectedSubTab = .sets
             viewModel.clearSubTabCache()
             setKeyboardManager.hide()
@@ -168,9 +172,6 @@ struct ActiveWorkoutView: View {
         // Finish workout summary sheet (WP07 T032)
         .sheet(isPresented: $viewModel.showFinishSheet) {
             WorkoutSummarySheet(viewModel: viewModel)
-                // A sheet is a separate presentation, so it does not inherit the
-                // `replayVisible()` above.
-                .replayVisible()
                 .onAppear {
                     services.analyticsService.screen(.workoutSummary)
                 }
@@ -181,10 +182,6 @@ struct ActiveWorkoutView: View {
                 dismiss()
             }
         }
-        // Sets, reps and RIR — the same figures the event stream already carries in
-        // bucketed form. No free-text field lives on this screen; the two that exist are
-        // on the summary sheet, which masks them individually.
-        .replayVisible()
     }
 
     // MARK: - Sub-Tab Picker (T025)

@@ -43,7 +43,7 @@ struct EditWorkoutView: View {
         VStack(spacing: 0) {
             headerBar
 
-            ExerciseTabStripView(dataSource: viewModel)
+            ExerciseTabStripView(dataSource: viewModel, services: services)
 
             if viewModel.isLoading {
                 Spacer()
@@ -71,7 +71,8 @@ struct EditWorkoutView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             SetEntryKeyboardOverlay(manager: setKeyboardManager)
         }
-        .onChange(of: viewModel.selectedExerciseIndex) { _, _ in
+        // Identity, not index — see ActiveWorkoutView for why.
+        .onChange(of: viewModel.selectedExerciseId) { _, _ in
             setKeyboardManager.hide()
         }
         .task {
@@ -83,7 +84,7 @@ struct EditWorkoutView: View {
         .sheet(isPresented: $showWorkoutProgressionSheet) {
             if let workout = viewModel.workout {
                 WorkoutProgressionSheet(
-                    workout: workout,
+                    workout: WorkoutSnapshot(from: workout),
                     exercises: viewModel.exercises,
                     showsExerciseOverrides: false
                 ) { excludeWorkout, excludedExerciseIds in
@@ -172,6 +173,8 @@ struct EditWorkoutView: View {
             }
             .background(Color.bgCard)
             .cornerRadius(10)
+            // Same field as on the summary sheet, reached from history instead.
+            .replayMasked()
         }
     }
 

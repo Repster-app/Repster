@@ -350,6 +350,17 @@ struct SettingsView: View {
                         showChevron: false
                     )
                 }
+
+                NavigationLink {
+                    InsightRuleDiagnosticsView(insightsService: services.insightsService)
+                } label: {
+                    SettingsNavigationRow(
+                        title: "Insight Rules",
+                        systemImage: "list.bullet.rectangle",
+                        summary: "Admin",
+                        showChevron: false
+                    )
+                }
             }
         }
     }

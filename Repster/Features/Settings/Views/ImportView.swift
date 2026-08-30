@@ -255,6 +255,10 @@ struct ImportView: View {
                         .font(.headline)
                         .foregroundStyle(Color.textPrimary)
 
+                    // Rows out of the user's own export file. The policy says CSV
+                    // contents are never sent, and a recording of them would be sending
+                    // them. Only the sample rows are masked; the column mapping above is
+                    // Repster's own labels and is the part worth watching.
                     ScrollView(.horizontal, showsIndicators: true) {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 0) {
@@ -282,6 +286,7 @@ struct ImportView: View {
                         }
                         .padding()
                     }
+                    .replayMasked()
                 }
                 .background(Color.bgCard)
                 .cornerRadius(12)

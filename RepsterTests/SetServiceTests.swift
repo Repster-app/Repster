@@ -950,6 +950,326 @@ final class SetServiceTests: XCTestCase {
         XCTAssertEqual(persistedAllowedSet?.prStatus, .current)
     }
 
+    // MARK: - Retroactive Progression Exclusion (WorkoutService.updateProgressionHistoryExclusions)
+    //
+    // The two tests above cover the flag as it behaves *at save time*. Flipping it on a workout
+    // that is already finished is a different path — it has to rebuild history that was derived
+    // under the opposite rule — and it was the one with no coverage at all: the only reference to
+    // `updateProgressionHistoryExclusions` in this suite was an empty mock stub.
+    //
+    // This matters because an excluded session does not merely lose its own badges. Its rep-max
+    // records vanish from the frontier, so a *lower*-rep set from some other day surfaces in their
+    // place, and the PR table looks plausible while being wrong. That is exactly what a real
+    // history hit: a 55 kg x 8 sat inside an excluded workout, so 55 kg x 6 from two months later
+    // showed as the standing PR and no amount of "recompute PRs" changed it — the rebuild kept
+    // faithfully re-deriving the same excluded answer.
+
+    func testUnexcludingFinishedWorkoutRestoresItsPRsAndDemotesTheLowerRepSet() async throws {
+        let context = try makeContext()
+        let excludedDate = makeDate(2026, 3, 29, 14, 7)
+        let countedDate = makeDate(2026, 6, 11, 5, 53)
+        let exercise = Exercise(
+            name: "Incline Smith Barbell Press",
+            equipmentType: .machinePin,
+            trackingType: .weightReps,
+            primaryMuscle: "chest"
+        )
+        let excludedWorkout = Workout(
+            date: excludedDate,
+            startTime: excludedDate,
+            endTime: excludedDate.addingTimeInterval(5_482),
+            duration: 5_482,
+            status: .completed,
+            excludeFromProgressionHistory: true
+        )
+        let countedWorkout = Workout(
+            date: countedDate,
+            startTime: countedDate,
+            endTime: countedDate.addingTimeInterval(3_600),
+            duration: 3_600,
+            status: .completed,
+            excludeFromProgressionHistory: false
+        )
+        // Strictly the better set — same weight, two more reps — but inside the excluded session.
+        let strongerSet = WorkoutSet(
+            workoutId: excludedWorkout.id,
+            exerciseId: exercise.id,
+            date: excludedDate,
+            completedAt: excludedDate.addingTimeInterval(720),
+            weight: 55,
+            reps: 8,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+        let weakerSet = WorkoutSet(
+            workoutId: countedWorkout.id,
+            exerciseId: exercise.id,
+            date: countedDate,
+            completedAt: countedDate.addingTimeInterval(420),
+            weight: 55,
+            reps: 6,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(excludedWorkout)
+        try await context.workoutRepo.save(countedWorkout)
+        _ = try await context.setService.save(strongerSet)
+        _ = try await context.setService.save(weakerSet)
+
+        // Before: the 8-rep set is invisible, so the 6-rep set owns the frontier.
+        let tableWhileExcluded = try await context.prService.fetchPRTable(for: exercise.id)
+        XCTAssertEqual(tableWhileExcluded.map(\.reps), [6])
+        XCTAssertEqual(tableWhileExcluded.first?.value ?? 0, 55, accuracy: 0.001)
+        XCTAssertEqual(tableWhileExcluded.first?.setId, weakerSet.id)
+        var persistedStronger = try await context.setRepo.fetch(byId: strongerSet.id)
+        var persistedWeaker = try await context.setRepo.fetch(byId: weakerSet.id)
+        XCTAssertNil(persistedStronger?.prStatus)
+        XCTAssertEqual(persistedWeaker?.prStatus, .current)
+
+        try await context.workoutService.updateProgressionHistoryExclusions(
+            excludedWorkout.id,
+            excludeWorkout: false,
+            excludedExerciseIds: []
+        )
+
+        // After: the 8-rep record exists and takes the frontier; 55 kg x 6 says nothing further
+        // about capability once 55 kg x 8 is on the board, so it drops off the visible table.
+        let records = try await context.performanceRecordRepo.fetchAll(
+            for: exercise.id,
+            recordType: .repMax
+        )
+        XCTAssertEqual(Set(records.compactMap(\.reps)), [6, 8])
+        let eightRepRecord = records.first { $0.reps == 8 }
+        XCTAssertEqual(eightRepRecord?.value ?? 0, 55, accuracy: 0.001)
+        XCTAssertEqual(eightRepRecord?.setId, strongerSet.id)
+
+        let tableAfterInclusion = try await context.prService.fetchPRTable(for: exercise.id)
+        XCTAssertEqual(tableAfterInclusion.map(\.reps), [8])
+        XCTAssertEqual(tableAfterInclusion.first?.setId, strongerSet.id)
+
+        persistedStronger = try await context.setRepo.fetch(byId: strongerSet.id)
+        persistedWeaker = try await context.setRepo.fetch(byId: weakerSet.id)
+        XCTAssertEqual(persistedStronger?.prStatus, .current)
+        XCTAssertEqual(persistedWeaker?.prStatus, .dominated)
+    }
+
+    func testExcludingFinishedWorkoutHandsItsPRToTheNextBestSet() async throws {
+        let context = try makeContext()
+        let firstDate = makeDate(2026, 4, 7, 9, 10)
+        let secondDate = makeDate(2026, 4, 19, 11, 39)
+        let exercise = Exercise(
+            name: "Chest Press",
+            equipmentType: .machinePin,
+            trackingType: .weightReps,
+            primaryMuscle: "chest"
+        )
+        let workoutToExclude = Workout(
+            date: firstDate,
+            startTime: firstDate,
+            endTime: firstDate.addingTimeInterval(3_782),
+            duration: 3_782,
+            status: .completed
+        )
+        let survivingWorkout = Workout(
+            date: secondDate,
+            startTime: secondDate,
+            endTime: secondDate.addingTimeInterval(3_721),
+            duration: 3_721,
+            status: .completed
+        )
+        let bestSet = WorkoutSet(
+            workoutId: workoutToExclude.id,
+            exerciseId: exercise.id,
+            date: firstDate,
+            completedAt: firstDate.addingTimeInterval(600),
+            weight: 70,
+            reps: 8,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+        let runnerUpSet = WorkoutSet(
+            workoutId: survivingWorkout.id,
+            exerciseId: exercise.id,
+            date: secondDate,
+            completedAt: secondDate.addingTimeInterval(600),
+            weight: 67.5,
+            reps: 8,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(workoutToExclude)
+        try await context.workoutRepo.save(survivingWorkout)
+        _ = try await context.setService.save(bestSet)
+        _ = try await context.setService.save(runnerUpSet)
+
+        let tableBefore = try await context.prService.fetchPRTable(for: exercise.id)
+        XCTAssertEqual(tableBefore.map(\.reps), [8])
+        XCTAssertEqual(tableBefore.first?.value ?? 0, 70, accuracy: 0.001)
+        XCTAssertEqual(tableBefore.first?.setId, bestSet.id)
+
+        try await context.workoutService.updateProgressionHistoryExclusions(
+            workoutToExclude.id,
+            excludeWorkout: true,
+            excludedExerciseIds: []
+        )
+
+        // The record must be handed to the next eligible set rather than left pointing at a set
+        // that no longer counts — and the excluded set must lose its badge.
+        let records = try await context.performanceRecordRepo.fetchAll(
+            for: exercise.id,
+            recordType: .repMax
+        )
+        XCTAssertEqual(records.count, 1)
+        XCTAssertEqual(records.first?.reps, 8)
+        XCTAssertEqual(records.first?.value ?? 0, 67.5, accuracy: 0.001)
+        XCTAssertEqual(records.first?.setId, runnerUpSet.id)
+
+        let tableAfter = try await context.prService.fetchPRTable(for: exercise.id)
+        XCTAssertEqual(tableAfter.map(\.reps), [8])
+        XCTAssertEqual(tableAfter.first?.setId, runnerUpSet.id)
+
+        let persistedBest = try await context.setRepo.fetch(byId: bestSet.id)
+        let persistedRunnerUp = try await context.setRepo.fetch(byId: runnerUpSet.id)
+        XCTAssertNil(persistedBest?.prStatus)
+        XCTAssertEqual(persistedRunnerUp?.prStatus, .current)
+    }
+
+    // MARK: - Progression Exclusion Visibility
+    //
+    // The lookup behind the history chip. Its whole job is to agree with what PRService actually
+    // excludes — a chip that disagrees with the PR table is worse than no chip, because it
+    // teaches people to distrust a signal that is usually right.
+
+    func testHistoryExclusionLookupResolvesWholeWorkoutAndPerExerciseFlags() async throws {
+        let context = try makeContext()
+        let date = makeDate(2026, 4, 7, 9, 10)
+        let benchId = UUID()
+        let rowId = UUID()
+
+        let wholeWorkoutExcluded = Workout(date: date, status: .completed, excludeFromProgressionHistory: true)
+        let benchOnlyExcluded = Workout(
+            date: date,
+            status: .completed,
+            excludedExerciseIdsFromProgressionHistory: [benchId]
+        )
+        let counted = Workout(date: date, status: .completed)
+
+        for workout in [wholeWorkoutExcluded, benchOnlyExcluded, counted] {
+            try await context.workoutRepo.save(workout)
+        }
+        let allIds: Set<UUID> = [wholeWorkoutExcluded.id, benchOnlyExcluded.id, counted.id]
+
+        let excludedForBench = try await context.workoutService.excludedWorkoutIdsForProgressionHistory(
+            workoutIds: allIds,
+            exerciseId: benchId
+        )
+        let excludedForRow = try await context.workoutService.excludedWorkoutIdsForProgressionHistory(
+            workoutIds: allIds,
+            exerciseId: rowId
+        )
+
+        XCTAssertEqual(excludedForBench, [wholeWorkoutExcluded.id, benchOnlyExcluded.id])
+
+        // The case that breaks a naive `workout.excludeFromProgressionHistory` read: the workout
+        // IS flagged, but not for this exercise, so the row's history must stay unmarked.
+        XCTAssertEqual(
+            excludedForRow,
+            [wholeWorkoutExcluded.id],
+            "An exercise-scoped exclusion must not mark the exercises it does not name"
+        )
+    }
+
+    func testHistoryExclusionLookupMatchesWhatPRServiceExcludes() async throws {
+        let context = try makeContext()
+        let date = makeDate(2026, 4, 7, 9, 30)
+        let exercise = Exercise(
+            name: "Bench Press",
+            equipmentType: .barbell,
+            trackingType: .weightReps,
+            primaryMuscle: "chest"
+        )
+        let excludedWorkout = Workout(
+            date: date,
+            status: .completed,
+            excludedExerciseIdsFromProgressionHistory: [exercise.id]
+        )
+        let set = WorkoutSet(
+            workoutId: excludedWorkout.id,
+            exerciseId: exercise.id,
+            date: date,
+            completedAt: date.addingTimeInterval(300),
+            weight: 100,
+            reps: 5,
+            setType: .working,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            completed: true
+        )
+
+        try await context.exerciseRepo.save(exercise)
+        try await context.workoutRepo.save(excludedWorkout)
+        _ = try await context.setService.save(set)
+
+        let flaggedForHistory = try await context.workoutService.excludedWorkoutIdsForProgressionHistory(
+            workoutIds: [excludedWorkout.id],
+            exerciseId: exercise.id
+        )
+        let records = try await context.performanceRecordRepo.fetchAll(
+            for: exercise.id,
+            recordType: .repMax
+        )
+
+        // The chip says "not counted"; the PR table must actually not count it.
+        XCTAssertEqual(flaggedForHistory, [excludedWorkout.id])
+        XCTAssertTrue(records.isEmpty, "History chip and PR eligibility disagree")
+    }
+
+    func testWorkoutSnapshotCarriesProgressionExclusionsToTheDetailBanner() async throws {
+        let context = try makeContext()
+        let date = makeDate(2026, 4, 19, 11, 39)
+        let exerciseId = UUID()
+        let workout = Workout(
+            date: date,
+            status: .completed,
+            excludeFromProgressionHistory: true,
+            excludedExerciseIdsFromProgressionHistory: [exerciseId]
+        )
+        try await context.workoutRepo.save(workout)
+
+        let snapshot = try await context.workoutService.fetchWorkoutSummary(workout.id)
+
+        XCTAssertEqual(snapshot?.excludesEntireWorkoutFromProgressionHistory, true)
+        XCTAssertEqual(snapshot?.excludedExerciseIdsForProgressionHistory, [exerciseId])
+        XCTAssertEqual(snapshot?.excludesFromProgressionHistory(exerciseId: exerciseId), true)
+        XCTAssertEqual(snapshot?.excludesFromProgressionHistory(exerciseId: UUID()), true)
+    }
+
+    func testWorkoutSnapshotReportsNoExclusionForAnUnflaggedWorkout() async throws {
+        let context = try makeContext()
+        let date = makeDate(2026, 4, 19, 12, 0)
+        let workout = Workout(date: date, status: .completed)
+        try await context.workoutRepo.save(workout)
+
+        let snapshot = try await context.workoutService.fetchWorkoutSummary(workout.id)
+
+        // nil on the model means false, not "unknown" — the banner must stay hidden.
+        XCTAssertEqual(snapshot?.excludesEntireWorkoutFromProgressionHistory, false)
+        XCTAssertEqual(snapshot?.excludedExerciseIdsForProgressionHistory, [])
+        XCTAssertEqual(snapshot?.excludesFromProgressionHistory(exerciseId: UUID()), false)
+    }
+
     func testSaveWeightRepsDurationSetDoesNotCreatePRRecordOrBadge() async throws {
         let context = try makeContext()
         let workoutDate = makeDate(2026, 3, 22, 9, 15)
@@ -1570,12 +1890,25 @@ final class SetServiceTests: XCTestCase {
             prService: prService,
             modelContainer: container
         )
+        let workoutService = WorkoutService(
+            workoutRepository: workoutRepo,
+            setRepository: setRepo,
+            prService: prService,
+            statsService: statsService,
+            fatigueLearningService: fatigueLearningService,
+            bodyweightService: BodyweightService(
+                bodyweightEntryRepository: bodyweightRepo,
+                healthProfileRepository: healthProfileRepo
+            ),
+            healthKitService: NoopHealthKitService()
+        )
 
         return SetServiceTestContext(
             modelContainer: container,
             setService: setService,
             statsService: statsService,
             prService: prService,
+            workoutService: workoutService,
             backupService: backupService,
             exerciseRepo: exerciseRepo,
             workoutRepo: workoutRepo,
@@ -1750,6 +2083,7 @@ private struct SetServiceTestContext {
     let setService: SetService
     let statsService: StatsService
     let prService: PRService
+    let workoutService: WorkoutService
     let backupService: WorkoutHistoryBackupService
     let exerciseRepo: ExerciseRepository
     let workoutRepo: WorkoutRepository

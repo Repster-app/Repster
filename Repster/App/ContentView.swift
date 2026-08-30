@@ -390,8 +390,6 @@ struct ContentView: View {
                     onConnected: { showAppleHealthOffer = false },
                     onDecline: { showAppleHealthOffer = false }
                 )
-                // Fixed copy, and the decline rate here is the thing being watched.
-                .replayVisible()
                 .onAppear { healthOffer.promptShown() }
             }
         }

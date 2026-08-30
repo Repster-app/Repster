@@ -86,6 +86,9 @@ struct CreateEditExerciseSheet: View {
     private var basicInfoSection: some View {
         Section("Basic Info") {
             TextField("Exercise Name", text: $viewModel.name)
+                // Masked while typed; the saved name is content, shown on every screen
+                // the exercise appears on.
+                .replayMasked()
                 .focused($focusedField, equals: .name)
                 .submitLabel(.done)
                 .onSubmit {

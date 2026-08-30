@@ -16,6 +16,7 @@ final class ExerciseDetailViewModel {
     private let prService: any PRServiceProtocol
     private let setService: any SetServiceProtocol
     private let statsService: any StatsServiceProtocol
+    private let workoutService: any WorkoutServiceProtocol
 
     // MARK: - Published State
 
@@ -38,13 +39,15 @@ final class ExerciseDetailViewModel {
         exerciseService: any ExerciseServiceProtocol,
         prService: any PRServiceProtocol,
         setService: any SetServiceProtocol,
-        statsService: any StatsServiceProtocol
+        statsService: any StatsServiceProtocol,
+        workoutService: any WorkoutServiceProtocol
     ) {
         self.exerciseId = exerciseId
         self.exerciseService = exerciseService
         self.prService = prService
         self.setService = setService
         self.statsService = statsService
+        self.workoutService = workoutService
     }
 
     // MARK: - Load Exercise (on appear)
@@ -63,11 +66,18 @@ final class ExerciseDetailViewModel {
         guard !historyLoaded else { return }
         let sets = (try? await setService.fetchSetSnapshots(for: exerciseId, limit: nil)) ?? []
         let grouped = Dictionary(grouping: sets) { $0.workoutId }
+        // One lookup for the whole tab rather than one per session. A failure degrades to
+        // "nothing is excluded" — a missing chip is a worse screen, not a broken one.
+        let excludedWorkoutIds = (try? await workoutService.excludedWorkoutIdsForProgressionHistory(
+            workoutIds: Set(grouped.keys),
+            exerciseId: exerciseId
+        )) ?? []
         historyWorkouts = grouped.map { workoutId, workoutSets in
             WorkoutHistoryGroup(
                 id: workoutId,
                 date: workoutSets.first?.date ?? Date(),
-                sets: workoutSets.sorted { $0.orderInExercise < $1.orderInExercise }
+                sets: workoutSets.sorted { $0.orderInExercise < $1.orderInExercise },
+                isExcludedFromProgression: excludedWorkoutIds.contains(workoutId)
             )
         }
         .sorted { $0.date > $1.date }

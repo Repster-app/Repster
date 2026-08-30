@@ -115,7 +115,21 @@ protocol SetTableDataSource: AnyObject, Observable {
     var exercises: [ChartExerciseData] { get }
 
     /// Index of the currently selected exercise in the tab strip.
+    ///
+    /// This is the strip's tap target and nothing more. It is **not** a stable handle on what the
+    /// user is looking at: mutating `exercises` shifts the array underneath a fixed integer, so the
+    /// same index can silently come to mean a different exercise. Observe `selectedExerciseId` for
+    /// that. See EXERCISE_REPLACE_AND_REORDER_DESIGN.md §3.
     var selectedExerciseIndex: Int { get set }
+
+    /// Identity of the currently selected exercise.
+    ///
+    /// The screen's identity *is* the exercise; the index is an implementation detail of a
+    /// horizontal strip. Views that need to react to "the user is now on a different exercise" —
+    /// resetting the sub-tab, clearing derived caches, dismissing the keypad — must key off this
+    /// rather than the index, because reordering past the selection or replacing in place changes
+    /// the exercise while leaving the integer untouched.
+    var selectedExerciseId: UUID? { get }
 
     // MARK: - Computed
 
@@ -174,6 +188,13 @@ protocol SetTableDataSource: AnyObject, Observable {
 
     /// Remove the exercise at the given index and delete all its sets.
     func removeExercise(at index: Int) async
+
+    /// Swap the exercise at `index` for `newExerciseId`, keeping its position in the strip.
+    ///
+    /// The outgoing exercise's sets are deleted and one empty working set is seeded, making this
+    /// equivalent in data terms to delete-then-add — it removes the tab-walking, not the semantics.
+    /// No-ops when the index is out of range or `newExerciseId` is already in the workout.
+    func replaceExercise(at index: Int, with newExerciseId: UUID) async
 
     /// Analytics only: the user tapped an exercise tab.
     ///

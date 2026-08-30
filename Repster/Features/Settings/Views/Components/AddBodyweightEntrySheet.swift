@@ -27,6 +27,8 @@ struct AddBodyweightEntrySheet: View {
                         Text(UnitConversion.weightUnitLabel(for: unitPreference))
                             .foregroundStyle(Color.textSecondary)
                     }
+                    // A health figure: masked wherever it appears.
+                    .replayMasked()
                 }
                 Section {
                     DatePicker("Date", selection: $date, displayedComponents: .date)

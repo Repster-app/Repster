@@ -14,6 +14,7 @@ struct CalendarView: View {
     @State private var workoutToSaveAsTemplate: WorkoutSnapshot? = nil
     @State private var workoutToEditId: UUID?
     @State private var workoutToDelete: WorkoutSnapshot? = nil
+    @State private var workoutToEditProgression: WorkoutSnapshot? = nil
     @State private var isDeletingWorkout = false
     @State private var saveAsTemplateController = SaveWorkoutAsTemplateController()
     @State private var templateFeedback: TemplateSaveFeedback? = nil
@@ -174,6 +175,25 @@ struct CalendarView: View {
                 guard oldValue != nil, newValue == nil, let selectedDate = viewModel.selectedDate else { return }
                 Task { await viewModel.selectDate(selectedDate) }
             }
+            .sheet(item: $workoutToEditProgression) { workout in
+                WorkoutProgressionSheet(
+                    workout: workout,
+                    exercises: [],
+                    showsExerciseOverrides: false
+                ) { excludeWorkout, excludedExerciseIds in
+                    try await services.workoutService.updateProgressionHistoryExclusions(
+                        workout.id,
+                        excludeWorkout: excludeWorkout,
+                        excludedExerciseIds: excludedExerciseIds
+                    )
+                }
+            }
+            .onChange(of: workoutToEditProgression) { oldValue, newValue in
+                // The save rebuilds PRs for every exercise in the workout, so the detail
+                // pane behind the sheet is stale until the date is reloaded.
+                guard oldValue != nil, newValue == nil, let selectedDate = viewModel.selectedDate else { return }
+                Task { await viewModel.selectDate(selectedDate) }
+            }
             .confirmationDialog(
                 "Delete Workout",
                 isPresented: Binding(
@@ -306,6 +326,9 @@ struct CalendarView: View {
                     },
                     onDeleteWorkout: { workout in
                         workoutToDelete = workout
+                    },
+                    onEditProgression: { workout in
+                        workoutToEditProgression = workout
                     },
                     onExerciseTapped: { exerciseId in
                         navigationPath.append(exerciseId)

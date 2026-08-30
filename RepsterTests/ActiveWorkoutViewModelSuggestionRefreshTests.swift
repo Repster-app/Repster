@@ -1679,13 +1679,26 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         XCTAssertEqual(viewModel.selectedExerciseIndex, 2)
         XCTAssertEqual(viewModel.currentExercise?.id, exerciseB.id)
 
+        // Ordering is persisted as ONE batched `applyOrdering`, never per-set `edit()`.
+        // This assertion replaced an `editedSetIds` one that pinned the fan-out this migration
+        // removed — see EXERCISE_REPLACE_AND_REORDER_DESIGN.md §2.
         try await waitUntil {
-            setService.editedSetIds.count == 5
+            !setService.orderingBatches.isEmpty
         }
 
         XCTAssertEqual(
-            setService.editedSetIds,
-            [aWarmup.id, aWorking.id, cWorking.id, bWarmup.id, bWorking.id]
+            setService.orderingBatches.count,
+            1,
+            "one reorder should be one batched write, not one per set"
+        )
+        XCTAssertTrue(
+            setService.editedSetIds.isEmpty,
+            "ordering must not run the PR/stats/fatigue pipeline via edit()"
+        )
+        XCTAssertEqual(
+            setService.orderingBatches.first?.map(\.setId),
+            [cWorking.id, bWarmup.id, bWorking.id],
+            "only the sets whose orderInWorkout actually moved should be written"
         )
         XCTAssertEqual(
             [aWarmup.orderInWorkout, aWorking.orderInWorkout, cWorking.orderInWorkout, bWarmup.orderInWorkout, bWorking.orderInWorkout],
@@ -1695,6 +1708,227 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             viewModel.setsByExercise[exerciseB.id]?.sorted { $0.orderInExercise < $1.orderInExercise }.map(\.orderInWorkout),
             [4, 5]
         )
+    }
+
+    // MARK: - Identity-based selection (EXERCISE_REPLACE_AND_REORDER_DESIGN.md §3)
+
+    /// One exercise per name, one working set each, contiguous `orderInWorkout` from 1.
+    ///
+    /// `spares` are registered with the exercise service but left *out* of the workout — the pool a
+    /// replacement can be picked from.
+    private func makeStripFixture(
+        names: [String],
+        selecting selectedIndex: Int,
+        spares: [String] = []
+    ) -> (
+        viewModel: ActiveWorkoutViewModel,
+        exercises: [Exercise],
+        spares: [Exercise],
+        setService: SetServiceStub
+    ) {
+        let profile = HealthProfile()
+        let setService = SetServiceStub()
+        let exerciseService = ExerciseServiceStub()
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: WorkoutServiceStub(),
+            setService: setService,
+            exerciseService: exerciseService,
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+
+        let exercises = names.map { makeExercise(name: $0) }
+        let spareExercises = spares.map { makeExercise(name: $0) }
+        for exercise in exercises + spareExercises {
+            exerciseService.fetchedExercises[exercise.id] = exercise
+        }
+
+        let workoutId = UUID()
+        viewModel.workout = Workout(id: workoutId, date: Date(), status: .inProgress)
+        viewModel.exercises = exercises.map { ChartExerciseData(from: $0) }
+
+        var sets: [UUID: [WorkoutSet]] = [:]
+        for (offset, exercise) in exercises.enumerated() {
+            sets[exercise.id] = [
+                WorkoutSet(
+                    workoutId: workoutId,
+                    exerciseId: exercise.id,
+                    reps: 8,
+                    rir: 2.0,
+                    orderInWorkout: offset + 1,
+                    orderInExercise: 1,
+                    completed: false
+                )
+            ]
+        }
+        viewModel.setsByExercise = sets
+        viewModel.selectedExerciseIndex = selectedIndex
+
+        return (viewModel, exercises, spareExercises, setService)
+    }
+
+    private var persistedSelectedExerciseId: UUID? {
+        UserDefaults.standard
+            .string(forKey: ActiveWorkoutSessionDefaultsKeys.selectedExerciseId)
+            .flatMap(UUID.init(uuidString:))
+    }
+
+    /// Defect B. Moving a *non-selected* exercise across the selection shifted the array underneath
+    /// a fixed integer, switching the user to a different exercise mid-set. Fails before the fix.
+    func testReorderingANonSelectedExerciseKeepsTheUserOnTheirExercise() throws {
+        let (viewModel, exercises, _, _) = makeStripFixture(names: ["A", "B", "C"], selecting: 1)
+        XCTAssertEqual(viewModel.currentExercise?.id, exercises[1].id, "precondition: on B")
+
+        // Move C in front of B. The user is on B and never touched C.
+        viewModel.reorderExercises(from: IndexSet(integer: 2), to: 1)
+
+        XCTAssertEqual(viewModel.exercises.map(\.id), [exercises[0].id, exercises[2].id, exercises[1].id])
+        XCTAssertEqual(
+            viewModel.currentExercise?.id,
+            exercises[1].id,
+            "selection must follow the exercise, not the slot"
+        )
+        XCTAssertEqual(viewModel.selectedExerciseId, exercises[1].id)
+        XCTAssertEqual(viewModel.selectedExerciseIndex, 2, "index re-derived from identity")
+    }
+
+    /// The case the old code got right. Must keep working.
+    func testReorderingTheSelectedExerciseKeepsSelectionOnIt() throws {
+        let (viewModel, exercises, _, _) = makeStripFixture(names: ["A", "B", "C"], selecting: 1)
+
+        viewModel.reorderExercises(from: IndexSet(integer: 1), to: 3)
+
+        XCTAssertEqual(viewModel.exercises.map(\.id), [exercises[0].id, exercises[2].id, exercises[1].id])
+        XCTAssertEqual(viewModel.currentExercise?.id, exercises[1].id)
+        XCTAssertEqual(viewModel.selectedExerciseIndex, 2)
+    }
+
+    /// Defect B at a third call site, found while implementing the fix. Removing an exercise
+    /// *before* the selected one shifts the array left, and the old clamp only fired when the index
+    /// ran off the end — so the user silently landed on the exercise *after* the one they were on,
+    /// while the persisted resume state still pointed at the right one. Fails before the fix.
+    func testRemovingAnExerciseBeforeTheSelectedOneKeepsTheUserOnTheirExercise() async throws {
+        let (viewModel, exercises, _, _) = makeStripFixture(names: ["A", "B", "C"], selecting: 1)
+        XCTAssertEqual(viewModel.currentExercise?.id, exercises[1].id, "precondition: on B")
+
+        await viewModel.removeExercise(at: 0)
+
+        XCTAssertEqual(viewModel.exercises.map(\.id), [exercises[1].id, exercises[2].id])
+        XCTAssertEqual(
+            viewModel.currentExercise?.id,
+            exercises[1].id,
+            "selection must follow the exercise, not the slot"
+        )
+        XCTAssertEqual(viewModel.selectedExerciseIndex, 0)
+        XCTAssertEqual(
+            persistedSelectedExerciseId,
+            exercises[1].id,
+            "screen and persisted resume state must agree"
+        )
+    }
+
+    /// Removing the exercise you are *on* has no anchor to return to, so it clamps — the old
+    /// behaviour, and the right one here.
+    func testRemovingTheSelectedExerciseClampsIntoRange() async throws {
+        let (viewModel, exercises, _, _) = makeStripFixture(names: ["A", "B", "C"], selecting: 2)
+
+        await viewModel.removeExercise(at: 2)
+
+        XCTAssertEqual(viewModel.exercises.map(\.id), [exercises[0].id, exercises[1].id])
+        XCTAssertEqual(viewModel.selectedExerciseIndex, 1)
+        XCTAssertEqual(viewModel.currentExercise?.id, exercises[1].id)
+        XCTAssertEqual(persistedSelectedExerciseId, exercises[1].id)
+    }
+
+    // MARK: - Replace exercise (EXERCISE_REPLACE_AND_REORDER_DESIGN.md §4)
+
+    /// The guard from §4.4.1. The strip's `ForEach` is keyed by exercise ID, so a duplicate would
+    /// give undefined selection and animation.
+    func testReplacingWithAnExerciseAlreadyInTheWorkoutIsRejected() async throws {
+        let (viewModel, exercises, _, setService) = makeStripFixture(names: ["A", "B", "C"], selecting: 1)
+
+        await viewModel.replaceExercise(at: 0, with: exercises[2].id)
+
+        XCTAssertEqual(viewModel.exercises.map(\.id), exercises.map(\.id), "nothing may move")
+        XCTAssertTrue(setService.deletedSetIds.isEmpty, "nothing may be deleted")
+    }
+
+    /// §4.4.2 — fetch before mutating, so a failed lookup is a no-op rather than a workout with a
+    /// hole in it.
+    func testReplacingWhenTheSnapshotFetchFailsDeletesNothing() async throws {
+        let (viewModel, exercises, _, setService) = makeStripFixture(names: ["A", "B", "C"], selecting: 1)
+
+        // An ID the exercise service has never heard of — the stub returns nil.
+        await viewModel.replaceExercise(at: 0, with: UUID())
+
+        XCTAssertEqual(viewModel.exercises.map(\.id), exercises.map(\.id))
+        XCTAssertTrue(setService.deletedSetIds.isEmpty, "a failed fetch must not delete anything")
+    }
+
+    /// Position held, old rows gone, one empty set seeded.
+    func testReplacingAMiddleExerciseHoldsItsPositionAndSeedsOneSet() async throws {
+        let (viewModel, exercises, spares, setService) = makeStripFixture(
+            names: ["A", "B", "C"],
+            selecting: 0,
+            spares: ["Replacement"]
+        )
+        let outgoingSetIds = viewModel.setsByExercise[exercises[1].id]?.map(\.id) ?? []
+        XCTAssertFalse(outgoingSetIds.isEmpty, "precondition: the outgoing exercise has rows")
+
+        await viewModel.replaceExercise(at: 1, with: spares[0].id)
+
+        XCTAssertEqual(
+            viewModel.exercises.map(\.id),
+            [exercises[0].id, spares[0].id, exercises[2].id],
+            "the replacement takes the same slot"
+        )
+        XCTAssertEqual(setService.deletedSetIds, outgoingSetIds, "the outgoing rows are deleted")
+        XCTAssertNil(viewModel.setsByExercise[exercises[1].id], "outgoing sets are dropped from state")
+        XCTAssertEqual(viewModel.setsByExercise[spares[0].id]?.count, 1, "exactly one seeded set")
+        XCTAssertFalse(
+            setService.orderingBatches.isEmpty,
+            "the seeded set lands at the global tail, so a reindex is mandatory"
+        )
+    }
+
+    /// §4.4.8. Replacing the exercise you are *on* changes the identity while the index stays put,
+    /// so the switch side effects have to fire off identity rather than the integer.
+    func testReplacingTheSelectedExerciseMovesSelectionOntoTheReplacement() async throws {
+        let (viewModel, exercises, spares, _) = makeStripFixture(
+            names: ["A", "B", "C"],
+            selecting: 1,
+            spares: ["Replacement"]
+        )
+
+        await viewModel.replaceExercise(at: 1, with: spares[0].id)
+
+        XCTAssertEqual(viewModel.selectedExerciseIndex, 1, "the integer does not move")
+        XCTAssertEqual(viewModel.currentExercise?.id, spares[0].id, "but the exercise does")
+        XCTAssertEqual(viewModel.selectedExerciseId, spares[0].id)
+        XCTAssertEqual(
+            persistedSelectedExerciseId,
+            spares[0].id,
+            "persisted resume state must follow the identity, not the index"
+        )
+        _ = exercises
+    }
+
+    /// Replacing someone else's slot must not move the user.
+    func testReplacingANonSelectedExerciseLeavesSelectionAlone() async throws {
+        let (viewModel, exercises, spares, _) = makeStripFixture(
+            names: ["A", "B", "C"],
+            selecting: 1,
+            spares: ["Replacement"]
+        )
+
+        await viewModel.replaceExercise(at: 2, with: spares[0].id)
+
+        XCTAssertEqual(viewModel.selectedExerciseIndex, 1)
+        XCTAssertEqual(viewModel.currentExercise?.id, exercises[1].id, "the user does not move")
     }
 
     func testAddSetTriggersImmediateSilentRefreshForCurrentExercise() async throws {
@@ -5231,6 +5465,11 @@ private final class WorkoutServiceStub: @unchecked Sendable, WorkoutServiceProto
     var onDeleteWorkout: (@MainActor (UUID) async -> Void)?
     /// When set, `deleteWorkout` throws it after the gate runs, to drive the failure path.
     var deleteWorkoutError: Error?
+    /// Workout ids the stub reports as excluded from progression history, so the in-workout
+    /// History sub-tab can be driven without a real store.
+    var excludedProgressionWorkoutIds: Set<UUID> = []
+    /// Arguments the last `excludedWorkoutIdsForProgressionHistory` call received.
+    var lastProgressionExclusionQuery: (workoutIds: Set<UUID>, exerciseId: UUID)?
 
     func startWorkout(options: WorkoutStartOptions) async throws -> Workout {
         Workout(
@@ -5295,6 +5534,13 @@ private final class WorkoutServiceStub: @unchecked Sendable, WorkoutServiceProto
         let _ = workoutId
         let _ = excludeWorkout
         let _ = excludedExerciseIds
+    }
+    func excludedWorkoutIdsForProgressionHistory(
+        workoutIds: Set<UUID>,
+        exerciseId: UUID
+    ) async throws -> Set<UUID> {
+        lastProgressionExclusionQuery = (workoutIds, exerciseId)
+        return excludedProgressionWorkoutIds.intersection(workoutIds)
     }
     func deleteWorkout(_ workoutId: UUID) async throws {
         deletedWorkoutIds.append(workoutId)
