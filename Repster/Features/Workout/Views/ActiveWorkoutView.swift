@@ -33,18 +33,20 @@ enum ActiveWorkoutBottomAccessoryLayout {
 
     /// Whether the superset prompt belongs on screen.
     ///
+    /// It **stacks above** a running rest timer rather than competing with it. Closing a round
+    /// earns rest *and* leaves you needing to walk back to the top of the group, so both answers
+    /// are live at once: the timer says how long, the prompt says where. Mid-round only the prompt
+    /// shows, because no timer is running.
+    ///
     /// Same keypad rule as `.finished`, for the same reason: mid-entry the message is redundant —
     /// you are already logging — and a bar appearing underneath would shift the keypad while a
-    /// thumb is on it. The rest timer wins the slot outright if one is somehow running, which it
-    /// should not be: the branch that raises a prompt is the branch that starts no timer.
+    /// thumb is on it.
     static func shouldShowSupersetPrompt(
         hasPrompt: Bool,
         restTimerState: RestTimerState,
         isKeyboardVisible: Bool
     ) -> Bool {
-        guard hasPrompt, !isKeyboardVisible else { return false }
-        if case .idle = restTimerState { return true }
-        return false
+        hasPrompt && !isKeyboardVisible
     }
 }
 
@@ -342,6 +344,20 @@ struct ActiveWorkoutView: View {
     @ViewBuilder
     private var bottomAccessoryArea: some View {
         VStack(spacing: 0) {
+            // Above the timer, not instead of it. Mid-round there is no timer and this is the only
+            // occupant; when a round closes both are live and the prompt is the one you act on.
+            if isSupersetPromptVisible, let prompt = viewModel.supersetPrompt {
+                SupersetPromptView(
+                    nextExerciseName: prompt.nextExerciseName,
+                    onTap: {
+                        services.analyticsService.recordWorkoutInteraction(.supersetPromptTaps)
+                        viewModel.goToSupersetPartner()
+                    },
+                    onDismiss: { viewModel.dismissSupersetPrompt() }
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
             if isRestTimerVisible {
                 RestTimerView(
                     state: viewModel.restTimer,
@@ -365,20 +381,6 @@ struct ActiveWorkoutView: View {
                         services.analyticsService.recordWorkoutInteraction(.restTimerSkips)
                         viewModel.dismissTimer()
                     }
-                )
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-
-            // Same slot, same height as the timer above — inside a superset there is no rest to
-            // count, so the slot names the partner instead and nothing on screen moves.
-            if isSupersetPromptVisible, let prompt = viewModel.supersetPrompt {
-                SupersetPromptView(
-                    nextExerciseName: prompt.nextExerciseName,
-                    onTap: {
-                        services.analyticsService.recordWorkoutInteraction(.supersetPromptTaps)
-                        viewModel.goToSupersetPartner()
-                    },
-                    onDismiss: { viewModel.dismissSupersetPrompt() }
                 )
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }

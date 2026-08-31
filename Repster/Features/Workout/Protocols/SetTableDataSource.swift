@@ -262,16 +262,9 @@ extension SetTableDataSource {
         SupersetGrouping.members(of: groupId, exercises: exercises, setsByExercise: setsByExercise)
     }
 
-    /// The next exercise in this exercise's group, or nil if it is ungrouped, in a group of one,
-    /// or already the last member.
-    func nextInSuperset(after exerciseId: UUID) -> ChartExerciseData? {
+    /// Where to go after a set on this exercise, and whether getting there closes a round.
+    func nextInSuperset(after exerciseId: UUID) -> SupersetGrouping.NextInGroup? {
         SupersetGrouping.next(after: exerciseId, exercises: exercises, setsByExercise: setsByExercise)
-    }
-
-    /// Whether this exercise is in a real group *and* is its last member — the point at which
-    /// normal rest resumes.
-    func isLastInSuperset(_ exerciseId: UUID) -> Bool {
-        SupersetGrouping.isLastMember(exerciseId, exercises: exercises, setsByExercise: setsByExercise)
     }
 
     /// Whether this exercise is in a group with at least one partner.
@@ -321,28 +314,55 @@ enum SupersetGrouping {
         return members(of: id, exercises: exercises, setsByExercise: setsByExercise).count > 1
     }
 
+    /// Where to go after finishing a set on `exerciseId`, and whether getting there closed a round.
+    struct NextInGroup: Equatable {
+        let exercise: ChartExerciseData
+
+        /// True when the walk ran off the end of the group and came back to the start.
+        ///
+        /// This is what "the round is over" means, and it is the only thing rest depends on:
+        /// alternating *within* a round earns no rest, completing one does.
+        let wrapped: Bool
+    }
+
+    /// The next member of the group with work left, walking in strip order and wrapping once.
+    ///
+    /// Cyclic rather than one-directional so the prompt works on both legs of a round: Bench sends
+    /// you to Incline, and Incline sends you back to Bench for the next round. Members with nothing
+    /// incomplete left are skipped, which is what stops a finished partner from swallowing the rest
+    /// of your rests — the previous one-directional version suppressed rest for every non-last
+    /// member regardless of whether the partner still had sets.
+    ///
+    /// Returns nil when no *other* member has work left. `exerciseId` itself is never returned:
+    /// there is nothing to jump to when the answer is "stay here".
     static func next(
         after exerciseId: UUID,
         exercises: [ChartExerciseData],
         setsByExercise: [UUID: [WorkoutSet]]
-    ) -> ChartExerciseData? {
+    ) -> NextInGroup? {
         guard let id = groupId(for: exerciseId, in: setsByExercise) else { return nil }
         let group = members(of: id, exercises: exercises, setsByExercise: setsByExercise)
         guard group.count > 1,
-              let position = group.firstIndex(where: { $0.id == exerciseId }),
-              position < group.count - 1
+              let position = group.firstIndex(where: { $0.id == exerciseId })
         else { return nil }
-        return group[position + 1]
+
+        for offset in 1..<group.count {
+            let index = (position + offset) % group.count
+            let candidate = group[index]
+            guard hasWorkLeft(candidate.id, in: setsByExercise) else { continue }
+            // `offset` never reaches `group.count`, so a wrapped index is always < position.
+            return NextInGroup(exercise: candidate, wrapped: index < position)
+        }
+        return nil
     }
 
-    static func isLastMember(
-        _ exerciseId: UUID,
-        exercises: [ChartExerciseData],
-        setsByExercise: [UUID: [WorkoutSet]]
-    ) -> Bool {
-        guard let id = groupId(for: exerciseId, in: setsByExercise) else { return false }
-        let group = members(of: id, exercises: exercises, setsByExercise: setsByExercise)
-        return group.count > 1 && group.last?.id == exerciseId
+    /// Whether an exercise still has a working set to perform.
+    ///
+    /// Warm-ups are excluded deliberately: a leftover un-ticked warm-up row is common
+    /// (UNPERFORMED_SETS_SCOPING.md) and should not make the app send someone back to an exercise
+    /// they are finished with.
+    static func hasWorkLeft(_ exerciseId: UUID, in setsByExercise: [UUID: [WorkoutSet]]) -> Bool {
+        (setsByExercise[exerciseId] ?? []).contains { !$0.completed && $0.setType != .warmup }
     }
 
     /// Contiguous runs of the display order, for anything that draws grouping.

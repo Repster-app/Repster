@@ -157,13 +157,33 @@ where the rest timer starts today.
 
 | Rule | Behaviour |
 |---|---|
-| Working set, in a group, not the last member | **No rest.** Accessory shows the next lift in the group |
-| Working set, in a group, last member | Normal rest, that exercise's rest time — unchanged |
+| Working set, another member still has work, walk did **not** wrap | **No rest.** Accessory shows that member |
+| Working set, another member still has work, walk **wrapped** | Normal rest **and** the prompt, stacked — the round closed |
+| Working set, no other member has work left | Normal rest, no prompt — the group is done |
 | Working set, ungrouped | Unchanged |
 | **Any set whose rest is suppressed** | **Write `restDurationSeconds = 0`** — see §2.2 |
 | Warm-up set, any exercise | Unchanged. Warm-up rest time applies; you do not superset warm-ups |
 | Order within a group | Derived from existing exercise order, not stored |
 | PRs / stats / charts / e1RM | Untouched — a group never touches `exerciseId`, `weight` or `reps` |
+
+### The walk · revised 2026-08-31
+
+"Next in the group" is a **cyclic** walk in strip order, skipping members with no incomplete working
+set, and it reports whether it wrapped. One traversal answers both questions the branch asks:
+
+- **where to point** — the first member with work left, going forward and wrapping once
+- **whether rest is earned** — wrapping *is* the round closing, so `wrapped` is the rest condition
+
+This replaced a one-directional `isLastMember` rule, for two reasons. The prompt only helped on one
+leg of a round: Bench sent you to Incline, and Incline sent you nowhere, so every second round began
+with a manual tab hunt. And the old rule suppressed rest for any non-last member **regardless of
+whether the partner had sets left** — finish Incline early, go back to Bench, and every remaining
+Bench set got zero rest while pointing at an exercise with nothing to do. Both are covered by
+`SupersetGroupingTests`.
+
+Warm-ups are excluded from "has work left": a leftover un-ticked warm-up row is common
+([UNPERFORMED_SETS_SCOPING.md](UNPERFORMED_SETS_SCOPING.md)) and must not send someone back to an
+exercise they have finished.
 
 **Order needs no new field.** Exercise order is already reconstructed from `MIN(orderInWorkout)`
 across each exercise's sets ([ActiveWorkoutViewModel.swift:379](Repster/Features/Workout/ViewModels/ActiveWorkoutViewModel.swift:379)),
@@ -179,6 +199,11 @@ nobody will find.
 `RestTimerState` is a four-case enum consumed through
 `ActiveWorkoutBottomAccessoryLayout.shouldShowRestTimer(for:isKeyboardVisible:)`
 ([ActiveWorkoutView.swift:12](Repster/Features/Workout/Views/ActiveWorkoutView.swift:12)).
+
+**The prompt stacks above the timer rather than competing for the slot.** Closing a round earns rest
+*and* leaves you needing to walk back to the top of the group, so both answers are live at once: the
+timer says how long, the prompt says where. Mid-round only the prompt shows, because no timer is
+running. The stack costs 45pt, and only while resting — when nobody is logging.
 
 The superset prompt is **not** a fifth case on that enum — it is not a timer, it has no duration, and
 folding it in would make every `switch` in the timer code answer a question about supersets. Add a

@@ -536,9 +536,16 @@ final class ActiveWorkoutViewModel {
             //
             // Keyed on `set.exerciseId` rather than `currentExercise`, because this branch decides
             // what happens to the row that was just completed, and the two can differ.
-            let suppressRestForSuperset = set.setType != .warmup
-                && isInSuperset(set.exerciseId)
-                && !isLastInSuperset(set.exerciseId)
+            // One walk answers both questions. `next` is nil when no other member has work left —
+            // a finished partner, or a group of one — and rest is then earned as normal. When it
+            // wrapped, the round closed, so rest is also earned; the prompt still points back to
+            // the top of the group so the next round is one tap rather than a hunt.
+            let nextInGroup = set.setType == .warmup ? nil : nextInSuperset(after: set.exerciseId)
+            let suppressRestForSuperset = nextInGroup.map { !$0.wrapped } ?? false
+
+            supersetPrompt = nextInGroup.map {
+                SupersetPrompt(nextExerciseId: $0.exercise.id, nextExerciseName: $0.exercise.name)
+            }
 
             if suppressRestForSuperset {
                 // Record the zero, explicitly. `restDurationSeconds` is otherwise only written by
@@ -561,12 +568,8 @@ final class ActiveWorkoutViewModel {
                     dbg("[ActiveWorkoutViewModel] Failed to record zero rest for set \(set.id): \(error)")
                     #endif
                 }
-                supersetPrompt = nextInSuperset(after: set.exerciseId).map {
-                    SupersetPrompt(nextExerciseId: $0.id, nextExerciseName: $0.name)
-                }
                 updateLiveActivityState()
             } else {
-                supersetPrompt = nil
                 let restTime: Int?
                 if set.setType == .warmup {
                     restTime = globalDefaultWarmupRestTime ?? currentExercise?.defaultRestTime ?? globalDefaultRestTime

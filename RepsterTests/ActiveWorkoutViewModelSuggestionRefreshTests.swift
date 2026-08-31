@@ -182,8 +182,8 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         XCTAssertEqual(setService.recordedRestDurations.first?.setId, benchSet.id)
     }
 
-    /// The last member is where the group ends and normal rest resumes.
-    func testCompletingASetOnTheLastSupersetMemberStartsNormalRest() async throws {
+    /// Closing a round earns rest **and** points back to the top of the group — both at once.
+    func testClosingARoundStartsRestAndPointsBackToTheTop() async throws {
         let setService = SetServiceStub()
         let context = makeSupersetViewModel(setService: setService)
         let viewModel = context.viewModel
@@ -194,11 +194,21 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
 
         let timer = viewModel.restTimer
         guard case .running = timer else {
-            return XCTFail("the last member of a group rests normally, got \(timer)")
+            return XCTFail("closing a round rests normally, got \(timer)")
         }
         XCTAssertTrue(
             setService.recordedRestDurations.isEmpty,
             "a real timer records its own duration when it finishes — this path must not pre-empt it"
+        )
+        XCTAssertEqual(
+            viewModel.supersetPrompt?.nextExerciseId, context.bench,
+            "and the prompt wraps back so the next round is one tap, not a hunt"
+        )
+        XCTAssertTrue(
+            ActiveWorkoutBottomAccessoryLayout.shouldShowSupersetPrompt(
+                hasPrompt: true, restTimerState: timer, isKeyboardVisible: false
+            ),
+            "the two stack — the timer says how long, the prompt says where"
         )
     }
 
@@ -352,6 +362,27 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         XCTAssertFalse(viewModel.isInSuperset(context.bench))
     }
 
+    /// Do all of Incline first, then go back to Bench: every remaining Bench set points at an
+    /// exercise with nothing left to do, and gets no rest for it.
+    func testCompletingASetWhenThePartnerIsAlreadyFinishedStillRests() async throws {
+        let setService = SetServiceStub()
+        let context = makeSupersetViewModel(setService: setService)
+        let viewModel = context.viewModel
+
+        let inclineSet = try XCTUnwrap(viewModel.setsByExercise[context.incline]?.first)
+        inclineSet.completed = true
+
+        let benchSet = try XCTUnwrap(
+            viewModel.setsByExercise[context.bench]?.first { $0.setType == .working }
+        )
+        await viewModel.completeSet(benchSet, input: SetCompletionInput(weight: 80, reps: 8, rir: 2))
+
+        guard case .running = viewModel.restTimer else {
+            return XCTFail("nothing left to alternate with, so rest is earned — got \(viewModel.restTimer)")
+        }
+        XCTAssertNil(viewModel.supersetPrompt, "and nowhere to point")
+    }
+
     // MARK: - Superset prompt lifecycle (PR5)
 
     func testCompletingASetMidSupersetRaisesThePromptNamingThePartner() async throws {
@@ -435,17 +466,26 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         XCTAssertEqual(viewModel.currentExercise?.id, context.bench, "dismiss must not navigate")
     }
 
-    /// The last member ends the group, so there is nothing to point at.
-    func testLastSupersetMemberRaisesNoPrompt() async throws {
+    /// With the group finished there is nowhere left to send anyone.
+    func testAFinishedGroupRaisesNoPrompt() async throws {
         let setService = SetServiceStub()
         let context = makeSupersetViewModel(setService: setService)
         let viewModel = context.viewModel
         viewModel.selectedExerciseIndex = 1
 
+        // Bench's only working set is already done, so closing Incline closes the group.
+        let benchWorking = try XCTUnwrap(
+            viewModel.setsByExercise[context.bench]?.first { $0.setType == .working }
+        )
+        benchWorking.completed = true
+
         let inclineSet = try XCTUnwrap(viewModel.setsByExercise[context.incline]?.first)
         await viewModel.completeSet(inclineSet, input: SetCompletionInput(weight: 30, reps: 10, rir: 2))
 
         XCTAssertNil(viewModel.supersetPrompt)
+        guard case .running = viewModel.restTimer else {
+            return XCTFail("and rest runs as it would for any ungrouped exercise")
+        }
     }
 
     /// The prompt must not outlive the workout it belongs to.
@@ -482,14 +522,14 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         )
     }
 
-    func testARunningRestTimerWinsTheSlotOverThePrompt() {
-        XCTAssertFalse(
+    func testThePromptStacksAboveARunningRestTimer() {
+        XCTAssertTrue(
             ActiveWorkoutBottomAccessoryLayout.shouldShowSupersetPrompt(
                 hasPrompt: true,
                 restTimerState: .running(remaining: 60, total: 120),
                 isKeyboardVisible: false
             ),
-            "both in the slot at once would stack two 43pt bars"
+            "closing a round makes both answers live at once"
         )
         XCTAssertFalse(
             ActiveWorkoutBottomAccessoryLayout.shouldShowSupersetPrompt(

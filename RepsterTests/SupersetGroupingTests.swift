@@ -18,10 +18,9 @@ final class SupersetGroupingTests: XCTestCase {
         XCTAssertNil(SupersetGrouping.groupId(for: bench.id, in: sets))
         XCTAssertFalse(SupersetGrouping.isGrouped(bench.id, exercises: [bench], setsByExercise: sets))
         XCTAssertNil(SupersetGrouping.next(after: bench.id, exercises: [bench], setsByExercise: sets))
-        XCTAssertFalse(SupersetGrouping.isLastMember(bench.id, exercises: [bench], setsByExercise: sets))
     }
 
-    func testCleanPairResolvesOrderAndLastMember() {
+    func testCleanPairWalksForwardThenWrapsBack() {
         let group = UUID()
         let bench = makeExercise("Bench Press")
         let incline = makeExercise("Incline DB Press")
@@ -34,18 +33,69 @@ final class SupersetGroupingTests: XCTestCase {
         XCTAssertEqual(SupersetGrouping.groupId(for: bench.id, in: sets), group)
         XCTAssertTrue(SupersetGrouping.isGrouped(bench.id, exercises: exercises, setsByExercise: sets))
 
-        XCTAssertEqual(
-            SupersetGrouping.next(after: bench.id, exercises: exercises, setsByExercise: sets)?.id,
-            incline.id,
-            "the first member's next is the second"
-        )
-        XCTAssertNil(
-            SupersetGrouping.next(after: incline.id, exercises: exercises, setsByExercise: sets),
-            "the last member has no next — this is where rest resumes"
-        )
+        let forward = SupersetGrouping.next(after: bench.id, exercises: exercises, setsByExercise: sets)
+        XCTAssertEqual(forward?.exercise.id, incline.id, "mid-round, the walk goes forward")
+        XCTAssertEqual(forward?.wrapped, false, "and no round has closed, so no rest is earned")
 
-        XCTAssertFalse(SupersetGrouping.isLastMember(bench.id, exercises: exercises, setsByExercise: sets))
-        XCTAssertTrue(SupersetGrouping.isLastMember(incline.id, exercises: exercises, setsByExercise: sets))
+        let back = SupersetGrouping.next(after: incline.id, exercises: exercises, setsByExercise: sets)
+        XCTAssertEqual(back?.exercise.id, bench.id, "the last member points back to the top")
+        XCTAssertEqual(back?.wrapped, true, "having closed a round, which is what earns the rest")
+    }
+
+    /// The bug the one-directional version shipped with: finish the partner early and every
+    /// remaining set on this exercise pointed at it and got no rest for the privilege.
+    func testAMemberWithNoWorkLeftIsSkipped() {
+        let group = UUID()
+        let bench = makeExercise("Bench Press")
+        let incline = makeExercise("Incline DB Press")
+        let sets = [
+            bench.id: [makeSet(exerciseId: bench.id, group: group)],
+            incline.id: [makeSet(exerciseId: incline.id, group: group, completed: true)]
+        ]
+
+        XCTAssertNil(
+            SupersetGrouping.next(after: bench.id, exercises: [bench, incline], setsByExercise: sets),
+            "nothing left to alternate with — rest is earned and there is nowhere to point"
+        )
+    }
+
+    /// A leftover un-ticked warm-up is common and must not read as work left.
+    func testAnUnfinishedWarmupDoesNotCountAsWorkLeft() {
+        let group = UUID()
+        let bench = makeExercise("Bench Press")
+        let incline = makeExercise("Incline DB Press")
+        let sets = [
+            bench.id: [makeSet(exerciseId: bench.id, group: group)],
+            incline.id: [
+                makeSet(exerciseId: incline.id, group: group, completed: true),
+                makeSet(exerciseId: incline.id, group: group, setType: .warmup)
+            ]
+        ]
+
+        XCTAssertFalse(SupersetGrouping.hasWorkLeft(incline.id, in: sets))
+        XCTAssertNil(
+            SupersetGrouping.next(after: bench.id, exercises: [bench, incline], setsByExercise: sets)
+        )
+    }
+
+    /// Three members cycle rather than stopping at the end.
+    func testAThreeMemberGroupCyclesThroughAllOfThem() {
+        let group = UUID()
+        let a = makeExercise("A")
+        let b = makeExercise("B")
+        let c = makeExercise("C")
+        let exercises = [a, b, c]
+        let sets = Dictionary(uniqueKeysWithValues: exercises.map {
+            ($0.id, [makeSet(exerciseId: $0.id, group: group)])
+        })
+
+        let fromA = SupersetGrouping.next(after: a.id, exercises: exercises, setsByExercise: sets)
+        let fromB = SupersetGrouping.next(after: b.id, exercises: exercises, setsByExercise: sets)
+        let fromC = SupersetGrouping.next(after: c.id, exercises: exercises, setsByExercise: sets)
+
+        XCTAssertEqual([fromA?.exercise.id, fromB?.exercise.id, fromC?.exercise.id], [b.id, c.id, a.id])
+        XCTAssertEqual([fromA?.wrapped, fromB?.wrapped, fromC?.wrapped], [false, false, true],
+                       "only the walk off the end closes a round")
     }
 
     /// Reachable four ways: delete or replace one half of a pair, import a template whose group
@@ -62,10 +112,9 @@ final class SupersetGroupingTests: XCTestCase {
             "the raw field is unchanged — only the interpretation of it is"
         )
         XCTAssertFalse(SupersetGrouping.isGrouped(bench.id, exercises: exercises, setsByExercise: sets))
-        XCTAssertNil(SupersetGrouping.next(after: bench.id, exercises: exercises, setsByExercise: sets))
-        XCTAssertFalse(
-            SupersetGrouping.isLastMember(bench.id, exercises: exercises, setsByExercise: sets),
-            "a group of one has no last member — otherwise it would start a rest it never suppressed"
+        XCTAssertNil(
+            SupersetGrouping.next(after: bench.id, exercises: exercises, setsByExercise: sets),
+            "a group of one has nowhere to point, so it rests like any ungrouped exercise"
         )
         XCTAssertFalse(
             SupersetGrouping.runs(exercises: exercises, setsByExercise: sets)[0].isMarked,
@@ -440,14 +489,20 @@ final class SupersetGroupingTests: XCTestCase {
         ))
     }
 
-    private func makeSet(exerciseId: UUID, group: UUID?) -> WorkoutSet {
+    private func makeSet(
+        exerciseId: UUID,
+        group: UUID?,
+        completed: Bool = false,
+        setType: SetType = .working
+    ) -> WorkoutSet {
         WorkoutSet(
             workoutId: UUID(),
             exerciseId: exerciseId,
+            setType: setType,
             orderInWorkout: 1,
             orderInExercise: 1,
             supersetGroupId: group,
-            completed: false
+            completed: completed
         )
     }
 
