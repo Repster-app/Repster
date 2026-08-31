@@ -15,6 +15,82 @@ struct ExerciseGroup: Sendable {
     let stats: ChartExerciseStatsData?
 }
 
+extension ExerciseGroup {
+
+    /// Group a workout's sets by exercise, in the order the workout ran.
+    ///
+    /// Extracted because this was written twice — `CalendarViewModel` and
+    /// `WorkoutDetailFromHomeView` — and the two copies **had already drifted**: Calendar ordered
+    /// by `sets.first?.orderInWorkout`, Home by `sets.map(\.orderInWorkout).min()`. Those are not
+    /// the same. `sets` is sorted by `orderInExercise`, and a warm-up added mid-workout is appended
+    /// at the global tail, so its `orderInExercise` is 1 while its `orderInWorkout` is the highest
+    /// in the workout — enough to order the same session differently on the two screens.
+    ///
+    /// `min()` is the correct rule and the one kept: it is what `ActiveWorkoutViewModel` uses to
+    /// order the tab strip, so all three now agree.
+    ///
+    /// Async fetching stays with the callers — they resolve exercises differently (a local cache
+    /// versus the service) and that was never the part that drifted.
+    static func build(
+        sets: [ChartSetData],
+        exercisesById: [UUID: ChartExerciseData],
+        statsById: [UUID: ChartExerciseStatsData?]
+    ) -> [ExerciseGroup] {
+        var setsByExercise: [UUID: [ChartSetData]] = [:]
+        for set in sets {
+            setsByExercise[set.exerciseId, default: []].append(set)
+        }
+
+        return setsByExercise.compactMap { exerciseId, exerciseSets -> ExerciseGroup? in
+            guard let exercise = exercisesById[exerciseId] else { return nil }
+            return ExerciseGroup(
+                exercise: exercise,
+                sets: exerciseSets.sorted { $0.orderInExercise < $1.orderInExercise },
+                stats: statsById[exerciseId] ?? nil
+            )
+        }
+        .sorted { lhs, rhs in
+            let lhsOrder = lhs.sets.map(\.orderInWorkout).min() ?? Int.max
+            let rhsOrder = rhs.sets.map(\.orderInWorkout).min() ?? Int.max
+            return lhsOrder < rhsOrder
+        }
+    }
+
+    /// The superset group this exercise's sets carry, if any.
+    ///
+    /// Same "any non-nil set decides it" rule as the live screen
+    /// (`SupersetGrouping.groupId(for:in:)`), over the read-only snapshot type.
+    var supersetGroupId: UUID? {
+        sets.lazy.compactMap(\.supersetGroupId).first
+    }
+}
+
+/// Contiguous runs of exercise groups, for surfaces that draw superset grouping after the fact.
+///
+/// The workout-detail equivalent of `SupersetGrouping.Run`, and it enforces the same two rules:
+/// a run of one is never marked, and non-adjacent members of one group produce separate runs.
+struct ExerciseGroupRun: Identifiable {
+    var id: UUID { groups[0].exercise.id }
+    var supersetGroupId: UUID?
+    var groups: [ExerciseGroup]
+
+    var isMarked: Bool { supersetGroupId != nil && groups.count > 1 }
+
+    static func runs(from groups: [ExerciseGroup]) -> [ExerciseGroupRun] {
+        var result: [ExerciseGroupRun] = []
+        for group in groups {
+            let id = group.supersetGroupId
+            if let id, var last = result.last, last.supersetGroupId == id {
+                last.groups.append(group)
+                result[result.count - 1] = last
+            } else {
+                result.append(ExerciseGroupRun(supersetGroupId: id, groups: [group]))
+            }
+        }
+        return result
+    }
+}
+
 struct WorkoutDetail: Sendable {
     let workout: WorkoutSnapshot
     let exerciseGroups: [ExerciseGroup]
@@ -195,29 +271,21 @@ final class CalendarViewModel {
                     exerciseSetMap[set.exerciseId, default: []].append(set)
                 }
 
-                // Build exercise groups ordered by position in workout
-                var exerciseGroups: [ExerciseGroup] = []
+                // Resolve exercises and stats here — the grouping and ordering itself is shared
+                // with the Home detail screen via `ExerciseGroup.build`.
                 var exerciseLookup: [UUID: ChartExerciseData] = [:]
-                for (exerciseId, exerciseSets) in exerciseSetMap {
-                    let exercise = try await cachedExercise(exerciseId)
-                    guard let exercise else { continue }
+                var statsLookup: [UUID: ChartExerciseStatsData?] = [:]
+                for exerciseId in exerciseSetMap.keys {
+                    guard let exercise = try await cachedExercise(exerciseId) else { continue }
                     exerciseLookup[exerciseId] = exercise
-
-                    let sortedSets = exerciseSets.sorted { $0.orderInExercise < $1.orderInExercise }
-                    let stats = try? await statsService.fetchStatsSnapshot(for: exerciseId)
-
-                    exerciseGroups.append(ExerciseGroup(
-                        exercise: exercise,
-                        sets: sortedSets,
-                        stats: stats
-                    ))
+                    statsLookup[exerciseId] = try? await statsService.fetchStatsSnapshot(for: exerciseId)
                 }
 
-                exerciseGroups.sort { lhs, rhs in
-                    let lhsOrder = lhs.sets.first?.orderInWorkout ?? Int.max
-                    let rhsOrder = rhs.sets.first?.orderInWorkout ?? Int.max
-                    return lhsOrder < rhsOrder
-                }
+                let exerciseGroups = ExerciseGroup.build(
+                    sets: sets,
+                    exercisesById: exerciseLookup,
+                    statsById: statsLookup
+                )
 
                 // Compute summary stats using hasData filter
                 let completedSets = sets.filter(\.hasData)

@@ -42,6 +42,10 @@ struct ExerciseHistoryView: View {
                 // The set rows below are deliberately left alone — no dimming, no strike. They
                 // are a true record of what was lifted, and those sets are still in the charts
                 // and the volume total. Only the session header carries the exception.
+                if !group.supersetPartnerNames.isEmpty {
+                    SupersetChip(partnerNames: group.supersetPartnerNames)
+                }
+
                 if group.isExcludedFromProgression {
                     ProgressionExclusionChip()
                 }

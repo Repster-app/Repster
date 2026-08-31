@@ -24,4 +24,12 @@ struct WorkoutHistoryGroup: Identifiable {
     /// Resolved per exercise rather than per workout: a session excluded for only some of its
     /// exercises must mark those and leave the rest clean.
     let isExcludedFromProgression: Bool
+
+    /// Exercises this one was supersetted with in that session, in the order the workout ran them.
+    ///
+    /// Empty for the overwhelming majority of sessions. Named rather than merely flagged because
+    /// this screen shows one side of the pair: the partner *is* the explanation for the numbers,
+    /// and a set taken with no rest after another exercise is systematically weaker than the same
+    /// set rested. See SUPERSETS_SCOPING.md §5.1.
+    var supersetPartnerNames: [String] = []
 }

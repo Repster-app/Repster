@@ -103,6 +103,401 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         )
     }
 
+    // MARK: - Superset rest behaviour (PR4)
+    //
+    // The whole feature, in one branch: a working set inside a group starts no rest timer, and
+    // records that it did not. See SUPERSETS_SCOPING.md §2.2 and §4.
+
+    /// Builds a two-exercise superset plus one ungrouped exercise, in display order.
+    @MainActor
+    private func makeSupersetViewModel(
+        setService: SetServiceStub,
+        preGrouped: Bool = true
+    ) -> (viewModel: ActiveWorkoutViewModel, bench: UUID, incline: UUID, fly: UUID, group: UUID) {
+        let viewModel = makeOrderingViewModel(setService: setService)
+        let workoutId = UUID()
+        viewModel.workout = Workout(id: workoutId, date: Date(), status: .inProgress)
+
+        let bench = makeExercise(name: "Bench Press")
+        let incline = makeExercise(name: "Incline DB Press")
+        let fly = makeExercise(name: "Cable Fly")
+        viewModel.exercises = [bench, incline, fly].map(ChartExerciseData.init(from:))
+
+        let group = UUID()
+        func row(_ exerciseId: UUID, _ order: Int, _ groupId: UUID?, _ type: SetType = .working) -> WorkoutSet {
+            WorkoutSet(
+                workoutId: workoutId,
+                exerciseId: exerciseId,
+                weight: 80,
+                reps: 8,
+                rir: 2,
+                setType: type,
+                orderInWorkout: order,
+                orderInExercise: 1,
+                supersetGroupId: groupId,
+                completed: false
+            )
+        }
+
+        let pairGroup = preGrouped ? group : nil
+        let benchSet = row(bench.id, 1, pairGroup)
+        let benchWarmup = row(bench.id, 2, pairGroup, .warmup)
+        let inclineSet = row(incline.id, 3, pairGroup)
+        let flySet = row(fly.id, 4, nil)
+
+        viewModel.setsByExercise = [
+            bench.id: [benchWarmup, benchSet],
+            incline.id: [inclineSet],
+            fly.id: [flySet]
+        ]
+        setService.workoutSets[workoutId] = [benchSet, benchWarmup, inclineSet, flySet]
+
+        return (viewModel, bench.id, incline.id, fly.id, group)
+    }
+
+    /// The first member of a pair: no timer, and the zero is written down.
+    func testCompletingASetMidSupersetStartsNoTimerAndRecordsZeroRest() async throws {
+        let setService = SetServiceStub()
+        let context = makeSupersetViewModel(setService: setService)
+        let viewModel = context.viewModel
+
+        let benchSet = try XCTUnwrap(
+            viewModel.setsByExercise[context.bench]?.first { $0.setType == .working }
+        )
+
+        await viewModel.completeSet(benchSet, input: SetCompletionInput(weight: 80, reps: 8, rir: 2))
+
+        let timer = viewModel.restTimer
+        XCTAssertEqual(timer, .idle, "a superset transition must not start a rest countdown")
+
+        XCTAssertEqual(
+            setService.recordedRestDurations.map(\.seconds), [0],
+            """
+            Zero must be written explicitly. Left nil, LoadPrescriptionService reads
+            `restDurationSeconds ?? configuredRestSeconds` and decays fatigue as though a full
+            two-minute rest happened — over-estimating readiness on exactly the sets where the
+            lifter is most cooked.
+            """
+        )
+        XCTAssertEqual(setService.recordedRestDurations.first?.setId, benchSet.id)
+    }
+
+    /// The last member is where the group ends and normal rest resumes.
+    func testCompletingASetOnTheLastSupersetMemberStartsNormalRest() async throws {
+        let setService = SetServiceStub()
+        let context = makeSupersetViewModel(setService: setService)
+        let viewModel = context.viewModel
+        viewModel.selectedExerciseIndex = 1
+
+        let inclineSet = try XCTUnwrap(viewModel.setsByExercise[context.incline]?.first)
+        await viewModel.completeSet(inclineSet, input: SetCompletionInput(weight: 30, reps: 10, rir: 2))
+
+        let timer = viewModel.restTimer
+        guard case .running = timer else {
+            return XCTFail("the last member of a group rests normally, got \(timer)")
+        }
+        XCTAssertTrue(
+            setService.recordedRestDurations.isEmpty,
+            "a real timer records its own duration when it finishes — this path must not pre-empt it"
+        )
+    }
+
+    /// Warm-ups are excluded by set type, not by grouping — the row still carries the group id.
+    func testWarmupInsideASupersetStillRests() async throws {
+        let setService = SetServiceStub()
+        let context = makeSupersetViewModel(setService: setService)
+        let viewModel = context.viewModel
+
+        let warmup = try XCTUnwrap(
+            viewModel.setsByExercise[context.bench]?.first { $0.setType == .warmup }
+        )
+        XCTAssertNotNil(warmup.supersetGroupId, "fixture: warm-ups carry the group id")
+
+        await viewModel.completeSet(warmup, input: SetCompletionInput(weight: 40, reps: 10))
+
+        let timer = viewModel.restTimer
+        guard case .running = timer else {
+            return XCTFail("a warm-up rests on the warm-up time even inside a group, got \(timer)")
+        }
+        XCTAssertTrue(setService.recordedRestDurations.isEmpty)
+    }
+
+    /// The path every existing user is on.
+    func testUngroupedExerciseRestsExactlyAsBefore() async throws {
+        let setService = SetServiceStub()
+        let context = makeSupersetViewModel(setService: setService)
+        let viewModel = context.viewModel
+        viewModel.selectedExerciseIndex = 2
+
+        let flySet = try XCTUnwrap(viewModel.setsByExercise[context.fly]?.first)
+        await viewModel.completeSet(flySet, input: SetCompletionInput(weight: 17.5, reps: 15, rir: 3))
+
+        let timer = viewModel.restTimer
+        guard case .running = timer else {
+            return XCTFail("an ungrouped set must rest, got \(timer)")
+        }
+        XCTAssertTrue(setService.recordedRestDurations.isEmpty)
+    }
+
+    // MARK: - Superset authoring (PR9)
+
+    func testCreatingASupersetStampsEverySetOfBothExercises() async throws {
+        let setService = SetServiceStub()
+        let context = makeSupersetViewModel(setService: setService, preGrouped: false)
+        let viewModel = context.viewModel
+
+        await viewModel.createSuperset(anchorExerciseId: context.bench, partnerExerciseId: context.incline)
+
+        let benchGroups = Set((viewModel.setsByExercise[context.bench] ?? []).map(\.supersetGroupId))
+        let inclineGroups = Set((viewModel.setsByExercise[context.incline] ?? []).map(\.supersetGroupId))
+
+        XCTAssertEqual(benchGroups.count, 1, "every set of the anchor agrees")
+        XCTAssertEqual(inclineGroups, benchGroups, "and the partner shares it")
+        XCTAssertNotNil(benchGroups.first ?? nil)
+
+        // Warm-ups included: "every set of this exercise agrees" has to stay true.
+        XCTAssertEqual(
+            (viewModel.setsByExercise[context.bench] ?? []).filter { $0.setType == .warmup }
+                .compactMap(\.supersetGroupId).count,
+            1,
+            "a warm-up carries the group too — PR4 excludes it by set type, not by grouping"
+        )
+        XCTAssertTrue(viewModel.isInSuperset(context.bench))
+    }
+
+    func testCreatingASupersetLeavesUnrelatedExercisesAlone() async throws {
+        let setService = SetServiceStub()
+        let context = makeSupersetViewModel(setService: setService, preGrouped: false)
+        let viewModel = context.viewModel
+
+        await viewModel.createSuperset(anchorExerciseId: context.bench, partnerExerciseId: context.incline)
+
+        XCTAssertTrue(
+            (viewModel.setsByExercise[context.fly] ?? []).allSatisfy { $0.supersetGroupId == nil }
+        )
+        XCTAssertFalse(viewModel.isInSuperset(context.fly))
+    }
+
+    /// A container cannot wrap two tabs with a third between them, so a distant partner moves.
+    func testCreatingASupersetWithANonAdjacentPartnerMakesThemAdjacent() async throws {
+        let setService = SetServiceStub()
+        let context = makeSupersetViewModel(setService: setService, preGrouped: false)
+        let viewModel = context.viewModel
+
+        // Bench is at 0, Cable Fly at 2 — Incline sits between them.
+        await viewModel.createSuperset(anchorExerciseId: context.bench, partnerExerciseId: context.fly)
+
+        let order = viewModel.exercises.map(\.id)
+        XCTAssertEqual(order, [context.bench, context.fly, context.incline])
+
+        let runs = SupersetGrouping.runs(
+            exercises: viewModel.exercises,
+            setsByExercise: viewModel.setsByExercise
+        )
+        XCTAssertTrue(runs[0].isMarked, "and the pair now draws as one container")
+    }
+
+    func testRemovingFromASupersetClearsEverySetIncludingCompletedOnes() async throws {
+        let setService = SetServiceStub()
+        let context = makeSupersetViewModel(setService: setService)
+        let viewModel = context.viewModel
+
+        // Log into the group first — the decision is that dissolving clears these too.
+        let benchSet = try XCTUnwrap(
+            viewModel.setsByExercise[context.bench]?.first { $0.setType == .working }
+        )
+        await viewModel.completeSet(benchSet, input: SetCompletionInput(weight: 80, reps: 8, rir: 2))
+        XCTAssertTrue(benchSet.completed)
+
+        await viewModel.removeFromSuperset(exerciseId: context.bench)
+
+        XCTAssertTrue(
+            (viewModel.setsByExercise[context.bench] ?? []).allSatisfy { $0.supersetGroupId == nil },
+            "Remove from Superset must mean the exercise is not in a superset — completed rows included"
+        )
+        XCTAssertFalse(viewModel.isInSuperset(context.bench))
+    }
+
+    /// Dissolving one half is enough: the survivor becomes a group of one, which every reader
+    /// already treats as ungrouped. No second write.
+    func testRemovingOneHalfLeavesTheOtherUngrouped() async throws {
+        let setService = SetServiceStub()
+        let context = makeSupersetViewModel(setService: setService)
+        let viewModel = context.viewModel
+
+        await viewModel.removeFromSuperset(exerciseId: context.bench)
+
+        XCTAssertNotNil(
+            viewModel.supersetGroupId(for: context.incline),
+            "the survivor's rows are untouched — only their interpretation changes"
+        )
+        XCTAssertFalse(viewModel.isInSuperset(context.incline))
+        XCTAssertEqual(setService.supersetGroupWrites.count, 1, "one write, not two")
+
+        let runs = SupersetGrouping.runs(
+            exercises: viewModel.exercises,
+            setsByExercise: viewModel.setsByExercise
+        )
+        XCTAssertTrue(runs.allSatisfy { !$0.isMarked })
+    }
+
+    func testCreatingASupersetWithItselfIsARefusal() async throws {
+        let setService = SetServiceStub()
+        let context = makeSupersetViewModel(setService: setService, preGrouped: false)
+        let viewModel = context.viewModel
+
+        await viewModel.createSuperset(anchorExerciseId: context.bench, partnerExerciseId: context.bench)
+
+        XCTAssertTrue(setService.supersetGroupWrites.isEmpty)
+        XCTAssertFalse(viewModel.isInSuperset(context.bench))
+    }
+
+    // MARK: - Superset prompt lifecycle (PR5)
+
+    func testCompletingASetMidSupersetRaisesThePromptNamingThePartner() async throws {
+        let setService = SetServiceStub()
+        let context = makeSupersetViewModel(setService: setService)
+        let viewModel = context.viewModel
+
+        let benchSet = try XCTUnwrap(
+            viewModel.setsByExercise[context.bench]?.first { $0.setType == .working }
+        )
+        await viewModel.completeSet(benchSet, input: SetCompletionInput(weight: 80, reps: 8, rir: 2))
+
+        XCTAssertEqual(viewModel.supersetPrompt?.nextExerciseId, context.incline)
+        XCTAssertEqual(viewModel.supersetPrompt?.nextExerciseName, "Incline DB Press")
+    }
+
+    func testTakingThePromptSwitchesExerciseAndClearsIt() async throws {
+        let setService = SetServiceStub()
+        let context = makeSupersetViewModel(setService: setService)
+        let viewModel = context.viewModel
+
+        let benchSet = try XCTUnwrap(
+            viewModel.setsByExercise[context.bench]?.first { $0.setType == .working }
+        )
+        await viewModel.completeSet(benchSet, input: SetCompletionInput(weight: 80, reps: 8, rir: 2))
+
+        viewModel.goToSupersetPartner()
+
+        XCTAssertEqual(viewModel.currentExercise?.id, context.incline)
+        XCTAssertNil(viewModel.supersetPrompt, "the prompt has done its job once it is taken")
+    }
+
+    /// Walking over via the tab strip is the same outcome by a different route — the prompt is an
+    /// offer, and navigating at all retires it.
+    func testSwitchingExerciseByTabClearsThePrompt() async throws {
+        let setService = SetServiceStub()
+        let context = makeSupersetViewModel(setService: setService)
+        let viewModel = context.viewModel
+
+        let benchSet = try XCTUnwrap(
+            viewModel.setsByExercise[context.bench]?.first { $0.setType == .working }
+        )
+        await viewModel.completeSet(benchSet, input: SetCompletionInput(weight: 80, reps: 8, rir: 2))
+        XCTAssertNotNil(viewModel.supersetPrompt)
+
+        viewModel.selectedExerciseIndex = 2
+
+        XCTAssertNil(viewModel.supersetPrompt)
+    }
+
+    /// Un-ticking is a correction: whatever the completion said to do next no longer follows.
+    func testUncompletingTheSetClearsThePrompt() async throws {
+        let setService = SetServiceStub()
+        let context = makeSupersetViewModel(setService: setService)
+        let viewModel = context.viewModel
+
+        let benchSet = try XCTUnwrap(
+            viewModel.setsByExercise[context.bench]?.first { $0.setType == .working }
+        )
+        await viewModel.completeSet(benchSet, input: SetCompletionInput(weight: 80, reps: 8, rir: 2))
+        XCTAssertNotNil(viewModel.supersetPrompt)
+
+        await viewModel.uncompleteSet(benchSet)
+
+        XCTAssertNil(viewModel.supersetPrompt)
+    }
+
+    func testDismissingThePromptLeavesTheExerciseAlone() async throws {
+        let setService = SetServiceStub()
+        let context = makeSupersetViewModel(setService: setService)
+        let viewModel = context.viewModel
+
+        let benchSet = try XCTUnwrap(
+            viewModel.setsByExercise[context.bench]?.first { $0.setType == .working }
+        )
+        await viewModel.completeSet(benchSet, input: SetCompletionInput(weight: 80, reps: 8, rir: 2))
+
+        viewModel.dismissSupersetPrompt()
+
+        XCTAssertNil(viewModel.supersetPrompt)
+        XCTAssertEqual(viewModel.currentExercise?.id, context.bench, "dismiss must not navigate")
+    }
+
+    /// The last member ends the group, so there is nothing to point at.
+    func testLastSupersetMemberRaisesNoPrompt() async throws {
+        let setService = SetServiceStub()
+        let context = makeSupersetViewModel(setService: setService)
+        let viewModel = context.viewModel
+        viewModel.selectedExerciseIndex = 1
+
+        let inclineSet = try XCTUnwrap(viewModel.setsByExercise[context.incline]?.first)
+        await viewModel.completeSet(inclineSet, input: SetCompletionInput(weight: 30, reps: 10, rir: 2))
+
+        XCTAssertNil(viewModel.supersetPrompt)
+    }
+
+    /// The prompt must not outlive the workout it belongs to.
+    func testDiscardingTheWorkoutClearsThePrompt() async throws {
+        let setService = SetServiceStub()
+        let context = makeSupersetViewModel(setService: setService)
+        let viewModel = context.viewModel
+
+        let benchSet = try XCTUnwrap(
+            viewModel.setsByExercise[context.bench]?.first { $0.setType == .working }
+        )
+        await viewModel.completeSet(benchSet, input: SetCompletionInput(weight: 80, reps: 8, rir: 2))
+        XCTAssertNotNil(viewModel.supersetPrompt)
+
+        await viewModel.discardWorkout()
+
+        XCTAssertNil(viewModel.supersetPrompt)
+        XCTAssertEqual(viewModel.restTimer, .idle, "and the slot's other occupant goes too")
+    }
+
+    // MARK: - Accessory slot arbitration
+
+    func testSupersetPromptIsSuppressedWhileTheKeypadIsOpen() {
+        XCTAssertTrue(
+            ActiveWorkoutBottomAccessoryLayout.shouldShowSupersetPrompt(
+                hasPrompt: true, restTimerState: .idle, isKeyboardVisible: false
+            )
+        )
+        XCTAssertFalse(
+            ActiveWorkoutBottomAccessoryLayout.shouldShowSupersetPrompt(
+                hasPrompt: true, restTimerState: .idle, isKeyboardVisible: true
+            ),
+            "same rule as a finished rest — a bar appearing under a thumb mid-entry shifts the keypad"
+        )
+    }
+
+    func testARunningRestTimerWinsTheSlotOverThePrompt() {
+        XCTAssertFalse(
+            ActiveWorkoutBottomAccessoryLayout.shouldShowSupersetPrompt(
+                hasPrompt: true,
+                restTimerState: .running(remaining: 60, total: 120),
+                isKeyboardVisible: false
+            ),
+            "both in the slot at once would stack two 43pt bars"
+        )
+        XCTAssertFalse(
+            ActiveWorkoutBottomAccessoryLayout.shouldShowSupersetPrompt(
+                hasPrompt: false, restTimerState: .idle, isKeyboardVisible: false
+            )
+        )
+    }
+
     func testAddingWarmupSetReindexesInOneBatchAndPutsWarmupFirst() async throws {
         let setService = SetServiceStub()
         let viewModel = makeOrderingViewModel(setService: setService)
@@ -5317,6 +5712,34 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
         return emptyResult(setId)
     }
 
+    /// Every `recordRestDuration` call, in order. A superset transition must produce `0` here —
+    /// the absence of a call is the bug, not just a wrong value.
+    var recordedRestDurations: [(setId: UUID, seconds: Int)] = []
+
+    /// Canned partner names per workout, for history-chip tests.
+    var supersetPartnersByWorkout: [UUID: [String]] = [:]
+
+    func supersetPartnerNames(workoutIds: Set<UUID>, exerciseId: UUID) async throws -> [UUID: [String]] {
+        supersetPartnersByWorkout.filter { workoutIds.contains($0.key) }
+    }
+
+    /// Every `applySupersetGroup` call, in order.
+    var supersetGroupWrites: [(setIds: [UUID], groupId: UUID?)] = []
+
+    func applySupersetGroup(setIds: [UUID], groupId: UUID?) async throws {
+        supersetGroupWrites.append((setIds, groupId))
+        for set in workoutSets.values.flatMap({ $0 }) where setIds.contains(set.id) {
+            set.supersetGroupId = groupId
+        }
+    }
+
+    func recordRestDuration(setId: UUID, seconds: Int) async throws {
+        recordedRestDurations.append((setId, seconds))
+        if let set = workoutSets.values.flatMap({ $0 }).first(where: { $0.id == setId }) {
+            set.restDurationSeconds = seconds
+        }
+    }
+
     func save(setId: UUID, input: SetCompletionInput) async throws -> SetSaveResult {
         completionInputs[setId] = input
         let stored = workoutSets.values.flatMap { $0 }.first { $0.id == setId }
@@ -5354,7 +5777,8 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
         rightReps: Int?,
         rir: Double?,
         leftRIR: Double?,
-        rightRIR: Double?
+        rightRIR: Double?,
+        supersetGroupId: UUID?
     ) async throws -> WorkoutSet {
         let set = WorkoutSet(
             workoutId: workoutId,
@@ -5370,6 +5794,7 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
             setType: setType,
             orderInWorkout: orderInWorkout,
             orderInExercise: orderInExercise,
+            supersetGroupId: supersetGroupId,
             completed: false
         )
         createdSets.append(set)

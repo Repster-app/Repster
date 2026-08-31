@@ -217,22 +217,19 @@ struct WorkoutDetailFromHomeView: View {
                 exerciseSetMap[set.exerciseId, default: []].append(set)
             }
 
-            var exerciseGroups: [ExerciseGroup] = []
             var exerciseLookup: [UUID: ChartExerciseData] = [:]
-            for (exerciseId, exerciseSets) in exerciseSetMap {
-                let exercise = try await exerciseService.fetchExerciseSnapshot(exerciseId)
-                guard let exercise else { continue }
+            var statsLookup: [UUID: ChartExerciseStatsData?] = [:]
+            for exerciseId in exerciseSetMap.keys {
+                guard let exercise = try await exerciseService.fetchExerciseSnapshot(exerciseId) else { continue }
                 exerciseLookup[exerciseId] = exercise
-                let sorted = exerciseSets.sorted { $0.orderInExercise < $1.orderInExercise }
-                let stats = try? await statsService.fetchStatsSnapshot(for: exerciseId)
-                exerciseGroups.append(ExerciseGroup(exercise: exercise, sets: sorted, stats: stats))
+                statsLookup[exerciseId] = try? await statsService.fetchStatsSnapshot(for: exerciseId)
             }
 
-            exerciseGroups.sort { lhs, rhs in
-                let l = lhs.sets.map(\.orderInWorkout).min() ?? Int.max
-                let r = rhs.sets.map(\.orderInWorkout).min() ?? Int.max
-                return l < r
-            }
+            let exerciseGroups = ExerciseGroup.build(
+                sets: sets,
+                exercisesById: exerciseLookup,
+                statsById: statsLookup
+            )
 
             let completedSets = sets.filter(\.hasData)
             let aggregate = WorkoutAggregateSummary.summarize(

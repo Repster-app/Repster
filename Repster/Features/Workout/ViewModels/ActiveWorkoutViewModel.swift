@@ -53,6 +53,16 @@ enum RestTimerState: Equatable {
     case finished
 }
 
+/// What the bottom accessory shows instead of a countdown, mid-superset.
+///
+/// Deliberately **not** a fifth case on `RestTimerState`: it is not a timer, it has no duration and
+/// nothing ticks it, and folding it in would make every `switch` in the timer code answer a question
+/// about supersets. See SUPERSETS_SCOPING.md §4.
+struct SupersetPrompt: Equatable {
+    let nextExerciseId: UUID
+    let nextExerciseName: String
+}
+
 enum ActiveWorkoutSessionDefaultsKeys {
     static let workoutClockWorkoutId = "activeWorkoutClockWorkoutId"
     static let workoutClockAccumulatedElapsedSeconds = "activeWorkoutClockAccumulatedElapsedSeconds"
@@ -161,6 +171,13 @@ final class ActiveWorkoutViewModel {
 
     /// Rest timer state between sets.
     var restTimer: RestTimerState = .idle
+
+    /// The next lift in the current superset, when the last completed set suppressed its rest.
+    ///
+    /// Lives alongside `restTimer` rather than inside it, and shares its slot on screen — the
+    /// accessory area answers "what happens between sets", and inside a group the answer is a
+    /// partner rather than a countdown.
+    var supersetPrompt: SupersetPrompt?
 
     /// Whether Repster's own notification explainer is showing. See `RestAlarmPromptView`.
     var showRestAlarmPrompt: Bool = false
@@ -343,6 +360,7 @@ final class ActiveWorkoutViewModel {
                 selectedExerciseIndex = 0
                 setsByExercise = [:]
                 restTimer = .idle
+                supersetPrompt = nil
                 isWorkoutPaused = false
                 accumulatedElapsedSeconds = 0
                 lastWorkoutResumedAt = nil
@@ -510,16 +528,56 @@ final class ActiveWorkoutViewModel {
             // 6. Start rest timer: warmup sets use warmup rest time, working sets use default.
             // Note: startRestTimer() already calls updateLiveActivityState(),
             // so we only push a separate update if NO timer starts.
-            let restTime: Int?
-            if set.setType == .warmup {
-                restTime = globalDefaultWarmupRestTime ?? currentExercise?.defaultRestTime ?? globalDefaultRestTime
-            } else {
-                restTime = currentExercise?.defaultRestTime ?? globalDefaultRestTime
-            }
-            if let restTime, restTime > 0 {
-                startRestTimer(duration: restTime)
-            } else {
+            //
+            // A working set inside a superset, on any member but the last, starts no timer at all
+            // — going straight to the partner is the point of the group (SUPERSETS_SCOPING.md §4).
+            // Warm-ups are deliberately excluded: nobody supersets their warm-ups, and they keep
+            // resting on the warm-up time exactly as before.
+            //
+            // Keyed on `set.exerciseId` rather than `currentExercise`, because this branch decides
+            // what happens to the row that was just completed, and the two can differ.
+            let suppressRestForSuperset = set.setType != .warmup
+                && isInSuperset(set.exerciseId)
+                && !isLastInSuperset(set.exerciseId)
+
+            if suppressRestForSuperset {
+                // Record the zero, explicitly. `restDurationSeconds` is otherwise only written by
+                // `captureRestDurationOnLastCompletedSet`, and only when a timer runs to zero — so
+                // leaving it nil here would make both fatigue paths in `LoadPrescriptionService`
+                // read `restDurationSeconds ?? configuredRestSeconds` and decay fatigue as though
+                // the lifter had rested a full two minutes. That over-estimates readiness on
+                // exactly the sets where they are most cooked, and `FatigueLearningService` would
+                // learn the error rather than merely display it.
+                //
+                // Zero is a deliberate conservative floor, not the literal truth: wall-clock time
+                // does pass while the partner exercise is performed. Recording that properly needs
+                // `WorkoutSet.startedAt`, which exists on the model and is never populated. Erring
+                // toward "less recovered" is the safe direction for a model whose job is to avoid
+                // prescribing more than the lifter can do. See SUPERSETS_SCOPING.md §2.2.
+                do {
+                    try await setService.recordRestDuration(setId: set.id, seconds: 0)
+                } catch {
+                    #if DEBUG
+                    dbg("[ActiveWorkoutViewModel] Failed to record zero rest for set \(set.id): \(error)")
+                    #endif
+                }
+                supersetPrompt = nextInSuperset(after: set.exerciseId).map {
+                    SupersetPrompt(nextExerciseId: $0.id, nextExerciseName: $0.name)
+                }
                 updateLiveActivityState()
+            } else {
+                supersetPrompt = nil
+                let restTime: Int?
+                if set.setType == .warmup {
+                    restTime = globalDefaultWarmupRestTime ?? currentExercise?.defaultRestTime ?? globalDefaultRestTime
+                } else {
+                    restTime = currentExercise?.defaultRestTime ?? globalDefaultRestTime
+                }
+                if let restTime, restTime > 0 {
+                    startRestTimer(duration: restTime)
+                } else {
+                    updateLiveActivityState()
+                }
             }
 
             // 7. Invalidate PR, history, and suggestion caches, then reload
@@ -536,6 +594,117 @@ final class ActiveWorkoutViewModel {
             dbg("[ActiveWorkoutViewModel] Failed to complete set: \(error)")
             #endif
         }
+    }
+
+    // MARK: - Superset authoring
+
+    /// Pair two exercises into a superset, mid-workout.
+    ///
+    /// Writes one new group id across **every** set of both exercises, completed rows included —
+    /// grouping is all-or-nothing per exercise (SUPERSETS_SCOPING.md §6). A set logged before the
+    /// pair existed therefore reads as supersetted afterwards; that is the accepted cost of the
+    /// simpler model, and it is why the history chip is worded per session rather than per set.
+    ///
+    /// The pair must end up adjacent in the strip: a container cannot wrap two tabs with a third
+    /// between them, so a non-adjacent partner is moved next to the anchor. Ordering happens
+    /// **after** the group is written, so a failed write leaves the workout's order untouched.
+    func createSuperset(anchorExerciseId: UUID, partnerExerciseId: UUID) async {
+        guard anchorExerciseId != partnerExerciseId else { return }
+        guard exercises.contains(where: { $0.id == anchorExerciseId }),
+              exercises.contains(where: { $0.id == partnerExerciseId })
+        else { return }
+
+        let anchorSets = setsByExercise[anchorExerciseId] ?? []
+        let partnerSets = setsByExercise[partnerExerciseId] ?? []
+        let setIds = (anchorSets + partnerSets).map(\.id)
+        guard !setIds.isEmpty else { return }
+
+        let groupId = UUID()
+        do {
+            try await setService.applySupersetGroup(setIds: setIds, groupId: groupId)
+        } catch {
+            #if DEBUG
+            dbg("[ActiveWorkoutViewModel] Failed to create superset: \(error)")
+            #endif
+            return
+        }
+
+        applySupersetGroupLocally(groupId, to: [anchorExerciseId, partnerExerciseId])
+        moveAdjacent(partnerExerciseId, after: anchorExerciseId)
+
+        analyticsService.recordWorkoutInteraction(.supersetCreates)
+    }
+
+    /// Take an exercise out of its superset.
+    ///
+    /// Clears the group from every set of *this* exercise only. A pair dissolves cleanly from
+    /// either side with no second write: the exercise left behind becomes a group of one, which
+    /// every reader already treats as ungrouped (SUPERSETS_IMPLEMENTATION_PLAN.md G5).
+    func removeFromSuperset(exerciseId: UUID) async {
+        let setIds = (setsByExercise[exerciseId] ?? []).map(\.id)
+        guard !setIds.isEmpty else { return }
+
+        do {
+            try await setService.applySupersetGroup(setIds: setIds, groupId: nil)
+        } catch {
+            #if DEBUG
+            dbg("[ActiveWorkoutViewModel] Failed to remove from superset: \(error)")
+            #endif
+            return
+        }
+
+        applySupersetGroupLocally(nil, to: [exerciseId])
+
+        // The prompt may have been pointing into the group that just stopped existing.
+        if supersetPrompt != nil, !isInSuperset(currentExercise?.id ?? exerciseId) {
+            supersetPrompt = nil
+        }
+    }
+
+    /// Mirror a group write onto the screen's own copies, re-assigning per exercise so
+    /// `@Observable` notices.
+    private func applySupersetGroupLocally(_ groupId: UUID?, to exerciseIds: [UUID]) {
+        for exerciseId in exerciseIds {
+            guard let sets = setsByExercise[exerciseId] else { continue }
+            for set in sets { set.supersetGroupId = groupId }
+            setsByExercise[exerciseId] = sets
+        }
+    }
+
+    /// Put `partner` immediately after `anchor` in the strip, if it is not already.
+    ///
+    /// `toOffset` is `anchorIndex + 1` in both directions: moving forward, the partner is removed
+    /// first so the destination shifts down one and it lands right after the anchor; moving
+    /// backward it lands there directly. Same convention as the strip's Move Left / Move Right.
+    private func moveAdjacent(_ partnerExerciseId: UUID, after anchorExerciseId: UUID) {
+        guard let anchorIndex = exercises.firstIndex(where: { $0.id == anchorExerciseId }),
+              let partnerIndex = exercises.firstIndex(where: { $0.id == partnerExerciseId }),
+              partnerIndex != anchorIndex + 1
+        else { return }
+
+        reorderExercises(from: IndexSet(integer: partnerIndex), to: anchorIndex + 1)
+    }
+
+    // MARK: - Superset prompt
+
+    /// Take the shortcut the prompt offers.
+    ///
+    /// Selecting by identity, not by the index captured when the prompt was raised: a reorder or a
+    /// replace between raising and tapping would have moved it. `setSelectedExercise` clears the
+    /// prompt through `notifySelectedExerciseChangedIfNeeded`, so there is no separate clear here.
+    func goToSupersetPartner() {
+        guard let prompt = supersetPrompt else { return }
+        guard exercises.contains(where: { $0.id == prompt.nextExerciseId }) else {
+            supersetPrompt = nil
+            return
+        }
+        recordExerciseTabSelected()
+        setSelectedExercise(id: prompt.nextExerciseId)
+    }
+
+    /// Dismiss without moving. The tab strip still works; this only reclaims the slot.
+    func dismissSupersetPrompt() {
+        supersetPrompt = nil
     }
 
     /// Emits `first set logged` once per workout, with the delay since the
@@ -575,6 +744,12 @@ final class ActiveWorkoutViewModel {
             // cleared set.prStatus = nil on the same @Model reference.
             PRBadgeApplier.apply(result.prResult.affectedSetIds, to: &setsByExercise)
 
+            // Un-ticking is a correction. Whatever the completion said to do next no longer
+            // follows from anything, so the prompt goes with it.
+            if supersetPrompt != nil, set.exerciseId == currentExercise?.id {
+                supersetPrompt = nil
+            }
+
             // The set is back in the pending list — drop any stale done-strip
             // snapshot so re-completing later captures a fresh suggestion.
             completedSetSuggestionSnapshots.removeValue(forKey: set.id)
@@ -613,6 +788,17 @@ final class ActiveWorkoutViewModel {
     /// Creates a WorkoutSet with setType = .working, persists immediately
     /// (survives app kill per FR-003), and appends to local state.
     func addSet(for exerciseId: UUID) async {
+        await addSet(for: exerciseId, supersetGroupId: supersetGroupId(for: exerciseId))
+    }
+
+    /// Add a working set, naming the superset group explicitly.
+    ///
+    /// The group is normally derived from the exercise's existing rows, which is what
+    /// `addSet(for:)` does. `replaceExercise` cannot: it deletes the outgoing rows first, so by the
+    /// time it adds the replacement's first set there is nothing left to derive from. It captures
+    /// the outgoing group beforehand and passes it here, which is how a replacement inherits its
+    /// place in a superset (SUPERSETS_SCOPING.md §6).
+    private func addSet(for exerciseId: UUID, supersetGroupId: UUID?) async {
         guard let workout else { return }
 
         let totalSets = setsByExercise.values.flatMap { $0 }.count
@@ -627,7 +813,8 @@ final class ActiveWorkoutViewModel {
                 orderInWorkout: totalSets + 1,
                 orderInExercise: exerciseSets.count + 1,
                 weight: nil,
-                reps: nil
+                reps: nil,
+                supersetGroupId: supersetGroupId
             )
 
             // Append to local state
@@ -676,7 +863,10 @@ final class ActiveWorkoutViewModel {
                 orderInWorkout: totalSets + 1,
                 orderInExercise: insertionIndex + 1,
                 weight: nil,
-                reps: nil
+                reps: nil,
+                // Warm-ups carry the group so "every set of this exercise agrees" stays true.
+                // They still rest normally — PR4 branches on `setType`, not on this field.
+                supersetGroupId: supersetGroupId(for: exerciseId)
             )
 
             // Insert at correct position and reindex
@@ -912,6 +1102,11 @@ final class ActiveWorkoutViewModel {
         let outgoingSets = setsByExercise[outgoing.id] ?? []
         let selectedIdBefore = currentExercise?.id
 
+        // Read before the rows go: the replacement inherits the outgoing exercise's superset
+        // (SUPERSETS_SCOPING.md §6 — you swapped the movement, not the structure). Derivation
+        // reads `setsByExercise`, which is cleared two lines below.
+        let inheritedSupersetGroupId = supersetGroupId(for: outgoing.id)
+
         // Screen state first, store second. The rows must leave the screen *before* they leave the
         // store: the delete loop below awaits once per set, and `ExerciseTabStripView` reads every
         // exercise's sets on every render, so a deleted model would otherwise be handed to a view
@@ -941,7 +1136,7 @@ final class ActiveWorkoutViewModel {
         // An exercise with no sets does not exist — it cannot be ordered and will not survive a
         // rebuild. `addSet` also handles the Live Activity, the sub-tab caches and the suggestion
         // refresh for the now-current exercise.
-        await addSet(for: snapshot.id)
+        await addSet(for: snapshot.id, supersetGroupId: inheritedSupersetGroupId)
 
         // Mandatory, not tidy-up. `addSet` assigns the *global tail*, so the replacement's only set
         // has the highest `orderInWorkout` in the workout while sitting at position `slot` in the
@@ -1751,12 +1946,17 @@ final class ActiveWorkoutViewModel {
                 workoutIds: Set(grouped.keys),
                 exerciseId: exercise.id
             )
+            let partnersByWorkout = (try? await setService.supersetPartnerNames(
+                workoutIds: Set(grouped.keys),
+                exerciseId: exercise.id
+            )) ?? [:]
             subTabHistory = grouped.map { workoutId, workoutSets in
                 WorkoutHistoryGroup(
                     id: workoutId,
                     date: workoutSets.first?.date ?? Date(),
                     sets: workoutSets.sorted { $0.orderInExercise < $1.orderInExercise },
-                    isExcludedFromProgression: excludedWorkoutIds.contains(workoutId)
+                    isExcludedFromProgression: excludedWorkoutIds.contains(workoutId),
+                    supersetPartnerNames: partnersByWorkout[workoutId] ?? []
                 )
             }
             .sorted { $0.date > $1.date }
@@ -2332,6 +2532,10 @@ final class ActiveWorkoutViewModel {
         self.accumulatedElapsedSeconds = 0
         self.lastWorkoutResumedAt = nil
         self.elapsedTime = 0
+        // Latent rather than visible — the screen dismisses and this instance goes with it — but
+        // every other field here is reset, and a prompt outliving the workout it belongs to is the
+        // kind of thing that only becomes a bug once someone reuses the ViewModel.
+        self.supersetPrompt = nil
         dismissTimer()
     }
 
@@ -2444,6 +2648,9 @@ final class ActiveWorkoutViewModel {
         guard currentId != lastNotifiedExerciseId else { return }
         lastNotifiedExerciseId = currentId
 
+        // Whether they took the shortcut or walked over themselves, the prompt has done its job.
+        supersetPrompt = nil
+
         persistSelectedExerciseState()
         updateLiveActivityState()
     }
@@ -2467,6 +2674,11 @@ final class ActiveWorkoutViewModel {
 // MARK: - SetTableDataSource Conformance
 
 extension ActiveWorkoutViewModel: SetTableDataSource {
+
+    /// The live workout is the only screen where pairing means anything: it is the one with a rest
+    /// timer to suppress and a prompt to raise.
+    var supportsSupersetAuthoring: Bool { true }
+
     func suggestionState(for setId: UUID) -> SetSuggestionState? {
         weightSuggestionData?.rowState(for: setId)
     }

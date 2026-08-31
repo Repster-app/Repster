@@ -325,7 +325,9 @@ private struct TemplateExerciseCard: View {
 
             Menu {
                 Menu("Superset Group") {
-                    ForEach(["A", "B", "C"], id: \.self) { label in
+                    // Driven by the view model's own list rather than a literal — the picker
+                    // offered three while the model declared five and coloured four.
+                    ForEach(viewModel.supersetLetters, id: \.self) { label in
                         Button {
                             viewModel.setSupersetGroup(for: exerciseIndex, label: label)
                         } label: {

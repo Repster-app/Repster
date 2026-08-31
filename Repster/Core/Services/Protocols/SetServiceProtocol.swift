@@ -98,7 +98,13 @@ protocol SetServiceProtocol: Sendable {
         rightReps: Int?,
         rir: Double?,
         leftRIR: Double?,
-        rightRIR: Double?
+        rightRIR: Double?,
+        /// The superset group this row belongs to, or nil.
+        ///
+        /// Grouping is all-or-nothing per exercise (SUPERSETS_SCOPING.md §6), so a new row inherits
+        /// whatever its exercise is currently in. Passing nil here is what silently ungrouped every
+        /// mid-workout set before this parameter existed.
+        supersetGroupId: UUID?
     ) async throws -> WorkoutSet
 
     // Note: the per-side parameters have no defaults here — Swift doesn't allow default
@@ -207,6 +213,25 @@ protocol SetServiceProtocol: Sendable {
     /// the crash class (SWIFTDATA_CONCURRENCY_CRASH_ANALYSIS.md §5.3).
     func applyOrdering(_ updates: [SetOrderUpdate]) async throws
 
+    /// Which exercises shared a superset with `exerciseId` in each of these workouts.
+    ///
+    /// One batched lookup for a whole history tab. Workouts with no grouping are absent from the
+    /// result. See SUPERSETS_SCOPING.md §5.1.
+    func supersetPartnerNames(workoutIds: Set<UUID>, exerciseId: UUID) async throws -> [UUID: [String]]
+
+    /// Stamp or clear a superset group across many sets.
+    ///
+    /// Callers pass **every** set of the exercises involved — grouping is all-or-nothing per
+    /// exercise, completed rows included. See SUPERSETS_SCOPING.md §6.
+    func applySupersetGroup(setIds: [UUID], groupId: UUID?) async throws
+
+    /// Record how long the lifter rested after a set.
+    ///
+    /// Called with `0` when a rest is deliberately suppressed — a superset transition — because
+    /// leaving the field nil makes the fatigue model assume the exercise's full configured rest
+    /// was taken. See SUPERSETS_SCOPING.md §2.2.
+    func recordRestDuration(setId: UUID, seconds: Int) async throws
+
     // MARK: - Fetch (006: Active Workout Screen)
 
     /// Fetch all sets belonging to a workout, ordered by orderInWorkout.
@@ -266,7 +291,8 @@ extension SetServiceProtocol {
         orderInWorkout: Int,
         orderInExercise: Int,
         weight: Double?,
-        reps: Int?
+        reps: Int?,
+        supersetGroupId: UUID? = nil
     ) async throws -> WorkoutSet {
         try await create(
             workoutId: workoutId,
@@ -281,7 +307,8 @@ extension SetServiceProtocol {
             rightReps: nil,
             rir: nil,
             leftRIR: nil,
-            rightRIR: nil
+            rightRIR: nil,
+            supersetGroupId: supersetGroupId
         )
     }
 

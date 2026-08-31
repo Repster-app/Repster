@@ -689,6 +689,11 @@ struct ContentView: View {
         let startOptions = pendingWorkoutStartOptions ?? .default
         let newWorkout = try await services.workoutService.startWorkout(options: startOptions)
 
+        // Superset grouping is part of the workout being copied — dropping it would silently
+        // un-superset the copy. Remapped rather than reused so each workout owns its own group
+        // ids, the same thing template import does (`TemplateService.finalizeImport`).
+        var copiedSupersetGroupIds: [UUID: UUID] = [:]
+
         for sourceSet in sourceSets {
             // Per-side reps and RIR have to be carried explicitly. `reps` on a unilateral row is
             // only a derived mirror of `max(left, right)` (`syncDerivedPerformanceFields`), so
@@ -707,7 +712,13 @@ struct ContentView: View {
                 rightReps: sourceSet.rightReps,
                 rir: sourceSet.rir,
                 leftRIR: sourceSet.leftRIR,
-                rightRIR: sourceSet.rightRIR
+                rightRIR: sourceSet.rightRIR,
+                supersetGroupId: sourceSet.supersetGroupId.map { sourceGroupId in
+                    if let existing = copiedSupersetGroupIds[sourceGroupId] { return existing }
+                    let fresh = UUID()
+                    copiedSupersetGroupIds[sourceGroupId] = fresh
+                    return fresh
+                }
             )
         }
 

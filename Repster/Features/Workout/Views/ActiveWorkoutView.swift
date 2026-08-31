@@ -30,6 +30,22 @@ enum ActiveWorkoutBottomAccessoryLayout {
             return !isKeyboardVisible
         }
     }
+
+    /// Whether the superset prompt belongs on screen.
+    ///
+    /// Same keypad rule as `.finished`, for the same reason: mid-entry the message is redundant —
+    /// you are already logging — and a bar appearing underneath would shift the keypad while a
+    /// thumb is on it. The rest timer wins the slot outright if one is somehow running, which it
+    /// should not be: the branch that raises a prompt is the branch that starts no timer.
+    static func shouldShowSupersetPrompt(
+        hasPrompt: Bool,
+        restTimerState: RestTimerState,
+        isKeyboardVisible: Bool
+    ) -> Bool {
+        guard hasPrompt, !isKeyboardVisible else { return false }
+        if case .idle = restTimerState { return true }
+        return false
+    }
 }
 
 /// The active workout screen — a focused full-screen experience for logging sets.
@@ -311,8 +327,16 @@ struct ActiveWorkoutView: View {
         )
     }
 
+    private var isSupersetPromptVisible: Bool {
+        ActiveWorkoutBottomAccessoryLayout.shouldShowSupersetPrompt(
+            hasPrompt: viewModel.supersetPrompt != nil,
+            restTimerState: viewModel.restTimer,
+            isKeyboardVisible: isSetKeyboardVisible
+        )
+    }
+
     private var bottomAccessoryAnimationKey: String {
-        "\(selectedSubTab)-\(isSetKeyboardVisible)-\(isRestTimerVisible)"
+        "\(selectedSubTab)-\(isSetKeyboardVisible)-\(isRestTimerVisible)-\(isSupersetPromptVisible)"
     }
 
     @ViewBuilder
@@ -341,6 +365,20 @@ struct ActiveWorkoutView: View {
                         services.analyticsService.recordWorkoutInteraction(.restTimerSkips)
                         viewModel.dismissTimer()
                     }
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            // Same slot, same height as the timer above — inside a superset there is no rest to
+            // count, so the slot names the partner instead and nothing on screen moves.
+            if isSupersetPromptVisible, let prompt = viewModel.supersetPrompt {
+                SupersetPromptView(
+                    nextExerciseName: prompt.nextExerciseName,
+                    onTap: {
+                        services.analyticsService.recordWorkoutInteraction(.supersetPromptTaps)
+                        viewModel.goToSupersetPartner()
+                    },
+                    onDismiss: { viewModel.dismissSupersetPrompt() }
                 )
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }

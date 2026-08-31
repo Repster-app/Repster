@@ -53,7 +53,8 @@ final class SetService: SetServiceProtocol {
         rightReps: Int?,
         rir: Double?,
         leftRIR: Double?,
-        rightRIR: Double?
+        rightRIR: Double?,
+        supersetGroupId: UUID?
     ) async throws -> WorkoutSet {
         let set = try await setRepo.create(
             workoutId: workoutId,
@@ -68,7 +69,8 @@ final class SetService: SetServiceProtocol {
             rightReps: rightReps,
             rir: rir,
             leftRIR: leftRIR,
-            rightRIR: rightRIR
+            rightRIR: rightRIR,
+            supersetGroupId: supersetGroupId
         )
         // A created row is `completed: false` and has not been performed, so it must not
         // contribute to PRs or stats. Every caller already assumes a fresh row is uncounted
@@ -481,6 +483,68 @@ final class SetService: SetServiceProtocol {
         max: Int?
     ) async throws {
         try await setRepo.applyTargetRepOverride(setId: setId, min: min, max: max)
+    }
+
+    /// Which exercises shared a superset with `exerciseId` in each of these workouts.
+    ///
+    /// One batched lookup for a whole history tab, deliberately shaped like
+    /// `excludedWorkoutIdsForProgressionHistory` above — an exercise-history screen renders dozens
+    /// of sessions, and a per-session fetch would be dozens of round trips for a chip.
+    ///
+    /// Workouts with no grouping are simply absent from the result. A set taken with no rest after
+    /// another exercise is systematically weaker than the same set rested, so a session that looks
+    /// like a regression may just be a superset — this is what lets history say so.
+    /// See SUPERSETS_SCOPING.md §5.1.
+    func supersetPartnerNames(
+        workoutIds: Set<UUID>,
+        exerciseId: UUID
+    ) async throws -> [UUID: [String]] {
+        guard !workoutIds.isEmpty else { return [:] }
+
+        var partnersByWorkout: [UUID: [String]] = [:]
+        var nameCache: [UUID: String] = [:]
+
+        for workoutId in workoutIds {
+            let sets = try await setRepo.fetchChartSets(for: workoutId)
+
+            // Any non-nil set decides the exercise's group — the same rule the live screen uses
+            // (`SupersetGrouping.groupId(for:in:)`), because writes are all-or-nothing per exercise.
+            guard let groupId = sets.lazy
+                .filter({ $0.exerciseId == exerciseId })
+                .compactMap(\.supersetGroupId)
+                .first
+            else { continue }
+
+            // Partners in the order the workout ran them, so the chip reads the way the session did.
+            var seen = Swift.Set<UUID>()
+            var partnerIds: [UUID] = []
+            for set in sets.sorted(by: { $0.orderInWorkout < $1.orderInWorkout })
+            where set.supersetGroupId == groupId && set.exerciseId != exerciseId {
+                if seen.insert(set.exerciseId).inserted { partnerIds.append(set.exerciseId) }
+            }
+            guard !partnerIds.isEmpty else { continue }
+
+            var names: [String] = []
+            for partnerId in partnerIds {
+                if let cached = nameCache[partnerId] {
+                    names.append(cached)
+                } else if let exercise = try await exerciseRepo.fetch(byId: partnerId) {
+                    nameCache[partnerId] = exercise.name
+                    names.append(exercise.name)
+                }
+            }
+            if !names.isEmpty { partnersByWorkout[workoutId] = names }
+        }
+
+        return partnersByWorkout
+    }
+
+    func applySupersetGroup(setIds: [UUID], groupId: UUID?) async throws {
+        try await setRepo.applySupersetGroup(setIds: setIds, groupId: groupId)
+    }
+
+    func recordRestDuration(setId: UUID, seconds: Int) async throws {
+        try await setRepo.applyRestDuration(setId: setId, seconds: seconds)
     }
 
     // MARK: - Fetch (006: Active Workout Screen)

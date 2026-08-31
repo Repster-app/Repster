@@ -40,7 +40,8 @@ actor SetRepository: SetRepositoryProtocol {
         rightReps: Int? = nil,
         rir: Double? = nil,
         leftRIR: Double? = nil,
-        rightRIR: Double? = nil
+        rightRIR: Double? = nil,
+        supersetGroupId: UUID? = nil
     ) throws -> WorkoutSet {
         let set = WorkoutSet(
             workoutId: workoutId,
@@ -56,6 +57,7 @@ actor SetRepository: SetRepositoryProtocol {
             setType: setType,
             orderInWorkout: orderInWorkout,
             orderInExercise: orderInExercise,
+            supersetGroupId: supersetGroupId,
             completed: false
         )
         modelContext.insert(set)
@@ -207,6 +209,38 @@ actor SetRepository: SetRepositoryProtocol {
         set.overrideTargetRepMax = max
         set.updatedAt = Date()
         try modelContext.save()
+    }
+
+    /// Record how long the lifter actually rested after this set, without touching any other field.
+    ///
+    /// Exists because a suppressed rest still has to be *recorded*. `restDurationSeconds` is
+    /// otherwise only written when a timer runs to zero, so a superset set — which starts no timer
+    /// — would keep the field nil, and both fatigue paths in `LoadPrescriptionService` read
+    /// `restDurationSeconds ?? configuredRestSeconds`. Nil there means "a full rest happened",
+    /// which for a superset is the opposite of the truth. See SUPERSETS_SCOPING.md §2.2.
+    func applyRestDuration(setId: UUID, seconds: Int) throws {
+        guard let set = try fetch(byId: setId), set.restDurationSeconds != seconds else { return }
+        set.restDurationSeconds = seconds
+        try modelContext.save()
+    }
+
+    /// Stamp or clear a superset group across many sets, in a single transaction.
+    ///
+    /// Grouping is all-or-nothing per exercise (SUPERSETS_SCOPING.md §6), so callers pass **every**
+    /// set of the exercises involved, completed rows included. Like `applyOrdering`, this
+    /// deliberately does not run the PR/stats/fatigue pipeline: a group sits above sets and never
+    /// touches `exerciseId`, `weight` or `reps`, so nothing downstream can be affected by it.
+    func applySupersetGroup(setIds: [UUID], groupId: UUID?) throws {
+        guard !setIds.isEmpty else { return }
+
+        var didChange = false
+        for setId in setIds {
+            guard let set = try fetch(byId: setId), set.supersetGroupId != groupId else { continue }
+            set.supersetGroupId = groupId
+            set.updatedAt = Date()
+            didChange = true
+        }
+        if didChange { try modelContext.save() }
     }
 
     /// Apply set ordering changes inside this actor, in a single transaction.

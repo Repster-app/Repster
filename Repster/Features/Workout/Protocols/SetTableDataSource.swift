@@ -211,6 +211,20 @@ protocol SetTableDataSource: AnyObject, Observable {
     /// Sets grouped by exercise ID for checking completion status.
     var setsByExercise: [UUID: [WorkoutSet]] { get }
 
+    /// Whether this screen can author superset grouping.
+    ///
+    /// False on the historic-edit screen. Marking is shared — grouping should be *visible* wherever
+    /// the sets are — but authoring is not: creating a pair is a statement about how a session was
+    /// trained, and the edit screen has no rest timer and no prompt for it to mean anything against.
+    /// See SUPERSETS_IMPLEMENTATION_PLAN.md G2.
+    var supportsSupersetAuthoring: Bool { get }
+
+    /// Pair two exercises into a superset, mid-workout.
+    func createSuperset(anchorExerciseId: UUID, partnerExerciseId: UUID) async
+
+    /// Take an exercise out of its superset.
+    func removeFromSuperset(exerciseId: UUID) async
+
     /// Optional row-addressable Smart Suggestion state for a specific pending set.
     /// Returns nil when suggestions are unavailable or the row has no pending state.
     func suggestionState(for setId: UUID) -> SetSuggestionState?
@@ -226,7 +240,158 @@ extension SetTableDataSource {
     }
 }
 
+// MARK: - Supersets
+//
+// Derived, never stored. Grouping lives on `WorkoutSet.supersetGroupId`, and everything the screen
+// needs about it is a read over `exercises` and `setsByExercise` — both already on this protocol.
+// Putting it here rather than on a view model means the active-workout screen and the
+// edit-historic-workout screen get identical grouping with no shared state and no duplication.
+//
+// Behaviour (rest suppression, the next-up prompt) deliberately does NOT live here: it belongs to
+// `ActiveWorkoutViewModel` alone, which is the only conformer with a rest timer.
+// See SUPERSETS_SCOPING.md and SUPERSETS_IMPLEMENTATION_PLAN.md G2.
 extension SetTableDataSource {
+
+    /// The superset group this exercise currently belongs to, or nil.
+    func supersetGroupId(for exerciseId: UUID) -> UUID? {
+        SupersetGrouping.groupId(for: exerciseId, in: setsByExercise)
+    }
+
+    /// Exercises in the given group, in the strip's own display order.
+    func supersetMembers(of groupId: UUID) -> [ChartExerciseData] {
+        SupersetGrouping.members(of: groupId, exercises: exercises, setsByExercise: setsByExercise)
+    }
+
+    /// The next exercise in this exercise's group, or nil if it is ungrouped, in a group of one,
+    /// or already the last member.
+    func nextInSuperset(after exerciseId: UUID) -> ChartExerciseData? {
+        SupersetGrouping.next(after: exerciseId, exercises: exercises, setsByExercise: setsByExercise)
+    }
+
+    /// Whether this exercise is in a real group *and* is its last member — the point at which
+    /// normal rest resumes.
+    func isLastInSuperset(_ exerciseId: UUID) -> Bool {
+        SupersetGrouping.isLastMember(exerciseId, exercises: exercises, setsByExercise: setsByExercise)
+    }
+
+    /// Whether this exercise is in a group with at least one partner.
+    func isInSuperset(_ exerciseId: UUID) -> Bool {
+        SupersetGrouping.isGrouped(exerciseId, exercises: exercises, setsByExercise: setsByExercise)
+    }
+}
+
+/// The grouping rules, as free functions over the two things they actually need.
+///
+/// Deliberately not methods on the protocol: every rule here is a pure read over `exercises` and
+/// `setsByExercise`, and conforming a test double to the whole of `SetTableDataSource` to check
+/// "is this exercise in a group" would be ceremony around nothing. The protocol extension above is
+/// thin delegation so both screens still get identical behaviour.
+enum SupersetGrouping {
+
+    /// Any non-nil set decides the exercise's group.
+    ///
+    /// Writes are all-or-nothing per exercise (SUPERSETS_SCOPING.md §6), so an exercise's sets
+    /// always agree and the first non-nil is the only one there is. The scan is defensive: rows
+    /// written before `SetService.create` carried the field can still disagree, and
+    /// `sets.first?.supersetGroupId` would pick arbitrarily between them.
+    static func groupId(for exerciseId: UUID, in setsByExercise: [UUID: [WorkoutSet]]) -> UUID? {
+        setsByExercise[exerciseId]?.lazy.compactMap(\.supersetGroupId).first
+    }
+
+    /// Exercises in the group, in the order `exercises` already holds them.
+    ///
+    /// Returns the raw list including a group of one. **A group of fewer than two is not a
+    /// group** — reachable by deleting or replacing one half of a pair, or by importing a
+    /// template whose group names a single exercise — and every caller must treat it as ungrouped.
+    /// `isGrouped`, `next` and `isLastMember` all do; a caller reading this directly must too.
+    static func members(
+        of groupId: UUID,
+        exercises: [ChartExerciseData],
+        setsByExercise: [UUID: [WorkoutSet]]
+    ) -> [ChartExerciseData] {
+        exercises.filter { self.groupId(for: $0.id, in: setsByExercise) == groupId }
+    }
+
+    static func isGrouped(
+        _ exerciseId: UUID,
+        exercises: [ChartExerciseData],
+        setsByExercise: [UUID: [WorkoutSet]]
+    ) -> Bool {
+        guard let id = groupId(for: exerciseId, in: setsByExercise) else { return false }
+        return members(of: id, exercises: exercises, setsByExercise: setsByExercise).count > 1
+    }
+
+    static func next(
+        after exerciseId: UUID,
+        exercises: [ChartExerciseData],
+        setsByExercise: [UUID: [WorkoutSet]]
+    ) -> ChartExerciseData? {
+        guard let id = groupId(for: exerciseId, in: setsByExercise) else { return nil }
+        let group = members(of: id, exercises: exercises, setsByExercise: setsByExercise)
+        guard group.count > 1,
+              let position = group.firstIndex(where: { $0.id == exerciseId }),
+              position < group.count - 1
+        else { return nil }
+        return group[position + 1]
+    }
+
+    static func isLastMember(
+        _ exerciseId: UUID,
+        exercises: [ChartExerciseData],
+        setsByExercise: [UUID: [WorkoutSet]]
+    ) -> Bool {
+        guard let id = groupId(for: exerciseId, in: setsByExercise) else { return false }
+        let group = members(of: id, exercises: exercises, setsByExercise: setsByExercise)
+        return group.count > 1 && group.last?.id == exerciseId
+    }
+
+    /// Contiguous runs of the display order, for anything that draws grouping.
+    ///
+    /// A run is either one ungrouped exercise or two-plus adjacent members of the same group.
+    /// **Non-adjacent members of one group produce separate runs** — a template can already
+    /// assign group A to exercises 1 and 3 with something else between them
+    /// (`CreateEditTemplateViewModel.setSupersetGroup` has no contiguity check), and a container
+    /// spanning an exercise that is not in the group is worse than no marking at all.
+    /// See SUPERSETS_IMPLEMENTATION_PLAN.md G4.
+    static func runs(
+        exercises: [ChartExerciseData],
+        setsByExercise: [UUID: [WorkoutSet]]
+    ) -> [Run] {
+        var result: [Run] = []
+        for exercise in exercises {
+            let id = groupId(for: exercise.id, in: setsByExercise)
+            if let id, var last = result.last, last.groupId == id {
+                last.exercises.append(exercise)
+                result[result.count - 1] = last
+            } else {
+                result.append(Run(groupId: id, exercises: [exercise]))
+            }
+        }
+        return result
+    }
+
+    /// One horizontal run in the tab strip.
+    ///
+    /// An **unmarked run always holds exactly one exercise** — ungrouped exercises never merge, and
+    /// a non-contiguous group breaks into single-exercise runs. Renderers can rely on that.
+    struct Run: Equatable, Identifiable {
+        /// The leading exercise's id. Stable across re-renders because it comes from display order.
+        var id: UUID { exercises[0].id }
+
+        /// The group these exercises share, or nil when ungrouped. Non-nil with a single
+        /// exercise is a group of one and must render unmarked — see `isMarked`.
+        var groupId: UUID?
+        var exercises: [ChartExerciseData]
+
+        /// Whether this run should be drawn as a superset container.
+        var isMarked: Bool { groupId != nil && exercises.count > 1 }
+    }
+}
+
+extension SetTableDataSource {
+    var supportsSupersetAuthoring: Bool { false }
+    func createSuperset(anchorExerciseId: UUID, partnerExerciseId: UUID) async {}
+    func removeFromSuperset(exerciseId: UUID) async {}
     func recordExerciseTabSelected() {}
     func suggestionState(for setId: UUID) -> SetSuggestionState? { nil }
     func suggestedWeight(for setId: UUID) -> Double? {

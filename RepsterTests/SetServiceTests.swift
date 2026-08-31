@@ -1817,7 +1817,8 @@ final class SetServiceTests: XCTestCase {
             rightReps: 9,
             rir: 0,
             leftRIR: 0,
-            rightRIR: 0
+            rightRIR: 0,
+            supersetGroupId: nil
         )
 
         let persisted = try await context.setRepo.fetch(byId: created.id)

@@ -11,6 +11,14 @@ struct CalendarExerciseCard: View {
     let unitPreference: UnitPreference
     let onTapped: () -> Void
 
+    /// Whether this card sits inside a superset container.
+    ///
+    /// Only the surface changes: the container carries the `bgCard` fill, the radius and the
+    /// group's border, so a nested card must not paint its own or it reads as a card sitting *on*
+    /// the group rather than in it. Padding is unchanged, so the rows line up with an unnested card
+    /// directly above or below. See SUPERSETS_SCOPING.md §5.2.
+    var insideSupersetCard: Bool = false
+
     private var displaySets: [ChartSetData] {
         sets.filter { $0.hasData }
             .sorted { $0.orderInExercise < $1.orderInExercise }
@@ -29,8 +37,8 @@ struct CalendarExerciseCard: View {
                 }
             }
             .padding(14)
-            .background(Color.bgCard)
-            .cornerRadius(14)
+            .background(insideSupersetCard ? Color.clear : Color.bgCard)
+            .cornerRadius(insideSupersetCard ? 0 : 14)
         }
         .buttonStyle(.plain)
     }

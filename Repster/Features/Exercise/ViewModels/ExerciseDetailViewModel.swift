@@ -72,12 +72,19 @@ final class ExerciseDetailViewModel {
             workoutIds: Set(grouped.keys),
             exerciseId: exerciseId
         )) ?? []
+        // Same one-lookup-per-tab shape as the exclusion query above, and it degrades the same
+        // way: no partners means no chip, never a broken screen.
+        let partnersByWorkout = (try? await setService.supersetPartnerNames(
+            workoutIds: Set(grouped.keys),
+            exerciseId: exerciseId
+        )) ?? [:]
         historyWorkouts = grouped.map { workoutId, workoutSets in
             WorkoutHistoryGroup(
                 id: workoutId,
                 date: workoutSets.first?.date ?? Date(),
                 sets: workoutSets.sorted { $0.orderInExercise < $1.orderInExercise },
-                isExcludedFromProgression: excludedWorkoutIds.contains(workoutId)
+                isExcludedFromProgression: excludedWorkoutIds.contains(workoutId),
+                supersetPartnerNames: partnersByWorkout[workoutId] ?? []
             )
         }
         .sorted { $0.date > $1.date }

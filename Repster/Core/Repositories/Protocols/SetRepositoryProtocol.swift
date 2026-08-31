@@ -65,12 +65,19 @@ protocol SetRepositoryProtocol: Sendable {
         rightReps: Int?,
         rir: Double?,
         leftRIR: Double?,
-        rightRIR: Double?
+        rightRIR: Double?,
+        supersetGroupId: UUID?
     ) async throws -> WorkoutSet
 
     func save(_ set: WorkoutSet) async throws
     func delete(_ set: WorkoutSet) async throws
     func fetch(byId id: UUID) async throws -> WorkoutSet?
+
+    /// Record the rest actually taken after a set, without touching any other field.
+    func applyRestDuration(setId: UUID, seconds: Int) async throws
+
+    /// Stamp or clear a superset group across many sets, in one transaction.
+    func applySupersetGroup(setIds: [UUID], groupId: UUID?) async throws
 
     /// Apply set ordering changes inside the owning actor, in one transaction.
     /// Unknown ids are skipped. No-op for an empty batch.

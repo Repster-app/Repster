@@ -47,66 +47,27 @@ struct ExerciseTabStripView: View {
     /// Whether the "this will remove logged sets" confirmation is showing.
     @State private var showReplaceConfirmation = false
 
+    /// The exercise a superset is being built around, or nil when no picker is in flight.
+    ///
+    /// Boxed rather than a bare `UUID` so `.sheet(item:)` can key on it — the anchor has to survive
+    /// the sheet's lifetime, and holding it as an index would let a reorder or a replace behind the
+    /// sheet silently repoint it at a different exercise.
+    @State private var supersetAnchor: SupersetAnchor?
+
     // MARK: - Body
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 7) {
-                    ForEach(Array(dataSource.exercises.enumerated()), id: \.element.id) { index, exercise in
-                        ExerciseTab(
-                            name: exercise.name,
-                            isActive: index == dataSource.selectedExerciseIndex,
-                            isCompleted: isExerciseCompleted(exercise)
-                        )
-                        .id(exercise.id)
-                        .onTapGesture {
-                            guard index != dataSource.selectedExerciseIndex else { return }
-                            dataSource.recordExerciseTabSelected()
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                dataSource.selectedExerciseIndex = index
-                            }
-                        }
-                        .contextMenu {
-                            // Move Left (if not first)
-                            if index > 0 {
-                                Button {
-                                    dataSource.reorderExercises(
-                                        from: IndexSet(integer: index),
-                                        to: index - 1
-                                    )
-                                } label: {
-                                    Label("Move Left", systemImage: "arrow.left")
-                                }
-                            }
-
-                            // Move Right (if not last)
-                            if index < dataSource.exercises.count - 1 {
-                                Button {
-                                    dataSource.reorderExercises(
-                                        from: IndexSet(integer: index),
-                                        to: index + 2
-                                    )
-                                } label: {
-                                    Label("Move Right", systemImage: "arrow.right")
-                                }
-                            }
-
-                            Button {
-                                beginReplace(at: index)
-                            } label: {
-                                Label("Replace Exercise…", systemImage: "arrow.triangle.2.circlepath")
-                            }
-
-                            Divider()
-
-                            // Delete Exercise (only if more than 1 exercise)
-                            if dataSource.exercises.count > 1 {
-                                Button("Delete Exercise", role: .destructive) {
-                                    exerciseToDeleteIndex = index
-                                    showDeleteConfirmation = true
-                                }
-                            }
+                    ForEach(supersetRuns) { run in
+                        if let color = markColor(for: run) {
+                            supersetContainer(run: run, color: color)
+                        } else {
+                            // An unmarked run always holds exactly one exercise — see
+                            // `SupersetGrouping.Run`. That covers ungrouped exercises, a group of
+                            // one, and each half of a non-contiguous group.
+                            tab(for: run.exercises[0], insideContainer: false)
                         }
                     }
                 }
@@ -147,6 +108,31 @@ struct ExerciseTabStripView: View {
                 )
             }
         }
+        .sheet(item: $supersetAnchor) { anchor in
+            let anchorId = anchor.id
+            NavigationStack {
+                SupersetPartnerPicker(
+                    anchor: dataSource.exercises.first(where: { $0.id == anchorId }),
+                    candidates: dataSource.exercises.filter { $0.id != anchorId },
+                    isAdjacent: { candidateId in
+                        guard let anchorIndex = dataSource.exercises.firstIndex(where: { $0.id == anchorId }),
+                              let candidateIndex = dataSource.exercises.firstIndex(where: { $0.id == candidateId })
+                        else { return true }
+                        return abs(candidateIndex - anchorIndex) == 1
+                    },
+                    onPick: { partnerId in
+                        Task {
+                            await dataSource.createSuperset(
+                                anchorExerciseId: anchorId,
+                                partnerExerciseId: partnerId
+                            )
+                            supersetAnchor = nil
+                        }
+                    },
+                    onCancel: { supersetAnchor = nil }
+                )
+            }
+        }
         .alert("Delete Exercise?", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
@@ -156,6 +142,144 @@ struct ExerciseTabStripView: View {
             }
         } message: {
             Text("This will remove the exercise and all its sets from this workout.")
+        }
+    }
+
+    // MARK: - Supersets
+
+    /// Colours for the groups currently on screen, assigned by order of appearance.
+    ///
+    /// The strip carries no letters — a group is identified by its container and where it sits —
+    /// so the palette only has to separate two groups that are both visible, and it cycles rather
+    /// than capping. Green, red, gold and orange are deliberately absent: they mean completed,
+    /// delete, PR and "has a note" everywhere else in the app.
+    private static let groupPalette: [Color] = [.accent, .chart5, .chart7, .chart8]
+
+    private var supersetRuns: [SupersetGrouping.Run] {
+        SupersetGrouping.runs(
+            exercises: dataSource.exercises,
+            setsByExercise: dataSource.setsByExercise
+        )
+    }
+
+    /// The container colour for a run, or nil when it must not be drawn as a group.
+    private func markColor(for run: SupersetGrouping.Run) -> Color? {
+        guard run.isMarked, let groupId = run.groupId else { return nil }
+        let onScreen = supersetRuns.compactMap { $0.isMarked ? $0.groupId : nil }
+        guard let position = onScreen.firstIndex(of: groupId) else { return nil }
+        return Self.groupPalette[position % Self.groupPalette.count]
+    }
+
+    /// Two-plus adjacent members of one group, drawn as a single segmented control.
+    ///
+    /// Same grammar as `WorkoutSubTabBar` directly below the strip, which is the point: a superset
+    /// is one control holding several things, and the app already has that shape. The container is
+    /// 4pt taller than a loose tab (2pt padding each side) and the inner tabs keep their full
+    /// height, so the tap target does not shrink — see SUPERSETS_IMPLEMENTATION_PLAN.md PR3.
+    @ViewBuilder
+    private func supersetContainer(run: SupersetGrouping.Run, color: Color) -> some View {
+        HStack(spacing: 0) {
+            ForEach(Array(run.exercises.enumerated()), id: \.element.id) { position, exercise in
+                if position > 0 {
+                    Image(systemName: "chevron.left.chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(color)
+                        .frame(width: 15)
+                        .accessibilityHidden(true)
+                }
+                tab(for: exercise, insideContainer: true)
+            }
+        }
+        .padding(2)
+        .background(color.opacity(0.10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9)
+                .stroke(color.opacity(0.55), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 9))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Superset: \(run.exercises.map(\.name).joined(separator: ", then "))")
+    }
+
+    /// One tab, with the tap and long-press behaviour that used to live inline in the `ForEach`.
+    ///
+    /// The index is resolved by identity rather than passed in: runs are built from display order,
+    /// so an enumerated index over a run is a position *within the run*, not within the workout,
+    /// and every action below addresses the workout.
+    @ViewBuilder
+    private func tab(for exercise: ChartExerciseData, insideContainer: Bool) -> some View {
+        let index = dataSource.exercises.firstIndex(where: { $0.id == exercise.id }) ?? 0
+
+        ExerciseTab(
+            name: exercise.name,
+            isActive: index == dataSource.selectedExerciseIndex,
+            isCompleted: isExerciseCompleted(exercise),
+            insideContainer: insideContainer
+        )
+        .id(exercise.id)
+        .onTapGesture {
+            guard index != dataSource.selectedExerciseIndex else { return }
+            dataSource.recordExerciseTabSelected()
+            withAnimation(.easeInOut(duration: 0.2)) {
+                dataSource.selectedExerciseIndex = index
+            }
+        }
+        .contextMenu {
+            // Move Left (if not first)
+            if index > 0 {
+                Button {
+                    dataSource.reorderExercises(
+                        from: IndexSet(integer: index),
+                        to: index - 1
+                    )
+                } label: {
+                    Label("Move Left", systemImage: "arrow.left")
+                }
+            }
+
+            // Move Right (if not last)
+            if index < dataSource.exercises.count - 1 {
+                Button {
+                    dataSource.reorderExercises(
+                        from: IndexSet(integer: index),
+                        to: index + 2
+                    )
+                } label: {
+                    Label("Move Right", systemImage: "arrow.right")
+                }
+            }
+
+            if dataSource.supportsSupersetAuthoring {
+                if dataSource.isInSuperset(exercise.id) {
+                    Button {
+                        Task { await dataSource.removeFromSuperset(exerciseId: exercise.id) }
+                    } label: {
+                        Label("Remove from Superset", systemImage: "arrow.left.and.right")
+                    }
+                } else if dataSource.exercises.count > 1 {
+                    Button {
+                        supersetAnchor = SupersetAnchor(id: exercise.id)
+                    } label: {
+                        Label("Superset with…", systemImage: "chevron.left.chevron.right")
+                    }
+                }
+            }
+
+            Button {
+                beginReplace(at: index)
+            } label: {
+                Label("Replace Exercise…", systemImage: "arrow.triangle.2.circlepath")
+            }
+
+            Divider()
+
+            // Delete Exercise (only if more than 1 exercise)
+            if dataSource.exercises.count > 1 {
+                Button("Delete Exercise", role: .destructive) {
+                    exerciseToDeleteIndex = index
+                    showDeleteConfirmation = true
+                }
+            }
         }
     }
 
@@ -205,6 +329,11 @@ struct ExerciseTabStripView: View {
     }
 }
 
+/// The exercise a superset is being built around, boxed for `.sheet(item:)`.
+private struct SupersetAnchor: Identifiable {
+    let id: UUID
+}
+
 // MARK: - ExerciseTab
 
 /// A single tab in the exercise tab strip.
@@ -223,6 +352,14 @@ private struct ExerciseTab: View {
     /// Whether all sets for this exercise are completed.
     var isCompleted: Bool = false
 
+    /// Whether this tab sits inside a superset container.
+    ///
+    /// Only the surface changes: the container paints the group's tint, so an inactive tab must be
+    /// transparent — a `bgCard` fill would read as a tab sitting *on* the group rather than in it.
+    /// Height and padding are deliberately untouched, so the tap target inside a group is the same
+    /// as outside one.
+    var insideContainer: Bool = false
+
     var body: some View {
         HStack(spacing: 6) {
             Text(name)
@@ -238,9 +375,9 @@ private struct ExerciseTab: View {
         .foregroundColor(isActive ? .white : .textTertiary)
         .padding(.horizontal, 14)
         .frame(minHeight: 36)
-            .background(isActive ? Color.accent : Color.bgCard)
-            .cornerRadius(7)
-            .contentShape(Rectangle())
+        .background(isActive ? Color.accent : (insideContainer ? Color.clear : Color.bgCard))
+        .cornerRadius(7)
+        .contentShape(Rectangle())
     }
 }
 

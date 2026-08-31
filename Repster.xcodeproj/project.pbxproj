@@ -76,11 +76,13 @@
 		AC0002 /* SetInputField.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0002 /* SetInputField.swift */; };
 		AC0003 /* PRBadgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0003 /* PRBadgeView.swift */; };
 		AC0004 /* SetNumberBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0004 /* SetNumberBadge.swift */; };
+		AC0901 /* SupersetPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0901 /* SupersetPromptView.swift */; };
 		AC0005 /* CompletionCheckbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0005 /* CompletionCheckbox.swift */; };
 		AC0006 /* ActiveWorkoutViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0006 /* ActiveWorkoutViewModel.swift */; };
 		AC0007 /* SetRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0007 /* SetRowView.swift */; };
 		AC0008 /* SetTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0008 /* SetTableView.swift */; };
 		AC0009 /* ExerciseTabStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0009 /* ExerciseTabStripView.swift */; };
+		AC0902 /* SupersetPartnerPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0902 /* SupersetPartnerPicker.swift */; };
 		AC0010 /* ActiveWorkoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0010 /* ActiveWorkoutView.swift */; };
 		AC0011 /* ElapsedTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0011 /* ElapsedTimerView.swift */; };
 		AC0012 /* ExercisePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0012 /* ExercisePickerSheet.swift */; };
@@ -246,6 +248,7 @@
 		TT0003 /* ChartDataServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2004 /* ChartDataServiceTests.swift */; };
 		TT0004 /* WorkoutHistoryBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2005 /* WorkoutHistoryBackupTests.swift */; };
 		TT0005 /* SetServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2006 /* SetServiceTests.swift */; };
+		TT0901 /* SupersetGroupingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2901 /* SupersetGroupingTests.swift */; };
 		TT0006 /* WorkoutSetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2007 /* WorkoutSetTests.swift */; };
 		TT0007 /* SeedExerciseLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2008 /* SeedExerciseLibraryTests.swift */; };
 		TT0008 /* MonetizationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2009 /* MonetizationServiceTests.swift */; };
@@ -391,11 +394,13 @@
 		BC0002 /* SetInputField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetInputField.swift; sourceTree = "<group>"; };
 		BC0003 /* PRBadgeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PRBadgeView.swift; sourceTree = "<group>"; };
 		BC0004 /* SetNumberBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetNumberBadge.swift; sourceTree = "<group>"; };
+		BC0901 /* SupersetPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupersetPromptView.swift; sourceTree = "<group>"; };
 		BC0005 /* CompletionCheckbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionCheckbox.swift; sourceTree = "<group>"; };
 		BC0006 /* ActiveWorkoutViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutViewModel.swift; sourceTree = "<group>"; };
 		BC0007 /* SetRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetRowView.swift; sourceTree = "<group>"; };
 		BC0008 /* SetTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetTableView.swift; sourceTree = "<group>"; };
 		BC0009 /* ExerciseTabStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseTabStripView.swift; sourceTree = "<group>"; };
+		BC0902 /* SupersetPartnerPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupersetPartnerPicker.swift; sourceTree = "<group>"; };
 		BC0010 /* ActiveWorkoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutView.swift; sourceTree = "<group>"; };
 		BC0011 /* ElapsedTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElapsedTimerView.swift; sourceTree = "<group>"; };
 		BC0012 /* ExercisePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExercisePickerSheet.swift; sourceTree = "<group>"; };
@@ -555,6 +560,7 @@
 		TT2004 /* ChartDataServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartDataServiceTests.swift; sourceTree = "<group>"; };
 		TT2005 /* WorkoutHistoryBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutHistoryBackupTests.swift; sourceTree = "<group>"; };
 		TT2006 /* SetServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetServiceTests.swift; sourceTree = "<group>"; };
+		TT2901 /* SupersetGroupingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupersetGroupingTests.swift; sourceTree = "<group>"; };
 		TT2007 /* WorkoutSetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSetTests.swift; sourceTree = "<group>"; };
 		TT2008 /* SeedExerciseLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedExerciseLibraryTests.swift; sourceTree = "<group>"; };
 		TT2009 /* MonetizationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonetizationServiceTests.swift; sourceTree = "<group>"; };
@@ -830,6 +836,7 @@
 				BC0007 /* SetRowView.swift */,
 				BC0008 /* SetTableView.swift */,
 				BC0009 /* ExerciseTabStripView.swift */,
+				BC0902 /* SupersetPartnerPicker.swift */,
 				BC0010 /* ActiveWorkoutView.swift */,
 				BC0011 /* ElapsedTimerView.swift */,
 				BC0012 /* ExercisePickerSheet.swift */,
@@ -1259,6 +1266,7 @@
 				BC0002 /* SetInputField.swift */,
 				BC0003 /* PRBadgeView.swift */,
 				BC0004 /* SetNumberBadge.swift */,
+				BC0901 /* SupersetPromptView.swift */,
 				BC0005 /* CompletionCheckbox.swift */,
 				BC0017 /* E1RMCardView.swift */,
 				BC0018 /* LastWorkoutCardView.swift */,
@@ -1425,6 +1433,7 @@
 				TT2004 /* ChartDataServiceTests.swift */,
 				TT2005 /* WorkoutHistoryBackupTests.swift */,
 				TT2006 /* SetServiceTests.swift */,
+				TT2901 /* SupersetGroupingTests.swift */,
 				TT2099 /* ScreenDataGoldenMasterTests.swift */,
 				TT2100 /* WorkoutJourneyTests.swift */,
 				TT2101 /* CrossContextRaceTests.swift */,
@@ -1703,11 +1712,13 @@
 				AC0002 /* SetInputField.swift in Sources */,
 				AC0003 /* PRBadgeView.swift in Sources */,
 				AC0004 /* SetNumberBadge.swift in Sources */,
+				AC0901 /* SupersetPromptView.swift in Sources */,
 				AC0005 /* CompletionCheckbox.swift in Sources */,
 				AC0006 /* ActiveWorkoutViewModel.swift in Sources */,
 				AC0007 /* SetRowView.swift in Sources */,
 				AC0008 /* SetTableView.swift in Sources */,
 				AC0009 /* ExerciseTabStripView.swift in Sources */,
+				AC0902 /* SupersetPartnerPicker.swift in Sources */,
 				AC0010 /* ActiveWorkoutView.swift in Sources */,
 				AC0011 /* ElapsedTimerView.swift in Sources */,
 				AC0012 /* ExercisePickerSheet.swift in Sources */,
@@ -1894,6 +1905,7 @@
 				TT0003 /* ChartDataServiceTests.swift in Sources */,
 				TT0004 /* WorkoutHistoryBackupTests.swift in Sources */,
 				TT0005 /* SetServiceTests.swift in Sources */,
+				TT0901 /* SupersetGroupingTests.swift in Sources */,
 				TT0099 /* ScreenDataGoldenMasterTests.swift in Sources */,
 				TT0100 /* WorkoutJourneyTests.swift in Sources */,
 				TT0101 /* CrossContextRaceTests.swift in Sources */,

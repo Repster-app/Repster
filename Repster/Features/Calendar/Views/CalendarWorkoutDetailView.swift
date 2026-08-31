@@ -89,16 +89,68 @@ struct CalendarWorkoutDetailView: View {
                 .disabled(onEditProgression == nil)
             }
 
-            ForEach(detail.exerciseGroups, id: \.exercise.id) { group in
-                CalendarExerciseCard(
-                    exercise: group.exercise,
-                    sets: group.sets,
-                    stats: group.stats,
-                    unitPreference: unitPreference,
-                    onTapped: { onExerciseTapped(group.exercise.id) }
-                )
+            // Grouped exercises collapse into one card — the tab strip's grammar, one level up.
+            // A run of one, or a group whose members are not adjacent, renders as ordinary cards.
+            ForEach(ExerciseGroupRun.runs(from: detail.exerciseGroups)) { run in
+                if run.isMarked {
+                    supersetCard(run)
+                } else {
+                    card(for: run.groups[0])
+                }
             }
         }
+    }
+
+    @ViewBuilder
+    private func card(for group: ExerciseGroup, insideSupersetCard: Bool = false) -> some View {
+        CalendarExerciseCard(
+            exercise: group.exercise,
+            sets: group.sets,
+            stats: group.stats,
+            unitPreference: unitPreference,
+            onTapped: { onExerciseTapped(group.exercise.id) },
+            insideSupersetCard: insideSupersetCard
+        )
+    }
+
+    /// Two-plus adjacent exercises from one group, in a single card.
+    ///
+    /// Named rather than shown on the exercise-history screen's chip, because here both sides are
+    /// visible — the pairing is the thing you can see, so it does not also need spelling out.
+    @ViewBuilder
+    private func supersetCard(_ run: ExerciseGroupRun) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 5) {
+                Image(systemName: "chevron.left.chevron.right")
+                    .font(.system(size: 9, weight: .bold))
+                Text("SUPERSET")
+                    .font(.system(size: 9, weight: .bold))
+                    .kerning(0.9)
+                Spacer(minLength: 0)
+            }
+            .foregroundColor(.accent)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(Color.accentSoft)
+
+            ForEach(Array(run.groups.enumerated()), id: \.element.exercise.id) { index, group in
+                if index > 0 {
+                    Rectangle()
+                        .fill(Color.accent.opacity(0.22))
+                        .frame(height: 1)
+                        .padding(.horizontal, 14)
+                }
+                card(for: group, insideSupersetCard: true)
+            }
+        }
+        .background(Color.bgCard)
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.accent.opacity(0.32), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Superset: \(run.groups.map(\.exercise.name).joined(separator: ", then "))")
     }
 
     // MARK: - Session Label (T016)

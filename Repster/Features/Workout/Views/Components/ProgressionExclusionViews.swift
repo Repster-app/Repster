@@ -41,6 +41,51 @@ struct ProgressionExclusionChip: View {
     }
 }
 
+/// Session-header chip marking a session where this exercise was supersetted.
+///
+/// Geometry is `ProgressionExclusionChip`'s, to the pixel: the two sit in the same slot and a
+/// session can legitimately be both, so they have to stack rather than compete. Colour is the
+/// group's accent rather than `.stale` — this is a relationship, not a lower-confidence state.
+///
+/// Names the partner because this screen shows one side of the pair, and the partner is the
+/// explanation for the numbers. See SUPERSETS_SCOPING.md §5.1.
+struct SupersetChip: View {
+
+    /// Exercises this one was supersetted with, in the order the workout ran them.
+    let partnerNames: [String]
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "chevron.left.chevron.right")
+                .font(.system(size: 7, weight: .bold))
+
+            Text(label)
+                .font(.system(size: 9, weight: .bold))
+                .lineLimit(1)
+        }
+        .foregroundColor(.accent)
+        .padding(.vertical, 3)
+        .padding(.horizontal, 5)
+        .background(Color.accentSoft)
+        .overlay(
+            RoundedRectangle(cornerRadius: 4)
+                .stroke(Color.accent.opacity(0.20), lineWidth: 1)
+        )
+        .cornerRadius(4)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Supersetted with \(partnerNames.joined(separator: ", "))")
+    }
+
+    /// Two partners still fit; beyond that the count reads better than a truncated list.
+    private var label: String {
+        switch partnerNames.count {
+        case 0: return "SUPERSET"
+        case 1, 2: return "SUPERSET · \(partnerNames.joined(separator: " + ").uppercased())"
+        default: return "SUPERSET · \(partnerNames.count) OTHERS"
+        }
+    }
+}
+
 /// Full-width form, for the top of a workout's detail screen.
 ///
 /// Tapping opens the Progression sheet. That matters as much as the text: before this, the only

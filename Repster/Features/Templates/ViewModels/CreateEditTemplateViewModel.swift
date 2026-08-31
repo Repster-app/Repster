@@ -51,7 +51,12 @@ final class CreateEditTemplateViewModel {
 
     /// Maps superset group UUIDs to color labels (A, B, C).
     private var supersetGroupLabels: [UUID: String] = [:]
-    private let supersetLetters = ["A", "B", "C", "D", "E"]
+    /// Group letters offered in the editor.
+    ///
+    /// The letter is the identity; colour is only reinforcement, so this is the single limit —
+    /// `supersetColor` cycles rather than capping. Wanting more is a change to this array and
+    /// nothing else. See SUPERSETS_SCOPING.md §6.
+    let supersetLetters = ["A", "B", "C", "D", "E"]
 
     // MARK: - Dependencies
 
@@ -316,16 +321,20 @@ final class CreateEditTemplateViewModel {
         return supersetGroupLabels[groupId]
     }
 
+    /// Colours a group by its letter's position, cycling.
+    ///
+    /// Four hues, because the rest of the palette is spoken for: green means completed, red means
+    /// delete, gold means PR and orange is the note-indicator dot. Five letters over four colours
+    /// means E reuses A's blue, which is fine — the letters are what tell them apart, and the
+    /// previous `textTertiary` fallback rendered a real group as unlabelled grey instead.
     func supersetColor(for groupId: UUID?) -> Color {
-        guard let groupId, let label = supersetGroupLabels[groupId] else { return .textTertiary }
-        switch label {
-        case "A": return .accent
-        case "B": return .chart5
-        case "C": return .chart7
-        case "D": return .chart8
-        default: return .textTertiary
-        }
+        guard let groupId, let label = supersetGroupLabels[groupId],
+              let position = supersetLetters.firstIndex(of: label)
+        else { return .textTertiary }
+        return Self.supersetPalette[position % Self.supersetPalette.count]
     }
+
+    private static let supersetPalette: [Color] = [.accent, .chart5, .chart7, .chart8]
 
     func setSupersetGroup(for exerciseIndex: Int, label: String?) {
         guard exerciseIndex >= 0, exerciseIndex < exercises.count else { return }

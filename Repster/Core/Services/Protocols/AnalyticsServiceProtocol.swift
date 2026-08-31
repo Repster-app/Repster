@@ -250,6 +250,17 @@ enum WorkoutInteraction: String, CaseIterable {
     case restTimerAdjusts = "rest_timer_adjusts"
     /// Pauses only, not resumes.
     case workoutPauses = "workout_pauses"
+
+    // Supersets. Both answer questions the feature cannot otherwise settle:
+    // whether the one-tap shortcut earns its place over the tab strip, and
+    // whether anyone builds a group without a template.
+    // See SUPERSETS_IMPLEMENTATION_PLAN.md G7.
+
+    /// Taps on the next-in-superset bar. Not shown-count — the bar appearing is
+    /// automatic, taking it is the choice.
+    case supersetPromptTaps = "superset_prompt_taps"
+    /// Supersets created from the tab strip's menu, mid-workout.
+    case supersetCreates = "superset_creates"
 }
 
 /// Per-workout interaction counters, accumulated locally and shipped as
@@ -907,6 +918,8 @@ enum AnalyticsPropertyKey: String, CaseIterable {
     case restTimerSkips = "rest_timer_skips"
     case restTimerAdjusts = "rest_timer_adjusts"
     case workoutPauses = "workout_pauses"
+    case supersetPromptTaps = "superset_prompt_taps"
+    case supersetCreates = "superset_creates"
     // Attribution. Set as person properties (see `AnalyticsAttributionReporter`),
     // which is why they can be filtered on events that predate resolution.
     case acquisitionChannel = "acquisition_channel"

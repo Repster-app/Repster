@@ -221,7 +221,8 @@ final class EditWorkoutViewModel {
                 orderInWorkout: totalSets + 1,
                 orderInExercise: exerciseSets.count + 1,
                 weight: nil,
-                reps: nil
+                reps: nil,
+                supersetGroupId: supersetGroupId(for: exerciseId)
             )
             uncountedSetIds.insert(newSet.id)
             setsByExercise[exerciseId, default: []].append(newSet)
@@ -249,7 +250,8 @@ final class EditWorkoutViewModel {
                 orderInWorkout: totalSets + 1,
                 orderInExercise: 1,
                 weight: nil,
-                reps: nil
+                reps: nil,
+                supersetGroupId: supersetGroupId(for: exerciseId)
             )
             uncountedSetIds.insert(newSet.id)
 
