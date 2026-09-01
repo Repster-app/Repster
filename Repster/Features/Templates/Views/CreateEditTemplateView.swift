@@ -462,8 +462,7 @@ private struct TemplateExerciseCard: View {
             ForEach(Array(exercise.sets.enumerated()), id: \.element.id) { setIndex, editorSet in
                 TemplateSetRow(
                     editorSet: editorSet,
-                    setIndex: setIndex,
-                    exerciseIndex: exerciseIndex,
+                    exerciseId: exercise.id,
                     isWarmup: editorSet.setType == .warmup,
                     displayNumber: displayNumber(for: setIndex),
                     viewModel: viewModel
@@ -644,8 +643,9 @@ private struct TemplateExerciseCard: View {
 private struct TemplateSetRow: View {
 
     let editorSet: EditorSet
-    let setIndex: Int
-    let exerciseIndex: Int
+    /// Identity, not position: the exercises array moves under these rows. See
+    /// `CreateEditTemplateViewModel.updateSet(exerciseId:setId:_:)`.
+    let exerciseId: UUID
     let isWarmup: Bool
     let displayNumber: String
     var viewModel: CreateEditTemplateViewModel
@@ -689,13 +689,15 @@ private struct TemplateSetRow: View {
                 .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.border, lineWidth: 1))
                 .accessibilityLabel("Reps in reserve")
                 .onChange(of: rirText) { _, newValue in
-                    viewModel.exercises[exerciseIndex].sets[setIndex].targetRIR = Int(newValue)
+                    viewModel.updateSet(exerciseId: exerciseId, setId: editorSet.id) {
+                        $0.targetRIR = Int(newValue)
+                    }
                 }
 
             Spacer(minLength: 0)
 
             Button {
-                viewModel.duplicateSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
+                viewModel.duplicateSet(exerciseId: exerciseId, setId: editorSet.id)
             } label: {
                 Image(systemName: "doc.on.doc")
                     .font(.system(size: 13, weight: .medium))
@@ -708,7 +710,7 @@ private struct TemplateSetRow: View {
             .accessibilityLabel("Duplicate set")
 
             Button {
-                viewModel.removeSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
+                viewModel.removeSet(exerciseId: exerciseId, setId: editorSet.id)
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 12, weight: .bold))
@@ -756,8 +758,10 @@ private struct TemplateSetRow: View {
     /// Each field owns its own bound. Clearing one clears only that side, where the old parser threw
     /// away both — and silently kept the previous value on malformed input like "6-".
     private func applyRepBounds() {
-        viewModel.exercises[exerciseIndex].sets[setIndex].targetRepMin = Int(minText.trimmingCharacters(in: .whitespaces))
-        viewModel.exercises[exerciseIndex].sets[setIndex].targetRepMax = Int(maxText.trimmingCharacters(in: .whitespaces))
+        viewModel.updateSet(exerciseId: exerciseId, setId: editorSet.id) {
+            $0.targetRepMin = Int(minText.trimmingCharacters(in: .whitespaces))
+            $0.targetRepMax = Int(maxText.trimmingCharacters(in: .whitespaces))
+        }
     }
 }
 

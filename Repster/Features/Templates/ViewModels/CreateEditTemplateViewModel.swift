@@ -307,6 +307,41 @@ final class CreateEditTemplateViewModel {
         exercises[index].isExpanded.toggle()
     }
 
+    // MARK: - Identity-addressed set edits
+
+    /// Mutate a set by **id**, never by position.
+    ///
+    /// The editor's rows capture `exerciseIndex` / `setIndex` when they render, and the array moves
+    /// underneath them: drag-reorder mutates it on every `dropEntered`, and pairing a non-adjacent
+    /// superset partner moves an exercise outright. A row whose `onChange` fires after either one
+    /// would write into whatever now sits at its old index — a different exercise's set.
+    func updateSet(exerciseId: UUID, setId: UUID, _ mutate: (inout EditorSet) -> Void) {
+        guard let exerciseIndex = exercises.firstIndex(where: { $0.id == exerciseId }),
+              let setIndex = exercises[exerciseIndex].sets.firstIndex(where: { $0.id == setId }) else { return }
+        mutate(&exercises[exerciseIndex].sets[setIndex])
+    }
+
+    func duplicateSet(exerciseId: UUID, setId: UUID) {
+        guard let exerciseIndex = exercises.firstIndex(where: { $0.id == exerciseId }),
+              let setIndex = exercises[exerciseIndex].sets.firstIndex(where: { $0.id == setId }) else { return }
+        let source = exercises[exerciseIndex].sets[setIndex]
+        exercises[exerciseIndex].sets.insert(
+            EditorSet(
+                id: UUID(),
+                setType: source.setType,
+                targetRepMin: source.targetRepMin,
+                targetRepMax: source.targetRepMax,
+                targetRIR: source.targetRIR
+            ),
+            at: setIndex + 1
+        )
+    }
+
+    func removeSet(exerciseId: UUID, setId: UUID) {
+        guard let exerciseIndex = exercises.firstIndex(where: { $0.id == exerciseId }) else { return }
+        exercises[exerciseIndex].sets.removeAll { $0.id == setId }
+    }
+
     // MARK: - Set Operations
 
     func addWorkingSet(to exerciseIndex: Int) {

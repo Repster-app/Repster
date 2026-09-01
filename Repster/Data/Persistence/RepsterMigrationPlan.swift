@@ -1,5 +1,12 @@
 import SwiftData
 
+// NOT WIRED INTO THE CONTAINER, and must not be until it is rebuilt properly. See the comment in
+// ModelContainerSetup.swift.
+//
+// The flaw: `models` below returns the live model types, so this "v1" schema silently tracks every
+// change made to those models. It describes the present, not version 1. A migration plan built on it
+// tells SwiftData the store should already look like today's types, with no stage to get there.
+
 enum SchemaV1: VersionedSchema {
     static var versionIdentifier = Schema.Version(1, 0, 0)
 
@@ -32,9 +39,8 @@ enum RepsterMigrationPlan: SchemaMigrationPlan {
     }
 
     static var stages: [MigrationStage] {
-        // No stages yet. Every change so far has been an added optional property, which SwiftData
-        // handles as a lightweight migration — `WorkoutTemplate.folder` is the most recent.
-        // A rename, a type change or a required property needs a SchemaV2 and a stage here.
+        // Empty, and the plan is not passed to the container. Every change so far has been an added
+        // optional property, which implicit lightweight migration handles.
         []
     }
 }

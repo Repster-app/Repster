@@ -351,6 +351,113 @@ final class TemplateServiceTests: XCTestCase {
         XCTAssertEqual(reread.exercises.first?.supersetGroupId, groupId)
     }
 
+    // MARK: - Regression: sets must stay with their own exercise
+
+    func testEditorRoundTripKeepsEachSetWithItsOwnExercise() async throws {
+        let context = try makeContext()
+        let bench = makeExercise(name: "Bench Press")
+        let incline = makeExercise(name: "Incline DB Press")
+        let fly = makeExercise(name: "Cable Fly")
+        for exercise in [bench, incline, fly] { try await context.exerciseRepo.save(exercise) }
+
+        // Distinct set counts so a collapse onto one exercise is unmistakable: 3 / 1 / 2.
+        let templateId = try await context.service.createTemplate(
+            TemplateSaveData(
+                name: "Push", notes: nil,
+                exercises: [
+                    saveExercise(bench.id, order: 1, sets: [saveSet(order: 1), saveSet(order: 2), saveSet(order: 3)]),
+                    saveExercise(incline.id, order: 2, sets: [saveSet(order: 1)]),
+                    saveExercise(fly.id, order: 3, sets: [saveSet(order: 1), saveSet(order: 2)])
+                ]
+            )
+        )
+
+        let expected = ["Bench Press": 3, "Incline DB Press": 1, "Cable Fly": 2]
+
+        let created = try await context.service.fetchTemplateDetail(templateId)
+        let createdDetail = try XCTUnwrap(created)
+        XCTAssertEqual(
+            Dictionary(uniqueKeysWithValues: createdDetail.exercises.map { ($0.exerciseName, $0.sets.count) }),
+            expected,
+            "after create"
+        )
+
+        // Re-save exactly what was read back, three times — what opening and saving does.
+        for pass in 1...3 {
+            let fetched = try await context.service.fetchTemplateDetail(templateId)
+            let detail = try XCTUnwrap(fetched)
+            try await context.service.updateTemplate(
+                templateId,
+                data: TemplateSaveData(
+                    name: detail.template.name,
+                    notes: detail.template.notes,
+                    folder: detail.template.folder,
+                    exercises: detail.exercises.map { exercise in
+                        TemplateSaveExercise(
+                            exerciseId: exercise.exerciseId,
+                            orderInTemplate: exercise.orderInTemplate,
+                            supersetGroupId: exercise.supersetGroupId,
+                            restTimeSeconds: exercise.restTimeSeconds,
+                            notes: exercise.notes,
+                            sets: exercise.sets.map {
+                                TemplateSaveSet(
+                                    setType: $0.setType,
+                                    targetRepMin: $0.targetRepMin,
+                                    targetRepMax: $0.targetRepMax,
+                                    targetRIR: $0.targetRIR,
+                                    orderInExercise: $0.orderInExercise
+                                )
+                            }
+                        )
+                    }
+                )
+            )
+
+            let reread = try await context.service.fetchTemplateDetail(templateId)
+            let rereadDetail = try XCTUnwrap(reread)
+            XCTAssertEqual(
+                Dictionary(uniqueKeysWithValues: rereadDetail.exercises.map { ($0.exerciseName, $0.sets.count) }),
+                expected,
+                "after save pass \(pass)"
+            )
+        }
+    }
+
+    func testSetsFromARemovedExerciseAreNotAdoptedByAnother() async throws {
+        // "All sets moved to the first exercise" is what an orphaned-set bug looks like from outside.
+        let context = try makeContext()
+        let bench = makeExercise(name: "Bench Press")
+        let incline = makeExercise(name: "Incline DB Press")
+        try await context.exerciseRepo.save(bench)
+        try await context.exerciseRepo.save(incline)
+
+        let templateId = try await context.service.createTemplate(
+            TemplateSaveData(
+                name: "Push", notes: nil,
+                exercises: [
+                    saveExercise(bench.id, order: 1, sets: [saveSet(order: 1)]),
+                    saveExercise(incline.id, order: 2, sets: [saveSet(order: 1), saveSet(order: 2)])
+                ]
+            )
+        )
+
+        try await context.service.updateTemplate(
+            templateId,
+            data: TemplateSaveData(
+                name: "Push", notes: nil,
+                exercises: [saveExercise(bench.id, order: 1, sets: [saveSet(order: 1)])]
+            )
+        )
+
+        let fetched = try await context.service.fetchTemplateDetail(templateId)
+        let detail = try XCTUnwrap(fetched)
+        let summaries = try await context.service.fetchAllTemplates()
+        XCTAssertEqual(detail.exercises.count, 1)
+        XCTAssertEqual(detail.exercises.first?.sets.count, 1, "Sets from the removed exercise must not reappear")
+        XCTAssertEqual(detail.template.totalSetCount, 1)
+        XCTAssertEqual(summaries.first?.totalSetCount, 1, "List count must agree with detail")
+    }
+
     // MARK: - D4 — a template whose exercise no longer resolves still renders
 
     func testTemplateWithMissingExerciseStillFetches() async throws {
@@ -1028,6 +1135,54 @@ final class TemplateEditorSupersetTests: XCTestCase {
 
         viewModel.removeFromSuperset(at: 0)
         XCTAssertEqual(viewModel.nextSupersetLetter, "A", "A is free again and gets reused")
+    }
+
+    func testEditingASetAfterPairingReordersWritesToTheRightExercise() throws {
+        // pairExercise moves a non-adjacent partner, so any row still addressing by its old index
+        // would write into whatever now sits there. This is the shape of "my sets ended up on the
+        // wrong exercise".
+        let viewModel = try makeViewModel(exerciseNames: ["Bench", "Incline", "Pushdown"])
+        let benchId = viewModel.exercises[0].id
+        let pushdownId = viewModel.exercises[2].id
+        let pushdownSetId = viewModel.exercises[2].sets[0].id
+
+        // Bench + Pushdown: Pushdown moves from index 2 to index 1.
+        viewModel.pairExercise(at: 0, withExerciseAt: 2)
+        XCTAssertEqual(viewModel.exercises.map(\.exerciseName), ["Bench", "Pushdown", "Incline"])
+
+        viewModel.updateSet(exerciseId: pushdownId, setId: pushdownSetId) { $0.targetRepMin = 5 }
+
+        let pushdown = try XCTUnwrap(viewModel.exercises.first { $0.id == pushdownId })
+        let bench = try XCTUnwrap(viewModel.exercises.first { $0.id == benchId })
+        let incline = try XCTUnwrap(viewModel.exercises.first { $0.exerciseName == "Incline" })
+        XCTAssertEqual(pushdown.sets[0].targetRepMin, 5, "The edit lands on the set it was made on")
+        XCTAssertEqual(bench.sets[0].targetRepMin, 8, "Bench is untouched")
+        XCTAssertEqual(incline.sets[0].targetRepMin, 8, "Incline is untouched")
+    }
+
+    func testRemovingASetByIdRemovesOnlyThatSet() throws {
+        let viewModel = try makeViewModel(exerciseNames: ["Bench", "Incline"])
+        let benchId = viewModel.exercises[0].id
+        viewModel.addWorkingSet(to: 0)
+        XCTAssertEqual(viewModel.exercises[0].sets.count, 2)
+
+        let firstSetId = viewModel.exercises[0].sets[0].id
+        viewModel.removeSet(exerciseId: benchId, setId: firstSetId)
+
+        XCTAssertEqual(viewModel.exercises[0].sets.count, 1)
+        XCTAssertFalse(viewModel.exercises[0].sets.contains { $0.id == firstSetId })
+        XCTAssertEqual(viewModel.exercises[1].sets.count, 1, "The other exercise keeps its set")
+    }
+
+    func testEditsAgainstAStaleIdAreDroppedRatherThanMisapplied() throws {
+        let viewModel = try makeViewModel(exerciseNames: ["Bench", "Incline"])
+        let before = viewModel.exercises.map { $0.sets.map(\.targetRepMin) }
+
+        viewModel.updateSet(exerciseId: UUID(), setId: UUID()) { $0.targetRepMin = 99 }
+        viewModel.removeSet(exerciseId: UUID(), setId: UUID())
+        viewModel.duplicateSet(exerciseId: UUID(), setId: UUID())
+
+        XCTAssertEqual(viewModel.exercises.map { $0.sets.map(\.targetRepMin) }, before)
     }
 
     // MARK: - Harness

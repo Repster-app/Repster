@@ -28,12 +28,20 @@ enum ModelContainerSetup {
             isStoredInMemoryOnly: false
         )
 
-        // The plan was declared but never passed, so it has never actually run. Wiring it now costs
-        // nothing while every change is lightweight, and means the first stage that IS needed takes
-        // effect instead of being silently ignored. See TEMPLATES_IMPLEMENTATION_PLAN.md G2.
+        // Deliberately NO `migrationPlan:`.
+        //
+        // It was wired here on 2026-09-01 and reverted the same day. `SchemaV1.models` returns the
+        // LIVE model types, so it is not a frozen v1 schema — it is "whatever the models are now,
+        // labelled 1.0.0". Passing it tells SwiftData that 1.0.0 is the only schema that has ever
+        // existed and that it looks like the current types, with no stage to reach it from an older
+        // store. Implicit lightweight migration, which is what has always run here, handles added
+        // optional properties correctly and needs none of that.
+        //
+        // A real plan needs a genuinely frozen SchemaV1 — model definitions copied as they were at
+        // v1, not references to the live types — plus a SchemaV2 and a stage between them. Until that
+        // exists, wiring the plan is strictly worse than not wiring it.
         return try ModelContainer(
             for: schema,
-            migrationPlan: RepsterMigrationPlan.self,
             configurations: [configuration]
         )
     }
