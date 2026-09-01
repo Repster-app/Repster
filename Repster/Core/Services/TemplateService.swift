@@ -358,9 +358,14 @@ actor TemplateService: TemplateServiceProtocol {
             throw TemplateServiceError.templateNotFound(templateId)
         }
 
-        let archiveExercises = try await detail.exercises.mapAsync { exerciseDetail in
+        // An exercise that no longer resolves — deleted from the library since the template was made
+        // — used to throw and take the whole export with it. One unexportable row is not worth losing
+        // the file: a template holding a dangling reference is exactly the one you most want a copy
+        // of. The row is skipped; everything else exports.
+        let archiveExercises = try await detail.exercises.compactMapAsync { exerciseDetail -> TemplateArchiveExercise? in
             guard let exercise = try await exerciseRepo.fetch(byId: exerciseDetail.exerciseId) else {
-                throw TemplateServiceError.exerciseNotFound(exerciseDetail.exerciseId)
+                dbg("[TemplateService] Skipping unresolvable exercise \(exerciseDetail.exerciseId) while exporting template \(templateId)")
+                return nil
             }
 
             return TemplateArchiveExercise(
@@ -673,6 +678,16 @@ private extension Array {
         result.reserveCapacity(count)
         for element in self {
             result.append(try await transform(element))
+        }
+        return result
+    }
+
+    func compactMapAsync<T>(_ transform: (Element) async throws -> T?) async rethrows -> [T] {
+        var result: [T] = []
+        for element in self {
+            if let transformed = try await transform(element) {
+                result.append(transformed)
+            }
         }
         return result
     }

@@ -555,6 +555,32 @@ final class TemplateServiceTests: XCTestCase {
         XCTAssertEqual(detail.exercises.map { $0.sets.count }, Array(repeating: 2, count: 9))
     }
 
+    func testExportSkipsAnUnresolvableExerciseInsteadOfFailing() async throws {
+        // A template holding a dangling reference is the one you most want a copy of. Throwing meant
+        // the only way to get that data out was blocked precisely when it mattered.
+        let context = try makeContext()
+        let bench = makeExercise(name: "Bench Press")
+        try await context.exerciseRepo.save(bench)
+
+        let templateId = try await context.service.createTemplate(
+            TemplateSaveData(
+                name: "Half broken", notes: nil,
+                exercises: [
+                    saveExercise(bench.id, order: 1, sets: [saveSet(order: 1), saveSet(order: 2)]),
+                    saveExercise(UUID(), order: 2, sets: [saveSet(order: 1)])
+                ]
+            )
+        )
+
+        let data = try await context.service.exportTemplate(templateId)
+        let archive = try JSONDecoder().decode(TemplateArchive.self, from: data)
+
+        XCTAssertEqual(archive.template.name, "Half broken")
+        XCTAssertEqual(archive.exercises.count, 1, "The resolvable exercise still exports")
+        XCTAssertEqual(archive.exercises.first?.exercise.name, "Bench Press")
+        XCTAssertEqual(archive.exercises.first?.sets.count, 2)
+    }
+
     // MARK: - Filing from the list
 
     func testSettingAFolderRewritesOnlyTheFolder() async throws {
