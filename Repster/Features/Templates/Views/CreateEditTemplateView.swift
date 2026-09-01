@@ -653,6 +653,13 @@ private struct TemplateSetRow: View {
     @State private var minText: String = ""
     @State private var maxText: String = ""
     @State private var rirText: String = ""
+    /// Seeding the fields from the model must not look like the user typing.
+    ///
+    /// `applyRepBounds` writes BOTH bounds from these strings, and `onAppear` assigns them one at a
+    /// time — so between `minText = "8"` and `maxText = "10"` there is a moment where an `onChange`
+    /// would persist `targetRepMax = nil` and silently drop half the target. Nothing writes to the
+    /// model until seeding has finished.
+    @State private var didSeedFields = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -689,6 +696,7 @@ private struct TemplateSetRow: View {
                 .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.border, lineWidth: 1))
                 .accessibilityLabel("Reps in reserve")
                 .onChange(of: rirText) { _, newValue in
+                    guard didSeedFields else { return }
                     viewModel.updateSet(exerciseId: exerciseId, setId: editorSet.id) {
                         $0.targetRIR = Int(newValue)
                     }
@@ -725,9 +733,13 @@ private struct TemplateSetRow: View {
         .padding(.horizontal, 2)
         .padding(.vertical, 3)
         .onAppear {
-            if let min = editorSet.targetRepMin { minText = "\(min)" }
-            if let max = editorSet.targetRepMax { maxText = "\(max)" }
-            if let rir = editorSet.targetRIR { rirText = "\(rir)" }
+            // Seed once. Re-seeding on a later appear would overwrite whatever the user has typed,
+            // and the guard below keeps the seeding itself from reaching the model at all.
+            guard !didSeedFields else { return }
+            minText = editorSet.targetRepMin.map(String.init) ?? ""
+            maxText = editorSet.targetRepMax.map(String.init) ?? ""
+            rirText = editorSet.targetRIR.map(String.init) ?? ""
+            didSeedFields = true
         }
     }
 
@@ -747,7 +759,10 @@ private struct TemplateSetRow: View {
             .cornerRadius(7)
             .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.border, lineWidth: 1))
             .accessibilityLabel(accessibilityLabel)
-            .onChange(of: text.wrappedValue) { _, _ in applyRepBounds() }
+            .onChange(of: text.wrappedValue) { _, _ in
+                guard didSeedFields else { return }
+                applyRepBounds()
+            }
     }
 
     private var rirColor: Color {
