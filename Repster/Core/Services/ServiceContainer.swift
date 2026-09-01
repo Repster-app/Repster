@@ -154,8 +154,7 @@ final class ServiceContainer {
             templateRepository: repositoryContainer.templateRepository,
             workoutRepository: repositoryContainer.workoutRepository,
             setRepository: repositoryContainer.setRepository,
-            exerciseRepository: repositoryContainer.exerciseRepository,
-            exerciseStatsRepository: repositoryContainer.exerciseStatsRepository
+            exerciseRepository: repositoryContainer.exerciseRepository
         )
 
         // 13. LoadPrescriptionService — depends on repos only

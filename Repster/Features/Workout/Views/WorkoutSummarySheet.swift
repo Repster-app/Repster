@@ -873,14 +873,23 @@ final class SaveWorkoutAsTemplateController {
 
     func save(
         workoutId: UUID,
-        templateService: any TemplateServiceProtocol
+        templateService: any TemplateServiceProtocol,
+        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService()
     ) async throws -> String {
         isSaving = true
         defer { isSaving = false }
 
         let trimmedName = templateName.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedName = trimmedName.isEmpty ? "Workout" : trimmedName
-        _ = try await templateService.createTemplateFromWorkout(workoutId, name: resolvedName)
+        let templateId = try await templateService.createTemplateFromWorkout(workoutId, name: resolvedName)
+
+        // Second of the three creation paths, previously uncounted.
+        let detail = try? await templateService.fetchTemplateDetail(templateId)
+        analyticsService.templateCreated(
+            exerciseCount: detail?.exercises.count ?? 0,
+            source: "save_from_workout"
+        )
+
         showPrompt = false
         return resolvedName
     }
@@ -921,7 +930,8 @@ private struct SaveWorkoutAsTemplatePromptModifier: ViewModifier {
         do {
             let savedName = try await controller.save(
                 workoutId: workoutId,
-                templateService: services.templateService
+                templateService: services.templateService,
+                analyticsService: services.analyticsService
             )
             onSaved(savedName)
         } catch {

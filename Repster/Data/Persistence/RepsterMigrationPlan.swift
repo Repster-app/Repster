@@ -21,6 +21,7 @@ enum SchemaV1: VersionedSchema {
             TemplateSet.self,
             FatigueObservation.self,
             FatigueLearningSetAudit.self,
+            InsightRecord.self,
         ]
     }
 }
@@ -31,9 +32,9 @@ enum RepsterMigrationPlan: SchemaMigrationPlan {
     }
 
     static var stages: [MigrationStage] {
-        // No migrations yet — this baseline captures the V1 schema.
-        // When model changes are needed post-launch, add a SchemaV2
-        // and a corresponding MigrationStage here.
+        // No stages yet. Every change so far has been an added optional property, which SwiftData
+        // handles as a lightweight migration — `WorkoutTemplate.folder` is the most recent.
+        // A rename, a type change or a required property needs a SchemaV2 and a stage here.
         []
     }
 }

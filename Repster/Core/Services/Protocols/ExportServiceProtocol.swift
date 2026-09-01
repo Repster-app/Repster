@@ -8,6 +8,9 @@ struct WorkoutHistoryBackupPreview: Sendable {
     let setCount: Int
     let earliestWorkoutDate: Date?
     let latestWorkoutDate: Date?
+    /// `nil` for a v1 archive: it does not describe templates at all, so restoring it leaves them alone.
+    /// The restore screen should say so rather than implying the user is about to lose them.
+    var templateCount: Int? = nil
 }
 
 struct WorkoutHistoryRestoreResult: Sendable {
@@ -17,6 +20,26 @@ struct WorkoutHistoryRestoreResult: Sendable {
     let skippedFatigueObservations: Int
     let skippedFatigueLearningAudits: Int
     let duration: TimeInterval
+    /// `nil` when the archive predates template backup, which is not the same as "restored zero".
+    let templatesRestored: Int?
+
+    init(
+        workoutsRestored: Int,
+        exercisesUpserted: Int,
+        setsRestored: Int,
+        skippedFatigueObservations: Int,
+        skippedFatigueLearningAudits: Int,
+        duration: TimeInterval,
+        templatesRestored: Int? = nil
+    ) {
+        self.workoutsRestored = workoutsRestored
+        self.exercisesUpserted = exercisesUpserted
+        self.setsRestored = setsRestored
+        self.skippedFatigueObservations = skippedFatigueObservations
+        self.skippedFatigueLearningAudits = skippedFatigueLearningAudits
+        self.duration = duration
+        self.templatesRestored = templatesRestored
+    }
 
     var hasSkippedLearningData: Bool {
         skippedFatigueObservations > 0 || skippedFatigueLearningAudits > 0
@@ -51,7 +74,10 @@ enum WorkoutHistoryBackupError: Error, LocalizedError, Sendable {
 
 struct WorkoutHistoryArchive: Codable, Sendable {
     /// The version this build writes.
-    static let currentVersion = 1
+    ///
+    /// v2 added `templates`. v1 archives stay readable and are the reason `templates` is optional —
+    /// see the property.
+    static let currentVersion = 2
 
     /// The oldest version this build can still read.
     ///
@@ -69,6 +95,79 @@ struct WorkoutHistoryArchive: Codable, Sendable {
     let fatigueObservations: [WorkoutHistoryArchiveFatigueObservation]?
     let fatigueLearningAudits: [WorkoutHistoryArchiveFatigueLearningSetAudit]?
     let healthProfileLearning: WorkoutHistoryArchiveHealthProfileLearning?
+
+    /// Workout templates, added in v2.
+    ///
+    /// **`nil` and `[]` mean different things and restore must branch on it.** `nil` is a v1 archive,
+    /// written before templates were backed up at all — the user's templates are simply not described
+    /// by this file, so restore leaves them alone. `[]` is a v2 archive from someone who genuinely had
+    /// none, so restore clears them.
+    ///
+    /// Restore is a replace, not a merge, and every backup a user owns today is v1. Defaulting this to
+    /// `[]` anywhere between decode and the delete pass would turn restoring an old backup into
+    /// "delete every template". That single `?? []` is the whole bug — see
+    /// TEMPLATES_IMPLEMENTATION_PLAN.md D1.
+    let templates: [WorkoutHistoryArchiveTemplate]?
+
+    /// `templates` defaults to nil so an archive constructed without it is v1-shaped — which is what
+    /// it means. Only `exportBackup` passes it, and it always does.
+    init(
+        version: Int,
+        exportedAt: Date,
+        workouts: [WorkoutHistoryArchiveWorkout],
+        exercises: [WorkoutHistoryArchiveExercise],
+        sets: [WorkoutHistoryArchiveSet],
+        fatigueObservations: [WorkoutHistoryArchiveFatigueObservation]?,
+        fatigueLearningAudits: [WorkoutHistoryArchiveFatigueLearningSetAudit]?,
+        healthProfileLearning: WorkoutHistoryArchiveHealthProfileLearning?,
+        templates: [WorkoutHistoryArchiveTemplate]? = nil
+    ) {
+        self.version = version
+        self.exportedAt = exportedAt
+        self.workouts = workouts
+        self.exercises = exercises
+        self.sets = sets
+        self.fatigueObservations = fatigueObservations
+        self.fatigueLearningAudits = fatigueLearningAudits
+        self.healthProfileLearning = healthProfileLearning
+        self.templates = templates
+    }
+}
+
+// MARK: - Templates (archive v2)
+
+struct WorkoutHistoryArchiveTemplate: Codable, Sendable {
+    let id: UUID
+    let name: String
+    let notes: String?
+    let folder: String?
+    let lastUsedAt: Date?
+    let createdAt: Date
+    let updatedAt: Date
+    let exercises: [WorkoutHistoryArchiveTemplateExercise]
+}
+
+struct WorkoutHistoryArchiveTemplateExercise: Codable, Sendable {
+    let id: UUID
+    let exerciseId: UUID
+    let orderInTemplate: Int
+    let supersetGroupId: UUID?
+    let restTimeSeconds: Int?
+    let notes: String?
+    let createdAt: Date
+    let updatedAt: Date
+    let sets: [WorkoutHistoryArchiveTemplateSet]
+}
+
+struct WorkoutHistoryArchiveTemplateSet: Codable, Sendable {
+    let id: UUID
+    let setType: SetType
+    let targetRepMin: Int?
+    let targetRepMax: Int?
+    let targetRIR: Int?
+    let orderInExercise: Int
+    let createdAt: Date
+    let updatedAt: Date
 }
 
 struct WorkoutHistoryArchiveWorkout: Codable, Sendable {

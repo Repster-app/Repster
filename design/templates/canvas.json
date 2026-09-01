@@ -1,0 +1,217 @@
+{
+  "pages": [
+    {
+      "id": "page-1",
+      "name": "Landing"
+    },
+    {
+      "id": "page-2",
+      "name": "Editor"
+    },
+    {
+      "id": "page-3",
+      "name": "Settled"
+    },
+    {
+      "id": "page-4",
+      "name": "Superseded"
+    }
+  ],
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "title": "B2b \u00b7 All (chosen)",
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "page": "page-1"
+    },
+    {
+      "file": "ListB2bFiltered.dc.html",
+      "title": "B2b \u00b7 Folder selected",
+      "x": 500,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "page": "page-1"
+    },
+    {
+      "file": "Editor.dc.html",
+      "title": "E1 \u00b7 Accordion (chosen)",
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "page": "page-2"
+    },
+    {
+      "file": "SupersetPicker.dc.html",
+      "title": "Superset \u00b7 partner picker",
+      "x": 500,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "page": "page-2"
+    },
+    {
+      "file": "Detail.dc.html",
+      "title": "Template detail",
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "page": "page-3"
+    },
+    {
+      "file": "Folders.dc.html",
+      "title": "How a folder gets made",
+      "x": 500,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "page": "page-3"
+    },
+    {
+      "file": "ListB2b.dc.html",
+      "title": "B2b \u00b7 with row tags",
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "page": "page-4"
+    },
+    {
+      "file": "ListB2a.dc.html",
+      "title": "B2a \u00b7 Collapsible",
+      "x": 500,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "page": "page-4"
+    },
+    {
+      "file": "DirectionA.dc.html",
+      "title": "A \u00b7 Richer cards",
+      "x": 1000,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "page": "page-4"
+    },
+    {
+      "file": "ListB2.dc.html",
+      "title": "B1 \u00b7 Today's data only",
+      "x": 1500,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "page": "page-4"
+    },
+    {
+      "file": "EditorScheme.dc.html",
+      "title": "E2 \u00b7 Scheme-first",
+      "x": 2000,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "page": "page-4"
+    },
+    {
+      "file": "EditorDrill.dc.html",
+      "title": "E3 \u00b7 Drill-in",
+      "x": 2500,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "page": "page-4"
+    },
+    {
+      "file": "EditorTable.dc.html",
+      "title": "E4 \u00b7 Dense table",
+      "x": 3000,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "page": "page-4"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "note-landing",
+      "x": 0,
+      "y": -330,
+      "w": 890,
+      "text": "B2b is the landing. The row tags are gone \u2014 they could not survive user-generated folder names, and no abbreviation the app invents would be right.\n\nThe chips carry folder identity instead, and the two states divide the work: a selected folder gives a clean flat list, and All falls back to grouped runs with full-width headers. Both artboards are stress-tested with a deliberately awkward folder name.",
+      "page": "page-1"
+    },
+    {
+      "id": "note-all",
+      "x": 0,
+      "y": -190,
+      "w": 390,
+      "text": "B2b \u00b7 ALL (chosen) \u2014 grouped runs, full-width headers, no tags.\n\nA header has the whole row to work with, so a long folder name has somewhere to go and truncates at a readable size rather than inside a 9px pill. NOT IN A FOLDER is muted but present.\n\nTradeoff: this is close to the old B2 in All mode. The difference is that grouping is now the fallback, not the only mode \u2014 the chips are the primary way through.",
+      "page": "page-1"
+    },
+    {
+      "id": "note-filt",
+      "x": 500,
+      "y": -190,
+      "w": 390,
+      "text": "B2b \u00b7 FOLDER SELECTED \u2014 one folder, flat, no headers.\n\nHeaders would be redundant when every row belongs to the chip you just tapped, so they go, and the space becomes rows: six visible here against B2's three per folder.\n\nThe active chip is where the long name lives, and it can afford full width because the chip row scrolls sideways.\n\nTradeoff: a long name pushes the other chips off screen, so the folders you did not pick are one swipe away rather than visible.",
+      "page": "page-1"
+    },
+    {
+      "id": "note-e1",
+      "x": 0,
+      "y": -250,
+      "w": 390,
+      "text": "E1 \u00b7 ACCORDION (chosen) \u2014 the action row now carries all three: a half-width Warmup, a full-width Working Set, and More holding everything else.\n\nWarmup earns less width honestly \u2014 most exercises have none, and it is the rarer of the two adds. Working Set keeps the emphasis because it is what you press repeatedly.\n\nMore absorbs the header ellipsis entirely, so the unlabelled glyph is gone from every card. The menu now sits where you are already working instead of up in the header.\n\nTradeoff: acting on a COLLAPSED exercise means expanding it first. One extra tap for something you do once per exercise, in exchange for removing a mystery glyph from every row.",
+      "page": "page-2"
+    },
+    {
+      "id": "note-detail",
+      "x": 0,
+      "y": -190,
+      "w": 390,
+      "text": "TEMPLATE DETAIL \u2014 settled, with icon labels added. Edit and Copy were icon-only, which is the same discoverability trap as the superset menu at smaller scale.\n\nFull prescription per exercise, superset pair as one block with 3a/3b, Start primary.\n\nDepends on a decision: TIMES DONE and LAST DONE need Workout.templateId (Q3). Without it those two tiles come out.",
+      "page": "page-3"
+    },
+    {
+      "id": "note-folders",
+      "x": 500,
+      "y": -190,
+      "w": 390,
+      "text": "HOW A FOLDER GETS MADE \u2014 settled. User-created, because folders cannot be derived.\n\nOne nullable folder name on WorkoutTemplate. A folder exists because a template points at it and stops existing when the last one leaves. No entity, no lifecycle, no orphans.\n\nTradeoff: no ordering inside a folder and no folder metadata. Both want the dead Program model (Q6), which this does not foreclose.",
+      "page": "page-3"
+    },
+    {
+      "id": "note-sup",
+      "x": 0,
+      "y": -230,
+      "w": 1390,
+      "text": "Superseded, kept for the record.\n\nLanding: row tags failed on user-generated names. B2's folder sections lost to chips on density (its All view survives as the chosen artboard); B2a's collapse added a tap to every template. A explored richer cards on a flat list; B1 was the same look with nothing new underneath.\n\nEditor: E2 (scheme-first), E3 (drill-in) and E4 (dense table) all lost to E1. E2's insight about repeated identical rows is the one worth revisiting.",
+      "page": "page-4"
+    },
+    {
+      "id": "note-picker",
+      "x": 500,
+      "y": -250,
+      "w": 390,
+      "page": "page-2",
+      "text": "SUPERSET \u00b7 PARTNER PICKER \u2014 the part that actually fixes it, and the part worth keeping.\n\nToday you assign a LETTER, twice, on two exercises, with nothing saying a second step exists. Here you pick a PARTNER once, and the letter becomes an output: the sheet says these two become Superset B rather than asking you to choose B.\n\nA superset of one \u2014 the state today's flow leaves you in \u2014 becomes unreachable.\n\nCompatible with SUPERSETS_SCOPING.md \u00a76: the letter is still the identity and colours still cycle every four. What changes is that the app assigns it."
+    },
+    {
+      "id": "note-editor-intro",
+      "x": 0,
+      "y": -380,
+      "w": 890,
+      "page": "page-2",
+      "text": "Named More, not Special. In lifting apps \"special set\" is a term of art \u2014 Hevy uses it for drop sets and myo-reps \u2014 so the word promises set techniques and this menu delivers superset, note and folder. It would send you looking for the wrong thing.\n\nThe drawer is also thinner than it looks. DROP_SETS_SCOPING.md Decision 2 makes drop sets a SET annotation with real logged weights, and a template carries no weights, so there is nothing to prescribe. The other eleven set types are hidden by Decision 1. Rest time is per-exercise but dead \u2014 authored today, never read at runtime.\n\nSo More holds actions on the exercise, not special sets. When circuits, AMRAP and EMOM land \u2014 the decision record's Workout blocks \u2014 the grouping half may deserve its own word. Group with\u2026 is the candidate then, not now."
+    }
+  ],
+  "launch": {
+    "view": "canvas",
+    "page": "page-2"
+  }
+}

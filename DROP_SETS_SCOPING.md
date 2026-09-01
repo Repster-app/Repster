@@ -103,9 +103,11 @@ observe. Replace `allCases` with a `SetType.userSelectable` list.
 3. **Hidden types still render.** Whatever badge and stats treatment a type gets, it gets whether or
    not it's selectable.
 
-**Also narrow the AI template vocabulary.** [TemplateListSheet.swift:980](Repster/Features/Templates/Views/TemplateListSheet.swift:980)
-hands the model all 13 raw values, so it can emit types the app can't log. Feed it the same
-`userSelectable` list.
+~~**Also narrow the AI template vocabulary.** `TemplateListSheet.swift` hands the model all 13 raw
+values, so it can emit types the app can't log. Feed it the same `userSelectable` list.~~
+**Moot 2026-09-01** — the AI template helper was deleted
+([TEMPLATES_IMPLEMENTATION_PLAN.md](TEMPLATES_IMPLEMENTATION_PLAN.md) P5.1), taking the prompt with it.
+No path now feeds `SetType.allCases` to anything outside the app.
 
 **Size:** S. One list, one picker change, one prompt string.
 

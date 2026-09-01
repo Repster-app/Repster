@@ -20,6 +20,30 @@ struct EditorExercise: Identifiable {
     var isExpanded: Bool = false
 }
 
+/// A pairing option in the "Superset with…" sheet.
+struct SupersetCandidate: Identifiable {
+    let id: UUID
+    let index: Int
+    let name: String
+    let setSummary: String
+    /// Non-nil when this exercise is already in a group, which makes the row unselectable.
+    let existingGroupLabel: String?
+    let wouldMove: Bool
+    let subjectName: String
+
+    var isSelectable: Bool { existingGroupLabel == nil }
+
+    var detailText: String {
+        if let existingGroupLabel {
+            return "Already in Superset \(existingGroupLabel)"
+        }
+        if wouldMove {
+            return "Moves up to sit next to \(subjectName)"
+        }
+        return setSummary
+    }
+}
+
 /// In-memory representation of a set in the template editor.
 struct EditorSet: Identifiable {
     let id: UUID
@@ -39,6 +63,7 @@ final class CreateEditTemplateViewModel {
 
     var templateName: String = ""
     var templateNotes: String? = nil
+    var templateFolder: String? = nil
     var exercises: [EditorExercise] = []
     var isLoading: Bool = false
     var isSaving: Bool = false
@@ -123,6 +148,7 @@ final class CreateEditTemplateViewModel {
     private func applyTemplateDetail(_ detail: TemplateDetail) {
         templateName = detail.template.name
         templateNotes = detail.template.notes
+        templateFolder = detail.template.folder
 
         exercises = detail.exercises.map { ex in
             // Track superset groups
@@ -159,6 +185,7 @@ final class CreateEditTemplateViewModel {
     private func resetEditorState() {
         templateName = ""
         templateNotes = nil
+        templateFolder = nil
         exercises = []
         supersetGroupLabels = [:]
     }
@@ -173,6 +200,10 @@ final class CreateEditTemplateViewModel {
 
         if let templateId = editingTemplateId {
             try await templateService.updateTemplate(templateId, data: data)
+            analyticsService.templateEdited(
+                exerciseCount: exercises.count,
+                inFolder: data.folder != nil
+            )
         } else {
             _ = try await templateService.createTemplate(data)
             // Building a template is a commitment signal — it means the user
@@ -209,6 +240,7 @@ final class CreateEditTemplateViewModel {
         return TemplateSaveData(
             name: templateName.trimmingCharacters(in: .whitespacesAndNewlines),
             notes: templateNotes?.isEmpty == true ? nil : templateNotes,
+            folder: templateFolder,
             exercises: exerciseSaveData
         )
     }
@@ -336,22 +368,106 @@ final class CreateEditTemplateViewModel {
 
     private static let supersetPalette: [Color] = [.accent, .chart5, .chart7, .chart8]
 
-    func setSupersetGroup(for exerciseIndex: Int, label: String?) {
-        guard exerciseIndex >= 0, exerciseIndex < exercises.count else { return }
+    /// Exercises this one can be paired with: everything else that is not already in a group.
+    ///
+    /// Already-grouped exercises are returned too, flagged, so the picker can show them disabled
+    /// rather than hiding them — the model stays visible instead of silently shrinking the list.
+    func supersetCandidates(for exerciseIndex: Int) -> [SupersetCandidate] {
+        guard exercises.indices.contains(exerciseIndex) else { return [] }
+        let subject = exercises[exerciseIndex]
 
-        if let label {
-            // Find existing group with this label, or create new
-            let existingGroupId = supersetGroupLabels.first(where: { $0.value == label })?.key
-            let groupId = existingGroupId ?? UUID()
-
-            if existingGroupId == nil {
-                supersetGroupLabels[groupId] = label
-            }
-
-            exercises[exerciseIndex].supersetGroupId = groupId
-        } else {
-            exercises[exerciseIndex].supersetGroupId = nil
+        return exercises.enumerated().compactMap { index, candidate in
+            guard index != exerciseIndex else { return nil }
+            let partnerLabel = supersetLabel(for: candidate.supersetGroupId)
+            return SupersetCandidate(
+                id: candidate.id,
+                index: index,
+                name: candidate.exerciseName,
+                setSummary: setSummary(for: candidate),
+                existingGroupLabel: partnerLabel,
+                // §6 constraint 1: a group must be contiguous, so a non-adjacent partner moves. The
+                // picker says so on the row rather than letting it happen silently.
+                wouldMove: abs(index - exerciseIndex) > 1,
+                subjectName: subject.exerciseName
+            )
         }
+    }
+
+    /// The letter the next group would take. The app assigns it; the user picks a partner.
+    var nextSupersetLetter: String {
+        let used = Set(supersetGroupLabels.values)
+        return supersetLetters.first { !used.contains($0) } ?? supersetLetters[supersetGroupLabels.count % supersetLetters.count]
+    }
+
+    /// Pair two exercises into a new group, moving the partner adjacent if it is not already.
+    ///
+    /// Replaces a menu of letters assigned one exercise at a time. That flow needed the same letter
+    /// picked twice on two different exercises with nothing saying a second step existed, and it left
+    /// a group of one whenever the second step was missed. Picking a partner makes that unreachable.
+    func pairExercise(at exerciseIndex: Int, withExerciseAt partnerIndex: Int) {
+        guard exercises.indices.contains(exerciseIndex),
+              exercises.indices.contains(partnerIndex),
+              exerciseIndex != partnerIndex else { return }
+
+        let groupId = UUID()
+        supersetGroupLabels[groupId] = nextSupersetLetter
+
+        let subjectId = exercises[exerciseIndex].id
+        let partnerId = exercises[partnerIndex].id
+
+        // Dissolve whatever either was in first, so nothing is left in a group of one.
+        for id in [subjectId, partnerId] {
+            if let index = exercises.firstIndex(where: { $0.id == id }) {
+                dissolveGroup(containing: index)
+            }
+        }
+
+        guard let subjectIndex = exercises.firstIndex(where: { $0.id == subjectId }),
+              let currentPartnerIndex = exercises.firstIndex(where: { $0.id == partnerId }) else { return }
+
+        exercises[subjectIndex].supersetGroupId = groupId
+        exercises[currentPartnerIndex].supersetGroupId = groupId
+
+        if currentPartnerIndex != subjectIndex + 1 {
+            let partner = exercises.remove(at: currentPartnerIndex)
+            let insertionIndex = (exercises.firstIndex(where: { $0.id == subjectId }) ?? subjectIndex) + 1
+            exercises.insert(partner, at: min(insertionIndex, exercises.count))
+        }
+    }
+
+    /// Remove an exercise from its superset, dissolving the whole group.
+    ///
+    /// Groups are pairs for now (§6 constraint 2), so clearing one side would leave the other in a
+    /// group of one — the exact state the pairing flow exists to prevent.
+    func removeFromSuperset(at exerciseIndex: Int) {
+        guard exercises.indices.contains(exerciseIndex) else { return }
+        dissolveGroup(containing: exerciseIndex)
+    }
+
+    private func dissolveGroup(containing exerciseIndex: Int) {
+        guard exercises.indices.contains(exerciseIndex),
+              let groupId = exercises[exerciseIndex].supersetGroupId else { return }
+
+        for index in exercises.indices where exercises[index].supersetGroupId == groupId {
+            exercises[index].supersetGroupId = nil
+        }
+        supersetGroupLabels[groupId] = nil
+    }
+
+    /// Members of the same group, in list order, for rendering a block.
+    func supersetPartners(of exerciseIndex: Int) -> [EditorExercise] {
+        guard exercises.indices.contains(exerciseIndex),
+              let groupId = exercises[exerciseIndex].supersetGroupId else { return [] }
+        return exercises.filter { $0.supersetGroupId == groupId }
+    }
+
+    private func setSummary(for exercise: EditorExercise) -> String {
+        let warmups = exercise.sets.filter { $0.setType == .warmup }.count
+        let working = exercise.sets.count - warmups
+        var parts: [String] = []
+        if warmups > 0 { parts.append("\(warmups) warmup") }
+        parts.append("\(working) working")
+        return parts.joined(separator: " · ")
     }
 
     func currentSupersetLabel(for exerciseIndex: Int) -> String? {

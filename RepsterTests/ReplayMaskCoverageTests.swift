@@ -67,11 +67,16 @@ final class ReplayMaskCoverageTests: XCTestCase {
             #"TextField("e.g. Push Day, Upper Body A...", text: $viewModel.templateName)"#: .masked,
             #"TextEditor(text: Binding("#: .masked,
             #"TextField("—", value: Binding("#: .recorded,
-            #"TextField("6-8", text: $repRangeText)"#: .recorded,
-            #"TextField("RIR", text: $rirText)"#: .recorded
+            // The two rep-bound fields that replaced the single "6-8" parser. Rep counts are
+            // prescription numbers, not content the user authored — same call as RIR below.
+            #"TextField(placeholder, text: text)"#: .recorded,
+            #"TextField("RIR", text: $rirText)"#: .recorded,
+            // A folder name is something the user wrote, like the template name above it.
+            #"TextField("New folder name", text: $newFolderName)"#: .masked
         ],
-        "Features/Templates/Views/TemplateListSheet.swift": [
-            #"TextEditor(text: $draftText)"#: .masked
+        "Features/Templates/Views/TemplateFlowView.swift": [
+            // A search query over template names is the same content as the names themselves.
+            #"TextField("Search templates", text: $viewModel.searchText)"#: .masked
         ],
         "Features/Charts/Views/Components/ExerciseSelectionSheet.swift": [
             #"TextField("Preset name", text: $presetName)"#: .paused

@@ -10,11 +10,29 @@ struct TemplateSummary: Identifiable, Sendable {
     let id: UUID
     let name: String
     let notes: String?
+    let folder: String?
     let exerciseCount: Int
     let totalSetCount: Int
     let muscleGroups: [String]
     let lastUsedAt: Date?
     let createdAt: Date
+    /// Drives the link glyph on the row, so a supersetted session is legible before you open it.
+    var hasSuperset: Bool = false
+}
+
+/// One template's list-facing facts, computed inside the repository actor.
+/// `exerciseIds` is in template order so the service can resolve muscle groups without another fetch.
+struct TemplateListRow: Sendable {
+    let id: UUID
+    let name: String
+    let notes: String?
+    let folder: String?
+    let lastUsedAt: Date?
+    let createdAt: Date
+    let exerciseCount: Int
+    let totalSetCount: Int
+    let exerciseIds: [UUID]
+    let hasSuperset: Bool
 }
 
 /// Full template detail including all exercises and sets.
@@ -50,7 +68,30 @@ struct TemplateSetDetail: Identifiable, Sendable {
 struct TemplateSaveData: Sendable {
     let name: String
     let notes: String?
+    let folder: String?
     let exercises: [TemplateSaveExercise]
+
+    init(name: String, notes: String?, folder: String? = nil, exercises: [TemplateSaveExercise]) {
+        self.name = name
+        self.notes = notes
+        self.folder = TemplateFolder.normalized(folder)
+        self.exercises = exercises
+    }
+}
+
+/// Folder names are user-authored text, so they need one normalisation rule and one comparison rule.
+enum TemplateFolder {
+    /// Trim, and treat whitespace-only as "no folder" so an empty field never creates a ghost folder.
+    static func normalized(_ folder: String?) -> String? {
+        guard let folder else { return nil }
+        let trimmed = folder.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// Group key. "Deload" and "deload" are one folder; the first spelling seen supplies the display name.
+    static func groupingKey(_ folder: String?) -> String? {
+        normalized(folder)?.lowercased()
+    }
 }
 
 struct TemplateSaveExercise: Sendable {
@@ -83,6 +124,15 @@ struct TemplateArchiveTemplate: Codable, Sendable {
     let id: UUID
     let name: String
     let notes: String?
+    /// Absent in archives written before folders existed; decodes as nil, which is "Not in a folder".
+    let folder: String?
+
+    init(id: UUID, name: String, notes: String?, folder: String? = nil) {
+        self.id = id
+        self.name = name
+        self.notes = notes
+        self.folder = folder
+    }
 }
 
 struct TemplateArchiveExercise: Codable, Sendable {
@@ -120,78 +170,8 @@ struct TemplateArchiveSet: Codable, Sendable {
     let orderInExercise: Int
 }
 
-/// Lightweight exercise library export for ChatGPT-assisted template generation.
-struct AITemplateContextArchive: Codable, Sendable {
-    static let currentVersion = 1
-
-    let version: Int
-    let exportedAt: Date
-    let exercises: [AITemplateContextExercise]
-}
-
-struct AITemplateContextExercise: Codable, Sendable {
-    let exerciseId: UUID
-    let exerciseName: String
-    let equipmentType: EquipmentType
-    let trackingType: TrackingType
-    let primaryMuscle: String?
-    let secondaryMuscles: [String]
-    let movementPattern: MovementPattern?
-    let unilateral: Bool
-    let unilateralRepTargetMode: UnilateralRepTargetMode?
-    let bilateralLoadFactor: Double?
-    let bodyweightFactor: Double
-    let weightIncrement: Double?
-    let defaultRestTime: Int?
-    let fatigueRate: Double?
-    let recoveryConstant: Double?
-    let stats: AITemplateContextExerciseStats
-}
-
-struct AITemplateContextExerciseStats: Codable, Sendable {
-    let totalWorkouts: Int
-    let totalSets: Int
-    let lastPerformedDate: Date?
-    let bestE1RM: Double
-    let maxWeight: Double
-}
-
-/// AI-authored draft format that mirrors template structure while using user-friendly grouping keys.
-struct AITemplateDraft: Codable, Sendable {
-    static let currentVersion = 1
-
-    let version: Int
-    let templateName: String
-    let notes: String?
-    let exercises: [AITemplateDraftExercise]
-}
-
-struct AITemplateDraftExercise: Codable, Sendable {
-    let exerciseId: UUID
-    let exerciseName: String
-    let equipmentType: EquipmentType
-    let trackingType: TrackingType
-    let primaryMuscle: String?
-    let secondaryMuscles: [String]
-    let movementPattern: MovementPattern?
-    let unilateral: Bool
-    let unilateralRepTargetMode: UnilateralRepTargetMode?
-    let bilateralLoadFactor: Double?
-    let bodyweightFactor: Double
-    let weightIncrement: Double?
-    let defaultRestTime: Int?
-    let fatigueRate: Double?
-    let recoveryConstant: Double?
-    let orderInTemplate: Int
-    let supersetGroupKey: String?
-    let restTimeSeconds: Int?
-    let notes: String?
-    let sets: [TemplateArchiveSet]
-}
-
 enum TemplateImportSource: String, Sendable {
     case templateArchive
-    case aiTemplateDraft
 }
 
 enum TemplateExerciseMatchMethod: String, Sendable {
@@ -223,6 +203,7 @@ struct TemplateImportPreview: Sendable {
     let source: TemplateImportSource
     let templateName: String
     let notes: String?
+    let folder: String?
     let exercises: [TemplateImportExercisePreview]
 
     var unresolvedExercises: [TemplateImportExercisePreview] {
@@ -282,6 +263,10 @@ protocol TemplateServiceProtocol: Sendable {
     /// Delete a template and all its exercises and sets.
     func deleteTemplate(_ templateId: UUID) async throws
 
+    /// Copy a template, its exercises, its sets, its folder and its superset groups under a new name.
+    /// Returns the new template's ID.
+    func duplicateTemplate(_ templateId: UUID) async throws -> UUID
+
     // MARK: - Start Workout from Template
 
     /// Create a new Workout from a template's structure.
@@ -302,12 +287,8 @@ protocol TemplateServiceProtocol: Sendable {
     /// Export a single template as a versioned archive payload.
     func exportTemplate(_ templateId: UUID) async throws -> Data
 
-    /// Export the user's current exercise library plus lightweight exercise stats for AI prompt helpers.
-    func exportAITemplateContext() async throws -> Data
-
     /// Preview a template import without mutating stored templates or exercises.
-    /// Supports native `.repstertemplate` archives, legacy `.reppotemplate`
-    /// archives, and AI-authored JSON drafts.
+    /// Supports native `.repstertemplate` archives and legacy `.reppotemplate` archives.
     func previewTemplateImport(data: Data) async throws -> TemplateImportPreview
 
     /// Finalize a previewed template import after all unresolved exercises have explicit resolutions.

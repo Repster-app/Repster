@@ -1,0 +1,1433 @@
+<title>Templates Redesign</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --board:#0A0A0C; --board-2:#131317; --line:rgba(255,255,255,0.09); --line-soft:rgba(255,255,255,0.05);
+    --ink:#EAEAEF; --ink-2:#9BA0AE; --ink-3:#6A6A7B; --accent:#5B8DEF; --amber:#D4A23A;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:"DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--board);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;}
+  .wrap{padding:44px 32px 72px;}
+  .masthead{max-width:66ch;display:flex;flex-direction:column;gap:13px;}
+  .eyebrow{font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:0.16em;text-transform:uppercase;color:var(--accent);margin:0;}
+  h1{font-size:clamp(30px,4.4vw,42px);font-weight:700;letter-spacing:-0.025em;line-height:1.06;margin:0;text-wrap:balance;}
+  .sec{margin-top:52px;}
+  .sec-head{display:flex;align-items:baseline;gap:16px;}
+  .sec-title{font-size:19px;font-weight:700;letter-spacing:-0.01em;margin:0;}
+  .sec-rule{flex-grow:1;height:1px;background:var(--line);}
+  .sec-intro{max-width:72ch;margin-top:12px;display:flex;flex-direction:column;gap:9px;}
+  .sec-intro p{margin:0;font-size:14.5px;line-height:1.62;color:var(--ink-2);}
+  .board{display:flex;gap:34px;align-items:flex-start;overflow-x:auto;padding:22px 0;scrollbar-color:var(--line) transparent;}
+  .col{flex:0 0 390px;width:390px;display:flex;flex-direction:column;gap:13px;}
+  .col-head{display:flex;align-items:baseline;gap:10px;}
+  .col-title{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;margin:0;}
+  .note{background:var(--board-2);border:1px solid var(--line-soft);border-radius:12px;padding:15px 16px;display:flex;flex-direction:column;gap:9px;}
+  .note p{margin:0;font-size:13.5px;line-height:1.56;color:var(--ink-2);}
+  .n-lead{color:var(--ink) !important;}
+  .n-kicker{font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:0.06em;color:var(--accent);}
+  .n-warn{color:var(--ink-2);font-size:13px;padding-left:11px;border-left:2px solid var(--amber);}
+  .device{width:390px;height:844px;border-radius:22px;border:1px solid var(--line);overflow:hidden;box-shadow:0 22px 50px rgba(0,0,0,0.55);background:#111113;}
+  .device-inner{width:390px;height:844px;}
+  .foot{margin-top:44px;max-width:66ch;font-size:13.5px;line-height:1.62;color:var(--ink-3);}
+  .foot strong{color:var(--ink-2);font-weight:600;}
+  code{font-family:var(--mono);font-size:12.5px;color:var(--ink-2);}
+  @media (max-width:900px){.wrap{padding:28px 18px 52px;}.board{gap:26px;}}
+  @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important;}}
+</style>
+<div class="wrap">
+  <div class="masthead">
+    <p class="eyebrow">Repster · visual pass</p>
+    <h1>Templates, redrawn</h1>
+  </div>
+
+  <section class="sec">
+    <div class="sec-head"><h2 class="sec-title">Landing</h2><div class="sec-rule"></div></div>
+    <div class="sec-intro"><p class="n-p">B2b is the landing. The row tags are gone — they could not survive user-generated folder names, and no abbreviation the app invents would be right.</p><p class="n-p">The chips carry folder identity instead, and the two states divide the work: a selected folder gives a clean flat list, and All falls back to grouped runs with full-width headers. Both artboards are stress-tested with a deliberately awkward folder name.</p></div>
+    <div class="board">
+      <article class="col">
+        <header class="col-head"><h3 class="col-title">B2b · All (chosen)</h3></header>
+        <div class="note"><p class="n-lead">B2b · ALL (chosen) — grouped runs, full-width headers, no tags.</p><p class="n-p">A header has the whole row to work with, so a long folder name has somewhere to go and truncates at a readable size rather than inside a 9px pill. NOT IN A FOLDER is muted but present.</p><p class="n-warn">Tradeoff: this is close to the old B2 in All mode. The difference is that grouping is now the fallback, not the only mode — the chips are the primary way through.</p></div>
+        <div class="device"><div class="device-inner"><div style="width: 390px; height: 844px; background: #111113; display: flex; flex-direction: column; overflow: hidden; color: #EAEAEF;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 20px 0 20px;">
+    <div style="width: 44px; height: 44px; display: flex; align-items: center;"><span style="font-size: 15px; font-weight: 500; color: #9999A8;">Close</span></div>
+    <div style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: flex-end;">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+    </div>
+  </div>
+  <div style="padding: 2px 20px 12px 20px;"><span style="font-size: 30px; font-weight: 700; letter-spacing: -0.02em;">Templates</span></div>
+  <div style="padding: 0 20px 13px 20px;">
+    <div style="height: 44px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); border-radius: 11px; display: flex; align-items: center; gap: 9px; padding: 0 13px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.6-3.6"></path></svg>
+      <span style="font-size: 15px; font-weight: 400; color: #5C5C6E;">Search templates</span>
+    </div>
+  </div>
+  <div style="display: flex; gap: 7px; padding: 0 20px 14px 20px; overflow: hidden;">
+    <div style="height: 34px; padding: 0 13px; border-radius: 9px; background: #5B8DEF; border: none; display: flex; align-items: center; gap: 6px; flex-shrink: 0; opacity: 1;">
+      <span style="font-size: 13px; font-weight: 600; color: #FFFFFF; white-space: nowrap;">All</span>
+      <span style="font-size: 11px; font-weight: 600; color: #FFFFFF; opacity: 0.65;">13</span></div><div style="height: 34px; padding: 0 13px; border-radius: 9px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 6px; flex-shrink: 0; opacity: 1;">
+      <span style="font-size: 13px; font-weight: 600; color: #9999A8; white-space: nowrap;">Mesocycle 3 — Hypertrophy</span>
+      <span style="font-size: 11px; font-weight: 600; color: #9999A8; opacity: 0.65;">6</span></div><div style="height: 34px; padding: 0 13px; border-radius: 9px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 6px; flex-shrink: 0; opacity: 1;">
+      <span style="font-size: 13px; font-weight: 600; color: #9999A8; white-space: nowrap;">Accessory</span>
+      <span style="font-size: 11px; font-weight: 600; color: #9999A8; opacity: 0.65;">2</span></div><div style="height: 34px; padding: 0 13px; border-radius: 9px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 6px; flex-shrink: 0; opacity: 1;">
+      <span style="font-size: 13px; font-weight: 600; color: #9999A8; white-space: nowrap;">Deload</span>
+      <span style="font-size: 11px; font-weight: 600; color: #9999A8; opacity: 0.65;">3</span></div>
+  </div>
+  <div style="display: flex; align-items: center; gap: 9px; padding: 16px 20px 7px 20px;">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5a2 2 0 012-2h4l2 2.4h8a2 2 0 012 2v8.6a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+    <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: #9999A8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 232px;">MESOCYCLE 3 — HYPERTROPHY</span>
+    <span style="font-size: 10px; font-weight: 600; color: #5C5C6E; flex-shrink: 0;">6</span>
+    <div style="flex-grow: 1;"></div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.6" stroke-linecap="round"><circle cx="5" cy="12" r="0.5"></circle><circle cx="12" cy="12" r="0.5"></circle><circle cx="19" cy="12" r="0.5"></circle></svg>
+  </div><div style="padding: 0 20px;">
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #5B8DEF; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Upper A</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">6 ex · 22 sets · 2d ago</span>
+      </div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #4ECDC4; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Lower A</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">5 ex · 20 sets · 4d ago</span>
+      </div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; ">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #A87EE6; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><div style="display: flex; align-items: center; gap: 6px;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Upper B</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A87EE6" stroke-width="2.4" stroke-linecap="round"><path d="M9.5 14.5l5-5"></path><path d="M12.8 7.2l1.7-1.7a3.6 3.6 0 015.1 5.1l-1.7 1.7"></path><path d="M11.2 16.8l-1.7 1.7a3.6 3.6 0 01-5.1-5.1l1.7-1.7"></path></svg></div>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">6 ex · 21 sets · 6d ago</span>
+      </div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div></div>
+  <div style="display: flex; align-items: center; gap: 9px; padding: 16px 20px 7px 20px;">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5a2 2 0 012-2h4l2 2.4h8a2 2 0 012 2v8.6a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+    <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: #9999A8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 232px;">ACCESSORY</span>
+    <span style="font-size: 10px; font-weight: 600; color: #5C5C6E; flex-shrink: 0;">2</span>
+    <div style="flex-grow: 1;"></div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.6" stroke-linecap="round"><circle cx="5" cy="12" r="0.5"></circle><circle cx="12" cy="12" r="0.5"></circle><circle cx="19" cy="12" r="0.5"></circle></svg>
+  </div><div style="padding: 0 20px;">
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #D4A23A; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Arms Finisher</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">3 ex · 9 sets · 2w ago</span>
+      </div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; ">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #5EC269; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Core &amp; Calves</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">3 ex · 10 sets · never used</span>
+      </div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div></div>
+  <div style="display: flex; align-items: center; gap: 9px; padding: 16px 20px 7px 20px;">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5a2 2 0 012-2h4l2 2.4h8a2 2 0 012 2v8.6a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+    <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: #5C5C6E; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 232px;">NOT IN A FOLDER</span>
+    <span style="font-size: 10px; font-weight: 600; color: #5C5C6E; flex-shrink: 0;">2</span>
+    <div style="flex-grow: 1;"></div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.6" stroke-linecap="round"><circle cx="5" cy="12" r="0.5"></circle><circle cx="12" cy="12" r="0.5"></circle><circle cx="19" cy="12" r="0.5"></circle></svg>
+  </div><div style="padding: 0 20px;">
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; ">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #FF6B9D; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Hotel Gym</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">4 ex · 12 sets · 5w ago</span>
+      </div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div></div>
+</div></div></div>
+      </article>
+      <article class="col">
+        <header class="col-head"><h3 class="col-title">B2b · Folder selected</h3></header>
+        <div class="note"><p class="n-lead">B2b · FOLDER SELECTED — one folder, flat, no headers.</p><p class="n-p">Headers would be redundant when every row belongs to the chip you just tapped, so they go, and the space becomes rows: six visible here against B2&#x27;s three per folder.</p><p class="n-p">The active chip is where the long name lives, and it can afford full width because the chip row scrolls sideways.</p><p class="n-warn">Tradeoff: a long name pushes the other chips off screen, so the folders you did not pick are one swipe away rather than visible.</p></div>
+        <div class="device"><div class="device-inner"><div style="width: 390px; height: 844px; background: #111113; display: flex; flex-direction: column; overflow: hidden; color: #EAEAEF;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 20px 0 20px;">
+    <div style="width: 44px; height: 44px; display: flex; align-items: center;"><span style="font-size: 15px; font-weight: 500; color: #9999A8;">Close</span></div>
+    <div style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: flex-end;">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+    </div>
+  </div>
+  <div style="padding: 2px 20px 12px 20px;"><span style="font-size: 30px; font-weight: 700; letter-spacing: -0.02em;">Templates</span></div>
+  <div style="padding: 0 20px 13px 20px;">
+    <div style="height: 44px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); border-radius: 11px; display: flex; align-items: center; gap: 9px; padding: 0 13px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.6-3.6"></path></svg>
+      <span style="font-size: 15px; font-weight: 400; color: #5C5C6E;">Search templates</span>
+    </div>
+  </div>
+  <div style="display: flex; gap: 7px; padding: 0 20px 14px 20px; overflow: hidden;">
+    <div style="height: 34px; padding: 0 13px; border-radius: 9px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 6px; flex-shrink: 0; opacity: 1;">
+      <span style="font-size: 13px; font-weight: 600; color: #9999A8; white-space: nowrap;">All</span>
+      <span style="font-size: 11px; font-weight: 600; color: #9999A8; opacity: 0.65;">13</span></div><div style="height: 34px; padding: 0 13px; border-radius: 9px; background: #5B8DEF; border: none; display: flex; align-items: center; gap: 6px; flex-shrink: 0; opacity: 1;">
+      <span style="font-size: 13px; font-weight: 600; color: #FFFFFF; white-space: nowrap;">Mesocycle 3 — Hypertrophy</span>
+      <span style="font-size: 11px; font-weight: 600; color: #FFFFFF; opacity: 0.65;">6</span></div><div style="height: 34px; padding: 0 13px; border-radius: 9px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 6px; flex-shrink: 0; opacity: 1;">
+      <span style="font-size: 13px; font-weight: 600; color: #9999A8; white-space: nowrap;">Accessory</span>
+      <span style="font-size: 11px; font-weight: 600; color: #9999A8; opacity: 0.65;">2</span></div><div style="height: 34px; padding: 0 13px; border-radius: 9px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 6px; flex-shrink: 0; opacity: 1;">
+      <span style="font-size: 13px; font-weight: 600; color: #9999A8; white-space: nowrap;">Deload</span>
+      <span style="font-size: 11px; font-weight: 600; color: #9999A8; opacity: 0.65;">3</span></div>
+  </div><div style="display: flex; flex-direction: column; padding: 4px 20px 0 20px;">
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #5B8DEF; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Upper A</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">6 ex · 22 sets · 2d ago</span>
+      </div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #4ECDC4; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Lower A</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">5 ex · 20 sets · 4d ago</span>
+      </div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #A87EE6; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><div style="display: flex; align-items: center; gap: 6px;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Upper B</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A87EE6" stroke-width="2.4" stroke-linecap="round"><path d="M9.5 14.5l5-5"></path><path d="M12.8 7.2l1.7-1.7a3.6 3.6 0 015.1 5.1l-1.7 1.7"></path><path d="M11.2 16.8l-1.7 1.7a3.6 3.6 0 01-5.1-5.1l1.7-1.7"></path></svg></div>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">6 ex · 21 sets · 6d ago</span>
+      </div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #4ECDC4; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Lower B</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">5 ex · 19 sets · 8d ago</span>
+      </div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #FF6B9D; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Push Accessory</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">4 ex · 14 sets · 11d ago</span>
+      </div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; ">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #A87EE6; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Pull Accessory</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">4 ex · 15 sets · 13d ago</span>
+      </div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div></div>
+</div></div></div>
+      </article>
+    </div>
+  </section>
+  <section class="sec">
+    <div class="sec-head"><h2 class="sec-title">Editor</h2><div class="sec-rule"></div></div>
+    <div class="sec-intro"><p class="n-p">Named More, not Special. In lifting apps &quot;special set&quot; is a term of art — Hevy uses it for drop sets and myo-reps — so the word promises set techniques and this menu delivers superset, note and folder. It would send you looking for the wrong thing.</p><p class="n-p">The drawer is also thinner than it looks. DROP_SETS_SCOPING.md Decision 2 makes drop sets a SET annotation with real logged weights, and a template carries no weights, so there is nothing to prescribe. The other eleven set types are hidden by Decision 1. Rest time is per-exercise but dead — authored today, never read at runtime.</p><p class="n-p">So More holds actions on the exercise, not special sets. When circuits, AMRAP and EMOM land — the decision record&#x27;s Workout blocks — the grouping half may deserve its own word. Group with… is the candidate then, not now.</p></div>
+    <div class="board">
+      <article class="col">
+        <header class="col-head"><h3 class="col-title">E1 · Accordion (chosen)</h3></header>
+        <div class="note"><p class="n-lead">E1 · ACCORDION (chosen) — the action row now carries all three: a half-width Warmup, a full-width Working Set, and More holding everything else.</p><p class="n-p">Warmup earns less width honestly — most exercises have none, and it is the rarer of the two adds. Working Set keeps the emphasis because it is what you press repeatedly.</p><p class="n-p">More absorbs the header ellipsis entirely, so the unlabelled glyph is gone from every card. The menu now sits where you are already working instead of up in the header.</p><p class="n-warn">Tradeoff: acting on a COLLAPSED exercise means expanding it first. One extra tap for something you do once per exercise, in exchange for removing a mystery glyph from every row.</p></div>
+        <div class="device"><div class="device-inner"><div style="width: 390px; height: 844px; background: #111113; display: flex; flex-direction: column; overflow: hidden; color: #EAEAEF; position: relative;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 20px 0 20px; flex-shrink: 0;">
+    <span style="font-size: 15px; font-weight: 500; color: #9999A8;">Cancel</span>
+    <span style="font-size: 15px; font-weight: 600;">Edit Template</span>
+    <span style="font-size: 15px; font-weight: 600; color: #5B8DEF;">Save</span>
+  </div>
+
+  <div style="padding: 14px 20px 0 20px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px;">
+    <div style="height: 46px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); border-radius: 11px; display: flex; align-items: center; padding: 0 13px;">
+      <span style="font-size: 16px; font-weight: 500;">Push Day A</span>
+    </div>
+    <div style="height: 48px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 11px; display: flex; align-items: center; gap: 10px; padding: 0 13px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5a2 2 0 012-2h4l2 2.4h8a2 2 0 012 2v8.6a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+      <span style="font-size: 14px; font-weight: 500; color: #9999A8; flex-grow: 1;">Folder</span>
+      <span style="font-size: 14px; font-weight: 600;">Mesocycle 3</span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+  </div>
+
+  <div style="display: flex; align-items: center; padding: 18px 20px 9px 20px; flex-shrink: 0;">
+    <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #5C5C6E;">EXERCISES</span>
+    <div style="flex-grow: 1;"></div><span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">5 exercises · 22 sets</span>
+  </div>
+
+  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 9px; padding: 0 20px; overflow: hidden;">
+
+    <div style="background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 13px; display: flex; align-items: center; gap: 10px; padding: 12px 13px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M4 8h16M4 16h16"></path></svg>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px;">
+        <span style="font-size: 15px; font-weight: 600;">Bench Press</span>
+        <span style="font-size: 11px; font-weight: 500; color: #9999A8;">2 warmup · 3 × 6–8 · RIR 2</span>
+      </div><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+
+    <div style="background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 13px; display: flex; flex-direction: column;">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 12px 13px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M4 8h16M4 16h16"></path></svg>
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px;">
+          <span style="font-size: 15px; font-weight: 600;">Incline DB Press</span>
+          <span style="font-size: 11px; font-weight: 500; color: #9999A8;">3 working · 8–10 reps · RIR 2</span>
+        </div><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+      </div>
+      <div style="height: 1px; background: rgba(255,255,255,0.06);"></div>
+      <div style="padding: 11px 13px 13px 13px; display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: center; gap: 8px; padding: 0 2px 2px 2px;">
+          <span style="font-size: 9px; font-weight: 700; letter-spacing: 0.07em; color: #5C5C6E; width: 30px;">SET</span>
+          <span style="font-size: 9px; font-weight: 700; letter-spacing: 0.07em; color: #5C5C6E; width: 104px; text-align: center;">REP RANGE</span>
+          <span style="font-size: 9px; font-weight: 700; letter-spacing: 0.07em; color: #5C5C6E; width: 46px; text-align: center;">RIR</span>
+        </div>
+        
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 30px; height: 32px; border-radius: 7px; background: #262630; display: flex; align-items: center; justify-content: center;"><span style="font-size: 12px; font-weight: 700;">1</span></div>
+          <div style="width: 104px; display: flex; align-items: center; gap: 5px;">
+            <div style="flex-grow: 1; height: 32px; border-radius: 7px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;"><span style="font-size: 14px; font-weight: 600;">8</span></div>
+            <span style="font-size: 13px; color: #5C5C6E;">–</span>
+            <div style="flex-grow: 1; height: 32px; border-radius: 7px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;"><span style="font-size: 14px; font-weight: 600;">10</span></div>
+          </div>
+          <div style="width: 46px; height: 32px; border-radius: 7px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;"><span style="font-size: 14px; font-weight: 600; color: #E89B3E;">2</span></div>
+          <div style="flex-grow: 1;"></div>
+          <div style="width: 32px; height: 32px; border-radius: 8px; background: #262630; display: flex; align-items: center; justify-content: center;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.4"></rect><path d="M5 15V6a2 2 0 012-2h9"></path></svg></div>
+          <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(224,85,85,0.08); display: flex; align-items: center; justify-content: center;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#E05555" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 30px; height: 32px; border-radius: 7px; background: #262630; display: flex; align-items: center; justify-content: center;"><span style="font-size: 12px; font-weight: 700;">2</span></div>
+          <div style="width: 104px; display: flex; align-items: center; gap: 5px;">
+            <div style="flex-grow: 1; height: 32px; border-radius: 7px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;"><span style="font-size: 14px; font-weight: 600;">8</span></div>
+            <span style="font-size: 13px; color: #5C5C6E;">–</span>
+            <div style="flex-grow: 1; height: 32px; border-radius: 7px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;"><span style="font-size: 14px; font-weight: 600;">10</span></div>
+          </div>
+          <div style="width: 46px; height: 32px; border-radius: 7px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;"><span style="font-size: 14px; font-weight: 600; color: #E89B3E;">2</span></div>
+          <div style="flex-grow: 1;"></div>
+          <div style="width: 32px; height: 32px; border-radius: 8px; background: #262630; display: flex; align-items: center; justify-content: center;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.4"></rect><path d="M5 15V6a2 2 0 012-2h9"></path></svg></div>
+          <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(224,85,85,0.08); display: flex; align-items: center; justify-content: center;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#E05555" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 30px; height: 32px; border-radius: 7px; background: #262630; display: flex; align-items: center; justify-content: center;"><span style="font-size: 12px; font-weight: 700;">3</span></div>
+          <div style="width: 104px; display: flex; align-items: center; gap: 5px;">
+            <div style="flex-grow: 1; height: 32px; border-radius: 7px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;"><span style="font-size: 14px; font-weight: 600;">8</span></div>
+            <span style="font-size: 13px; color: #5C5C6E;">–</span>
+            <div style="flex-grow: 1; height: 32px; border-radius: 7px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;"><span style="font-size: 14px; font-weight: 600;">10</span></div>
+          </div>
+          <div style="width: 46px; height: 32px; border-radius: 7px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;"><span style="font-size: 14px; font-weight: 600; color: #A0B83C;">3</span></div>
+          <div style="flex-grow: 1;"></div>
+          <div style="width: 32px; height: 32px; border-radius: 8px; background: #262630; display: flex; align-items: center; justify-content: center;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.4"></rect><path d="M5 15V6a2 2 0 012-2h9"></path></svg></div>
+          <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(224,85,85,0.08); display: flex; align-items: center; justify-content: center;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#E05555" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></div>
+        </div>
+        <div style="display: flex; gap: 7px; padding-top: 3px;">
+          <div style="width: 84px; height: 38px; border-radius: 9px; background: rgba(212,162,58,0.10); display: flex; align-items: center; justify-content: center; gap: 4px; flex-shrink: 0;">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#D4A23A" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+            <span style="font-size: 12px; font-weight: 600; color: #D4A23A;">Warmup</span></div>
+          <div style="flex-grow: 1; height: 38px; border-radius: 9px; background: rgba(91,141,239,0.10); display: flex; align-items: center; justify-content: center; gap: 5px;">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="2.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+            <span style="font-size: 12.5px; font-weight: 600; color: #5B8DEF;">Working Set</span></div>
+          <div style="width: 78px; height: 38px; border-radius: 9px; background: #3A3A46; border: 1px solid rgba(255,255,255,0.10); display: flex; align-items: center; justify-content: center; gap: 5px; flex-shrink: 0;">
+            <span style="font-size: 12.5px; font-weight: 600; color: #EAEAEF;">More</span>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background: rgba(168,126,230,0.07); border: 1px solid rgba(168,126,230,0.30); border-radius: 13px; padding: 9px; display: flex; flex-direction: column; gap: 7px;">
+      <div style="display: flex; align-items: center; gap: 6px; padding: 0 4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A87EE6" stroke-width="2.4" stroke-linecap="round"><path d="M9.5 14.5l5-5"></path><path d="M12.8 7.2l1.7-1.7a3.6 3.6 0 015.1 5.1l-1.7 1.7"></path><path d="M11.2 16.8l-1.7 1.7a3.6 3.6 0 01-5.1-5.1l1.7-1.7"></path></svg>
+        <span style="font-size: 9px; font-weight: 700; letter-spacing: 0.08em; color: #A87EE6;">SUPERSET A</span>
+      </div>
+      <div style="background: #1B1B1F; border-radius: 9px; display: flex; align-items: center; gap: 10px; padding: 10px 11px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M4 8h16M4 16h16"></path></svg>
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px;">
+          <span style="font-size: 14px; font-weight: 600;">Cable Fly</span>
+          <span style="font-size: 11px; font-weight: 500; color: #9999A8;">3 working · 12–15 reps</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="position: absolute; inset: 0; background: rgba(6,6,8,0.58);"></div>
+  <div style="position: absolute; top: 296px; right: 33px; width: 244px; background: #2A2A33; border-radius: 13px; overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,0.6);">
+    
+      <div style="height: 46px; display: flex; align-items: center; gap: 11px; padding: 0 14px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+        <span style="font-size: 15px; font-weight: 500; color: #EAEAEF; flex-grow: 1;">Superset with…</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A87EE6" stroke-width="2.4" stroke-linecap="round"><path d="M9.5 14.5l5-5"></path><path d="M12.8 7.2l1.7-1.7a3.6 3.6 0 015.1 5.1l-1.7 1.7"></path><path d="M11.2 16.8l-1.7 1.7a3.6 3.6 0 01-5.1-5.1l1.7-1.7"></path></svg>
+      </div>
+    
+      <div style="height: 46px; display: flex; align-items: center; gap: 11px; padding: 0 14px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+        <span style="font-size: 15px; font-weight: 500; color: #EAEAEF; flex-grow: 1;">Add note</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.1" stroke-linecap="round"><path d="M4 6h16M4 12h11M4 18h8"></path></svg>
+      </div>
+    
+      <div style="height: 46px; display: flex; align-items: center; gap: 11px; padding: 0 14px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+        <span style="font-size: 15px; font-weight: 500; color: #EAEAEF; flex-grow: 1;">Move to folder</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5a2 2 0 012-2h4l2 2.4h8a2 2 0 012 2v8.6a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+      </div>
+    
+      <div style="height: 46px; display: flex; align-items: center; gap: 11px; padding: 0 14px; ">
+        <span style="font-size: 15px; font-weight: 500; color: #E05555; flex-grow: 1;">Remove exercise</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E05555" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6.5 7l1 13h9l1-13"></path></svg>
+      </div>
+  </div>
+  <div style="position: absolute; top: 490px; right: 33px; width: 78px; height: 38px; border-radius: 9px; background: #5B8DEF; display: flex; align-items: center; justify-content: center; gap: 5px;">
+    <span style="font-size: 12.5px; font-weight: 600; color: #FFFFFF;">More</span>
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(180deg);"><path d="M6 9l6 6 6-6"></path></svg>
+  </div>
+
+</div></div></div>
+      </article>
+      <article class="col">
+        <header class="col-head"><h3 class="col-title">Superset · partner picker</h3></header>
+        <div class="note"><p class="n-lead"><span class="n-kicker">SUPERSET · PARTNER PICKER</span> the part that actually fixes it, and the part worth keeping.</p><p class="n-p">Today you assign a LETTER, twice, on two exercises, with nothing saying a second step exists. Here you pick a PARTNER once, and the letter becomes an output: the sheet says these two become Superset B rather than asking you to choose B.</p><p class="n-p">A superset of one — the state today&#x27;s flow leaves you in — becomes unreachable.</p><p class="n-p">Compatible with SUPERSETS_SCOPING.md §6: the letter is still the identity and colours still cycle every four. What changes is that the app assigns it.</p></div>
+        <div class="device"><div class="device-inner"><div style="width: 390px; height: 844px; background: #111113; display: flex; flex-direction: column; overflow: hidden; color: #EAEAEF;">
+
+  <div style="flex-grow: 1; display: flex; flex-direction: column; opacity: 0.20; padding-top: 6px;">
+    <div style="display: flex; justify-content: space-between; padding: 6px 20px 0 20px;">
+      <span style="font-size: 15px; font-weight: 500; color: #9999A8;">Cancel</span>
+      <span style="font-size: 15px; font-weight: 600;">Edit Template</span>
+      <span style="font-size: 15px; font-weight: 600; color: #5B8DEF;">Save</span>
+    </div>
+    <div style="padding: 14px 20px 0 20px;">
+      <div style="height: 46px; background: #1F1F25; border-radius: 11px;"></div>
+    </div>
+    <div style="padding: 18px 20px 9px 20px;"><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #5C5C6E;">EXERCISES</span></div>
+    <div style="padding: 0 20px; display: flex; flex-direction: column; gap: 9px;">
+      <div style="height: 62px; background: #1B1B1F; border-radius: 13px;"></div>
+      <div style="height: 62px; background: #1B1B1F; border-radius: 13px;"></div>
+    </div>
+  </div>
+
+  <div style="background: #1B1B1F; border-top: 1px solid rgba(255,255,255,0.10); border-radius: 22px 22px 0 0; padding: 10px 0 24px 0; display: flex; flex-direction: column; box-shadow: 0 -18px 44px rgba(0,0,0,0.5);">
+
+    <div style="display: flex; justify-content: center; padding-bottom: 12px;">
+      <div style="width: 38px; height: 4px; border-radius: 3px; background: #3A3A46;"></div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 4px; padding: 0 20px 14px 20px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#A87EE6" stroke-width="2.4" stroke-linecap="round"><path d="M9.5 14.5l5-5"></path><path d="M12.8 7.2l1.7-1.7a3.6 3.6 0 015.1 5.1l-1.7 1.7"></path><path d="M11.2 16.8l-1.7 1.7a3.6 3.6 0 01-5.1-5.1l1.7-1.7"></path></svg>
+        <span style="font-size: 19px; font-weight: 700; letter-spacing: -0.01em;">Superset with</span>
+      </div>
+      <span style="font-size: 13px; font-weight: 500; color: #9999A8;">Pair Incline DB Press with one other exercise</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; padding: 0 20px;">
+      
+      <div style="min-height: 58px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.06); opacity: 1; padding: 9px 0;">
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-size: 16px; font-weight: 500; color: #EAEAEF;">Bench Press</span><span style="font-size: 11.5px; font-weight: 500; color: #5C5C6E;">2 warmup · 3 working</span>
+        </div>
+        
+      </div>
+      
+      <div style="min-height: 58px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.06); opacity: 1; padding: 9px 0;">
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-size: 16px; font-weight: 600; color: #EAEAEF;">Overhead Tricep Ext.</span><span style="font-size: 11.5px; font-weight: 500; color: #A87EE6;">Moves up to sit next to Incline DB Press</span>
+        </div>
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#A87EE6" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L20 7"></path></svg>
+      </div>
+      
+      <div style="min-height: 58px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.06); opacity: 1; padding: 9px 0;">
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-size: 16px; font-weight: 500; color: #EAEAEF;">Rope Pushdown</span><span style="font-size: 11.5px; font-weight: 500; color: #5C5C6E;">3 working</span>
+        </div>
+        
+      </div>
+      
+      <div style="min-height: 58px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.06); opacity: 0.42; padding: 9px 0;">
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-size: 16px; font-weight: 500; color: #EAEAEF;">Cable Fly</span><span style="font-size: 11.5px; font-weight: 500; color: #5C5C6E;">Already in Superset A</span>
+        </div>
+        
+      </div>
+      
+      <div style="min-height: 58px; display: flex; align-items: center; gap: 12px;  opacity: 0.42; padding: 9px 0;">
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-size: 16px; font-weight: 500; color: #EAEAEF;">Lateral Raise</span><span style="font-size: 11.5px; font-weight: 500; color: #5C5C6E;">Already in Superset A</span>
+        </div>
+        
+      </div>
+    </div>
+
+    <div style="margin: 14px 20px 0 20px; padding: 11px 13px; border-radius: 11px; background: rgba(168,126,230,0.09); border: 1px solid rgba(168,126,230,0.25); display: flex; align-items: center; gap: 9px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A87EE6" stroke-width="2.4" stroke-linecap="round"><path d="M9.5 14.5l5-5"></path><path d="M12.8 7.2l1.7-1.7a3.6 3.6 0 015.1 5.1l-1.7 1.7"></path><path d="M11.2 16.8l-1.7 1.7a3.6 3.6 0 01-5.1-5.1l1.7-1.7"></path></svg>
+      <span style="font-size: 12.5px; font-weight: 500; color: #9999A8;">These two become <span style="color: #A87EE6; font-weight: 700;">Superset B</span></span>
+    </div>
+
+    <div style="padding: 14px 20px 0 20px;">
+      <div style="height: 50px; border-radius: 13px; background: #A87EE6; display: flex; align-items: center; justify-content: center;">
+        <span style="font-size: 16px; font-weight: 600; color: #16101F;">Create superset</span>
+      </div>
+    </div>
+
+  </div>
+</div></div></div>
+      </article>
+    </div>
+  </section>
+  <section class="sec">
+    <div class="sec-head"><h2 class="sec-title">Settled</h2><div class="sec-rule"></div></div>
+    <div class="sec-intro"></div>
+    <div class="board">
+      <article class="col">
+        <header class="col-head"><h3 class="col-title">Template detail</h3></header>
+        <div class="note"><p class="n-lead"><span class="n-kicker">TEMPLATE DETAIL</span> settled, with icon labels added. Edit and Copy were icon-only, which is the same discoverability trap as the superset menu at smaller scale.</p><p class="n-p">Full prescription per exercise, superset pair as one block with 3a/3b, Start primary.</p><p class="n-warn">Depends on a decision: TIMES DONE and LAST DONE need Workout.templateId (Q3). Without it those two tiles come out.</p></div>
+        <div class="device"><div class="device-inner"><div style="width: 390px; height: 844px; background: #111113; display: flex; flex-direction: column; overflow: hidden; color: #EAEAEF;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 16px 0 16px; flex-shrink: 0;">
+    <div style="width: 44px; height: 44px; display: flex; align-items: center;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#EAEAEF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+    </div>
+    <div style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: flex-end;">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.6" stroke-linecap="round"><circle cx="5" cy="12" r="0.6"></circle><circle cx="12" cy="12" r="0.6"></circle><circle cx="19" cy="12" r="0.6"></circle></svg>
+    </div>
+  </div>
+
+  <div style="padding: 2px 20px 0 20px; flex-shrink: 0;">
+    <span style="font-size: 27px; font-weight: 700; letter-spacing: -0.02em; color: #EAEAEF;">Push Day A</span>
+  </div>
+
+  <div style="display: flex; gap: 7px; padding: 12px 20px 0 20px; flex-shrink: 0;">
+    <div style="flex-grow: 1; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 11px; padding: 9px 11px; display: flex; flex-direction: column; gap: 2px;">
+      <span style="font-size: 16px; font-weight: 700; color: #EAEAEF;">22</span>
+      <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.04em; color: #5C5C6E;">SETS</span>
+    </div>
+    <div style="flex-grow: 1; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 11px; padding: 9px 11px; display: flex; flex-direction: column; gap: 2px;">
+      <span style="font-size: 16px; font-weight: 700; color: #EAEAEF;">~58<span style="font-size: 11px; font-weight: 600; color: #9999A8;">m</span></span>
+      <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.04em; color: #5C5C6E;">EST. TIME</span>
+    </div>
+    <div style="flex-grow: 1; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 11px; padding: 9px 11px; display: flex; flex-direction: column; gap: 2px;">
+      <span style="font-size: 16px; font-weight: 700; color: #EAEAEF;">14</span>
+      <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.04em; color: #5C5C6E;">TIMES DONE</span>
+    </div>
+    <div style="flex-grow: 1; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 11px; padding: 9px 11px; display: flex; flex-direction: column; gap: 2px;">
+      <span style="font-size: 16px; font-weight: 700; color: #EAEAEF;">4<span style="font-size: 11px; font-weight: 600; color: #9999A8;">d</span></span>
+      <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.04em; color: #5C5C6E;">LAST DONE</span>
+    </div>
+  </div>
+
+  <div style="padding: 18px 20px 8px 20px; flex-shrink: 0;">
+    <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #5C5C6E;">EXERCISES</span>
+  </div>
+
+  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 7px; padding: 0 20px; overflow: hidden;">
+
+    <div style="display: flex; align-items: center; gap: 12px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 11px 13px;">
+      <span style="font-size: 12px; font-weight: 700; color: #5C5C6E; width: 13px;">1</span>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+        <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Bench Press</span>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="font-size: 11px; font-weight: 600; color: #D4A23A;">2 warmup</span>
+          <div style="width: 3px; height: 3px; border-radius: 2px; background: #5C5C6E;"></div>
+          <span style="font-size: 12px; font-weight: 500; color: #9999A8;">3 × 6–8</span>
+          <div style="width: 3px; height: 3px; border-radius: 2px; background: #5C5C6E;"></div>
+          <span style="font-size: 12px; font-weight: 500; color: #E89B3E;">RIR 2</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 12px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 11px 13px;">
+      <span style="font-size: 12px; font-weight: 700; color: #5C5C6E; width: 13px;">2</span>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+        <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Incline DB Press</span>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="font-size: 12px; font-weight: 500; color: #9999A8;">3 × 8–10</span>
+          <div style="width: 3px; height: 3px; border-radius: 2px; background: #5C5C6E;"></div>
+          <span style="font-size: 12px; font-weight: 500; color: #E89B3E;">RIR 2</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="background: rgba(168,126,230,0.07); border: 1px solid rgba(168,126,230,0.30); border-radius: 12px; padding: 9px 11px; display: flex; flex-direction: column; gap: 6px;">
+      <div style="display: flex; align-items: center; gap: 6px; padding-left: 2px;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A87EE6" stroke-width="2.4" stroke-linecap="round"><path d="M9.5 14.5l5-5"></path><path d="M12.8 7.2l1.7-1.7a3.6 3.6 0 015.1 5.1l-1.7 1.7"></path><path d="M11.2 16.8l-1.7 1.7a3.6 3.6 0 01-5.1-5.1l1.7-1.7"></path></svg>
+        <span style="font-size: 9px; font-weight: 700; letter-spacing: 0.08em; color: #A87EE6;">SUPERSET A</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 2px 2px;">
+        <span style="font-size: 12px; font-weight: 700; color: #A87EE6; width: 13px;">3a</span>
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Cable Fly</span>
+          <span style="font-size: 12px; font-weight: 500; color: #9999A8;">3 × 12–15 · RIR 1</span>
+        </div>
+      </div>
+      <div style="height: 1px; background: rgba(168,126,230,0.20); margin-left: 25px;"></div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 2px 2px;">
+        <span style="font-size: 12px; font-weight: 700; color: #A87EE6; width: 13px;">3b</span>
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Lateral Raise</span>
+          <span style="font-size: 12px; font-weight: 500; color: #9999A8;">3 × 12–15 · RIR 1</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 12px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 11px 13px;">
+      <span style="font-size: 12px; font-weight: 700; color: #5C5C6E; width: 13px;">4</span>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+        <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Overhead Tricep Ext.</span>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="font-size: 12px; font-weight: 500; color: #9999A8;">3 × 10–12</span>
+          <div style="width: 3px; height: 3px; border-radius: 2px; background: #5C5C6E;"></div>
+          <span style="font-size: 12px; font-weight: 500; color: #A0B83C;">RIR 3</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 12px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 11px 13px;">
+      <span style="font-size: 12px; font-weight: 700; color: #5C5C6E; width: 13px;">5</span>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+        <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Rope Pushdown</span>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="font-size: 12px; font-weight: 500; color: #9999A8;">3 × 12–15</span>
+          <div style="width: 3px; height: 3px; border-radius: 2px; background: #5C5C6E;"></div>
+          <span style="font-size: 12px; font-weight: 500; color: #A0B83C;">RIR 3</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="flex-shrink: 0; display: flex; align-items: center; gap: 9px; padding: 12px 20px 22px 20px; background: #111113; border-top: 1px solid rgba(255,255,255,0.06);">
+    <div style="width: 56px; height: 50px; border-radius: 13px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"></path></svg><span style="font-size: 10px; font-weight: 600; color: #9999A8; margin-top: 3px;">Edit</span>
+    </div>
+    <div style="width: 56px; height: 50px; border-radius: 13px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.4"></rect><path d="M5 15V6a2 2 0 012-2h9"></path></svg><span style="font-size: 10px; font-weight: 600; color: #9999A8; margin-top: 3px;">Copy</span>
+    </div>
+    <div style="flex-grow: 1; height: 50px; border-radius: 13px; background: #5B8DEF; display: flex; align-items: center; justify-content: center; gap: 9px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M8 5.5v13l11-6.5z"></path></svg>
+      <span style="font-size: 16px; font-weight: 600; color: #FFFFFF;">Start Workout</span>
+    </div>
+  </div>
+
+</div></div></div>
+      </article>
+      <article class="col">
+        <header class="col-head"><h3 class="col-title">How a folder gets made</h3></header>
+        <div class="note"><p class="n-lead"><span class="n-kicker">HOW A FOLDER GETS MADE</span> settled. User-created, because folders cannot be derived.</p><p class="n-p">One nullable folder name on WorkoutTemplate. A folder exists because a template points at it and stops existing when the last one leaves. No entity, no lifecycle, no orphans.</p><p class="n-warn">Tradeoff: no ordering inside a folder and no folder metadata. Both want the dead Program model (Q6), which this does not foreclose.</p></div>
+        <div class="device"><div class="device-inner"><div style="width: 390px; height: 844px; background: #111113; display: flex; flex-direction: column; overflow: hidden; color: #EAEAEF; position: relative;">
+
+  <div style="flex-grow: 1; display: flex; flex-direction: column; opacity: 0.22; padding-top: 6px;">
+    <div style="padding: 6px 20px 0 20px;"><span style="font-size: 15px; font-weight: 500; color: #9999A8;">Close</span></div>
+    <div style="padding: 8px 20px 14px 20px;"><span style="font-size: 30px; font-weight: 700; letter-spacing: -0.02em;">Templates</span></div>
+    <div style="padding: 0 20px 16px 20px;"><div style="height: 44px; background: #1F1F25; border-radius: 11px;"></div></div>
+    <div style="padding: 0 20px 8px 20px;"><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #9999A8;">PPL BLOCK 2</span></div>
+    <div style="display: flex; flex-direction: column; padding: 0 20px;">
+      <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <div style="width: 4px; height: 32px; border-radius: 2px; background: #5B8DEF;"></div>
+        <div style="display: flex; flex-direction: column; gap: 3px;">
+          <span style="font-size: 15px; font-weight: 600;">Push Day A</span>
+          <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">6 ex · 22 sets · 4d ago</span>
+        </div>
+      </div>
+      <div style="height: 60px; display: flex; align-items: center; gap: 13px;">
+        <div style="width: 4px; height: 32px; border-radius: 2px; background: #A87EE6;"></div>
+        <div style="display: flex; flex-direction: column; gap: 3px;">
+          <span style="font-size: 15px; font-weight: 600;">Pull Day A</span>
+          <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">5 ex · 19 sets · 6d ago</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="background: #1B1B1F; border-top: 1px solid rgba(255,255,255,0.10); border-radius: 22px 22px 0 0; padding: 10px 0 24px 0; display: flex; flex-direction: column; box-shadow: 0 -18px 44px rgba(0,0,0,0.5);">
+
+    <div style="display: flex; justify-content: center; padding-bottom: 12px;">
+      <div style="width: 38px; height: 4px; border-radius: 3px; background: #3A3A46;"></div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 3px; padding: 0 20px 16px 20px;">
+      <span style="font-size: 19px; font-weight: 700; letter-spacing: -0.01em; color: #EAEAEF;">Move to folder</span>
+      <span style="font-size: 13px; font-weight: 500; color: #9999A8;">Push Day A</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; padding: 0 20px;">
+
+      <div style="height: 56px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5a2 2 0 012-2h4l2 2.4h8a2 2 0 012 2v8.6a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+        <div style="flex-grow: 1; display: flex; align-items: baseline; gap: 7px;">
+          <span style="font-size: 16px; font-weight: 600; color: #EAEAEF;">PPL Block 2</span>
+          <span style="font-size: 12px; font-weight: 500; color: #5C5C6E;">3 templates</span>
+        </div>
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L20 7"></path></svg>
+      </div>
+
+      <div style="height: 56px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5a2 2 0 012-2h4l2 2.4h8a2 2 0 012 2v8.6a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+        <div style="flex-grow: 1; display: flex; align-items: baseline; gap: 7px;">
+          <span style="font-size: 16px; font-weight: 500; color: #EAEAEF;">Accessory</span>
+          <span style="font-size: 12px; font-weight: 500; color: #5C5C6E;">2 templates</span>
+        </div>
+      </div>
+
+      <div style="height: 56px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.1" stroke-linecap="round"><path d="M5 12h14"></path></svg>
+        <div style="flex-grow: 1;">
+          <span style="font-size: 16px; font-weight: 500; color: #EAEAEF;">Not in a folder</span>
+        </div>
+      </div>
+
+      <div style="height: 56px; display: flex; align-items: center; gap: 12px;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+        <div style="flex-grow: 1;">
+          <span style="font-size: 16px; font-weight: 600; color: #5B8DEF;">New folder…</span>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="padding: 16px 20px 0 20px;">
+      <div style="height: 50px; border-radius: 13px; background: #5B8DEF; display: flex; align-items: center; justify-content: center;">
+        <span style="font-size: 16px; font-weight: 600; color: #FFFFFF;">Done</span>
+      </div>
+    </div>
+
+  </div>
+
+</div></div></div>
+      </article>
+    </div>
+  </section>
+  <section class="sec">
+    <div class="sec-head"><h2 class="sec-title">Superseded</h2><div class="sec-rule"></div></div>
+    <div class="sec-intro"><p class="n-p">Superseded, kept for the record.</p><p class="n-p">Landing: row tags failed on user-generated names. B2&#x27;s folder sections lost to chips on density (its All view survives as the chosen artboard); B2a&#x27;s collapse added a tap to every template. A explored richer cards on a flat list; B1 was the same look with nothing new underneath.</p><p class="n-p">Editor: E2 (scheme-first), E3 (drill-in) and E4 (dense table) all lost to E1. E2&#x27;s insight about repeated identical rows is the one worth revisiting.</p></div>
+    <div class="board">
+      <article class="col">
+        <header class="col-head"><h3 class="col-title">B2b · with row tags</h3></header>
+        <div class="note"></div>
+        <div class="device"><div class="device-inner"><div style="width: 390px; height: 844px; background: #111113; display: flex; flex-direction: column; overflow: hidden; color: #EAEAEF;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 20px 0 20px;">
+    <div style="width: 44px; height: 44px; display: flex; align-items: center;"><span style="font-size: 15px; font-weight: 500; color: #9999A8;">Close</span></div>
+    <div style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: flex-end;">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+    </div>
+  </div>
+  <div style="padding: 2px 20px 12px 20px;"><span style="font-size: 30px; font-weight: 700; letter-spacing: -0.02em;">Templates</span></div>
+  <div style="padding: 0 20px 14px 20px;">
+    <div style="height: 44px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); border-radius: 11px; display: flex; align-items: center; gap: 9px; padding: 0 13px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.6-3.6"></path></svg>
+      <span style="font-size: 15px; font-weight: 400; color: #5C5C6E;">Search templates</span>
+    </div>
+  </div>
+  <div style="display: flex; gap: 7px; padding: 0 20px 14px 20px; overflow: hidden;">
+    <div style="height: 34px; padding: 0 13px; border-radius: 9px; background: #5B8DEF; border: none; display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+      <span style="font-size: 13px; font-weight: 600; color: #FFFFFF; white-space: nowrap;">All</span>
+      <span style="font-size: 11px; font-weight: 600; color: #FFFFFF; opacity: 0.7;">12</span></div><div style="height: 34px; padding: 0 13px; border-radius: 9px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+      <span style="font-size: 13px; font-weight: 600; color: #9999A8; white-space: nowrap;">PPL Block 2</span>
+      <span style="font-size: 11px; font-weight: 600; color: #9999A8; opacity: 0.7;">3</span></div><div style="height: 34px; padding: 0 13px; border-radius: 9px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+      <span style="font-size: 13px; font-weight: 600; color: #9999A8; white-space: nowrap;">Accessory</span>
+      <span style="font-size: 11px; font-weight: 600; color: #9999A8; opacity: 0.7;">2</span></div><div style="height: 34px; padding: 0 13px; border-radius: 9px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+      <span style="font-size: 13px; font-weight: 600; color: #9999A8; white-space: nowrap;">Deload</span>
+      <span style="font-size: 11px; font-weight: 600; color: #9999A8; opacity: 0.7;">3</span></div>
+  </div>
+  <div style="display: flex; flex-direction: column; padding: 0 20px;">
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #5B8DEF; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Push Day A</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">6 ex · 22 sets · 4d ago</span>
+      </div><div style="padding: 2px 6px; background: #262630; border-radius: 4px; flex-shrink: 0;"><span style="font-size: 9px; font-weight: 600; color: #9999A8;">PPL</span></div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #A87EE6; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><div style="display: flex; align-items: center; gap: 6px;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Pull Day A</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A87EE6" stroke-width="2.4" stroke-linecap="round"><path d="M9.5 14.5l5-5"></path><path d="M12.8 7.2l1.7-1.7a3.6 3.6 0 015.1 5.1l-1.7 1.7"></path><path d="M11.2 16.8l-1.7 1.7a3.6 3.6 0 01-5.1-5.1l1.7-1.7"></path></svg></div>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">5 ex · 19 sets · 6d ago</span>
+      </div><div style="padding: 2px 6px; background: #262630; border-radius: 4px; flex-shrink: 0;"><span style="font-size: 9px; font-weight: 600; color: #9999A8;">PPL</span></div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #4ECDC4; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Legs</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">5 ex · 20 sets · 9d ago</span>
+      </div><div style="padding: 2px 6px; background: #262630; border-radius: 4px; flex-shrink: 0;"><span style="font-size: 9px; font-weight: 600; color: #9999A8;">PPL</span></div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #D4A23A; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Arms Finisher</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">3 ex · 9 sets · 2w ago</span>
+      </div><div style="padding: 2px 6px; background: #262630; border-radius: 4px; flex-shrink: 0;"><span style="font-size: 9px; font-weight: 600; color: #9999A8;">Acc</span></div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #5EC269; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Core &amp; Calves</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">3 ex · 10 sets · never used</span>
+      </div><div style="padding: 2px 6px; background: #262630; border-radius: 4px; flex-shrink: 0;"><span style="font-size: 9px; font-weight: 600; color: #9999A8;">Acc</span></div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #4ECDC4; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Squat Deload</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">4 ex · 12 sets · 4w ago</span>
+      </div><div style="padding: 2px 6px; background: #262630; border-radius: 4px; flex-shrink: 0;"><span style="font-size: 9px; font-weight: 600; color: #9999A8;">Deload</span></div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #5B8DEF; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Bench Deload</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">4 ex · 11 sets · 4w ago</span>
+      </div><div style="padding: 2px 6px; background: #262630; border-radius: 4px; flex-shrink: 0;"><span style="font-size: 9px; font-weight: 600; color: #9999A8;">Deload</span></div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #FF6B9D; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Hotel Gym</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">4 ex · 12 sets · 5w ago</span>
+      </div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; ">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #9999A8; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Upper B</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">6 ex · 21 sets · 3w ago</span>
+      </div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div></div>
+</div></div></div>
+      </article>
+      <article class="col">
+        <header class="col-head"><h3 class="col-title">B2a · Collapsible</h3></header>
+        <div class="note"></div>
+        <div class="device"><div class="device-inner"><div style="width: 390px; height: 844px; background: #111113; display: flex; flex-direction: column; overflow: hidden; color: #EAEAEF;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 20px 0 20px;">
+    <div style="width: 44px; height: 44px; display: flex; align-items: center;"><span style="font-size: 15px; font-weight: 500; color: #9999A8;">Close</span></div>
+    <div style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: flex-end;">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+    </div>
+  </div>
+  <div style="padding: 2px 20px 12px 20px;"><span style="font-size: 30px; font-weight: 700; letter-spacing: -0.02em;">Templates</span></div>
+  <div style="padding: 0 20px 14px 20px;">
+    <div style="height: 44px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); border-radius: 11px; display: flex; align-items: center; gap: 9px; padding: 0 13px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.6-3.6"></path></svg>
+      <span style="font-size: 15px; font-weight: 400; color: #5C5C6E;">Search templates</span>
+    </div>
+  </div>
+  <div style="height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 20px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+    <div style="transform: rotate(90deg);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg></div>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5a2 2 0 012-2h4l2 2.4h8a2 2 0 012 2v8.6a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+    <span style="font-size: 13px; font-weight: 600; color: #EAEAEF; letter-spacing: 0.01em;">PPL Block 2</span>
+    <span style="font-size: 11px; font-weight: 600; color: #5C5C6E;">3</span>
+    <div style="flex-grow: 1;"></div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.6" stroke-linecap="round"><circle cx="5" cy="12" r="0.5"></circle><circle cx="12" cy="12" r="0.5"></circle><circle cx="19" cy="12" r="0.5"></circle></svg>
+  </div><div style="padding: 0 20px;">
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #5B8DEF; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Push Day A</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">6 ex · 22 sets · 4d ago</span>
+      </div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #A87EE6; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><div style="display: flex; align-items: center; gap: 6px;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Pull Day A</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A87EE6" stroke-width="2.4" stroke-linecap="round"><path d="M9.5 14.5l5-5"></path><path d="M12.8 7.2l1.7-1.7a3.6 3.6 0 015.1 5.1l-1.7 1.7"></path><path d="M11.2 16.8l-1.7 1.7a3.6 3.6 0 01-5.1-5.1l1.7-1.7"></path></svg></div>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">5 ex · 19 sets · 6d ago</span>
+      </div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; ">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #4ECDC4; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;"><span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Legs</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">5 ex · 20 sets · 9d ago</span>
+      </div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div></div>
+  <div style="height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 20px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+    <div style="transform: none;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg></div>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5a2 2 0 012-2h4l2 2.4h8a2 2 0 012 2v8.6a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+    <span style="font-size: 13px; font-weight: 600; color: #9999A8; letter-spacing: 0.01em;">Accessory</span>
+    <span style="font-size: 11px; font-weight: 600; color: #5C5C6E;">2</span>
+    <div style="flex-grow: 1;"></div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.6" stroke-linecap="round"><circle cx="5" cy="12" r="0.5"></circle><circle cx="12" cy="12" r="0.5"></circle><circle cx="19" cy="12" r="0.5"></circle></svg>
+  </div>
+  <div style="height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 20px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+    <div style="transform: none;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg></div>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5a2 2 0 012-2h4l2 2.4h8a2 2 0 012 2v8.6a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+    <span style="font-size: 13px; font-weight: 600; color: #9999A8; letter-spacing: 0.01em;">Deload Week</span>
+    <span style="font-size: 11px; font-weight: 600; color: #5C5C6E;">3</span>
+    <div style="flex-grow: 1;"></div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.6" stroke-linecap="round"><circle cx="5" cy="12" r="0.5"></circle><circle cx="12" cy="12" r="0.5"></circle><circle cx="19" cy="12" r="0.5"></circle></svg>
+  </div>
+  <div style="height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 20px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+    <div style="transform: none;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg></div>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5a2 2 0 012-2h4l2 2.4h8a2 2 0 012 2v8.6a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+    <span style="font-size: 13px; font-weight: 600; color: #9999A8; letter-spacing: 0.01em;">Travel</span>
+    <span style="font-size: 11px; font-weight: 600; color: #5C5C6E;">2</span>
+    <div style="flex-grow: 1;"></div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.6" stroke-linecap="round"><circle cx="5" cy="12" r="0.5"></circle><circle cx="12" cy="12" r="0.5"></circle><circle cx="19" cy="12" r="0.5"></circle></svg>
+  </div>
+  <div style="height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 20px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+    <div style="transform: none;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg></div>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5a2 2 0 012-2h4l2 2.4h8a2 2 0 012 2v8.6a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+    <span style="font-size: 13px; font-weight: 600; color: #9999A8; letter-spacing: 0.01em;">Not in a folder</span>
+    <span style="font-size: 11px; font-weight: 600; color: #5C5C6E;">2</span>
+    <div style="flex-grow: 1;"></div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.6" stroke-linecap="round"><circle cx="5" cy="12" r="0.5"></circle><circle cx="12" cy="12" r="0.5"></circle><circle cx="19" cy="12" r="0.5"></circle></svg>
+  </div>
+</div></div></div>
+      </article>
+      <article class="col">
+        <header class="col-head"><h3 class="col-title">A · Richer cards</h3></header>
+        <div class="note"></div>
+        <div class="device"><div class="device-inner"><div style="width: 390px; height: 844px; background: #111113; display: flex; flex-direction: column; overflow: hidden; color: #EAEAEF;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 20px 0 20px;">
+    <div style="width: 44px; height: 44px; display: flex; align-items: center;">
+      <span style="font-size: 15px; font-weight: 500; color: #9999A8;">Close</span>
+    </div>
+    <div style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: flex-end;">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+    </div>
+  </div>
+
+  <div style="padding: 2px 20px 12px 20px;">
+    <span style="font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: #EAEAEF;">Templates</span>
+  </div>
+
+  <div style="padding: 0 20px 14px 20px;">
+    <div style="height: 44px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); border-radius: 11px; display: flex; align-items: center; gap: 9px; padding: 0 13px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.6-3.6"></path></svg>
+      <span style="font-size: 15px; font-weight: 400; color: #5C5C6E;">Search templates</span>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 11px; padding: 0 20px;">
+
+    <div style="background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 14px; display: flex; align-items: center; gap: 12px;">
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 7px; min-width: 0;">
+        <div style="display: flex; align-items: baseline; gap: 8px;">
+          <span style="font-size: 17px; font-weight: 600; color: #EAEAEF;">Push Day A</span>
+          <div style="flex-grow: 1;"></div>
+          <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">4d ago</span>
+        </div>
+        <span style="font-size: 13px; font-weight: 400; color: #9999A8; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Bench Press · Incline DB Press · Cable Fly +3</span>
+        <div style="display: flex; align-items: center; gap: 7px;">
+          <span style="font-size: 12px; font-weight: 500; color: #5C5C6E;">6 exercises</span>
+          <div style="width: 3px; height: 3px; border-radius: 2px; background: #5C5C6E;"></div>
+          <span style="font-size: 12px; font-weight: 500; color: #5C5C6E;">22 sets</span>
+          <div style="width: 3px; height: 3px; border-radius: 2px; background: #5C5C6E;"></div>
+          <span style="font-size: 12px; font-weight: 500; color: #5C5C6E;">~58 min</span>
+        </div>
+        <div style="display: flex; gap: 5px; padding-top: 1px;">
+          <div style="padding: 3px 7px; background: #262630; border-radius: 5px;"><span style="font-size: 10px; font-weight: 600; color: #9999A8;">Chest</span></div>
+          <div style="padding: 3px 7px; background: #262630; border-radius: 5px;"><span style="font-size: 10px; font-weight: 600; color: #9999A8;">Shoulders</span></div>
+          <div style="padding: 3px 7px; background: #262630; border-radius: 5px;"><span style="font-size: 10px; font-weight: 600; color: #9999A8;">Triceps</span></div>
+        </div>
+      </div>
+      <div style="width: 44px; height: 44px; border-radius: 22px; background: #5B8DEF; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M8 5.5v13l11-6.5z"></path></svg>
+      </div>
+    </div>
+
+    <div style="background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 14px; display: flex; align-items: center; gap: 12px;">
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 7px; min-width: 0;">
+        <div style="display: flex; align-items: baseline; gap: 8px;">
+          <span style="font-size: 17px; font-weight: 600; color: #EAEAEF;">Pull Day A</span>
+          <div style="flex-grow: 1;"></div>
+          <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">6d ago</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A87EE6" stroke-width="2.4" stroke-linecap="round" style="flex-shrink: 0;"><path d="M9.5 14.5l5-5"></path><path d="M12.8 7.2l1.7-1.7a3.6 3.6 0 015.1 5.1l-1.7 1.7"></path><path d="M11.2 16.8l-1.7 1.7a3.6 3.6 0 01-5.1-5.1l1.7-1.7"></path></svg>
+          <span style="font-size: 13px; font-weight: 400; color: #9999A8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Deadlift · Pull-Up · Barbell Row +2</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 7px;">
+          <span style="font-size: 12px; font-weight: 500; color: #5C5C6E;">5 exercises</span>
+          <div style="width: 3px; height: 3px; border-radius: 2px; background: #5C5C6E;"></div>
+          <span style="font-size: 12px; font-weight: 500; color: #5C5C6E;">19 sets</span>
+          <div style="width: 3px; height: 3px; border-radius: 2px; background: #5C5C6E;"></div>
+          <span style="font-size: 12px; font-weight: 500; color: #5C5C6E;">~52 min</span>
+        </div>
+        <div style="display: flex; gap: 5px; padding-top: 1px;">
+          <div style="padding: 3px 7px; background: #262630; border-radius: 5px;"><span style="font-size: 10px; font-weight: 600; color: #9999A8;">Back</span></div>
+          <div style="padding: 3px 7px; background: #262630; border-radius: 5px;"><span style="font-size: 10px; font-weight: 600; color: #9999A8;">Biceps</span></div>
+          <div style="padding: 3px 7px; background: #262630; border-radius: 5px;"><span style="font-size: 10px; font-weight: 600; color: #9999A8;">Rear Delts</span></div>
+        </div>
+      </div>
+      <div style="width: 44px; height: 44px; border-radius: 22px; background: rgba(91,141,239,0.10); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="#5B8DEF"><path d="M8 5.5v13l11-6.5z"></path></svg>
+      </div>
+    </div>
+
+    <div style="background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 14px; display: flex; align-items: center; gap: 12px;">
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 7px; min-width: 0;">
+        <div style="display: flex; align-items: baseline; gap: 8px;">
+          <span style="font-size: 17px; font-weight: 600; color: #EAEAEF;">Legs</span>
+          <div style="flex-grow: 1;"></div>
+          <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">9d ago</span>
+        </div>
+        <span style="font-size: 13px; font-weight: 400; color: #9999A8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Back Squat · Romanian Deadlift · Leg Press +2</span>
+        <div style="display: flex; align-items: center; gap: 7px;">
+          <span style="font-size: 12px; font-weight: 500; color: #5C5C6E;">5 exercises</span>
+          <div style="width: 3px; height: 3px; border-radius: 2px; background: #5C5C6E;"></div>
+          <span style="font-size: 12px; font-weight: 500; color: #5C5C6E;">20 sets</span>
+          <div style="width: 3px; height: 3px; border-radius: 2px; background: #5C5C6E;"></div>
+          <span style="font-size: 12px; font-weight: 500; color: #5C5C6E;">~61 min</span>
+        </div>
+        <div style="display: flex; gap: 5px; padding-top: 1px;">
+          <div style="padding: 3px 7px; background: #262630; border-radius: 5px;"><span style="font-size: 10px; font-weight: 600; color: #9999A8;">Quads</span></div>
+          <div style="padding: 3px 7px; background: #262630; border-radius: 5px;"><span style="font-size: 10px; font-weight: 600; color: #9999A8;">Hamstrings</span></div>
+          <div style="padding: 3px 7px; background: #262630; border-radius: 5px;"><span style="font-size: 10px; font-weight: 600; color: #9999A8;">Glutes</span></div>
+        </div>
+      </div>
+      <div style="width: 44px; height: 44px; border-radius: 22px; background: rgba(91,141,239,0.10); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="#5B8DEF"><path d="M8 5.5v13l11-6.5z"></path></svg>
+      </div>
+    </div>
+
+    <div style="background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 14px; display: flex; align-items: center; gap: 12px; opacity: 0.5;">
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 7px; min-width: 0;">
+        <div style="display: flex; align-items: baseline; gap: 8px;">
+          <span style="font-size: 17px; font-weight: 600; color: #EAEAEF;">Upper B</span>
+          <div style="flex-grow: 1;"></div>
+          <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">3w ago</span>
+        </div>
+        <span style="font-size: 13px; font-weight: 400; color: #9999A8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Overhead Press · Weighted Dip · Chin-Up +3</span>
+      </div>
+    </div>
+
+  </div>
+
+</div></div></div>
+      </article>
+      <article class="col">
+        <header class="col-head"><h3 class="col-title">B1 · Today&#x27;s data only</h3></header>
+        <div class="note"></div>
+        <div class="device"><div class="device-inner"><div style="width: 390px; height: 844px; background: #111113; display: flex; flex-direction: column; overflow: hidden; color: #EAEAEF;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 20px 0 20px;">
+    <div style="width: 44px; height: 44px; display: flex; align-items: center;">
+      <span style="font-size: 15px; font-weight: 500; color: #9999A8;">Close</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <div style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.6-3.6"></path></svg>
+      </div>
+      <div style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: flex-end;">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding: 2px 20px 14px 20px;">
+    <span style="font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: #EAEAEF;">Templates</span>
+  </div>
+
+  <div style="padding: 0 20px 18px 20px;">
+    <div style="background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 15px; display: flex; flex-direction: column; gap: 11px;">
+      <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #5C5C6E;">LONGEST SINCE TRAINED</span>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0;">
+          <span style="font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: #EAEAEF;">Legs</span>
+          <span style="font-size: 12px; font-weight: 500; color: #9999A8;">5 exercises · 20 sets · 9d ago</span>
+        </div>
+        <div style="height: 44px; padding: 0 18px; border-radius: 12px; background: #5B8DEF; display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M8 5.5v13l11-6.5z"></path></svg>
+          <span style="font-size: 15px; font-weight: 600; color: #FFFFFF;">Start</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 8px; padding: 0 20px 8px 20px;">
+    <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #5C5C6E;">THIS WEEK</span>
+    <div style="flex-grow: 1; height: 1px; background: rgba(255,255,255,0.06);"></div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; padding: 0 20px;">
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #5B8DEF; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+        <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Push Day A</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">6 ex · 22 sets · 4d ago</span>
+      </div>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px;">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #A87EE6; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Pull Day A</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A87EE6" stroke-width="2.4" stroke-linecap="round"><path d="M9.5 14.5l5-5"></path><path d="M12.8 7.2l1.7-1.7a3.6 3.6 0 015.1 5.1l-1.7 1.7"></path><path d="M11.2 16.8l-1.7 1.7a3.6 3.6 0 01-5.1-5.1l1.7-1.7"></path></svg>
+        </div>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">5 ex · 19 sets · 6d ago</span>
+      </div>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 8px; padding: 18px 20px 8px 20px;">
+    <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #5C5C6E;">EARLIER</span>
+    <div style="flex-grow: 1; height: 1px; background: rgba(255,255,255,0.06);"></div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; padding: 0 20px;">
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #4ECDC4; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+        <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Legs</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">5 ex · 20 sets · 9d ago</span>
+      </div>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #D4A23A; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+        <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Arms Finisher</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">3 ex · 9 sets · 2w ago</span>
+      </div>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px;">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #FF6B9D; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+        <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Hotel Gym</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">4 ex · 12 sets · 5w ago</span>
+      </div>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 8px; padding: 18px 20px 8px 20px;">
+    <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #5C5C6E;">NEVER USED</span>
+    <div style="flex-grow: 1; height: 1px; background: rgba(255,255,255,0.06);"></div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; padding: 0 20px;">
+    <div style="height: 60px; display: flex; align-items: center; gap: 13px;">
+      <div style="width: 4px; height: 32px; border-radius: 2px; background: #5EC269; flex-shrink: 0;"></div>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+        <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Core &amp; Calves</span>
+        <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">3 ex · 10 sets · imported</span>
+      </div>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+  </div>
+
+</div></div></div>
+      </article>
+      <article class="col">
+        <header class="col-head"><h3 class="col-title">E2 · Scheme-first</h3></header>
+        <div class="note"></div>
+        <div class="device"><div class="device-inner"><div style="width: 390px; height: 844px; background: #111113; display: flex; flex-direction: column; overflow: hidden; color: #EAEAEF;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 20px 0 20px; flex-shrink: 0;">
+    <span style="font-size: 15px; font-weight: 500; color: #9999A8;">Cancel</span>
+    <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Edit Template</span>
+    <span style="font-size: 15px; font-weight: 600; color: #5B8DEF;">Save</span>
+  </div>
+  <div style="padding: 16px 20px 0 20px; flex-shrink: 0; display: flex; flex-direction: column; gap: 7px;">
+    <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #5C5C6E;">TEMPLATE NAME</span>
+    <div style="height: 46px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); border-radius: 11px; display: flex; align-items: center; padding: 0 13px;">
+      <span style="font-size: 16px; font-weight: 500; color: #EAEAEF;">Push Day A</span>
+    </div>
+  </div>
+  <div style="display: flex; align-items: center; padding: 18px 20px 9px 20px; flex-shrink: 0;">
+    <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #5C5C6E;">EXERCISES</span>
+    <div style="flex-grow: 1;"></div><span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">5 exercises · 22 sets</span>
+  </div>
+  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 9px; padding: 0 20px; overflow: hidden;">
+    <div style="background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 13px; display: flex; align-items: center; gap: 10px; padding: 12px 13px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M4 8h16M4 16h16"></path></svg>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+        <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Bench Press</span>
+        <span style="font-size: 11px; font-weight: 500; color: #9999A8;">2 warmup · 3 × 6–8 · RIR 2</span>
+      </div><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 13px; display: flex; flex-direction: column;">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 12px 13px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M4 8h16M4 16h16"></path></svg>
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px;">
+          <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Incline DB Press</span>
+          <span style="font-size: 11px; font-weight: 500; color: #9999A8;">3 × 8–10 · RIR 2</span>
+        </div><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+      </div>
+      <div style="height: 1px; background: rgba(255,255,255,0.06);"></div>
+      <div style="padding: 13px; display: flex; flex-direction: column; gap: 13px;">
+        
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 13px; font-weight: 500; color: #9999A8; flex-grow: 1;">Working sets</span>
+        <div style="display: flex; align-items: center; gap: 2px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); border-radius: 9px; padding: 2px;">
+          <div style="width: 34px; height: 32px; display: flex; align-items: center; justify-content: center;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14"></path></svg></div>
+          <span style="min-width: 26px; text-align: center; font-size: 15px; font-weight: 700; color: #EAEAEF;">3</span>
+          <div style="width: 34px; height: 32px; display: flex; align-items: center; justify-content: center;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></div>
+        </div>
+      </div>
+        
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 13px; font-weight: 500; color: #9999A8; flex-grow: 1;">Rep range</span>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <div style="width: 52px; height: 36px; border-radius: 9px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">8</span></div>
+          <span style="font-size: 13px; color: #5C5C6E;">–</span>
+          <div style="width: 52px; height: 36px; border-radius: 9px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">10</span></div>
+        </div>
+      </div>
+        
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 13px; font-weight: 500; color: #9999A8; flex-grow: 1;">Target RIR</span>
+        <div style="width: 52px; height: 36px; border-radius: 9px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 15px; font-weight: 600; color: #E89B3E;">2</span></div>
+      </div>
+        
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 13px; font-weight: 500; color: #9999A8; flex-grow: 1;">Warm-up sets</span>
+        <div style="display: flex; align-items: center; gap: 2px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); border-radius: 9px; padding: 2px;">
+          <div style="width: 34px; height: 32px; display: flex; align-items: center; justify-content: center;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14"></path></svg></div>
+          <span style="min-width: 26px; text-align: center; font-size: 15px; font-weight: 700; color: #EAEAEF;">0</span>
+          <div style="width: 34px; height: 32px; display: flex; align-items: center; justify-content: center;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></div>
+        </div>
+      </div>
+        <div style="height: 1px; background: rgba(255,255,255,0.06);"></div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 12px; font-weight: 500; color: #5C5C6E; flex-grow: 1;">All 3 sets share this prescription</span>
+          <span style="font-size: 12px; font-weight: 600; color: #5B8DEF;">Vary sets</span>
+        </div>
+      </div>
+    </div>
+    <div style="background: #A87EE612; border: 1px solid #A87EE64D; border-radius: 13px; padding: 9px; display: flex; flex-direction: column; gap: 7px;">
+      <div style="display: flex; align-items: center; gap: 6px; padding: 0 4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A87EE6" stroke-width="2.4" stroke-linecap="round"><path d="M9.5 14.5l5-5"></path><path d="M12.8 7.2l1.7-1.7a3.6 3.6 0 015.1 5.1l-1.7 1.7"></path><path d="M11.2 16.8l-1.7 1.7a3.6 3.6 0 01-5.1-5.1l1.7-1.7"></path></svg>
+        <span style="font-size: 9px; font-weight: 700; letter-spacing: 0.08em; color: #A87EE6;">SUPERSET A</span>
+        <div style="flex-grow: 1;"></div><span style="font-size: 11px; font-weight: 600; color: #9999A8;">Unpair</span>
+      </div>
+      <div style="background: #1B1B1F; border-radius: 9px; display: flex; align-items: center; gap: 10px; padding: 10px 11px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M4 8h16M4 16h16"></path></svg>
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+          <span style="font-size: 14px; font-weight: 600; color: #EAEAEF;">Cable Fly</span>
+          <span style="font-size: 11px; font-weight: 500; color: #9999A8;">3 × 12–15 · RIR 1</span>
+        </div>
+      </div>
+      <div style="background: #1B1B1F; border-radius: 9px; display: flex; align-items: center; gap: 10px; padding: 10px 11px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M4 8h16M4 16h16"></path></svg>
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+          <span style="font-size: 14px; font-weight: 600; color: #EAEAEF;">Lateral Raise</span>
+          <span style="font-size: 11px; font-weight: 500; color: #9999A8;">3 × 12–15 · RIR 1</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="flex-shrink: 0; padding: 10px 20px 22px 20px;">
+    <div style="height: 48px; border-radius: 13px; background: rgba(91,141,239,0.10); display: flex; align-items: center; justify-content: center; gap: 8px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      <span style="font-size: 15px; font-weight: 600; color: #5B8DEF;">Add Exercise</span>
+    </div>
+  </div>
+</div></div></div>
+      </article>
+      <article class="col">
+        <header class="col-head"><h3 class="col-title">E3 · Drill-in</h3></header>
+        <div class="note"></div>
+        <div class="device"><div class="device-inner"><div style="width: 390px; height: 844px; background: #111113; display: flex; flex-direction: column; overflow: hidden; color: #EAEAEF;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 16px 0 16px; flex-shrink: 0;">
+    <div style="display: flex; align-items: center; gap: 3px;">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+      <span style="font-size: 15px; font-weight: 500; color: #5B8DEF;">Push Day A</span>
+    </div>
+    <span style="font-size: 15px; font-weight: 600; color: #5B8DEF;">Done</span>
+  </div>
+  <div style="padding: 8px 20px 0 20px; flex-shrink: 0; display: flex; flex-direction: column; gap: 3px;">
+    <span style="font-size: 24px; font-weight: 700; letter-spacing: -0.02em;">Incline DB Press</span>
+    <span style="font-size: 12px; font-weight: 500; color: #9999A8;">Dumbbell · Exercise 2 of 5</span>
+  </div>
+
+  <div style="padding: 20px 20px 6px 20px; flex-shrink: 0; display: flex; align-items: center; gap: 8px;">
+    <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #5C5C6E; width: 34px;">SET</span>
+    <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #5C5C6E; flex-grow: 1; text-align: center;">REP RANGE</span>
+    <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #5C5C6E; width: 56px; text-align: center;">RIR</span>
+    <div style="width: 34px;"></div>
+  </div>
+  <div style="padding: 0 20px; flex-shrink: 0;">
+    
+      <div style="display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+        <div style="width: 34px; height: 38px; border-radius: 9px; background: rgba(212,162,58,0.10); display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 700; color: #D4A23A;">W1</span></div>
+        <div style="flex-grow: 1; display: flex; align-items: center; gap: 6px;">
+          <div style="flex-grow: 1; height: 38px; border-radius: 9px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">12</span></div>
+          <span style="font-size: 13px; color: #5C5C6E;">–</span>
+          <div style="flex-grow: 1; height: 38px; border-radius: 9px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">12</span></div>
+        </div>
+        <div style="width: 56px; height: 38px; border-radius: 9px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 15px; font-weight: 600; color: #E89B3E;">—</span></div>
+        <div style="width: 34px; height: 38px; border-radius: 9px; background: rgba(224,85,85,0.08); display: flex; align-items: center; justify-content: center;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#E05555" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></div>
+      </div>
+    
+      <div style="display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+        <div style="width: 34px; height: 38px; border-radius: 9px; background: #262630; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 700; color: #EAEAEF;">1</span></div>
+        <div style="flex-grow: 1; display: flex; align-items: center; gap: 6px;">
+          <div style="flex-grow: 1; height: 38px; border-radius: 9px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">8</span></div>
+          <span style="font-size: 13px; color: #5C5C6E;">–</span>
+          <div style="flex-grow: 1; height: 38px; border-radius: 9px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">10</span></div>
+        </div>
+        <div style="width: 56px; height: 38px; border-radius: 9px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 15px; font-weight: 600; color: #E89B3E;">2</span></div>
+        <div style="width: 34px; height: 38px; border-radius: 9px; background: rgba(224,85,85,0.08); display: flex; align-items: center; justify-content: center;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#E05555" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></div>
+      </div>
+    
+      <div style="display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+        <div style="width: 34px; height: 38px; border-radius: 9px; background: #262630; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 700; color: #EAEAEF;">2</span></div>
+        <div style="flex-grow: 1; display: flex; align-items: center; gap: 6px;">
+          <div style="flex-grow: 1; height: 38px; border-radius: 9px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">8</span></div>
+          <span style="font-size: 13px; color: #5C5C6E;">–</span>
+          <div style="flex-grow: 1; height: 38px; border-radius: 9px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">10</span></div>
+        </div>
+        <div style="width: 56px; height: 38px; border-radius: 9px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 15px; font-weight: 600; color: #E89B3E;">2</span></div>
+        <div style="width: 34px; height: 38px; border-radius: 9px; background: rgba(224,85,85,0.08); display: flex; align-items: center; justify-content: center;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#E05555" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></div>
+      </div>
+    
+      <div style="display: flex; align-items: center; gap: 10px; padding: 7px 0; ">
+        <div style="width: 34px; height: 38px; border-radius: 9px; background: #262630; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 700; color: #EAEAEF;">3</span></div>
+        <div style="flex-grow: 1; display: flex; align-items: center; gap: 6px;">
+          <div style="flex-grow: 1; height: 38px; border-radius: 9px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">8</span></div>
+          <span style="font-size: 13px; color: #5C5C6E;">–</span>
+          <div style="flex-grow: 1; height: 38px; border-radius: 9px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">10</span></div>
+        </div>
+        <div style="width: 56px; height: 38px; border-radius: 9px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 15px; font-weight: 600; color: #E89B3E;">3</span></div>
+        <div style="width: 34px; height: 38px; border-radius: 9px; background: rgba(224,85,85,0.08); display: flex; align-items: center; justify-content: center;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#E05555" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></div>
+      </div>
+  </div>
+  <div style="display: flex; gap: 8px; padding: 12px 20px 0 20px; flex-shrink: 0;">
+    <div style="flex-grow: 1; height: 40px; border-radius: 10px; background: rgba(212,162,58,0.10); display: flex; align-items: center; justify-content: center;">
+      <span style="font-size: 13px; font-weight: 600; color: #D4A23A;">＋ Warmup</span></div>
+    <div style="flex-grow: 1; height: 40px; border-radius: 10px; background: rgba(91,141,239,0.10); display: flex; align-items: center; justify-content: center;">
+      <span style="font-size: 13px; font-weight: 600; color: #5B8DEF;">＋ Working Set</span></div>
+  </div>
+
+  <div style="padding: 22px 20px 0 20px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px;">
+    <div style="height: 52px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; display: flex; align-items: center; gap: 10px; padding: 0 14px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#A87EE6" stroke-width="2.4" stroke-linecap="round"><path d="M9.5 14.5l5-5"></path><path d="M12.8 7.2l1.7-1.7a3.6 3.6 0 015.1 5.1l-1.7 1.7"></path><path d="M11.2 16.8l-1.7 1.7a3.6 3.6 0 01-5.1-5.1l1.7-1.7"></path></svg>
+      <span style="font-size: 14px; font-weight: 500; color: #EAEAEF; flex-grow: 1;">Superset</span>
+      <span style="font-size: 14px; font-weight: 600; color: #A87EE6;">Group A</span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+    <div style="height: 52px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; display: flex; align-items: center; gap: 10px; padding: 0 14px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h11M4 18h8"></path></svg>
+      <span style="font-size: 14px; font-weight: 500; color: #EAEAEF; flex-grow: 1;">Note for this exercise</span>
+      <span style="font-size: 13px; font-weight: 500; color: #5C5C6E;">None</span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+  </div>
+</div></div></div>
+      </article>
+      <article class="col">
+        <header class="col-head"><h3 class="col-title">E4 · Dense table</h3></header>
+        <div class="note"></div>
+        <div class="device"><div class="device-inner"><div style="width: 390px; height: 844px; background: #111113; display: flex; flex-direction: column; overflow: hidden; color: #EAEAEF;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 20px 0 20px; flex-shrink: 0;">
+    <span style="font-size: 15px; font-weight: 500; color: #9999A8;">Cancel</span>
+    <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Edit Template</span>
+    <span style="font-size: 15px; font-weight: 600; color: #5B8DEF;">Save</span>
+  </div>
+  <div style="padding: 14px 20px 0 20px; flex-shrink: 0;">
+    <div style="height: 42px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; display: flex; align-items: center; padding: 0 13px;">
+      <span style="font-size: 16px; font-weight: 600; color: #EAEAEF;">Push Day A</span>
+      <div style="flex-grow: 1;"></div><span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">5 ex · 22 sets</span>
+    </div>
+  </div>
+  <div style="display: flex; align-items: center; gap: 8px; padding: 16px 20px 4px 20px; flex-shrink: 0;">
+    <span style="width: 30px; font-size: 9px; font-weight: 700; letter-spacing: 0.07em; color: #5C5C6E;">SET</span>
+    <span style="flex-grow: 1; font-size: 9px; font-weight: 700; letter-spacing: 0.07em; color: #5C5C6E; text-align: center;">REPS</span>
+    <span style="width: 52px; font-size: 9px; font-weight: 700; letter-spacing: 0.07em; color: #5C5C6E; text-align: center;">RIR</span>
+  </div>
+  <div style="flex-grow: 1; padding: 0 20px; overflow: hidden;">
+      <div style="height: 36px; display: flex; align-items: center; gap: 8px; padding-top: 8px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M4 8h16M4 16h16"></path></svg><span style="font-size: 13px; font-weight: 700; color: #EAEAEF;">Bench Press</span>
+        <div style="flex-grow: 1;"></div><span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">5 sets</span>
+      </div>
+      <div style="height: 34px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <span style="width: 30px; font-size: 12px; font-weight: 700; color: #D4A23A;">W1</span>
+        <div style="flex-grow: 1; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #EAEAEF;">12</span></div>
+        <div style="width: 52px; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #E89B3E;">—</span></div>
+      </div>
+      <div style="height: 34px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <span style="width: 30px; font-size: 12px; font-weight: 700; color: #D4A23A;">W2</span>
+        <div style="flex-grow: 1; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #EAEAEF;">8</span></div>
+        <div style="width: 52px; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #E89B3E;">—</span></div>
+      </div>
+      <div style="height: 34px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <span style="width: 30px; font-size: 12px; font-weight: 700; color: #9999A8;">1</span>
+        <div style="flex-grow: 1; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #EAEAEF;">6–8</span></div>
+        <div style="width: 52px; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #E89B3E;">2</span></div>
+      </div>
+      <div style="height: 34px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <span style="width: 30px; font-size: 12px; font-weight: 700; color: #9999A8;">2</span>
+        <div style="flex-grow: 1; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #EAEAEF;">6–8</span></div>
+        <div style="width: 52px; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #E89B3E;">2</span></div>
+      </div>
+      <div style="height: 34px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <span style="width: 30px; font-size: 12px; font-weight: 700; color: #9999A8;">3</span>
+        <div style="flex-grow: 1; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #EAEAEF;">6–8</span></div>
+        <div style="width: 52px; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #E89B3E;">1</span></div>
+      </div>
+      <div style="height: 36px; display: flex; align-items: center; gap: 8px; padding-top: 8px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M4 8h16M4 16h16"></path></svg><span style="font-size: 13px; font-weight: 700; color: #EAEAEF;">Incline DB Press</span>
+        <div style="flex-grow: 1;"></div><span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">3 sets</span>
+      </div>
+      <div style="height: 34px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <span style="width: 30px; font-size: 12px; font-weight: 700; color: #9999A8;">1</span>
+        <div style="flex-grow: 1; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #EAEAEF;">8–10</span></div>
+        <div style="width: 52px; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #E89B3E;">2</span></div>
+      </div>
+      <div style="height: 34px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <span style="width: 30px; font-size: 12px; font-weight: 700; color: #9999A8;">2</span>
+        <div style="flex-grow: 1; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #EAEAEF;">8–10</span></div>
+        <div style="width: 52px; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #E89B3E;">2</span></div>
+      </div>
+      <div style="height: 34px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <span style="width: 30px; font-size: 12px; font-weight: 700; color: #9999A8;">3</span>
+        <div style="flex-grow: 1; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #EAEAEF;">8–10</span></div>
+        <div style="width: 52px; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #E89B3E;">3</span></div>
+      </div>
+      <div style="height: 36px; display: flex; align-items: center; gap: 8px; padding-top: 8px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M4 8h16M4 16h16"></path></svg><span style="font-size: 13px; font-weight: 700; color: #EAEAEF;">Cable Fly</span><span style="font-size: 9px; font-weight: 700; letter-spacing: 0.06em; color: #A87EE6; padding: 1px 5px; border: 1px solid #A87EE666; border-radius: 4px;">SS A</span>
+        <div style="flex-grow: 1;"></div><span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">3 sets</span>
+      </div>
+      <div style="height: 34px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <span style="width: 30px; font-size: 12px; font-weight: 700; color: #9999A8;">1</span>
+        <div style="flex-grow: 1; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #EAEAEF;">12–15</span></div>
+        <div style="width: 52px; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #E89B3E;">1</span></div>
+      </div>
+      <div style="height: 34px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <span style="width: 30px; font-size: 12px; font-weight: 700; color: #9999A8;">2</span>
+        <div style="flex-grow: 1; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #EAEAEF;">12–15</span></div>
+        <div style="width: 52px; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #E89B3E;">1</span></div>
+      </div>
+      <div style="height: 34px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <span style="width: 30px; font-size: 12px; font-weight: 700; color: #9999A8;">3</span>
+        <div style="flex-grow: 1; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #EAEAEF;">12–15</span></div>
+        <div style="width: 52px; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #E89B3E;">1</span></div>
+      </div>
+      <div style="height: 36px; display: flex; align-items: center; gap: 8px; padding-top: 8px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2.2" stroke-linecap="round"><path d="M4 8h16M4 16h16"></path></svg><span style="font-size: 13px; font-weight: 700; color: #EAEAEF;">Lateral Raise</span><span style="font-size: 9px; font-weight: 700; letter-spacing: 0.06em; color: #A87EE6; padding: 1px 5px; border: 1px solid #A87EE666; border-radius: 4px;">SS A</span>
+        <div style="flex-grow: 1;"></div><span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">3 sets</span>
+      </div>
+      <div style="height: 34px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <span style="width: 30px; font-size: 12px; font-weight: 700; color: #9999A8;">1</span>
+        <div style="flex-grow: 1; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #EAEAEF;">12–15</span></div>
+        <div style="width: 52px; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #E89B3E;">1</span></div>
+      </div>
+      <div style="height: 34px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.04);">
+        <span style="width: 30px; font-size: 12px; font-weight: 700; color: #9999A8;">2</span>
+        <div style="flex-grow: 1; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #EAEAEF;">12–15</span></div>
+        <div style="width: 52px; height: 26px; border-radius: 6px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 13px; font-weight: 600; color: #E89B3E;">1</span></div>
+      </div>
+  </div>
+  <div style="flex-shrink: 0; padding: 10px 20px 22px 20px;">
+    <div style="height: 48px; border-radius: 13px; background: rgba(91,141,239,0.10); display: flex; align-items: center; justify-content: center; gap: 8px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      <span style="font-size: 15px; font-weight: 600; color: #5B8DEF;">Add Exercise</span>
+    </div>
+  </div>
+</div></div></div>
+      </article>
+    </div>
+  </section>
+  <p class="foot"><strong>Static board.</strong> This machine has no Node or Bun, so the interactive
+  design canvas could not be assembled — these are the same artboards, rendered for viewing rather
+  than editing. The working files are in <code>design/templates/</code> and re-seed into a real
+  canvas on any machine with a JS runtime.</p>
+</div>

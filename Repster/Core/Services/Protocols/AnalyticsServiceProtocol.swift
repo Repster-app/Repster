@@ -536,10 +536,37 @@ extension AnalyticsServiceProtocol {
         track(.exerciseCreated, properties: [.source: .string(source)])
     }
 
+    /// `source` separates the three creation paths. Only `create_template_form` was instrumented
+    /// before, so the retention signal this event is watched for undercounted by two thirds.
     func templateCreated(exerciseCount: Int, source: String) {
         track(.templateCreated, properties: [
             .exerciseCountBucket: .string(AnalyticsBuckets.count(exerciseCount)),
             .source: .string(source)
+        ])
+    }
+
+    /// Editing is the signal that a template is in real use rather than built once and abandoned.
+    func templateEdited(exerciseCount: Int, inFolder: Bool) {
+        track(.templateEdited, properties: [
+            .exerciseCountBucket: .string(AnalyticsBuckets.count(exerciseCount)),
+            .inFolder: .bool(inFolder)
+        ])
+    }
+
+    func templateDeleted() {
+        track(.templateDeleted, properties: [:])
+    }
+
+    func templateDuplicated() {
+        track(.templateDuplicated, properties: [:])
+    }
+
+    /// Distinct from `workout started` with `template_used`: this fires from the templates screen
+    /// itself, so a template opened and started can be told apart from one merely browsed.
+    func templateStarted(exerciseCount: Int, inFolder: Bool) {
+        track(.templateStarted, properties: [
+            .exerciseCountBucket: .string(AnalyticsBuckets.count(exerciseCount)),
+            .inFolder: .bool(inFolder)
         ])
     }
 
@@ -816,6 +843,10 @@ enum AnalyticsEvent: String, CaseIterable {
     case onboardingCompleted = "onboarding completed"
     case exerciseCreated = "exercise created"
     case templateCreated = "template created"
+    case templateEdited = "template edited"
+    case templateDeleted = "template deleted"
+    case templateDuplicated = "template duplicated"
+    case templateStarted = "template started"
     case emptyStateShown = "empty state shown"
     case reviewPromptRequested = "review prompt requested"
     case importStarted = "import started"
@@ -859,6 +890,7 @@ enum AnalyticsPropertyKey: String, CaseIterable {
     case durationBucket = "duration_bucket"
     case setCountBucket = "set_count_bucket"
     case exerciseCountBucket = "exercise_count_bucket"
+    case inFolder = "in_folder"
     case workoutCountBucket = "workout_count_bucket"
     case rowCountBucket = "row_count_bucket"
     case totalRepsBucket = "total_reps_bucket"

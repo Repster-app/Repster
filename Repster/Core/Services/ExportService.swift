@@ -88,6 +88,60 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
             }
         let healthProfile = try context.fetch(FetchDescriptor<HealthProfile>()).first
 
+        // Templates, nested rather than three flat arrays: template exercise and set ids are internal
+        // and nothing outside a template references them, so there is no join to preserve.
+        let templates = try context.fetch(
+            FetchDescriptor<WorkoutTemplate>(sortBy: [SortDescriptor(\.createdAt)])
+        )
+        let allTemplateExercises = try context.fetch(
+            FetchDescriptor<TemplateExercise>(sortBy: [SortDescriptor(\.orderInTemplate)])
+        )
+        let allTemplateSets = try context.fetch(
+            FetchDescriptor<TemplateSet>(sortBy: [SortDescriptor(\.orderInExercise)])
+        )
+        let templateExercisesByTemplate = Dictionary(grouping: allTemplateExercises, by: \.templateId)
+        let templateSetsByExercise = Dictionary(grouping: allTemplateSets, by: \.templateExerciseId)
+
+        let archiveTemplates = templates.map { template in
+            WorkoutHistoryArchiveTemplate(
+                id: template.id,
+                name: template.name,
+                notes: template.notes,
+                folder: template.folder,
+                lastUsedAt: template.lastUsedAt,
+                createdAt: template.createdAt,
+                updatedAt: template.updatedAt,
+                exercises: (templateExercisesByTemplate[template.id] ?? [])
+                    .sorted { $0.orderInTemplate < $1.orderInTemplate }
+                    .map { templateExercise in
+                        WorkoutHistoryArchiveTemplateExercise(
+                            id: templateExercise.id,
+                            exerciseId: templateExercise.exerciseId,
+                            orderInTemplate: templateExercise.orderInTemplate,
+                            supersetGroupId: templateExercise.supersetGroupId,
+                            restTimeSeconds: templateExercise.restTimeSeconds,
+                            notes: templateExercise.notes,
+                            createdAt: templateExercise.createdAt,
+                            updatedAt: templateExercise.updatedAt,
+                            sets: (templateSetsByExercise[templateExercise.id] ?? [])
+                                .sorted { $0.orderInExercise < $1.orderInExercise }
+                                .map { templateSet in
+                                    WorkoutHistoryArchiveTemplateSet(
+                                        id: templateSet.id,
+                                        setType: templateSet.setType,
+                                        targetRepMin: templateSet.targetRepMin,
+                                        targetRepMax: templateSet.targetRepMax,
+                                        targetRIR: templateSet.targetRIR,
+                                        orderInExercise: templateSet.orderInExercise,
+                                        createdAt: templateSet.createdAt,
+                                        updatedAt: templateSet.updatedAt
+                                    )
+                                }
+                        )
+                    }
+            )
+        }
+
         let archiveWorkouts = workouts.map(WorkoutHistoryArchiveWorkout.init)
         let archiveExercises = exercises.map(WorkoutHistoryArchiveExercise.init)
         let archiveSets = sortedSets.map(WorkoutHistoryArchiveSet.init)
@@ -110,7 +164,8 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
             sets: archiveSets,
             fatigueObservations: sanitizedLearningData.observations,
             fatigueLearningAudits: sanitizedLearningData.audits,
-            healthProfileLearning: healthProfile.map(WorkoutHistoryArchiveHealthProfileLearning.init)
+            healthProfileLearning: healthProfile.map(WorkoutHistoryArchiveHealthProfileLearning.init),
+            templates: archiveTemplates
         )
 
         let encoder = JSONEncoder()
@@ -130,7 +185,8 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
             exerciseCount: archive.exercises.count,
             setCount: archive.sets.count,
             earliestWorkoutDate: dates.first,
-            latestWorkoutDate: dates.last
+            latestWorkoutDate: dates.last,
+            templateCount: archive.templates?.count
         )
     }
 
@@ -215,6 +271,34 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
             context.insert(archivedAudit.makeModel())
         }
 
+        // Templates. `nil` means the archive predates template backup and says nothing about the
+        // user's templates, so they are left exactly as they are. Only a present array — even an
+        // empty one — authorises deleting them. Every backup written before v2 lands in the nil
+        // branch, which is the whole point. See TEMPLATES_IMPLEMENTATION_PLAN.md D1.
+        var templatesRestored: Int?
+        if let archivedTemplates = archive.templates {
+            for templateSet in try context.fetch(FetchDescriptor<TemplateSet>()) {
+                context.delete(templateSet)
+            }
+            for templateExercise in try context.fetch(FetchDescriptor<TemplateExercise>()) {
+                context.delete(templateExercise)
+            }
+            for template in try context.fetch(FetchDescriptor<WorkoutTemplate>()) {
+                context.delete(template)
+            }
+
+            for archivedTemplate in archivedTemplates {
+                context.insert(archivedTemplate.makeModel())
+                for archivedExercise in archivedTemplate.exercises {
+                    context.insert(archivedExercise.makeModel(templateId: archivedTemplate.id))
+                    for archivedSet in archivedExercise.sets {
+                        context.insert(archivedSet.makeModel(templateExerciseId: archivedExercise.id))
+                    }
+                }
+            }
+            templatesRestored = archivedTemplates.count
+        }
+
         try context.save()
 
         if let healthProfileLearning = archive.healthProfileLearning {
@@ -234,7 +318,8 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
             setsRestored: archive.sets.count,
             skippedFatigueObservations: sanitizedLearningData.skippedObservationCount,
             skippedFatigueLearningAudits: sanitizedLearningData.skippedAuditCount,
-            duration: Date().timeIntervalSince(start)
+            duration: Date().timeIntervalSince(start),
+            templatesRestored: templatesRestored
         )
     }
 
@@ -350,6 +435,56 @@ actor WorkoutHistoryBackupService: WorkoutHistoryBackupServiceProtocol {
         context.insert(profile)
         try context.save()
         return profile
+    }
+}
+
+private extension WorkoutHistoryArchiveTemplate {
+    func makeModel() -> WorkoutTemplate {
+        WorkoutTemplate(
+            id: id,
+            name: name,
+            notes: notes,
+            folder: folder,
+            lastUsedAt: lastUsedAt,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+private extension WorkoutHistoryArchiveTemplateExercise {
+    /// The exercise this points at may not exist locally — restore upserts exercises but never deletes
+    /// them, and an archive can reference one the user has since removed. The reference is kept rather
+    /// than dropped: `fetchTemplateDetail` renders it as "Unknown Exercise", which is honest, where
+    /// silently deleting the row would look like the template lost an exercise. See D4.
+    func makeModel(templateId: UUID) -> TemplateExercise {
+        TemplateExercise(
+            id: id,
+            templateId: templateId,
+            exerciseId: exerciseId,
+            orderInTemplate: orderInTemplate,
+            supersetGroupId: supersetGroupId,
+            restTimeSeconds: restTimeSeconds,
+            notes: notes,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+private extension WorkoutHistoryArchiveTemplateSet {
+    func makeModel(templateExerciseId: UUID) -> TemplateSet {
+        TemplateSet(
+            id: id,
+            templateExerciseId: templateExerciseId,
+            setType: setType,
+            targetRepMin: targetRepMin,
+            targetRepMax: targetRepMax,
+            targetRIR: targetRIR,
+            orderInExercise: orderInExercise,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
     }
 }
 

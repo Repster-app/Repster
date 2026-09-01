@@ -1334,6 +1334,217 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
         )
     }
 
+    // MARK: - Templates in the archive (v2) — TEMPLATES_IMPLEMENTATION_PLAN.md D1
+
+    /// The most important test in the templates plan.
+    ///
+    /// Restore is a replace, not a merge, and every backup a user owns today is v1. If a v1 archive's
+    /// absent `templates` key were ever defaulted to `[]`, restoring an old backup would delete every
+    /// template the user has. Absent must mean "this file says nothing about templates".
+    func testRestoringV1ArchiveLeavesExistingTemplatesUntouched() async throws {
+        let context = try makeBackupServiceContext()
+        let exercise = Exercise(name: "Bench Press", equipmentType: .barbell, trackingType: .weightReps)
+        try await context.exerciseRepo.save(exercise)
+
+        let templateId = try await context.templateService.createTemplate(
+            TemplateSaveData(
+                name: "Push Day A",
+                notes: nil,
+                folder: "Mesocycle 3",
+                exercises: [
+                    TemplateSaveExercise(
+                        exerciseId: exercise.id,
+                        orderInTemplate: 1,
+                        supersetGroupId: nil,
+                        restTimeSeconds: nil,
+                        notes: nil,
+                        sets: [
+                            TemplateSaveSet(setType: .working, targetRepMin: 6, targetRepMax: 8, targetRIR: 2, orderInExercise: 1)
+                        ]
+                    )
+                ]
+            )
+        )
+
+        // A v1 archive: valid, decodable, and with no `templates` key at all.
+        let legacyArchive = """
+        {
+          "version": 1,
+          "exportedAt": "2026-01-01T00:00:00Z",
+          "workouts": [],
+          "exercises": [],
+          "sets": []
+        }
+        """
+        let result = try await context.service.restoreBackup(data: Data(legacyArchive.utf8))
+
+        XCTAssertNil(result.templatesRestored, "A v1 archive did not describe templates, so none were restored")
+
+        let surviving = try await context.templateService.fetchAllTemplates()
+        XCTAssertEqual(surviving.count, 1, "Restoring a v1 backup must not delete the user's templates")
+        XCTAssertEqual(surviving.first?.id, templateId)
+        XCTAssertEqual(surviving.first?.name, "Push Day A")
+        XCTAssertEqual(surviving.first?.folder, "Mesocycle 3")
+
+        let detail = try await context.templateService.fetchTemplateDetail(templateId)
+        XCTAssertEqual(detail?.exercises.count, 1)
+        XCTAssertEqual(detail?.exercises.first?.sets.count, 1)
+    }
+
+    /// The other half of the contract: a v2 archive that genuinely holds no templates clears them.
+    func testRestoringV2ArchiveWithEmptyTemplatesClearsThem() async throws {
+        let context = try makeBackupServiceContext()
+        let exercise = Exercise(name: "Bench Press", equipmentType: .barbell, trackingType: .weightReps)
+        try await context.exerciseRepo.save(exercise)
+        _ = try await context.templateService.createTemplate(
+            TemplateSaveData(name: "Push Day A", notes: nil, exercises: [])
+        )
+
+        let emptyArchive = """
+        {
+          "version": 2,
+          "exportedAt": "2026-01-01T00:00:00Z",
+          "workouts": [],
+          "exercises": [],
+          "sets": [],
+          "templates": []
+        }
+        """
+        let result = try await context.service.restoreBackup(data: Data(emptyArchive.utf8))
+
+        XCTAssertEqual(result.templatesRestored, 0)
+        let surviving = try await context.templateService.fetchAllTemplates()
+        XCTAssertTrue(surviving.isEmpty)
+    }
+
+    func testBackupRoundTripsTemplatesWithFoldersAndSupersetGroups() async throws {
+        let context = try makeBackupServiceContext()
+        let fly = Exercise(name: "Cable Fly", equipmentType: .cable, trackingType: .weightReps)
+        let raise = Exercise(name: "Lateral Raise", equipmentType: .dumbbell, trackingType: .weightReps)
+        try await context.exerciseRepo.save(fly)
+        try await context.exerciseRepo.save(raise)
+
+        let groupId = UUID()
+        _ = try await context.templateService.createTemplate(
+            TemplateSaveData(
+                name: "Push Day A",
+                notes: "top set then back off",
+                folder: "Mesocycle 3",
+                exercises: [
+                    TemplateSaveExercise(
+                        exerciseId: fly.id, orderInTemplate: 1, supersetGroupId: groupId,
+                        restTimeSeconds: 90, notes: "slow eccentric",
+                        sets: [TemplateSaveSet(setType: .working, targetRepMin: 12, targetRepMax: 15, targetRIR: 1, orderInExercise: 1)]
+                    ),
+                    TemplateSaveExercise(
+                        exerciseId: raise.id, orderInTemplate: 2, supersetGroupId: groupId,
+                        restTimeSeconds: nil, notes: nil,
+                        sets: [
+                            TemplateSaveSet(setType: .warmup, targetRepMin: nil, targetRepMax: nil, targetRIR: nil, orderInExercise: 1),
+                            TemplateSaveSet(setType: .working, targetRepMin: 12, targetRepMax: 15, targetRIR: 1, orderInExercise: 2)
+                        ]
+                    )
+                ]
+            )
+        )
+
+        let data = try await context.service.exportBackup()
+        let archive = try decodeBackupArchive(data)
+        XCTAssertEqual(archive.version, 2)
+        XCTAssertEqual(archive.templates?.count, 1)
+
+        // Wipe, then restore.
+        let restored = try await context.service.restoreBackup(data: data)
+        XCTAssertEqual(restored.templatesRestored, 1)
+
+        let templates = try await context.templateService.fetchAllTemplates()
+        XCTAssertEqual(templates.count, 1)
+        XCTAssertEqual(templates.first?.folder, "Mesocycle 3")
+        XCTAssertEqual(templates.first?.notes, "top set then back off")
+
+        let firstId = try XCTUnwrap(templates.first?.id)
+        let fetchedDetail = try await context.templateService.fetchTemplateDetail(firstId)
+        let detail = try XCTUnwrap(fetchedDetail)
+        XCTAssertEqual(detail.exercises.count, 2)
+        XCTAssertEqual(detail.exercises.map(\.exerciseName), ["Cable Fly", "Lateral Raise"])
+        XCTAssertEqual(Set(detail.exercises.compactMap(\.supersetGroupId)), [groupId])
+        XCTAssertEqual(detail.exercises[0].restTimeSeconds, 90)
+        XCTAssertEqual(detail.exercises[0].notes, "slow eccentric")
+        XCTAssertEqual(detail.exercises[1].sets.count, 2)
+        XCTAssertEqual(detail.exercises[1].sets.first?.setType, .warmup)
+    }
+
+    func testRestoredTemplateKeepsAnExerciseReferenceThatNoLongerResolves() async throws {
+        // D4: restore upserts exercises but never deletes them, so an archived template can point at
+        // one that is not present. Keep the row — it renders as "Unknown Exercise" — rather than
+        // quietly dropping an exercise out of the user's template.
+        let context = try makeBackupServiceContext()
+        let ghostId = UUID()
+        let archiveJSON = """
+        {
+          "version": 2,
+          "exportedAt": "2026-01-01T00:00:00Z",
+          "workouts": [],
+          "exercises": [],
+          "sets": [],
+          "templates": [
+            {
+              "id": "\(UUID().uuidString)",
+              "name": "Ghost",
+              "notes": null,
+              "folder": null,
+              "lastUsedAt": null,
+              "createdAt": "2026-01-01T00:00:00Z",
+              "updatedAt": "2026-01-01T00:00:00Z",
+              "exercises": [
+                {
+                  "id": "\(UUID().uuidString)",
+                  "exerciseId": "\(ghostId.uuidString)",
+                  "orderInTemplate": 1,
+                  "supersetGroupId": null,
+                  "restTimeSeconds": null,
+                  "notes": null,
+                  "createdAt": "2026-01-01T00:00:00Z",
+                  "updatedAt": "2026-01-01T00:00:00Z",
+                  "sets": [
+                    {
+                      "id": "\(UUID().uuidString)",
+                      "setType": "working",
+                      "targetRepMin": 8,
+                      "targetRepMax": 10,
+                      "targetRIR": 2,
+                      "orderInExercise": 1,
+                      "createdAt": "2026-01-01T00:00:00Z",
+                      "updatedAt": "2026-01-01T00:00:00Z"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+        """
+        let result = try await context.service.restoreBackup(data: Data(archiveJSON.utf8))
+        XCTAssertEqual(result.templatesRestored, 1)
+
+        let templates = try await context.templateService.fetchAllTemplates()
+        let firstId = try XCTUnwrap(templates.first?.id)
+        let fetchedDetail = try await context.templateService.fetchTemplateDetail(firstId)
+        let detail = try XCTUnwrap(fetchedDetail)
+        XCTAssertEqual(detail.exercises.count, 1)
+        XCTAssertEqual(detail.exercises.first?.exerciseName, "Unknown Exercise")
+    }
+
+    func testPreviewReportsNoTemplateCountForV1Archive() async throws {
+        let context = try makeBackupServiceContext()
+        let legacyArchive = """
+        {"version":1,"exportedAt":"2026-01-01T00:00:00Z","workouts":[],"exercises":[],"sets":[]}
+        """
+        let preview = try context.service.previewBackup(data: Data(legacyArchive.utf8))
+        XCTAssertEqual(preview.archiveVersion, 1)
+        XCTAssertNil(preview.templateCount, "v1 says nothing about templates, which is not the same as zero")
+    }
+
     private func makeBackupServiceContext() throws -> WorkoutHistoryBackupArchiveTestContext {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
@@ -1424,8 +1635,7 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             templateRepository: templateRepo,
             workoutRepository: workoutRepo,
             setRepository: setRepo,
-            exerciseRepository: exerciseRepo,
-            exerciseStatsRepository: exerciseStatsRepo
+            exerciseRepository: exerciseRepo
         )
         let service = WorkoutHistoryBackupService(
             statsService: statsService,

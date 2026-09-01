@@ -28,8 +28,12 @@ enum ModelContainerSetup {
             isStoredInMemoryOnly: false
         )
 
+        // The plan was declared but never passed, so it has never actually run. Wiring it now costs
+        // nothing while every change is lightweight, and means the first stage that IS needed takes
+        // effect instead of being silently ignored. See TEMPLATES_IMPLEMENTATION_PLAN.md G2.
         return try ModelContainer(
             for: schema,
+            migrationPlan: RepsterMigrationPlan.self,
             configurations: [configuration]
         )
     }

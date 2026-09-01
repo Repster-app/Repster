@@ -6,6 +6,13 @@ final class WorkoutTemplate {
     var id: UUID
     var name: String
     var notes: String?
+    /// User-named folder this template belongs to, or nil for "Not in a folder".
+    ///
+    /// Deliberately a nullable name rather than an entity: a folder exists because a template points
+    /// at it and stops existing when the last one leaves. No lifecycle, no orphans, and nil is a
+    /// first-class state the list renders as its own section. Optional so lightweight migration adds
+    /// it to existing stores without a stage — see TEMPLATES_IMPLEMENTATION_PLAN.md P1.1 and D5.
+    var folder: String?
     var lastUsedAt: Date?
     var createdAt: Date
     var updatedAt: Date
@@ -14,6 +21,7 @@ final class WorkoutTemplate {
         id: UUID = UUID(),
         name: String,
         notes: String? = nil,
+        folder: String? = nil,
         lastUsedAt: Date? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
@@ -21,6 +29,7 @@ final class WorkoutTemplate {
         self.id = id
         self.name = name
         self.notes = notes
+        self.folder = folder
         self.lastUsedAt = lastUsedAt
         self.createdAt = createdAt
         self.updatedAt = updatedAt

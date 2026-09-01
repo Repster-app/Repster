@@ -38,6 +38,7 @@
 		A20010 /* PlannedWorkout.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20010 /* PlannedWorkout.swift */; };
 		A20011 /* PlannedSet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20011 /* PlannedSet.swift */; };
 		A30001 /* ModelContainerSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30001 /* ModelContainerSetup.swift */; };
+		A3F001 /* RepsterMigrationPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F001 /* RepsterMigrationPlan.swift */; };
 		A30002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30002 /* ContentView.swift */; };
 		A30003 /* UnitConversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30003 /* UnitConversion.swift */; };
 		A40001 /* SetRepositoryProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40001 /* SetRepositoryProtocol.swift */; };
@@ -179,10 +180,14 @@
 		AT0006 /* TemplateServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = BT0006 /* TemplateServiceProtocol.swift */; };
 		AT0007 /* TemplateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BT0007 /* TemplateService.swift */; };
 		AT0008 /* TemplateListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BT0008 /* TemplateListViewModel.swift */; };
+		A3F002 /* TemplateDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F002 /* TemplateDetailViewModel.swift */; };
 		AT0009 /* CreateEditTemplateViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BT0009 /* CreateEditTemplateViewModel.swift */; };
-		AT0010 /* TemplateListSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BT0010 /* TemplateListSheet.swift */; };
+		AT0010 /* TemplateFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BT0010 /* TemplateFlowView.swift */; };
+		A3F010 /* TemplateImportReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F010 /* TemplateImportReviewSheet.swift */; };
+		A3F012 /* TemplateSharing.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F012 /* TemplateSharing.swift */; };
+		A3F003 /* TemplateDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F003 /* TemplateDetailView.swift */; };
 		AT0011 /* CreateEditTemplateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BT0011 /* CreateEditTemplateView.swift */; };
-		AT0012 /* TemplateCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BT0012 /* TemplateCardView.swift */; };
+		AT0012 /* TemplateRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BT0012 /* TemplateRowView.swift */; };
 		ATRB0001 /* AttributionServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = ATRB1001 /* AttributionServiceProtocol.swift */; };
 		ATRB0002 /* AttributionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ATRB1002 /* AttributionService.swift */; };
 		ATRB0003 /* AttributionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ATRB2001 /* AttributionServiceTests.swift */; };
@@ -247,6 +252,8 @@
 		TT0002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = TT2003 /* XCTest.framework */; };
 		TT0003 /* ChartDataServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2004 /* ChartDataServiceTests.swift */; };
 		TT0004 /* WorkoutHistoryBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2005 /* WorkoutHistoryBackupTests.swift */; };
+		TTF001 /* TemplateServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TTF002 /* TemplateServiceTests.swift */; };
+		TTF003 /* TemplateImportExportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TTF004 /* TemplateImportExportTests.swift */; };
 		TT0005 /* SetServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2006 /* SetServiceTests.swift */; };
 		TT0901 /* SupersetGroupingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2901 /* SupersetGroupingTests.swift */; };
 		TT0006 /* WorkoutSetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2007 /* WorkoutSetTests.swift */; };
@@ -355,6 +362,7 @@
 		B20010 /* PlannedWorkout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannedWorkout.swift; sourceTree = "<group>"; };
 		B20011 /* PlannedSet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannedSet.swift; sourceTree = "<group>"; };
 		B30001 /* ModelContainerSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelContainerSetup.swift; sourceTree = "<group>"; };
+		B3F001 /* RepsterMigrationPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepsterMigrationPlan.swift; sourceTree = "<group>"; };
 		B30002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B30003 /* UnitConversion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnitConversion.swift; sourceTree = "<group>"; };
 		B40001 /* SetRepositoryProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetRepositoryProtocol.swift; sourceTree = "<group>"; };
@@ -496,10 +504,14 @@
 		BT0006 /* TemplateServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateServiceProtocol.swift; sourceTree = "<group>"; };
 		BT0007 /* TemplateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateService.swift; sourceTree = "<group>"; };
 		BT0008 /* TemplateListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateListViewModel.swift; sourceTree = "<group>"; };
+		B3F002 /* TemplateDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateDetailViewModel.swift; sourceTree = "<group>"; };
 		BT0009 /* CreateEditTemplateViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateEditTemplateViewModel.swift; sourceTree = "<group>"; };
-		BT0010 /* TemplateListSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateListSheet.swift; sourceTree = "<group>"; };
+		BT0010 /* TemplateFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateFlowView.swift; sourceTree = "<group>"; };
+		B3F010 /* TemplateImportReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateImportReviewSheet.swift; sourceTree = "<group>"; };
+		B3F012 /* TemplateSharing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateSharing.swift; sourceTree = "<group>"; };
+		B3F003 /* TemplateDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateDetailView.swift; sourceTree = "<group>"; };
 		BT0011 /* CreateEditTemplateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateEditTemplateView.swift; sourceTree = "<group>"; };
-		BT0012 /* TemplateCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateCardView.swift; sourceTree = "<group>"; };
+		BT0012 /* TemplateRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateRowView.swift; sourceTree = "<group>"; };
 		BW0001 /* LoadPrescriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadPrescriptionService.swift; sourceTree = "<group>"; };
 		BW0002 /* LoadPrescriptionServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadPrescriptionServiceProtocol.swift; sourceTree = "<group>"; };
 		BW0003 /* ExerciseSettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseSettingsSheet.swift; sourceTree = "<group>"; };
@@ -559,6 +571,8 @@
 		TT2003 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 		TT2004 /* ChartDataServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartDataServiceTests.swift; sourceTree = "<group>"; };
 		TT2005 /* WorkoutHistoryBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutHistoryBackupTests.swift; sourceTree = "<group>"; };
+		TTF002 /* TemplateServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateServiceTests.swift; sourceTree = "<group>"; };
+		TTF004 /* TemplateImportExportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateImportExportTests.swift; sourceTree = "<group>"; };
 		TT2006 /* SetServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetServiceTests.swift; sourceTree = "<group>"; };
 		TT2901 /* SupersetGroupingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupersetGroupingTests.swift; sourceTree = "<group>"; };
 		TT2007 /* WorkoutSetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSetTests.swift; sourceTree = "<group>"; };
@@ -1206,6 +1220,7 @@
 			isa = PBXGroup;
 			children = (
 				B30001 /* ModelContainerSetup.swift */,
+				B3F001 /* RepsterMigrationPlan.swift */,
 			);
 			path = Persistence;
 			sourceTree = "<group>";
@@ -1352,6 +1367,7 @@
 			isa = PBXGroup;
 			children = (
 				BT0008 /* TemplateListViewModel.swift */,
+				B3F002 /* TemplateDetailViewModel.swift */,
 				BT0009 /* CreateEditTemplateViewModel.swift */,
 			);
 			path = ViewModels;
@@ -1361,7 +1377,10 @@
 			isa = PBXGroup;
 			children = (
 				DT0004 /* Components */,
-				BT0010 /* TemplateListSheet.swift */,
+				BT0010 /* TemplateFlowView.swift */,
+				B3F010 /* TemplateImportReviewSheet.swift */,
+				B3F012 /* TemplateSharing.swift */,
+				B3F003 /* TemplateDetailView.swift */,
 				BT0011 /* CreateEditTemplateView.swift */,
 			);
 			path = Views;
@@ -1370,7 +1389,7 @@
 		DT0004 /* Components */ = {
 			isa = PBXGroup;
 			children = (
-				BT0012 /* TemplateCardView.swift */,
+				BT0012 /* TemplateRowView.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -1432,6 +1451,8 @@
 				TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */,
 				TT2004 /* ChartDataServiceTests.swift */,
 				TT2005 /* WorkoutHistoryBackupTests.swift */,
+				TTF002 /* TemplateServiceTests.swift */,
+				TTF004 /* TemplateImportExportTests.swift */,
 				TT2006 /* SetServiceTests.swift */,
 				TT2901 /* SupersetGroupingTests.swift */,
 				TT2099 /* ScreenDataGoldenMasterTests.swift */,
@@ -1671,6 +1692,7 @@
 				A20010 /* PlannedWorkout.swift in Sources */,
 				A20011 /* PlannedSet.swift in Sources */,
 				A30001 /* ModelContainerSetup.swift in Sources */,
+				A3F001 /* RepsterMigrationPlan.swift in Sources */,
 				A30002 /* ContentView.swift in Sources */,
 				A30003 /* UnitConversion.swift in Sources */,
 				A40001 /* SetRepositoryProtocol.swift in Sources */,
@@ -1858,10 +1880,14 @@
 				AT0006 /* TemplateServiceProtocol.swift in Sources */,
 				AT0007 /* TemplateService.swift in Sources */,
 				AT0008 /* TemplateListViewModel.swift in Sources */,
+				A3F002 /* TemplateDetailViewModel.swift in Sources */,
 				AT0009 /* CreateEditTemplateViewModel.swift in Sources */,
-				AT0010 /* TemplateListSheet.swift in Sources */,
+				AT0010 /* TemplateFlowView.swift in Sources */,
+				A3F010 /* TemplateImportReviewSheet.swift in Sources */,
+				A3F012 /* TemplateSharing.swift in Sources */,
+				A3F003 /* TemplateDetailView.swift in Sources */,
 				AT0011 /* CreateEditTemplateView.swift in Sources */,
-				AT0012 /* TemplateCardView.swift in Sources */,
+				AT0012 /* TemplateRowView.swift in Sources */,
 				FL0001 /* FatigueObservation.swift in Sources */,
 				IN0001 /* InsightRecord.swift in Sources */,
 				IN0002 /* InsightsServiceProtocol.swift in Sources */,
@@ -1904,6 +1930,8 @@
 				AHO001 /* AppleHealthOfferTests.swift in Sources */,
 				TT0003 /* ChartDataServiceTests.swift in Sources */,
 				TT0004 /* WorkoutHistoryBackupTests.swift in Sources */,
+				TTF001 /* TemplateServiceTests.swift in Sources */,
+				TTF003 /* TemplateImportExportTests.swift in Sources */,
 				TT0005 /* SetServiceTests.swift in Sources */,
 				TT0901 /* SupersetGroupingTests.swift in Sources */,
 				TT0099 /* ScreenDataGoldenMasterTests.swift in Sources */,

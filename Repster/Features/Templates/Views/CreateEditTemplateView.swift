@@ -9,10 +9,13 @@ import UniformTypeIdentifiers
 struct CreateEditTemplateView: View {
 
     private let editingTemplateId: UUID?
+    private let existingFolders: [String]
     private let onSaved: (() -> Void)?
     @State private var viewModel: CreateEditTemplateViewModel
     @State private var draggedExerciseId: UUID? = nil
     @State private var dropTargetExerciseId: UUID? = nil
+    @State private var supersetSubjectIndex: Int? = nil
+    @State private var showFolderPicker = false
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceContainer.self) private var services
 
@@ -20,10 +23,12 @@ struct CreateEditTemplateView: View {
         templateService: any TemplateServiceProtocol,
         exerciseService: any ExerciseServiceProtocol,
         editingTemplateId: UUID? = nil,
+        existingFolders: [String] = [],
         analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService(),
         onSaved: (() -> Void)? = nil
     ) {
         self.editingTemplateId = editingTemplateId
+        self.existingFolders = existingFolders
         self.onSaved = onSaved
         _viewModel = State(initialValue: CreateEditTemplateViewModel(
             templateService: templateService,
@@ -78,6 +83,32 @@ struct CreateEditTemplateView: View {
         .sheet(isPresented: $viewModel.showExercisePicker) {
             exercisePickerSheet
         }
+        .sheet(isPresented: Binding(
+            get: { supersetSubjectIndex != nil },
+            set: { if !$0 { supersetSubjectIndex = nil } }
+        )) {
+            if let index = supersetSubjectIndex {
+                SupersetPartnerSheet(
+                    subjectName: viewModel.exercises[safe: index]?.exerciseName ?? "",
+                    nextLetter: viewModel.nextSupersetLetter,
+                    candidates: viewModel.supersetCandidates(for: index),
+                    onPair: { partnerIndex in
+                        viewModel.pairExercise(at: index, withExerciseAt: partnerIndex)
+                        supersetSubjectIndex = nil
+                    }
+                )
+            }
+        }
+        .sheet(isPresented: $showFolderPicker) {
+            TemplateFolderSheet(
+                current: viewModel.templateFolder,
+                existingFolders: existingFolders,
+                onPick: { folder in
+                    viewModel.templateFolder = folder
+                    showFolderPicker = false
+                }
+            )
+        }
     }
 
     // MARK: - Name Section
@@ -101,7 +132,42 @@ struct CreateEditTemplateView: View {
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(Color.border, lineWidth: 1)
                 )
+
+            folderRow
         }
+    }
+
+    /// Filing is reachable while you are making the template, not only from a context menu you would
+    /// have to know exists.
+    private var folderRow: some View {
+        Button {
+            showFolderPicker = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "folder")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.textSecondary)
+                Text("Folder")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.textSecondary)
+                Spacer()
+                Text(viewModel.templateFolder ?? "None")
+                    .replayMasked()
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(viewModel.templateFolder == nil ? .textTertiary : .textPrimary)
+                    .lineLimit(1)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.textTertiary)
+            }
+            .padding(.horizontal, 13)
+            .frame(height: 48)
+            .background(Color.bgCard)
+            .cornerRadius(11)
+            .overlay(RoundedRectangle(cornerRadius: 11).stroke(Color.border, lineWidth: 1))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Exercises Section
@@ -132,7 +198,8 @@ struct CreateEditTemplateView: View {
                         exerciseIndex: index,
                         viewModel: viewModel,
                         draggedExerciseId: $draggedExerciseId,
-                        dropTargetExerciseId: $dropTargetExerciseId
+                        dropTargetExerciseId: $dropTargetExerciseId,
+                        onRequestSuperset: { supersetSubjectIndex = $0 }
                     )
                 }
             }
@@ -208,6 +275,7 @@ private struct TemplateExerciseCard: View {
     var viewModel: CreateEditTemplateViewModel
     @Binding var draggedExerciseId: UUID?
     @Binding var dropTargetExerciseId: UUID?
+    let onRequestSuperset: (Int) -> Void
 
     private var isDraggedCard: Bool {
         draggedExerciseId == exercise.id
@@ -323,53 +391,6 @@ private struct TemplateExerciseCard: View {
             }
             .buttonStyle(.plain)
 
-            Menu {
-                Menu("Superset Group") {
-                    // Driven by the view model's own list rather than a literal — the picker
-                    // offered three while the model declared five and coloured four.
-                    ForEach(viewModel.supersetLetters, id: \.self) { label in
-                        Button {
-                            viewModel.setSupersetGroup(for: exerciseIndex, label: label)
-                        } label: {
-                            HStack {
-                                Text("Group \(label)")
-                                if viewModel.currentSupersetLabel(for: exerciseIndex) == label {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-
-                    Button("None") {
-                        viewModel.setSupersetGroup(for: exerciseIndex, label: nil)
-                    }
-                }
-
-                Button {
-                    if exercise.notes == nil {
-                        viewModel.exercises[exerciseIndex].notes = ""
-                        viewModel.exercises[exerciseIndex].isExpanded = true
-                    } else {
-                        viewModel.exercises[exerciseIndex].isExpanded = true
-                    }
-                } label: {
-                    Label(exercise.notes != nil ? "Edit Note" : "Add Note", systemImage: "note.text")
-                }
-
-                Divider()
-
-                Button(role: .destructive) {
-                    viewModel.removeExercise(at: exerciseIndex)
-                } label: {
-                    Label("Remove Exercise", systemImage: "trash")
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.textTertiary)
-                    .frame(width: 28, height: 28)
-            }
-            .buttonStyle(.plain)
         }
         .padding(14)
     }
@@ -423,12 +444,20 @@ private struct TemplateExerciseCard: View {
 
     private var setList: some View {
         VStack(spacing: 0) {
-            Text("SETS")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.textTertiary)
-                .kerning(0.5)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.bottom, 8)
+            HStack(spacing: 8) {
+                Text("SET")
+                    .frame(width: 30, alignment: .leading)
+                Text("REP RANGE")
+                    .frame(width: 98, alignment: .center)
+                Text("RIR")
+                    .frame(width: 46, alignment: .center)
+                Spacer(minLength: 0)
+            }
+            .font(.system(size: 9, weight: .bold))
+            .kerning(0.6)
+            .foregroundColor(.textTertiary)
+            .padding(.horizontal, 2)
+            .padding(.bottom, 6)
 
             ForEach(Array(exercise.sets.enumerated()), id: \.element.id) { setIndex, editorSet in
                 TemplateSetRow(
@@ -456,18 +485,21 @@ private struct TemplateExerciseCard: View {
 
     // MARK: - Add Set Buttons
 
+    /// Warm-up takes half the width of Working Set: most exercises have none, and it is the rarer of
+    /// the two adds. `More` carries everything that used to sit behind an unlabelled ellipsis in the
+    /// card header, so the mystery glyph is gone from every row.
     private var addSetButtons: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 7) {
             Button {
                 viewModel.addWarmupSet(to: exerciseIndex)
             } label: {
                 Text("＋ Warmup")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.gold)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 36)
+                    .frame(width: 84)
+                    .frame(height: 38)
                     .background(Color.goldSoft)
-                    .cornerRadius(8)
+                    .cornerRadius(9)
             }
             .buttonStyle(.plain)
 
@@ -475,14 +507,65 @@ private struct TemplateExerciseCard: View {
                 viewModel.addWorkingSet(to: exerciseIndex)
             } label: {
                 Text("＋ Working Set")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 12.5, weight: .semibold))
                     .foregroundColor(.accent)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 36)
+                    .frame(height: 38)
                     .background(Color.accentSoft)
-                    .cornerRadius(8)
+                    .cornerRadius(9)
             }
             .buttonStyle(.plain)
+
+            Menu {
+                exerciseActions
+            } label: {
+                HStack(spacing: 5) {
+                    Text("More").font(.system(size: 12.5, weight: .semibold))
+                    Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
+                }
+                .foregroundColor(.textPrimary)
+                .frame(width: 78)
+                .frame(height: 38)
+                .background(Color.bgSubtle)
+                .cornerRadius(9)
+                .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.border, lineWidth: 1))
+            }
+            .accessibilityLabel("More actions for \(exercise.exerciseName)")
+        }
+    }
+
+    /// Named More rather than Special: in lifting apps "special set" means drop sets and myo-reps, so
+    /// the word would promise set techniques and deliver superset, note and folder. See
+    /// TEMPLATES_IMPLEMENTATION_PLAN.md P4.1.
+    @ViewBuilder
+    private var exerciseActions: some View {
+        if exercise.supersetGroupId == nil {
+            Button {
+                onRequestSuperset(exerciseIndex)
+            } label: {
+                Label("Superset with…", systemImage: "link")
+            }
+        } else {
+            Button {
+                viewModel.removeFromSuperset(at: exerciseIndex)
+            } label: {
+                Label("Remove from superset", systemImage: "link.badge.plus")
+            }
+        }
+
+        Button {
+            viewModel.exercises[exerciseIndex].notes = exercise.notes ?? ""
+            viewModel.exercises[exerciseIndex].isExpanded = true
+        } label: {
+            Label(exercise.notes != nil ? "Edit note" : "Add note", systemImage: "note.text")
+        }
+
+        Divider()
+
+        Button(role: .destructive) {
+            viewModel.removeExercise(at: exerciseIndex)
+        } label: {
+            Label("Remove exercise", systemImage: "trash")
         }
     }
 
@@ -567,108 +650,102 @@ private struct TemplateSetRow: View {
     let displayNumber: String
     var viewModel: CreateEditTemplateViewModel
 
-    @State private var repRangeText: String = ""
+    @State private var minText: String = ""
+    @State private var maxText: String = ""
     @State private var rirText: String = ""
 
     var body: some View {
         HStack(spacing: 8) {
-            // Set badge
             Text(displayNumber)
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: 12, weight: .bold))
                 .foregroundColor(isWarmup ? .gold : .textPrimary)
-                .frame(width: 28, height: 28)
+                .frame(width: 30, height: 32)
                 .background(isWarmup ? Color.goldSoft : Color.bgSubtle)
                 .cornerRadius(7)
 
-            // Set type label
-            Text(isWarmup ? "W" : "Set")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.textSecondary)
-                .frame(width: 26, alignment: .leading)
+            // Two fields, not one free-text box.
+            //
+            // The old single field parsed "8" into min == max — a fixed target, which the suggestion
+            // engine cannot progress (SUGGESTION_PROGRESSION_DESIGN.md P2). Typing one number was the
+            // easy path into a shape that silently opts out of the app's headline feature. Two fields
+            // make a range the default and a fixed target something you type twice on purpose.
+            HStack(spacing: 5) {
+                repField(text: $minText, placeholder: "8", accessibilityLabel: "Minimum reps")
+                Text("–")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.textTertiary)
+                repField(text: $maxText, placeholder: "10", accessibilityLabel: "Maximum reps")
+            }
+            .frame(width: 98)
 
-            // Rep range input
-            TextField("6-8", text: $repRangeText)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.textPrimary)
-                .multilineTextAlignment(.center)
-                .padding(.vertical, 7)
-                .padding(.horizontal, 4)
-                .background(Color.bgInput)
-                .cornerRadius(6)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.border, lineWidth: 1)
-                )
-                .frame(width: 88)
-                .onChange(of: repRangeText) { _, newValue in
-                    parseRepRange(newValue)
-                }
-
-            // RIR input
             TextField("RIR", text: $rirText)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(rirColor)
                 .multilineTextAlignment(.center)
-                .padding(.vertical, 7)
-                .padding(.horizontal, 4)
-                .background(Color.bgInput)
-                .cornerRadius(6)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.border, lineWidth: 1)
-                )
-                .frame(width: 50)
                 .keyboardType(.numberPad)
+                .frame(width: 46, height: 32)
+                .background(Color.bgInput)
+                .cornerRadius(7)
+                .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.border, lineWidth: 1))
+                .accessibilityLabel("Reps in reserve")
                 .onChange(of: rirText) { _, newValue in
                     viewModel.exercises[exerciseIndex].sets[setIndex].targetRIR = Int(newValue)
                 }
 
             Spacer(minLength: 0)
 
-            // Copy button
             Button {
                 viewModel.duplicateSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
             } label: {
                 Image(systemName: "doc.on.doc")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.textTertiary)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 32, height: 32)
                     .background(Color.bgSubtle)
-                    .cornerRadius(9)
+                    .cornerRadius(8)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Duplicate set")
 
-            // Delete button
             Button {
                 viewModel.removeSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.danger)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 32, height: 32)
                     .background(Color.dangerSoft)
-                    .cornerRadius(9)
+                    .cornerRadius(8)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Remove set")
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(Color.bg)
-        .cornerRadius(8)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.border, lineWidth: 1)
-        )
-        .padding(.bottom, 4)
+        .padding(.horizontal, 2)
+        .padding(.vertical, 3)
         .onAppear {
-            // Initialize text from model
-            if let min = editorSet.targetRepMin, let max = editorSet.targetRepMax {
-                repRangeText = min == max ? "\(min)" : "\(min)-\(max)"
-            }
-            if let rir = editorSet.targetRIR {
-                rirText = "\(rir)"
-            }
+            if let min = editorSet.targetRepMin { minText = "\(min)" }
+            if let max = editorSet.targetRepMax { maxText = "\(max)" }
+            if let rir = editorSet.targetRIR { rirText = "\(rir)" }
         }
+    }
+
+    private func repField(
+        text: Binding<String>,
+        placeholder: String,
+        accessibilityLabel: String
+    ) -> some View {
+        TextField(placeholder, text: text)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(.textPrimary)
+            .multilineTextAlignment(.center)
+            .keyboardType(.numberPad)
+            .frame(maxWidth: .infinity)
+            .frame(height: 32)
+            .background(Color.bgInput)
+            .cornerRadius(7)
+            .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.border, lineWidth: 1))
+            .accessibilityLabel(accessibilityLabel)
+            .onChange(of: text.wrappedValue) { _, _ in applyRepBounds() }
     }
 
     private var rirColor: Color {
@@ -676,23 +753,11 @@ private struct TemplateSetRow: View {
         return Color.rirColor(for: Double(rir))
     }
 
-    /// Parse "6-8" → targetRepMin=6, targetRepMax=8
-    /// Parse "8" → targetRepMin=8, targetRepMax=8
-    private func parseRepRange(_ text: String) {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.contains("-") {
-            let parts = trimmed.split(separator: "-")
-            if parts.count == 2, let min = Int(parts[0]), let max = Int(parts[1]) {
-                viewModel.exercises[exerciseIndex].sets[setIndex].targetRepMin = min
-                viewModel.exercises[exerciseIndex].sets[setIndex].targetRepMax = max
-            }
-        } else if let single = Int(trimmed) {
-            viewModel.exercises[exerciseIndex].sets[setIndex].targetRepMin = single
-            viewModel.exercises[exerciseIndex].sets[setIndex].targetRepMax = single
-        } else {
-            viewModel.exercises[exerciseIndex].sets[setIndex].targetRepMin = nil
-            viewModel.exercises[exerciseIndex].sets[setIndex].targetRepMax = nil
-        }
+    /// Each field owns its own bound. Clearing one clears only that side, where the old parser threw
+    /// away both — and silently kept the previous value on malformed input like "6-".
+    private func applyRepBounds() {
+        viewModel.exercises[exerciseIndex].sets[setIndex].targetRepMin = Int(minText.trimmingCharacters(in: .whitespaces))
+        viewModel.exercises[exerciseIndex].sets[setIndex].targetRepMax = Int(maxText.trimmingCharacters(in: .whitespaces))
     }
 }
 
@@ -735,5 +800,186 @@ private struct TemplateExerciseDropDelegate: DropDelegate {
             dropTargetExerciseId = nil
         }
         return true
+    }
+}
+
+
+// MARK: - Superset partner sheet
+
+/// You pick a **partner**; the app assigns the letter.
+///
+/// The old flow asked for a letter, on one exercise at a time, with nothing saying a second step
+/// existed — so people assigned Group A once and ended up with a superset of one. That state is not
+/// reachable from here.
+private struct SupersetPartnerSheet: View {
+
+    let subjectName: String
+    let nextLetter: String
+    let candidates: [SupersetCandidate]
+    let onPair: (Int) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Pair \(subjectName) with one other exercise")
+                        .replayMasked()
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.textSecondary)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 14)
+
+                    ForEach(Array(candidates.enumerated()), id: \.element.id) { offset, candidate in
+                        Button {
+                            guard candidate.isSelectable else { return }
+                            onPair(candidate.index)
+                        } label: {
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(candidate.name)
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.textPrimary)
+                                        .multilineTextAlignment(.leading)
+                                    Text(candidate.detailText)
+                                        .font(.system(size: 11.5, weight: .medium))
+                                        .foregroundColor(candidate.wouldMove && candidate.isSelectable ? .chart5 : .textTertiary)
+                                        .multilineTextAlignment(.leading)
+                                }
+                                Spacer(minLength: 8)
+                            }
+                            .frame(minHeight: 58)
+                            .padding(.horizontal, 20)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!candidate.isSelectable)
+                        // Grouped exercises stay visible rather than vanishing from the list.
+                        .opacity(candidate.isSelectable ? 1 : 0.42)
+
+                        if offset < candidates.count - 1 {
+                            Rectangle().fill(Color.border).frame(height: 1).padding(.leading, 20)
+                        }
+                    }
+
+                    if candidates.isEmpty {
+                        Text("Add another exercise first — a superset needs two.")
+                            .font(.system(size: 13))
+                            .foregroundColor(.textTertiary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 40)
+                    } else {
+                        HStack(spacing: 9) {
+                            Image(systemName: "link")
+                                .font(.system(size: 12, weight: .bold))
+                            Text("These two become Superset \(nextLetter)")
+                                .font(.system(size: 12.5, weight: .medium))
+                                .foregroundColor(.textSecondary)
+                        }
+                        .foregroundStyle(Color.chart5)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(13)
+                        .background(Color.chart5.opacity(0.09))
+                        .clipShape(RoundedRectangle(cornerRadius: 11))
+                        .overlay(RoundedRectangle(cornerRadius: 11).stroke(Color.chart5.opacity(0.25), lineWidth: 1))
+                        .padding(.horizontal, 20)
+                        .padding(.top, 18)
+                    }
+                }
+                .padding(.top, 12)
+                .padding(.bottom, 24)
+            }
+            .background(Color.bg)
+            .navigationTitle("Superset with")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+        .presentationDetents([.medium, .large])
+    }
+}
+
+// MARK: - Folder sheet
+
+/// A folder exists because a template names it. Picking "None" and moving the last template out is
+/// how one stops existing — there is no folder to delete separately.
+private struct TemplateFolderSheet: View {
+
+    let current: String?
+    let existingFolders: [String]
+    let onPick: (String?) -> Void
+
+    @State private var newFolderName = ""
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Button {
+                        onPick(nil)
+                    } label: {
+                        HStack {
+                            Text("Not in a folder").foregroundColor(.textPrimary)
+                            Spacer()
+                            if current == nil {
+                                Image(systemName: "checkmark").foregroundStyle(Color.accent)
+                            }
+                        }
+                    }
+
+                    ForEach(existingFolders, id: \.self) { folder in
+                        Button {
+                            onPick(folder)
+                        } label: {
+                            HStack {
+                                Text(folder).replayMasked().foregroundColor(.textPrimary)
+                                Spacer()
+                                if TemplateFolder.groupingKey(current) == TemplateFolder.groupingKey(folder) {
+                                    Image(systemName: "checkmark").foregroundStyle(Color.accent)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Section {
+                    HStack(spacing: 10) {
+                        TextField("New folder name", text: $newFolderName)
+                            .replayMasked()
+                            .autocorrectionDisabled()
+                        Button("Add") {
+                            onPick(newFolderName)
+                        }
+                        .disabled(TemplateFolder.normalized(newFolderName) == nil)
+                        .fontWeight(.semibold)
+                    }
+                } footer: {
+                    Text("Folders are just names. Move the last template out and the folder goes with it.")
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(Color.bg)
+            .navigationTitle("Folder")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+        .presentationDetents([.medium])
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }

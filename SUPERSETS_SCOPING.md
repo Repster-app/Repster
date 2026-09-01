@@ -315,7 +315,14 @@ ordinary way to train.
 
 **Decided: the letter is the identity, the colour is reinforcement — so cycle the palette.**
 
-- Drive the menu from `supersetLetters` instead of a literal, keeping the five that are already declared.
+- ~~Drive the menu from `supersetLetters` instead of a literal, keeping the five that are already
+  declared.~~ **Superseded 2026-09-01 — there is no letter menu.**
+  [TEMPLATES_IMPLEMENTATION_PLAN.md](TEMPLATES_IMPLEMENTATION_PLAN.md) P4.3 replaces the picker with
+  *Superset with…*, which asks for a **partner** and assigns the letter itself: the first free entry in
+  `supersetLetters`. The user experienced the letter picker as undiscoverable — you assign a letter,
+  twice, on two exercises, with nothing saying a second step exists — and picking a partner removes both
+  the second step and the group-of-one it could leave behind. Everything else in this section is
+  unchanged and is what P4.3 implements.
 - `supersetColor` indexes `[accent, chart5, chart7, chart8]` by the letter's position, modulo four.
   E reuses A's blue; the letters keep them apart.
 - Wanting more later is then a one-line change to one array, with nothing else to keep in sync.
