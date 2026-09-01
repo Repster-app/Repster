@@ -44,6 +44,7 @@ struct TemplateFlowView: View {
     @State private var shareSheetItem: TemplateShareItem? = nil
     @State private var actionAlert: TemplateActionAlert? = nil
     @State private var pendingImportReview: PendingTemplateImportReview? = nil
+    @State private var movingTemplate: TemplateSummary? = nil
     @Environment(\.dismiss) private var dismiss
 
     let beforeStartWorkout: () async -> Bool
@@ -88,21 +89,25 @@ struct TemplateFlowView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     HStack(spacing: 14) {
-                        Button {
-                            showImportPicker = true
-                        } label: {
-                            Image(systemName: "square.and.arrow.down")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(Color.textSecondary)
-                        }
-                        .accessibilityLabel("Import template")
+                        // One button, because both items do the same job: put a new template in this
+                        // list. An import glyph sitting next to New read as one confusing control.
+                        Menu {
+                            Button {
+                                navigationPath.append(TemplateFlowRoute.create(sessionId: UUID()))
+                            } label: {
+                                Label("New Template", systemImage: "square.and.pencil")
+                            }
 
-                        Button {
-                            navigationPath.append(TemplateFlowRoute.create(sessionId: UUID()))
+                            Button {
+                                showImportPicker = true
+                            } label: {
+                                Label("Import from File…", systemImage: "square.and.arrow.down")
+                            }
                         } label: {
                             Text("New")
                                 .font(.system(size: 16, weight: .semibold))
                         }
+                        .accessibilityLabel("New template")
                     }
                 }
             }
@@ -146,6 +151,16 @@ struct TemplateFlowView: View {
         }
         .sheet(item: $shareSheetItem) { item in
             TemplateShareSheet(activityItems: [item.url])
+        }
+        .sheet(item: $movingTemplate) { template in
+            TemplateFolderSheet(
+                current: template.folder,
+                existingFolders: viewModel.folderChips.filter { !$0.isAll }.map(\.name),
+                onPick: { folder in
+                    Task { await moveTemplate(template, to: folder) }
+                    movingTemplate = nil
+                }
+            )
         }
         .sheet(item: $pendingImportReview) { item in
             TemplateImportReviewSheet(
@@ -435,6 +450,12 @@ struct TemplateFlowView: View {
         }
 
         Button {
+            movingTemplate = template
+        } label: {
+            Label(template.folder == nil ? "Move to Folder…" : "Change Folder…", systemImage: "folder")
+        }
+
+        Button {
             Task { await exportTemplate(template) }
         } label: {
             Label("Export Template", systemImage: "square.and.arrow.up")
@@ -453,6 +474,18 @@ struct TemplateFlowView: View {
     /// abrupt rather than fast, and it left no way to see what was in a template before committing.
     private func openTemplate(_ template: TemplateSummary) {
         navigationPath.append(TemplateFlowRoute.detail(templateId: template.id))
+    }
+
+    /// Filing a template from the list, so making a folder never requires opening a template first.
+    private func moveTemplate(_ template: TemplateSummary, to folder: String?) async {
+        do {
+            try await viewModel.setFolder(folder, for: template.id)
+        } catch {
+            actionAlert = TemplateActionAlert(
+                title: "Couldn’t Move Template",
+                message: error.localizedDescription
+            )
+        }
     }
 
     private func duplicateTemplate(_ template: TemplateSummary) async {

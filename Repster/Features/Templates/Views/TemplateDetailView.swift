@@ -9,6 +9,9 @@ import SwiftUI
 struct TemplateDetailView: View {
 
     @State private var viewModel: TemplateDetailViewModel
+    /// Exercises unfolded to show their individual sets. Collapsed by default so the screen still
+    /// reads as a summary; unfolding is how you check set types without opening the editor.
+    @State private var expandedExerciseIds: Set<UUID> = []
     private let template: TemplateSummary
     private let onStart: () -> Void
     private let onEdit: () -> Void
@@ -194,19 +197,114 @@ struct TemplateDetailView: View {
     }
 
     private func exerciseCard(number: String, exercise: TemplateExerciseDetail, tint: Color) -> some View {
-        HStack(spacing: 12) {
-            Text(number)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundColor(tint)
-                .frame(width: 18, alignment: .leading)
+        VStack(spacing: 0) {
+            exerciseHeader(number: number, exercise: exercise, tint: tint)
 
-            exerciseBody(exercise)
+            if expandedExerciseIds.contains(exercise.id) {
+                Rectangle().fill(Color.border).frame(height: 1)
+                setList(for: exercise)
+            }
         }
-        .padding(.horizontal, 13)
-        .padding(.vertical, 11)
         .background(Color.bgCard)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.border, lineWidth: 1))
+    }
+
+    private func exerciseHeader(number: String, exercise: TemplateExerciseDetail, tint: Color) -> some View {
+        Button {
+            toggle(exercise.id)
+        } label: {
+            HStack(spacing: 12) {
+                Text(number)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(tint)
+                    .frame(width: 18, alignment: .leading)
+
+                exerciseBody(exercise)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.textTertiary)
+                    .rotationEffect(expandedExerciseIds.contains(exercise.id) ? .degrees(90) : .zero)
+            }
+            .padding(.horizontal, 13)
+            .padding(.vertical, 11)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(expandedExerciseIds.contains(exercise.id) ? "Hides the sets" : "Shows the sets")
+    }
+
+    private func toggle(_ id: UUID) {
+        withAnimation(.easeInOut(duration: 0.18)) {
+            if expandedExerciseIds.contains(id) {
+                expandedExerciseIds.remove(id)
+            } else {
+                expandedExerciseIds.insert(id)
+            }
+        }
+    }
+
+    /// Every set, in order, with its own targets — the thing the summary line above can only average.
+    /// Without this you have to open the editor to find out whether the last set differs.
+    private func setList(for exercise: TemplateExerciseDetail) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(numberedSets(for: exercise).enumerated()), id: \.element.set.id) { index, entry in
+                if index > 0 {
+                    Rectangle().fill(Color.border.opacity(0.6)).frame(height: 1).padding(.leading, 44)
+                }
+                HStack(spacing: 10) {
+                    Text(entry.label)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(entry.set.setType == .warmup ? .gold : .textSecondary)
+                        .frame(width: 26, height: 24)
+                        .background(entry.set.setType == .warmup ? Color.goldSoft : Color.bgSubtle)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                    Text(repText(for: entry.set))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.textPrimary)
+
+                    Spacer(minLength: 0)
+
+                    if let rir = entry.set.targetRIR {
+                        Text("RIR \(rir)")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(Color.rirColor(for: Double(rir)))
+                    }
+                }
+                .padding(.horizontal, 13)
+                .padding(.vertical, 7)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    /// Warm-ups number W1/W2 and do not consume working-set numbers, matching the editor and the
+    /// live workout.
+    private func numberedSets(for exercise: TemplateExerciseDetail) -> [(label: String, set: TemplateSetDetail)] {
+        var warmups = 0
+        var working = 0
+        return exercise.sets
+            .sorted { $0.orderInExercise < $1.orderInExercise }
+            .map { set in
+                if set.setType == .warmup {
+                    warmups += 1
+                    return ("W\(warmups)", set)
+                }
+                working += 1
+                return ("\(working)", set)
+            }
+    }
+
+    private func repText(for set: TemplateSetDetail) -> String {
+        switch (set.targetRepMin, set.targetRepMax) {
+        case let (.some(min), .some(max)) where min == max: return "\(min) reps"
+        case let (.some(min), .some(max)): return "\(min)–\(max) reps"
+        case let (.some(min), .none): return "\(min)+ reps"
+        case let (.none, .some(max)): return "up to \(max) reps"
+        case (.none, .none): return set.setType == .warmup ? "Warm-up" : "No target"
+        }
     }
 
     private func supersetBlock(letter: String, members: [TemplateDetailSupersetMember]) -> some View {
@@ -230,15 +328,32 @@ struct TemplateDetailView: View {
                         .frame(height: 1)
                         .padding(.leading, 30)
                 }
-                HStack(spacing: 12) {
-                    Text(member.label)
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(tint)
-                        .frame(width: 18, alignment: .leading)
+                VStack(spacing: 0) {
+                    Button {
+                        toggle(member.exercise.id)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Text(member.label)
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(tint)
+                                .frame(width: 18, alignment: .leading)
 
-                    exerciseBody(member.exercise)
+                            exerciseBody(member.exercise)
+
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(.textTertiary)
+                                .rotationEffect(expandedExerciseIds.contains(member.exercise.id) ? .degrees(90) : .zero)
+                        }
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    if expandedExerciseIds.contains(member.exercise.id) {
+                        setList(for: member.exercise)
+                    }
                 }
-                .padding(.vertical, 2)
             }
         }
         .padding(9)

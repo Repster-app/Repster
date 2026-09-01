@@ -458,6 +458,69 @@ final class TemplateServiceTests: XCTestCase {
         XCTAssertEqual(summaries.first?.totalSetCount, 1, "List count must agree with detail")
     }
 
+    // MARK: - Filing from the list
+
+    func testSettingAFolderRewritesOnlyTheFolder() async throws {
+        // Moving a template from the list round-trips its whole structure through updateTemplate, so
+        // the thing to prove is that nothing except the folder changes.
+        let context = try makeContext()
+        let fly = makeExercise(name: "Cable Fly")
+        let raise = makeExercise(name: "Lateral Raise")
+        try await context.exerciseRepo.save(fly)
+        try await context.exerciseRepo.save(raise)
+
+        let group = UUID()
+        let templateId = try await context.service.createTemplate(
+            TemplateSaveData(
+                name: "Push", notes: "keep me",
+                exercises: [
+                    saveExercise(fly.id, order: 1, group: group, sets: [saveSet(order: 1, min: 12, max: 15, rir: 1)]),
+                    saveExercise(raise.id, order: 2, group: group, sets: [saveSet(order: 1), saveSet(order: 2)])
+                ]
+            )
+        )
+
+        let beforeFetched = try await context.service.fetchTemplateDetail(templateId)
+        let before = try XCTUnwrap(beforeFetched)
+
+        try await context.service.updateTemplate(
+            templateId,
+            data: TemplateSaveData(
+                name: before.template.name,
+                notes: before.template.notes,
+                folder: "Mesocycle 3",
+                exercises: before.exercises.map { exercise in
+                    TemplateSaveExercise(
+                        exerciseId: exercise.exerciseId,
+                        orderInTemplate: exercise.orderInTemplate,
+                        supersetGroupId: exercise.supersetGroupId,
+                        restTimeSeconds: exercise.restTimeSeconds,
+                        notes: exercise.notes,
+                        sets: exercise.sets.map {
+                            TemplateSaveSet(
+                                setType: $0.setType,
+                                targetRepMin: $0.targetRepMin,
+                                targetRepMax: $0.targetRepMax,
+                                targetRIR: $0.targetRIR,
+                                orderInExercise: $0.orderInExercise
+                            )
+                        }
+                    )
+                }
+            )
+        )
+
+        let afterFetched = try await context.service.fetchTemplateDetail(templateId)
+        let after = try XCTUnwrap(afterFetched)
+        XCTAssertEqual(after.template.folder, "Mesocycle 3")
+        XCTAssertEqual(after.template.name, "Push")
+        XCTAssertEqual(after.template.notes, "keep me")
+        XCTAssertEqual(after.exercises.map(\.exerciseName), ["Cable Fly", "Lateral Raise"])
+        XCTAssertEqual(after.exercises.map { $0.sets.count }, [1, 2], "Set counts stay with their exercises")
+        XCTAssertEqual(Set(after.exercises.compactMap(\.supersetGroupId)), [group])
+        XCTAssertEqual(after.exercises[0].sets.first?.targetRepMin, 12)
+    }
+
     // MARK: - D4 — a template whose exercise no longer resolves still renders
 
     func testTemplateWithMissingExerciseStillFetches() async throws {

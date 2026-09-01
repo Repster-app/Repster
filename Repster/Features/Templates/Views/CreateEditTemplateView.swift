@@ -912,7 +912,10 @@ private struct SupersetPartnerSheet: View {
 
 /// A folder exists because a template names it. Picking "None" and moving the last template out is
 /// how one stops existing — there is no folder to delete separately.
-private struct TemplateFolderSheet: View {
+///
+/// Internal rather than file-private: the list reaches it too, so filing a template never requires
+/// opening the editor first.
+struct TemplateFolderSheet: View {
 
     let current: String?
     let existingFolders: [String]

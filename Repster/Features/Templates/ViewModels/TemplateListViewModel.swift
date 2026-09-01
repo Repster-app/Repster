@@ -208,6 +208,39 @@ final class TemplateListViewModel {
         return workout
     }
 
+    /// Re-file a template without opening the editor. Reads the current detail so the move rewrites
+    /// only the folder — everything else round-trips exactly as stored.
+    func setFolder(_ folder: String?, for templateId: UUID) async throws {
+        guard let detail = try await templateService.fetchTemplateDetail(templateId) else { return }
+        try await templateService.updateTemplate(
+            templateId,
+            data: TemplateSaveData(
+                name: detail.template.name,
+                notes: detail.template.notes,
+                folder: folder,
+                exercises: detail.exercises.map { exercise in
+                    TemplateSaveExercise(
+                        exerciseId: exercise.exerciseId,
+                        orderInTemplate: exercise.orderInTemplate,
+                        supersetGroupId: exercise.supersetGroupId,
+                        restTimeSeconds: exercise.restTimeSeconds,
+                        notes: exercise.notes,
+                        sets: exercise.sets.map {
+                            TemplateSaveSet(
+                                setType: $0.setType,
+                                targetRepMin: $0.targetRepMin,
+                                targetRepMax: $0.targetRepMax,
+                                targetRIR: $0.targetRIR,
+                                orderInExercise: $0.orderInExercise
+                            )
+                        }
+                    )
+                }
+            )
+        )
+        await loadTemplates()
+    }
+
     func duplicateTemplate(_ templateId: UUID) async throws -> UUID {
         let newId = try await templateService.duplicateTemplate(templateId)
         await loadTemplates()
