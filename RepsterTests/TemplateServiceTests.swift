@@ -458,6 +458,103 @@ final class TemplateServiceTests: XCTestCase {
         XCTAssertEqual(summaries.first?.totalSetCount, 1, "List count must agree with detail")
     }
 
+    // MARK: - Save-as-template from a workout: set distribution
+
+    func testSaveAsTemplateKeepsEachExercisesOwnSets() async throws {
+        let context = try makeContext()
+        let names = ["Back extension holds", "Assisted Pull Up", "Cable Row", "Cable Curl"]
+        var exercises: [Exercise] = []
+        for name in names {
+            let exercise = makeExercise(name: name)
+            try await context.exerciseRepo.save(exercise)
+            exercises.append(exercise)
+        }
+
+        let workout = Workout(date: Date(), startTime: Date(), status: .completed)
+        try await context.workoutRepo.save(workout)
+
+        // 3 / 2 / 4 / 1 — deliberately uneven, and logged exercise-by-exercise.
+        let counts = [3, 2, 4, 1]
+        var order = 1
+        for (exercise, count) in zip(exercises, counts) {
+            for setIndex in 1...count {
+                try await context.setRepo.save(
+                    workoutSet(workout.id, exercise.id, order: order, group: nil, orderInExercise: setIndex)
+                )
+                order += 1
+            }
+        }
+
+        let templateId = try await context.service.createTemplateFromWorkout(workout.id, name: "From Workout")
+        let fetched = try await context.service.fetchTemplateDetail(templateId)
+        let detail = try XCTUnwrap(fetched)
+
+        XCTAssertEqual(detail.exercises.map(\.exerciseName), names)
+        XCTAssertEqual(detail.exercises.map { $0.sets.count }, counts)
+        XCTAssertEqual(detail.template.totalSetCount, 10)
+    }
+
+    func testSaveAsTemplateHandlesInterleavedSupersetLogging() async throws {
+        // A superset is logged A, B, A, B, A, B — the sets are not contiguous per exercise, which is
+        // the ordering most likely to break a grouping that assumed they were.
+        let context = try makeContext()
+        let fly = makeExercise(name: "Cable Fly")
+        let raise = makeExercise(name: "Lateral Raise")
+        try await context.exerciseRepo.save(fly)
+        try await context.exerciseRepo.save(raise)
+
+        let workout = Workout(date: Date(), startTime: Date(), status: .completed)
+        try await context.workoutRepo.save(workout)
+
+        var order = 1
+        for round in 1...3 {
+            for exercise in [fly, raise] {
+                try await context.setRepo.save(
+                    workoutSet(workout.id, exercise.id, order: order, group: nil, orderInExercise: round)
+                )
+                order += 1
+            }
+        }
+
+        let templateId = try await context.service.createTemplateFromWorkout(workout.id, name: "Superset day")
+        let fetched = try await context.service.fetchTemplateDetail(templateId)
+        let detail = try XCTUnwrap(fetched)
+
+        XCTAssertEqual(detail.exercises.map(\.exerciseName), ["Cable Fly", "Lateral Raise"])
+        XCTAssertEqual(detail.exercises.map { $0.sets.count }, [3, 3], "Sets must not pile onto the first exercise")
+    }
+
+    func testSaveAsTemplateWithNineExercisesDoesNotCollapseOntoTheFirst() async throws {
+        // The reported shape: 9 exercises, first showing 12 sets and the rest 1 each.
+        let context = try makeContext()
+        var exercises: [Exercise] = []
+        for index in 1...9 {
+            let exercise = makeExercise(name: "Exercise \(index)")
+            try await context.exerciseRepo.save(exercise)
+            exercises.append(exercise)
+        }
+
+        let workout = Workout(date: Date(), startTime: Date(), status: .completed)
+        try await context.workoutRepo.save(workout)
+
+        var order = 1
+        for exercise in exercises {
+            for setIndex in 1...2 {
+                try await context.setRepo.save(
+                    workoutSet(workout.id, exercise.id, order: order, group: nil, orderInExercise: setIndex)
+                )
+                order += 1
+            }
+        }
+
+        let templateId = try await context.service.createTemplateFromWorkout(workout.id, name: "Upper Body 2")
+        let fetched = try await context.service.fetchTemplateDetail(templateId)
+        let detail = try XCTUnwrap(fetched)
+
+        XCTAssertEqual(detail.exercises.count, 9)
+        XCTAssertEqual(detail.exercises.map { $0.sets.count }, Array(repeating: 2, count: 9))
+    }
+
     // MARK: - Filing from the list
 
     func testSettingAFolderRewritesOnlyTheFolder() async throws {
@@ -784,7 +881,8 @@ final class TemplateServiceTests: XCTestCase {
         _ workoutId: UUID,
         _ exerciseId: UUID,
         order: Int,
-        group: UUID?
+        group: UUID?,
+        orderInExercise: Int? = nil
     ) -> WorkoutSet {
         WorkoutSet(
             workoutId: workoutId,
@@ -794,7 +892,7 @@ final class TemplateServiceTests: XCTestCase {
             reps: 8,
             setType: .working,
             orderInWorkout: order,
-            orderInExercise: order,
+            orderInExercise: orderInExercise ?? order,
             supersetGroupId: group,
             completed: true
         )
