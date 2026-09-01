@@ -3978,6 +3978,67 @@ final class ExerciseRebuildDetectionTests: XCTestCase {
         XCTAssertTrue(context.prService.rebuiltExerciseIds.isEmpty)
         XCTAssertTrue(context.statsService.rebuiltExerciseIds.isEmpty)
     }
+
+    /// `deleteExercise` describes itself as a full cascade and did not touch templates, so every
+    /// template using the exercise kept a row pointing at an id that no longer resolved — shown as
+    /// "Unknown Exercise" and still counted in the template's set total. The removal semantics are
+    /// covered in TemplateServiceTests; this asserts the cascade actually reaches them.
+    func testDeleteExerciseRemovesTheTemplateRowsThatPointAtIt() async throws {
+        let context = try makeExerciseRebuildServiceContext()
+        let doomed = Exercise(name: "Wrist Cur", equipmentType: .other, trackingType: .weightReps)
+        let kept = Exercise(name: "Bench Press", equipmentType: .barbell, trackingType: .weightReps)
+        try await context.exerciseRepo.save(doomed)
+        try await context.exerciseRepo.save(kept)
+
+        let template = WorkoutTemplate(name: "Upper Body 2")
+        try await context.templateRepo.saveTemplate(template)
+        try await context.templateRepo.replaceTemplateContents(
+            templateId: template.id,
+            exercises: [
+                TemplateSaveExercise(
+                    exerciseId: kept.id,
+                    orderInTemplate: 1,
+                    supersetGroupId: nil,
+                    restTimeSeconds: nil,
+                    notes: nil,
+                    sets: [
+                        TemplateSaveSet(
+                            setType: .working,
+                            targetRepMin: 6,
+                            targetRepMax: 8,
+                            targetRIR: 2,
+                            orderInExercise: 1
+                        )
+                    ]
+                ),
+                TemplateSaveExercise(
+                    exerciseId: doomed.id,
+                    orderInTemplate: 2,
+                    supersetGroupId: nil,
+                    restTimeSeconds: nil,
+                    notes: nil,
+                    sets: [
+                        TemplateSaveSet(
+                            setType: .working,
+                            targetRepMin: nil,
+                            targetRepMax: nil,
+                            targetRIR: nil,
+                            orderInExercise: 1
+                        )
+                    ]
+                )
+            ]
+        )
+
+        try await context.service.deleteExercise(doomed.id)
+
+        let rows = try await context.templateRepo.fetchTemplateExercises(for: template.id)
+        XCTAssertEqual(rows.map(\.exerciseId), [kept.id])
+        XCTAssertEqual(rows.map(\.orderInTemplate), [1])
+        let keptSets = try await context.templateRepo.fetchTemplateSets(for: rows[0].id)
+        XCTAssertEqual(keptSets.count, 1)
+        XCTAssertEqual(keptSets.first?.targetRepMin, 6)
+    }
 }
 
 final class ExerciseTrackingTypeTests: XCTestCase {
@@ -6927,6 +6988,7 @@ private struct ExerciseRebuildServiceContext {
     let service: ExerciseService
     let exerciseRepo: ExerciseRepository
     let setRepo: SetRepository
+    let templateRepo: TemplateRepository
     let prService: PRServiceStub
     let statsService: StatsServiceStub
 }
@@ -6941,6 +7003,9 @@ private func makeExerciseRebuildServiceContext() throws -> ExerciseRebuildServic
         ExerciseStats.self,
         PerformanceRecord.self,
         HealthProfile.self,
+        WorkoutTemplate.self,
+        TemplateExercise.self,
+        TemplateSet.self,
         configurations: configuration
     )
 
@@ -6948,6 +7013,7 @@ private func makeExerciseRebuildServiceContext() throws -> ExerciseRebuildServic
     let setRepo = SetRepository(modelContainer: container)
     let exerciseStatsRepo = ExerciseStatsRepository(modelContainer: container)
     let performanceRecordRepo = PerformanceRecordRepository(modelContainer: container)
+    let templateRepo = TemplateRepository(modelContainer: container)
     let prService = PRServiceStub()
     let statsService = StatsServiceStub()
     let service = ExerciseService(
@@ -6955,6 +7021,7 @@ private func makeExerciseRebuildServiceContext() throws -> ExerciseRebuildServic
         setRepository: setRepo,
         exerciseStatsRepository: exerciseStatsRepo,
         performanceRecordRepository: performanceRecordRepo,
+        templateRepository: templateRepo,
         prService: prService,
         statsService: statsService,
         fatigueLearningService: makeStubFatigueLearningService()
@@ -6964,6 +7031,7 @@ private func makeExerciseRebuildServiceContext() throws -> ExerciseRebuildServic
         service: service,
         exerciseRepo: exerciseRepo,
         setRepo: setRepo,
+        templateRepo: templateRepo,
         prService: prService,
         statsService: statsService
     )
@@ -6977,6 +7045,9 @@ private func makeExerciseTrackingTypeServiceContext() throws -> ExerciseTracking
         ExerciseStats.self,
         PerformanceRecord.self,
         HealthProfile.self,
+        WorkoutTemplate.self,
+        TemplateExercise.self,
+        TemplateSet.self,
         configurations: configuration
     )
 
@@ -6986,6 +7057,7 @@ private func makeExerciseTrackingTypeServiceContext() throws -> ExerciseTracking
     let exerciseStatsRepo = ExerciseStatsRepository(modelContainer: container)
     let performanceRecordRepo = PerformanceRecordRepository(modelContainer: container)
     let healthProfileRepo = HealthProfileRepository(modelContainer: container)
+    let templateRepo = TemplateRepository(modelContainer: container)
     let prService = PRService(
         performanceRecordRepository: performanceRecordRepo,
         setRepository: setRepo,
@@ -7005,6 +7077,7 @@ private func makeExerciseTrackingTypeServiceContext() throws -> ExerciseTracking
         setRepository: setRepo,
         exerciseStatsRepository: exerciseStatsRepo,
         performanceRecordRepository: performanceRecordRepo,
+        templateRepository: templateRepo,
         prService: prService,
         statsService: statsService,
         fatigueLearningService: makeStubFatigueLearningService()

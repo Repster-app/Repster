@@ -9,6 +9,9 @@ import UniformTypeIdentifiers
 struct CreateEditTemplateView: View {
 
     private let editingTemplateId: UUID?
+    /// What the list already knows this template holds, used only to tell an empty read apart from a
+    /// genuinely empty template. See `CreateEditTemplateViewModel.loadFailed`.
+    private let expectedExerciseCount: Int?
     private let existingFolders: [String]
     private let onSaved: (() -> Void)?
     @State private var viewModel: CreateEditTemplateViewModel
@@ -23,11 +26,13 @@ struct CreateEditTemplateView: View {
         templateService: any TemplateServiceProtocol,
         exerciseService: any ExerciseServiceProtocol,
         editingTemplateId: UUID? = nil,
+        expectedExerciseCount: Int? = nil,
         existingFolders: [String] = [],
         analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService(),
         onSaved: (() -> Void)? = nil
     ) {
         self.editingTemplateId = editingTemplateId
+        self.expectedExerciseCount = expectedExerciseCount
         self.existingFolders = existingFolders
         self.onSaved = onSaved
         _viewModel = State(initialValue: CreateEditTemplateViewModel(
@@ -39,19 +44,23 @@ struct CreateEditTemplateView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                // Template name
-                nameSection
+            if viewModel.loadFailed {
+                loadFailedState
+            } else {
+                VStack(spacing: 16) {
+                    // Template name
+                    nameSection
 
-                // Exercises header + list
-                exercisesSection
+                    // Exercises header + list
+                    exercisesSection
 
-                // Add exercise button
-                addExerciseButton
+                    // Add exercise button
+                    addExerciseButton
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 40)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
-            .padding(.bottom, 40)
         }
         .background(Color.bg)
         .navigationTitle(editingTemplateId != nil ? "Edit Template" : "New Template")
@@ -78,7 +87,10 @@ struct CreateEditTemplateView: View {
         }
         .preferredColorScheme(.dark)
         .task(id: editingTemplateId) {
-            await viewModel.prepareForPresentation(editingTemplateId: editingTemplateId)
+            await viewModel.prepareForPresentation(
+                editingTemplateId: editingTemplateId,
+                expectedExerciseCount: expectedExerciseCount
+            )
         }
         .sheet(isPresented: $viewModel.showExercisePicker) {
             exercisePickerSheet
@@ -192,10 +204,9 @@ struct CreateEditTemplateView: View {
             if viewModel.exercises.isEmpty {
                 emptyExercisesState
             } else {
-                ForEach(Array(viewModel.exercises.enumerated()), id: \.element.id) { index, exercise in
+                ForEach(viewModel.exercises) { exercise in
                     TemplateExerciseCard(
                         exercise: exercise,
-                        exerciseIndex: index,
                         viewModel: viewModel,
                         draggedExerciseId: $draggedExerciseId,
                         dropTargetExerciseId: $dropTargetExerciseId,
@@ -204,6 +215,47 @@ struct CreateEditTemplateView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Load Failure
+
+    /// Shown instead of the form when the template could not be read.
+    ///
+    /// The form is not merely disabled here — it is not rendered at all. An empty editor titled
+    /// "Edit Template" is indistinguishable from a template with nothing in it, and saving one over
+    /// a template that failed to load replaces its real contents.
+    private var loadFailedState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 32))
+                .foregroundColor(.textTertiary)
+
+            Text("Couldn't load this template")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.textPrimary)
+
+            Text("Nothing has been changed. Try again, or go back and reopen it.")
+                .font(.system(size: 13, weight: .regular))
+                .foregroundColor(.textTertiary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+
+            Button {
+                Task { await viewModel.retryLoad() }
+            } label: {
+                Text("Try again")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.accent)
+                    .padding(.horizontal, 22)
+                    .frame(height: 44)
+                    .background(Color.accentSoft)
+                    .cornerRadius(12)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 80)
     }
 
     // MARK: - Empty State
@@ -271,7 +323,6 @@ struct CreateEditTemplateView: View {
 private struct TemplateExerciseCard: View {
 
     let exercise: EditorExercise
-    let exerciseIndex: Int
     var viewModel: CreateEditTemplateViewModel
     @Binding var draggedExerciseId: UUID?
     @Binding var dropTargetExerciseId: UUID?
@@ -553,8 +604,10 @@ private struct TemplateExerciseCard: View {
         }
 
         Button {
-            viewModel.exercises[exerciseIndex].notes = exercise.notes ?? ""
-            viewModel.exercises[exerciseIndex].isExpanded = true
+            viewModel.updateExercise(id: exercise.id) {
+                $0.notes = exercise.notes ?? ""
+                $0.isExpanded = true
+            }
         } label: {
             Label(exercise.notes != nil ? "Edit note" : "Add note", systemImage: "note.text")
         }
@@ -581,7 +634,9 @@ private struct TemplateExerciseCard: View {
             HStack(spacing: 8) {
                 TextField("—", value: Binding(
                     get: { exercise.restTimeSeconds },
-                    set: { viewModel.exercises[exerciseIndex].restTimeSeconds = $0 }
+                    set: { newValue in
+                        viewModel.updateExercise(id: exercise.id) { $0.restTimeSeconds = newValue }
+                    }
                 ), format: .number)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.textPrimary)
@@ -609,7 +664,9 @@ private struct TemplateExerciseCard: View {
     private var notesSection: some View {
         TextEditor(text: Binding(
             get: { exercise.notes ?? "" },
-            set: { viewModel.exercises[exerciseIndex].notes = $0.isEmpty ? nil : $0 }
+            set: { newValue in
+                viewModel.updateExercise(id: exercise.id) { $0.notes = newValue.isEmpty ? nil : newValue }
+            }
         ))
         .scrollContentBackground(.hidden)
         .font(.system(size: 13))

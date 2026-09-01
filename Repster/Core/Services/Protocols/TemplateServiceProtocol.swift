@@ -35,6 +35,42 @@ struct TemplateListRow: Sendable {
     let hasSuperset: Bool
 }
 
+/// One template's whole contents, assembled inside the repository actor.
+///
+/// The detail read used to fetch `[TemplateExercise]` out of the actor and then read
+/// `templateExercise.id` on the service's actor to issue the next query — the query that decides
+/// which sets belong to which exercise. That is the crash class
+/// SWIFTDATA_CONCURRENCY_CRASH_ANALYSIS.md exists about, in the one read where getting it wrong would
+/// silently reparent sets. Value types, like `TemplateListRow`, so no `@Model` crosses the boundary.
+struct TemplateDetailRows: Sendable {
+    let id: UUID
+    let name: String
+    let notes: String?
+    let folder: String?
+    let lastUsedAt: Date?
+    let createdAt: Date
+    let exercises: [TemplateExerciseRow]
+}
+
+struct TemplateExerciseRow: Sendable {
+    let id: UUID
+    let exerciseId: UUID
+    let orderInTemplate: Int
+    let supersetGroupId: UUID?
+    let restTimeSeconds: Int?
+    let notes: String?
+    let sets: [TemplateSetRowData]
+}
+
+struct TemplateSetRowData: Sendable {
+    let id: UUID
+    let setType: SetType
+    let targetRepMin: Int?
+    let targetRepMax: Int?
+    let targetRIR: Int?
+    let orderInExercise: Int
+}
+
 /// Full template detail including all exercises and sets.
 struct TemplateDetail: Sendable {
     let template: TemplateSummary
@@ -262,6 +298,10 @@ protocol TemplateServiceProtocol: Sendable {
 
     /// Delete a template and all its exercises and sets.
     func deleteTemplate(_ templateId: UUID) async throws
+
+    /// Move a template between folders. Touches the folder and nothing else — see
+    /// `TemplateRepositoryProtocol.updateTemplateFolder` for why this is not an `updateTemplate`.
+    func updateTemplateFolder(_ templateId: UUID, folder: String?) async throws
 
     /// Copy a template, its exercises, its sets, its folder and its superset groups under a new name.
     /// Returns the new template's ID.

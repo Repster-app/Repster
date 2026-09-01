@@ -126,6 +126,7 @@ final class ServiceContainer {
             setRepository: repositoryContainer.setRepository,
             exerciseStatsRepository: repositoryContainer.exerciseStatsRepository,
             performanceRecordRepository: repositoryContainer.performanceRecordRepository,
+            templateRepository: repositoryContainer.templateRepository,
             prService: prService,
             statsService: statsService,
             fatigueLearningService: fatigueLearningService

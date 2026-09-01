@@ -69,6 +69,57 @@ actor TemplateRepository: TemplateRepositoryProtocol {
         }
     }
 
+    /// See the protocol. Three fetches, grouped in memory, nothing handed out but values.
+    func fetchTemplateDetailRows(templateId: UUID) throws -> TemplateDetailRows? {
+        guard let template = try modelContext.fetch(
+            FetchDescriptor<WorkoutTemplate>(predicate: #Predicate { $0.id == templateId })
+        ).first else { return nil }
+
+        let exercises = try modelContext.fetch(
+            FetchDescriptor<TemplateExercise>(
+                predicate: #Predicate { $0.templateId == templateId },
+                sortBy: [SortDescriptor(\.orderInTemplate)]
+            )
+        )
+        let exerciseIds = Set(exercises.map(\.id))
+        let setsByExercise = Dictionary(
+            grouping: try modelContext.fetch(FetchDescriptor<TemplateSet>())
+                .filter { exerciseIds.contains($0.templateExerciseId) },
+            by: \.templateExerciseId
+        )
+
+        return TemplateDetailRows(
+            id: template.id,
+            name: template.name,
+            notes: template.notes,
+            folder: template.folder,
+            lastUsedAt: template.lastUsedAt,
+            createdAt: template.createdAt,
+            exercises: exercises.map { exercise in
+                TemplateExerciseRow(
+                    id: exercise.id,
+                    exerciseId: exercise.exerciseId,
+                    orderInTemplate: exercise.orderInTemplate,
+                    supersetGroupId: exercise.supersetGroupId,
+                    restTimeSeconds: exercise.restTimeSeconds,
+                    notes: exercise.notes,
+                    sets: (setsByExercise[exercise.id] ?? [])
+                        .sorted { $0.orderInExercise < $1.orderInExercise }
+                        .map { set in
+                            TemplateSetRowData(
+                                id: set.id,
+                                setType: set.setType,
+                                targetRepMin: set.targetRepMin,
+                                targetRepMax: set.targetRepMax,
+                                targetRIR: set.targetRIR,
+                                orderInExercise: set.orderInExercise
+                            )
+                        }
+                )
+            }
+        )
+    }
+
     // MARK: - Atomic whole-template writes
 
     /// Replace a template's exercises and sets in one commit. See the protocol for why.
@@ -116,6 +167,76 @@ actor TemplateRepository: TemplateRepositoryProtocol {
             modelContext.rollback()
             throw error
         }
+    }
+
+    /// See the protocol for why this exists. Everything is read **before** anything is deleted:
+    /// re-fetching after a delete can hand back rows whose attributes are unresolved faults, and
+    /// touching one of those is fatal (SWIFTDATA_CONCURRENCY_CRASH_ANALYSIS.md).
+    @discardableResult
+    func deleteTemplateReferences(toExerciseId exerciseId: UUID) throws -> Int {
+        do {
+            let doomed = try modelContext.fetch(
+                FetchDescriptor<TemplateExercise>(
+                    predicate: #Predicate { $0.exerciseId == exerciseId }
+                )
+            )
+            guard !doomed.isEmpty else { return 0 }
+
+            let doomedIds = Set(doomed.map(\.id))
+            var survivorsByTemplate: [UUID: [TemplateExercise]] = [:]
+            for templateId in Set(doomed.map(\.templateId)) {
+                survivorsByTemplate[templateId] = try fetchTemplateExercises(for: templateId)
+                    .filter { !doomedIds.contains($0.id) }
+            }
+
+            for templateExercise in doomed {
+                for set in try fetchTemplateSets(for: templateExercise.id) {
+                    modelContext.delete(set)
+                }
+                modelContext.delete(templateExercise)
+            }
+
+            let now = Date()
+            for (templateId, survivors) in survivorsByTemplate {
+                var membersByGroup: [UUID: Int] = [:]
+                for survivor in survivors {
+                    guard let groupId = survivor.supersetGroupId else { continue }
+                    membersByGroup[groupId, default: 0] += 1
+                }
+
+                for (index, survivor) in survivors.enumerated() {
+                    survivor.orderInTemplate = index + 1
+                    if let groupId = survivor.supersetGroupId, membersByGroup[groupId] == 1 {
+                        survivor.supersetGroupId = nil
+                    }
+                    survivor.updatedAt = now
+                }
+
+                for template in try modelContext.fetch(
+                    FetchDescriptor<WorkoutTemplate>(predicate: #Predicate { $0.id == templateId })
+                ) {
+                    template.updatedAt = now
+                }
+            }
+
+            try modelContext.save()
+            return doomed.count
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
+    }
+
+    /// See the protocol for why this is not a `replaceTemplateContents` round trip.
+    func updateTemplateFolder(templateId: UUID, folder: String?) throws {
+        let descriptor = FetchDescriptor<WorkoutTemplate>(
+            predicate: #Predicate { $0.id == templateId }
+        )
+        guard let template = try modelContext.fetch(descriptor).first else { return }
+
+        template.folder = folder
+        template.updatedAt = Date()
+        try modelContext.save()
     }
 
     func deleteTemplateAndContents(templateId: UUID) throws {

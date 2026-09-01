@@ -140,6 +140,7 @@ actor ExerciseService: ExerciseServiceProtocol {
     private let setRepo: SetRepositoryProtocol
     private let exerciseStatsRepo: ExerciseStatsRepositoryProtocol
     private let performanceRecordRepo: PerformanceRecordRepositoryProtocol
+    private let templateRepo: TemplateRepositoryProtocol
     private let prService: PRServiceProtocol
     private let statsService: StatsServiceProtocol
     private let fatigueLearningService: FatigueLearningService
@@ -149,6 +150,7 @@ actor ExerciseService: ExerciseServiceProtocol {
         setRepository: SetRepositoryProtocol,
         exerciseStatsRepository: ExerciseStatsRepositoryProtocol,
         performanceRecordRepository: PerformanceRecordRepositoryProtocol,
+        templateRepository: TemplateRepositoryProtocol,
         prService: PRServiceProtocol,
         statsService: StatsServiceProtocol,
         fatigueLearningService: FatigueLearningService
@@ -157,6 +159,7 @@ actor ExerciseService: ExerciseServiceProtocol {
         self.setRepo = setRepository
         self.exerciseStatsRepo = exerciseStatsRepository
         self.performanceRecordRepo = performanceRecordRepository
+        self.templateRepo = templateRepository
         self.prService = prService
         self.statsService = statsService
         self.fatigueLearningService = fatigueLearningService
@@ -253,7 +256,15 @@ actor ExerciseService: ExerciseServiceProtocol {
         // 4. Delete all PerformanceRecords for this exercise
         try await performanceRecordRepo.deleteAll(for: exerciseId)
 
-        // 5. Delete the exercise itself
+        // 5. Drop every template row that points at this exercise.
+        //
+        // This step was missing, and "full cascade" was wrong because of it: the template kept a
+        // `TemplateExercise` whose `exerciseId` no longer resolved, which `fetchTemplateDetail`
+        // renders as "Unknown Exercise" and still counts in the template's set total. It runs
+        // before the exercise row goes so a throw here leaves the library intact.
+        try await templateRepo.deleteTemplateReferences(toExerciseId: exerciseId)
+
+        // 6. Delete the exercise itself
         try await exerciseRepo.delete(exercise)
     }
 

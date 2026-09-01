@@ -84,7 +84,9 @@ actor TemplateService: TemplateServiceProtocol {
         let rows = try await templateRepo.fetchTemplateListRows()
         guard !rows.isEmpty else { return [] }
 
-        let allExercises = try await exerciseRepo.fetchAll()
+        // Snapshots, not `@Model`s: `fetchAll` hands back live objects whose properties were then
+        // faulted here, on this actor. Same crash class as the detail read below.
+        let allExercises = try await exerciseRepo.fetchAllChartExercises()
         var muscleByExerciseId: [UUID: String] = [:]
         for exercise in allExercises {
             if let muscle = ExercisePrimaryGroup.normalizedValue(exercise.primaryMuscle) {
@@ -122,22 +124,29 @@ actor TemplateService: TemplateServiceProtocol {
         }
     }
 
+    /// Two actor round trips, and no `@Model` crosses either one.
+    ///
+    /// This was `1 + 2E` hops — per exercise a fetch for its sets and a fetch for its `Exercise` —
+    /// with `templateExercise.id` faulted here, on this actor, to drive the set lookup. That is the
+    /// read that decides which sets belong to which exercise, so it is the worst place in the feature
+    /// to be doing it. The rows now arrive assembled from inside the repository actor.
     func fetchTemplateDetail(_ templateId: UUID) async throws -> TemplateDetail? {
-        guard let template = try await templateRepo.fetchTemplate(byId: templateId) else {
+        guard let rows = try await templateRepo.fetchTemplateDetailRows(templateId: templateId) else {
             return nil
         }
 
-        let templateExercises = try await templateRepo.fetchTemplateExercises(for: templateId)
-        var exerciseDetails: [TemplateExerciseDetail] = []
-        var totalSets = 0
+        let allExercises = try await exerciseRepo.fetchAllChartExercises()
+        let exercisesById = Dictionary(uniqueKeysWithValues: allExercises.map { ($0.id, $0) })
+
         var muscleGroups: [String] = []
+        var totalSets = 0
 
-        for templateExercise in templateExercises {
-            let sets = try await templateRepo.fetchTemplateSets(for: templateExercise.id)
-            totalSets += sets.count
+        let exerciseDetails: [TemplateExerciseDetail] = rows.exercises.map { row in
+            totalSets += row.sets.count
 
-            let exercise = try await exerciseRepo.fetch(byId: templateExercise.exerciseId)
-            let exerciseName = exercise?.name ?? "Unknown Exercise"
+            // Still resolved leniently: an exercise deleted from the library leaves the template row
+            // in place, and the screen says so rather than pretending the exercise was never there.
+            let exercise = exercisesById[row.exerciseId]
             let primaryMuscle = exercise?.primaryMuscle
 
             if let muscle = ExercisePrimaryGroup.normalizedValue(primaryMuscle),
@@ -145,16 +154,16 @@ actor TemplateService: TemplateServiceProtocol {
                 muscleGroups.append(muscle)
             }
 
-            exerciseDetails.append(TemplateExerciseDetail(
-                id: templateExercise.id,
-                exerciseId: templateExercise.exerciseId,
-                exerciseName: exerciseName,
+            return TemplateExerciseDetail(
+                id: row.id,
+                exerciseId: row.exerciseId,
+                exerciseName: exercise?.name ?? "Unknown Exercise",
                 primaryMuscle: primaryMuscle,
-                orderInTemplate: templateExercise.orderInTemplate,
-                supersetGroupId: templateExercise.supersetGroupId,
-                restTimeSeconds: templateExercise.restTimeSeconds,
-                notes: templateExercise.notes,
-                sets: sets.map { set in
+                orderInTemplate: row.orderInTemplate,
+                supersetGroupId: row.supersetGroupId,
+                restTimeSeconds: row.restTimeSeconds,
+                notes: row.notes,
+                sets: row.sets.map { set in
                     TemplateSetDetail(
                         id: set.id,
                         setType: set.setType,
@@ -164,22 +173,23 @@ actor TemplateService: TemplateServiceProtocol {
                         orderInExercise: set.orderInExercise
                     )
                 }
-            ))
+            )
         }
 
-        let summary = TemplateSummary(
-            id: template.id,
-            name: template.name,
-            notes: template.notes,
-            folder: template.folder,
-            exerciseCount: templateExercises.count,
-            totalSetCount: totalSets,
-            muscleGroups: muscleGroups,
-            lastUsedAt: template.lastUsedAt,
-            createdAt: template.createdAt
+        return TemplateDetail(
+            template: TemplateSummary(
+                id: rows.id,
+                name: rows.name,
+                notes: rows.notes,
+                folder: rows.folder,
+                exerciseCount: rows.exercises.count,
+                totalSetCount: totalSets,
+                muscleGroups: muscleGroups,
+                lastUsedAt: rows.lastUsedAt,
+                createdAt: rows.createdAt
+            ),
+            exercises: exerciseDetails
         )
-
-        return TemplateDetail(template: summary, exercises: exerciseDetails)
     }
 
     func createTemplate(_ data: TemplateSaveData) async throws -> UUID {
@@ -203,6 +213,18 @@ actor TemplateService: TemplateServiceProtocol {
         // One commit. The old delete-then-insert-per-row sequence could leave the template with zero
         // exercises if anything interrupted it — see TEMPLATES_IMPLEMENTATION_PLAN.md D2.
         try await templateRepo.replaceTemplateContents(templateId: templateId, exercises: data.exercises)
+    }
+
+    func updateTemplateFolder(_ templateId: UUID, folder: String?) async throws {
+        guard try await templateRepo.fetchTemplate(byId: templateId) != nil else {
+            throw TemplateServiceError.templateNotFound(templateId)
+        }
+        // Same rule `TemplateSaveData` applies, so this path cannot create a ghost folder that the
+        // editor's path would have trimmed away.
+        try await templateRepo.updateTemplateFolder(
+            templateId: templateId,
+            folder: TemplateFolder.normalized(folder)
+        )
     }
 
     func deleteTemplate(_ templateId: UUID) async throws {

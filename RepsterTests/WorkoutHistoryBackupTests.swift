@@ -1627,6 +1627,7 @@ final class WorkoutHistoryBackupArchiveServiceTests: XCTestCase {
             setRepository: setRepo,
             exerciseStatsRepository: exerciseStatsRepo,
             performanceRecordRepository: performanceRecordRepo,
+            templateRepository: templateRepo,
             prService: prService,
             statsService: statsService,
             fatigueLearningService: fatigueLearningService

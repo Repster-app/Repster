@@ -54,6 +54,7 @@ final class WorkoutJourneyTests: XCTestCase {
                 for: Exercise.self, Workout.self, WorkoutSet.self, ExerciseStats.self,
                 PerformanceRecord.self, BodyweightEntry.self, HealthProfile.self,
                 FatigueObservation.self, FatigueLearningSetAudit.self,
+                WorkoutTemplate.self, TemplateExercise.self, TemplateSet.self,
                 configurations: ModelConfiguration(isStoredInMemoryOnly: true)
             )
 
@@ -67,6 +68,7 @@ final class WorkoutJourneyTests: XCTestCase {
             let performanceRecordRepo = PerformanceRecordRepository(modelContainer: container)
             let fatigueObservationRepo = FatigueObservationRepository(modelContainer: container)
             let fatigueLearningAuditRepo = FatigueLearningSetAuditRepository(modelContainer: container)
+            let templateRepo = TemplateRepository(modelContainer: container)
 
             statsService = StatsService(
                 exerciseStatsRepository: exerciseStatsRepo,
@@ -102,6 +104,7 @@ final class WorkoutJourneyTests: XCTestCase {
                 setRepository: setRepo,
                 exerciseStatsRepository: exerciseStatsRepo,
                 performanceRecordRepository: performanceRecordRepo,
+                templateRepository: templateRepo,
                 prService: prService,
                 statsService: statsService,
                 fatigueLearningService: fatigueLearningService

@@ -132,6 +132,9 @@ struct TemplateFlowView: View {
                         templateService: templateService,
                         exerciseService: exerciseService,
                         editingTemplateId: route.editingTemplateId,
+                        expectedExerciseCount: route.editingTemplateId.flatMap { id in
+                            viewModel.templates.first(where: { $0.id == id })?.exerciseCount
+                        },
                         existingFolders: viewModel.folderChips.filter { !$0.isAll }.map(\.name),
                         analyticsService: analyticsService,
                         onSaved: {

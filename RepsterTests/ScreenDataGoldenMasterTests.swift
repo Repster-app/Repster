@@ -48,6 +48,7 @@ final class ScreenDataGoldenMasterTests: XCTestCase {
             for: Exercise.self, Workout.self, WorkoutSet.self, ExerciseStats.self,
             PerformanceRecord.self, BodyweightEntry.self, HealthProfile.self,
             FatigueObservation.self, FatigueLearningSetAudit.self,
+            WorkoutTemplate.self, TemplateExercise.self, TemplateSet.self,
             configurations: configuration
         )
 
@@ -60,6 +61,7 @@ final class ScreenDataGoldenMasterTests: XCTestCase {
         let healthProfileRepo = HealthProfileRepository(modelContainer: container)
         let fatigueObservationRepo = FatigueObservationRepository(modelContainer: container)
         let fatigueAuditRepo = FatigueLearningSetAuditRepository(modelContainer: container)
+        let templateRepo = TemplateRepository(modelContainer: container)
 
         let statsService = StatsService(
             exerciseStatsRepository: exerciseStatsRepo,
@@ -99,6 +101,7 @@ final class ScreenDataGoldenMasterTests: XCTestCase {
             setRepository: setRepo,
             exerciseStatsRepository: exerciseStatsRepo,
             performanceRecordRepository: performanceRecordRepo,
+            templateRepository: templateRepo,
             prService: prService,
             statsService: statsService,
             fatigueLearningService: fatigueLearningService

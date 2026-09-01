@@ -208,36 +208,13 @@ final class TemplateListViewModel {
         return workout
     }
 
-    /// Re-file a template without opening the editor. Reads the current detail so the move rewrites
-    /// only the folder — everything else round-trips exactly as stored.
+    /// Re-file a template without opening the editor.
+    ///
+    /// This used to read the whole detail and push it back through `updateTemplate`, which deletes
+    /// and recreates every exercise and set to change one nullable string. It now changes the folder
+    /// and nothing else — the contents are never read, let alone rewritten.
     func setFolder(_ folder: String?, for templateId: UUID) async throws {
-        guard let detail = try await templateService.fetchTemplateDetail(templateId) else { return }
-        try await templateService.updateTemplate(
-            templateId,
-            data: TemplateSaveData(
-                name: detail.template.name,
-                notes: detail.template.notes,
-                folder: folder,
-                exercises: detail.exercises.map { exercise in
-                    TemplateSaveExercise(
-                        exerciseId: exercise.exerciseId,
-                        orderInTemplate: exercise.orderInTemplate,
-                        supersetGroupId: exercise.supersetGroupId,
-                        restTimeSeconds: exercise.restTimeSeconds,
-                        notes: exercise.notes,
-                        sets: exercise.sets.map {
-                            TemplateSaveSet(
-                                setType: $0.setType,
-                                targetRepMin: $0.targetRepMin,
-                                targetRepMax: $0.targetRepMax,
-                                targetRIR: $0.targetRIR,
-                                orderInExercise: $0.orderInExercise
-                            )
-                        }
-                    )
-                }
-            )
-        )
+        try await templateService.updateTemplateFolder(templateId, folder: folder)
         await loadTemplates()
     }
 

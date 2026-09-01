@@ -23,7 +23,6 @@ struct EditorExercise: Identifiable {
 /// A pairing option in the "Superset with…" sheet.
 struct SupersetCandidate: Identifiable {
     let id: UUID
-    let index: Int
     let name: String
     let setSummary: String
     /// Non-nil when this exercise is already in a group, which makes the row unselectable.
@@ -69,6 +68,23 @@ final class CreateEditTemplateViewModel {
     var isSaving: Bool = false
     var showExercisePicker: Bool = false
 
+    /// The load did not produce the template it was asked for.
+    ///
+    /// Before this existed the editor silently presented an empty form on a failed read, and Save
+    /// would then replace the real template's contents with whatever had been typed into it. Save is
+    /// blocked while this is set.
+    var loadFailed: Bool = false
+
+    /// Bumped per load so a superseded one cannot land after a newer one.
+    private var loadGeneration = 0
+    /// What the list says this template holds, so a read that comes back with nothing can be told
+    /// apart from a template that genuinely has nothing.
+    private var expectedExerciseCount: Int?
+    /// Set by `retryLoad`. A second read that is also empty is taken as the truth — templates can
+    /// legitimately end up empty (every exercise they used was deleted from the library), and that
+    /// one must stay editable.
+    private var didAcceptEmptyLoad = false
+
     /// If non-nil, we're editing an existing template. Otherwise creating new.
     var editingTemplateId: UUID? = nil
 
@@ -102,15 +118,25 @@ final class CreateEditTemplateViewModel {
     }
 
     /// Re-initializes editor state for the current presentation and loads template data if editing.
-    func prepareForPresentation(editingTemplateId: UUID?) async {
+    ///
+    /// `expectedExerciseCount` is what the templates list already knows this template holds. It is
+    /// only used to judge an empty read — see `loadFailed`.
+    func prepareForPresentation(editingTemplateId: UUID?, expectedExerciseCount: Int? = nil) async {
         self.editingTemplateId = editingTemplateId
+        self.expectedExerciseCount = expectedExerciseCount
         resetEditorState()
+        await loadIfEditing()
+    }
+
+    func retryLoad() async {
+        didAcceptEmptyLoad = true
         await loadIfEditing()
     }
 
     // MARK: - Computed
 
     var canSave: Bool {
+        !loadFailed &&
         !templateName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !exercises.isEmpty
     }
@@ -123,13 +149,37 @@ final class CreateEditTemplateViewModel {
 
     func loadIfEditing() async {
         guard let templateId = editingTemplateId else { return }
+
+        loadGeneration &+= 1
+        let generation = loadGeneration
         isLoading = true
-        defer { isLoading = false }
+        loadFailed = false
 
         do {
-            guard let detail = try await fetchTemplateDetailWithRetry(templateId) else { return }
+            let detail = try await fetchTemplateDetailWithRetry(templateId)
+            // A newer load owns the editor's state now, including isLoading. Landing this one would
+            // put another template's contents in front of the id the editor is about to save to.
+            guard generation == loadGeneration else { return }
+            isLoading = false
+
+            guard let detail else {
+                loadFailed = true
+                return
+            }
+
+            if detail.exercises.isEmpty,
+               let expectedExerciseCount,
+               expectedExerciseCount > 0,
+               !didAcceptEmptyLoad {
+                loadFailed = true
+                return
+            }
+
             applyTemplateDetail(detail)
         } catch {
+            guard generation == loadGeneration else { return }
+            isLoading = false
+            loadFailed = true
             dbg("[CreateEditTemplateViewModel] Failed to load template: \(error)")
         }
     }
@@ -188,6 +238,8 @@ final class CreateEditTemplateViewModel {
         templateFolder = nil
         exercises = []
         supersetGroupLabels = [:]
+        loadFailed = false
+        didAcceptEmptyLoad = false
     }
 
     // MARK: - Save
@@ -309,6 +361,18 @@ final class CreateEditTemplateViewModel {
         exercises[index].isExpanded.toggle()
     }
 
+    /// Mutate an exercise by **id**, never by position — the counterpart to `updateSet`.
+    ///
+    /// The card's note, rest-time and expand writes were the last four that still went through
+    /// `exercises[exerciseIndex]`. A card captures its index when it renders and the array moves
+    /// underneath it — a drag reorder mutates it on every `dropEntered`, and pairing a non-adjacent
+    /// superset partner moves an exercise outright — so those writes could land on a different
+    /// exercise, and an unguarded subscript could go out of bounds outright once the array shrank.
+    func updateExercise(id: UUID, _ mutate: (inout EditorExercise) -> Void) {
+        guard let index = exercises.firstIndex(where: { $0.id == id }) else { return }
+        mutate(&exercises[index])
+    }
+
     // MARK: - Identity-addressed set edits
 
     /// Mutate a set by **id**, never by position.
@@ -401,7 +465,6 @@ final class CreateEditTemplateViewModel {
             let partnerLabel = supersetLabel(for: candidate.supersetGroupId)
             return SupersetCandidate(
                 id: candidate.id,
-                index: index,
                 name: candidate.exerciseName,
                 setSummary: setSummary(for: candidate),
                 existingGroupLabel: partnerLabel,

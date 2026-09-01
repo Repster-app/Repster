@@ -811,6 +811,342 @@ final class TemplateServiceTests: XCTestCase {
         }
     }
 
+    // MARK: - The detail read
+
+    func testAnExerciseDeletedFromTheLibraryStillResolvesThroughTheRowsPath() async throws {
+        // The lenient resolve has to survive the switch from a per-exercise fetch to one snapshot
+        // lookup — a dangling row must read as "Unknown Exercise", not disappear and not throw.
+        let context = try makeContext()
+        let bench = makeExercise(name: "Bench Press")
+        try await context.exerciseRepo.save(bench)
+        let ghostId = UUID()
+
+        let templateId = try await context.service.createTemplate(
+            TemplateSaveData(name: "Push", notes: nil, exercises: [
+                saveExercise(bench.id, order: 1, sets: [saveSet(order: 1)]),
+                saveExercise(ghostId, order: 2, sets: [saveSet(order: 1), saveSet(order: 2)])
+            ])
+        )
+
+        let fetched = try await context.service.fetchTemplateDetail(templateId)
+        let detail = try XCTUnwrap(fetched)
+
+        XCTAssertEqual(detail.exercises.map(\.exerciseName), ["Bench Press", "Unknown Exercise"])
+        XCTAssertEqual(detail.exercises.map(\.sets.count), [1, 2])
+        XCTAssertNil(detail.exercises[1].primaryMuscle)
+        XCTAssertEqual(detail.template.totalSetCount, 3)
+        XCTAssertEqual(detail.template.muscleGroups, ["chest"])
+    }
+
+    func testDetailRowsCarrySetsOnlyForTheirOwnExercise() async throws {
+        // The rows path fetches every TemplateSet once and groups them, rather than querying per
+        // exercise. A grouping mistake here is exactly the reparenting this feature was investigated
+        // for, so it is asserted directly rather than through a count.
+        let context = try makeContext()
+        let bench = makeExercise(name: "Bench Press")
+        let fly = makeExercise(name: "Cable Fly")
+        try await context.exerciseRepo.save(bench)
+        try await context.exerciseRepo.save(fly)
+
+        let mine = try await context.service.createTemplate(
+            TemplateSaveData(name: "Push", notes: nil, exercises: [
+                saveExercise(bench.id, order: 1, sets: [saveSet(order: 1, min: 3, max: 5)]),
+                saveExercise(fly.id, order: 2, sets: [
+                    saveSet(order: 1, min: 12, max: 15), saveSet(order: 2, min: 12, max: 15)
+                ])
+            ])
+        )
+        // A second template's sets live in the same table and must not leak in.
+        _ = try await context.service.createTemplate(
+            TemplateSaveData(name: "Pull", notes: nil, exercises: [
+                saveExercise(bench.id, order: 1, sets: [saveSet(order: 1), saveSet(order: 2), saveSet(order: 3)])
+            ])
+        )
+
+        let fetchedRows = try await context.templateRepo.fetchTemplateDetailRows(templateId: mine)
+        let rows = try XCTUnwrap(fetchedRows)
+
+        XCTAssertEqual(rows.exercises.map(\.sets.count), [1, 2])
+        XCTAssertEqual(rows.exercises[0].sets.map(\.targetRepMin), [3])
+        XCTAssertEqual(rows.exercises[1].sets.map(\.targetRepMin), [12, 12])
+        XCTAssertEqual(rows.exercises[1].sets.map(\.orderInExercise), [1, 2])
+    }
+
+    func testDetailRowsAreNilForAMissingTemplate() async throws {
+        let context = try makeContext()
+        let rows = try await context.templateRepo.fetchTemplateDetailRows(templateId: UUID())
+        XCTAssertNil(rows)
+    }
+
+    // MARK: - Filing a template into a folder
+
+    func testMovingATemplateToAFolderLeavesItsContentsUntouched() async throws {
+        // Filing used to read the whole detail and push it back through replaceTemplateContents,
+        // which deletes and recreates every row to change one nullable string.
+        let context = try makeContext()
+        let bench = makeExercise(name: "Bench Press")
+        let fly = makeExercise(name: "Cable Fly")
+        try await context.exerciseRepo.save(bench)
+        try await context.exerciseRepo.save(fly)
+
+        let templateId = try await context.service.createTemplate(
+            TemplateSaveData(name: "Push", notes: "leave me", exercises: [
+                saveExercise(bench.id, order: 1, sets: [saveSet(order: 1), saveSet(order: 2)]),
+                saveExercise(fly.id, order: 2, sets: [saveSet(order: 1)])
+            ])
+        )
+
+        let before = try await context.templateRepo.fetchTemplateExercises(for: templateId)
+        let beforeExerciseIds = before.map(\.id)
+        let beforeCreatedAt = before.map(\.createdAt)
+        var beforeSetIds: [UUID] = []
+        for row in before {
+            beforeSetIds += try await context.templateRepo.fetchTemplateSets(for: row.id).map(\.id)
+        }
+
+        try await context.service.updateTemplateFolder(templateId, folder: "Push Days")
+
+        let after = try await context.templateRepo.fetchTemplateExercises(for: templateId)
+        var afterSetIds: [UUID] = []
+        for row in after {
+            afterSetIds += try await context.templateRepo.fetchTemplateSets(for: row.id).map(\.id)
+        }
+
+        // The same rows, not equivalent replacements.
+        XCTAssertEqual(after.map(\.id), beforeExerciseIds)
+        XCTAssertEqual(afterSetIds, beforeSetIds)
+        XCTAssertEqual(after.map(\.createdAt), beforeCreatedAt)
+
+        let fetched = try await context.service.fetchTemplateDetail(templateId)
+        let detail = try XCTUnwrap(fetched)
+        XCTAssertEqual(detail.template.folder, "Push Days")
+        XCTAssertEqual(detail.template.notes, "leave me")
+        XCTAssertEqual(detail.exercises.map(\.sets.count), [2, 1])
+    }
+
+    func testMovingATemplateOutOfAFolderClearsIt() async throws {
+        let context = try makeContext()
+        let bench = makeExercise(name: "Bench Press")
+        try await context.exerciseRepo.save(bench)
+        let templateId = try await context.service.createTemplate(
+            TemplateSaveData(name: "Push", notes: nil, folder: "Push Days", exercises: [
+                saveExercise(bench.id, order: 1, sets: [saveSet(order: 1)])
+            ])
+        )
+
+        try await context.service.updateTemplateFolder(templateId, folder: nil)
+
+        let fetched = try await context.service.fetchTemplateDetail(templateId)
+        XCTAssertNil(try XCTUnwrap(fetched).template.folder)
+    }
+
+    func testMovingToAWhitespaceFolderNameFilesItNowhere() async throws {
+        // The editor's path normalises through TemplateSaveData; this one has to match or a folder
+        // named "   " appears in the list.
+        let context = try makeContext()
+        let bench = makeExercise(name: "Bench Press")
+        try await context.exerciseRepo.save(bench)
+        let templateId = try await makeSimpleTemplate(context, exerciseId: bench.id, name: "Push")
+
+        try await context.service.updateTemplateFolder(templateId, folder: "   ")
+
+        let fetched = try await context.service.fetchTemplateDetail(templateId)
+        XCTAssertNil(try XCTUnwrap(fetched).template.folder)
+    }
+
+    func testMovingTrimsTheFolderName() async throws {
+        let context = try makeContext()
+        let bench = makeExercise(name: "Bench Press")
+        try await context.exerciseRepo.save(bench)
+        let templateId = try await makeSimpleTemplate(context, exerciseId: bench.id, name: "Push")
+
+        try await context.service.updateTemplateFolder(templateId, folder: "  Push Days  ")
+
+        let fetched = try await context.service.fetchTemplateDetail(templateId)
+        XCTAssertEqual(try XCTUnwrap(fetched).template.folder, "Push Days")
+    }
+
+    func testMovingAMissingTemplateThrows() async throws {
+        let context = try makeContext()
+        do {
+            try await context.service.updateTemplateFolder(UUID(), folder: "Push Days")
+            XCTFail("Expected updateTemplateFolder to throw for an unknown id")
+        } catch {
+            // Expected.
+        }
+    }
+
+    // MARK: - Deleting an exercise that templates point at
+    //
+    // `ExerciseService.deleteExercise` calls itself a full cascade and skipped templates entirely,
+    // so a deleted exercise left a `TemplateExercise` row behind that resolved to nothing. The
+    // template rendered it as "Unknown Exercise" forever and kept counting its sets in the total.
+    // Two real templates on a user device were found holding one each.
+
+    func testDeletingAnExerciseRemovesItsTemplateRowAndItsSets() async throws {
+        let context = try makeContext()
+        let bench = makeExercise(name: "Bench Press")
+        let fly = makeExercise(name: "Cable Fly")
+        let press = makeExercise(name: "Overhead Press")
+        for exercise in [bench, fly, press] { try await context.exerciseRepo.save(exercise) }
+
+        let templateId = try await context.service.createTemplate(
+            TemplateSaveData(
+                name: "Push",
+                notes: nil,
+                exercises: [
+                    saveExercise(bench.id, order: 1, sets: [saveSet(order: 1), saveSet(order: 2)]),
+                    saveExercise(fly.id, order: 2, sets: [saveSet(order: 1), saveSet(order: 2), saveSet(order: 3)]),
+                    saveExercise(press.id, order: 3, sets: [saveSet(order: 1)])
+                ]
+            )
+        )
+
+        let removed = try await context.templateRepo.deleteTemplateReferences(toExerciseId: fly.id)
+        XCTAssertEqual(removed, 1)
+
+        let fetched = try await context.service.fetchTemplateDetail(templateId)
+        let detail = try XCTUnwrap(fetched)
+        XCTAssertEqual(detail.exercises.map(\.exerciseId), [bench.id, press.id])
+        XCTAssertFalse(detail.exercises.contains { $0.exerciseName == "Unknown Exercise" })
+
+        // The 3 sets went with it, and nobody else's moved or vanished.
+        XCTAssertEqual(detail.template.totalSetCount, 3)
+        XCTAssertEqual(detail.exercises.map(\.sets.count), [2, 1])
+    }
+
+    func testDeletingAnExerciseClosesTheOrderGapItLeaves() async throws {
+        let context = try makeContext()
+        let bench = makeExercise(name: "Bench Press")
+        let fly = makeExercise(name: "Cable Fly")
+        let press = makeExercise(name: "Overhead Press")
+        for exercise in [bench, fly, press] { try await context.exerciseRepo.save(exercise) }
+
+        let templateId = try await context.service.createTemplate(
+            TemplateSaveData(
+                name: "Push",
+                notes: nil,
+                exercises: [
+                    saveExercise(bench.id, order: 1, sets: [saveSet(order: 1)]),
+                    saveExercise(fly.id, order: 2, sets: [saveSet(order: 1)]),
+                    saveExercise(press.id, order: 3, sets: [saveSet(order: 1)])
+                ]
+            )
+        )
+
+        try await context.templateRepo.deleteTemplateReferences(toExerciseId: fly.id)
+
+        // Not [1, 3]: a gap survives every read and export, and reads as a missing exercise.
+        let rows = try await context.templateRepo.fetchTemplateExercises(for: templateId)
+        XCTAssertEqual(rows.map(\.orderInTemplate), [1, 2])
+        XCTAssertEqual(rows.map(\.exerciseId), [bench.id, press.id])
+    }
+
+    func testDeletingOneHalfOfASupersetDissolvesTheGroup() async throws {
+        let context = try makeContext()
+        let fly = makeExercise(name: "Cable Fly")
+        let raise = makeExercise(name: "Lateral Raise")
+        let bench = makeExercise(name: "Bench Press")
+        for exercise in [fly, raise, bench] { try await context.exerciseRepo.save(exercise) }
+
+        let groupId = UUID()
+        let templateId = try await context.service.createTemplate(
+            TemplateSaveData(
+                name: "Push",
+                notes: nil,
+                exercises: [
+                    saveExercise(bench.id, order: 1, sets: [saveSet(order: 1)]),
+                    saveExercise(fly.id, order: 2, group: groupId, sets: [saveSet(order: 1)]),
+                    saveExercise(raise.id, order: 3, group: groupId, sets: [saveSet(order: 1)])
+                ]
+            )
+        )
+
+        try await context.templateRepo.deleteTemplateReferences(toExerciseId: fly.id)
+
+        // A group of one is the state the pairing flow exists to prevent (SUPERSETS_SCOPING.md §6).
+        let rows = try await context.templateRepo.fetchTemplateExercises(for: templateId)
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertTrue(rows.allSatisfy { $0.supersetGroupId == nil })
+    }
+
+    func testDeletingAnExerciseLeavesASupersetOfTwoSurvivorsIntact() async throws {
+        let context = try makeContext()
+        let fly = makeExercise(name: "Cable Fly")
+        let raise = makeExercise(name: "Lateral Raise")
+        let bench = makeExercise(name: "Bench Press")
+        for exercise in [fly, raise, bench] { try await context.exerciseRepo.save(exercise) }
+
+        let groupId = UUID()
+        let templateId = try await context.service.createTemplate(
+            TemplateSaveData(
+                name: "Push",
+                notes: nil,
+                exercises: [
+                    saveExercise(bench.id, order: 1, sets: [saveSet(order: 1)]),
+                    saveExercise(fly.id, order: 2, group: groupId, sets: [saveSet(order: 1)]),
+                    saveExercise(raise.id, order: 3, group: groupId, sets: [saveSet(order: 1)])
+                ]
+            )
+        )
+
+        try await context.templateRepo.deleteTemplateReferences(toExerciseId: bench.id)
+
+        let rows = try await context.templateRepo.fetchTemplateExercises(for: templateId)
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(Set(rows.compactMap(\.supersetGroupId)), [groupId])
+    }
+
+    func testDeletingAnExerciseReachesEveryTemplateUsingItAndNoOthers() async throws {
+        let context = try makeContext()
+        let bench = makeExercise(name: "Bench Press")
+        let fly = makeExercise(name: "Cable Fly")
+        try await context.exerciseRepo.save(bench)
+        try await context.exerciseRepo.save(fly)
+
+        let usesFly = try await context.service.createTemplate(
+            TemplateSaveData(name: "Push", notes: nil, exercises: [
+                saveExercise(bench.id, order: 1, sets: [saveSet(order: 1)]),
+                saveExercise(fly.id, order: 2, sets: [saveSet(order: 1)])
+            ])
+        )
+        let alsoUsesFly = try await context.service.createTemplate(
+            TemplateSaveData(name: "Chest", notes: nil, exercises: [
+                saveExercise(fly.id, order: 1, sets: [saveSet(order: 1), saveSet(order: 2)])
+            ])
+        )
+        let untouched = try await makeSimpleTemplate(context, exerciseId: bench.id, name: "Legs")
+
+        let removed = try await context.templateRepo.deleteTemplateReferences(toExerciseId: fly.id)
+        XCTAssertEqual(removed, 2)
+
+        let pushRows = try await context.templateRepo.fetchTemplateExercises(for: usesFly)
+        XCTAssertEqual(pushRows.map(\.exerciseId), [bench.id])
+        // A template can be emptied by this. It is left alive and empty rather than deleted: losing a
+        // named template as a side effect of an unrelated library edit would be the bigger surprise.
+        let chestRows = try await context.templateRepo.fetchTemplateExercises(for: alsoUsesFly)
+        XCTAssertTrue(chestRows.isEmpty)
+        let legsRows = try await context.templateRepo.fetchTemplateExercises(for: untouched)
+        XCTAssertEqual(legsRows.map(\.exerciseId), [bench.id])
+        let legsSets = try await context.templateRepo.fetchTemplateSets(for: legsRows[0].id)
+        XCTAssertEqual(legsSets.count, 2)
+    }
+
+    func testDeletingAnExerciseNoTemplateUsesChangesNothing() async throws {
+        let context = try makeContext()
+        let bench = makeExercise(name: "Bench Press")
+        try await context.exerciseRepo.save(bench)
+        let templateId = try await makeSimpleTemplate(context, exerciseId: bench.id, name: "Push")
+
+        let removed = try await context.templateRepo.deleteTemplateReferences(toExerciseId: UUID())
+
+        XCTAssertEqual(removed, 0)
+        let fetched = try await context.service.fetchTemplateDetail(templateId)
+        let detail = try XCTUnwrap(fetched)
+        XCTAssertEqual(detail.exercises.count, 1)
+        XCTAssertEqual(detail.template.totalSetCount, 2)
+    }
+
     // MARK: - Harness
 
     private func makeContext() throws -> Context {
@@ -1401,6 +1737,177 @@ final class TemplateEditorSupersetTests: XCTestCase {
             )
         }
         return viewModel
+    }
+}
+
+// MARK: - Editor load failures
+
+/// A read that does not produce the template used to leave an empty editor titled "Edit Template",
+/// indistinguishable from a template with nothing in it. Adding an exercise and saving then replaced
+/// the real contents. The editor now refuses to render a saveable form it cannot stand behind.
+@MainActor
+final class TemplateEditorLoadFailureTests: XCTestCase {
+
+    func testATemplateThatDoesNotLoadBlocksTheEditorInsteadOfShowingAnEmptyForm() async throws {
+        let harness = try makeHarness()
+
+        await harness.viewModel.prepareForPresentation(
+            editingTemplateId: UUID(),
+            expectedExerciseCount: 3
+        )
+
+        XCTAssertTrue(harness.viewModel.loadFailed)
+        XCTAssertFalse(harness.viewModel.canSave)
+        XCTAssertFalse(harness.viewModel.isLoading)
+    }
+
+    func testSaveStaysBlockedAfterAFailedLoadEvenWithAFilledInForm() async throws {
+        // The real loss path: the form is filled in, Save looks available, and `updateTemplate`
+        // replaces the template's contents with whatever is on screen.
+        let harness = try makeHarness()
+        await harness.viewModel.prepareForPresentation(
+            editingTemplateId: UUID(),
+            expectedExerciseCount: 3
+        )
+
+        harness.viewModel.templateName = "Upper Body 2"
+        harness.viewModel.exercises = [
+            EditorExercise(
+                id: UUID(),
+                exerciseId: UUID(),
+                exerciseName: "Bench Press",
+                primaryMuscle: "chest",
+                sets: [EditorSet(id: UUID(), setType: .working, targetRepMin: 8, targetRepMax: 10, targetRIR: 2)]
+            )
+        ]
+
+        XCTAssertFalse(harness.viewModel.canSave)
+    }
+
+    func testAnEmptyReadOfATemplateTheListSaysHasExercisesIsTreatedAsAFailure() async throws {
+        let harness = try makeHarness()
+        let templateId = try await harness.makeTemplate(exerciseCount: 3)
+        // Stand in for the transient empty read `fetchTemplateDetailWithRetry` exists to paper over.
+        try await harness.templateRepo.replaceTemplateContents(templateId: templateId, exercises: [])
+
+        await harness.viewModel.prepareForPresentation(
+            editingTemplateId: templateId,
+            expectedExerciseCount: 3
+        )
+
+        XCTAssertTrue(harness.viewModel.loadFailed)
+        XCTAssertFalse(harness.viewModel.canSave)
+    }
+
+    func testRetryingAcceptsATemplateThatIsGenuinelyEmpty() async throws {
+        // Templates can legitimately end up empty — every exercise they used was deleted from the
+        // library — and that one has to stay editable rather than being locked out forever.
+        let harness = try makeHarness()
+        let templateId = try await harness.makeTemplate(exerciseCount: 2)
+        try await harness.templateRepo.replaceTemplateContents(templateId: templateId, exercises: [])
+
+        await harness.viewModel.prepareForPresentation(
+            editingTemplateId: templateId,
+            expectedExerciseCount: 2
+        )
+        XCTAssertTrue(harness.viewModel.loadFailed)
+
+        await harness.viewModel.retryLoad()
+
+        XCTAssertFalse(harness.viewModel.loadFailed)
+        XCTAssertTrue(harness.viewModel.exercises.isEmpty)
+        XCTAssertEqual(harness.viewModel.templateName, "Push")
+    }
+
+    func testANormalLoadIsNotFlagged() async throws {
+        let harness = try makeHarness()
+        let templateId = try await harness.makeTemplate(exerciseCount: 2)
+
+        await harness.viewModel.prepareForPresentation(
+            editingTemplateId: templateId,
+            expectedExerciseCount: 2
+        )
+
+        XCTAssertFalse(harness.viewModel.loadFailed)
+        XCTAssertEqual(harness.viewModel.exercises.count, 2)
+        XCTAssertTrue(harness.viewModel.canSave)
+    }
+
+    func testCreatingANewTemplateIsNeverFlagged() async throws {
+        let harness = try makeHarness()
+
+        await harness.viewModel.prepareForPresentation(editingTemplateId: nil)
+
+        XCTAssertFalse(harness.viewModel.loadFailed)
+    }
+
+    // MARK: - Harness
+
+    private struct Harness {
+        let viewModel: CreateEditTemplateViewModel
+        let service: TemplateService
+        let templateRepo: TemplateRepository
+        let exerciseRepo: ExerciseRepository
+
+        func makeTemplate(exerciseCount: Int) async throws -> UUID {
+            var saveExercises: [TemplateSaveExercise] = []
+            for index in 0..<exerciseCount {
+                let exercise = Exercise(
+                    name: "Exercise \(index)",
+                    equipmentType: .barbell,
+                    trackingType: .weightReps,
+                    primaryMuscle: "chest"
+                )
+                try await exerciseRepo.save(exercise)
+                saveExercises.append(
+                    TemplateSaveExercise(
+                        exerciseId: exercise.id,
+                        orderInTemplate: index + 1,
+                        supersetGroupId: nil,
+                        restTimeSeconds: nil,
+                        notes: nil,
+                        sets: [
+                            TemplateSaveSet(
+                                setType: .working,
+                                targetRepMin: 8,
+                                targetRepMax: 10,
+                                targetRIR: 2,
+                                orderInExercise: 1
+                            )
+                        ]
+                    )
+                )
+            }
+            return try await service.createTemplate(
+                TemplateSaveData(name: "Push", notes: nil, exercises: saveExercises)
+            )
+        }
+    }
+
+    private func makeHarness() throws -> Harness {
+        let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(
+            for: Exercise.self, ExerciseStats.self, Workout.self, WorkoutSet.self,
+            WorkoutTemplate.self, TemplateExercise.self, TemplateSet.self,
+            configurations: configuration
+        )
+        let templateRepo = TemplateRepository(modelContainer: container)
+        let exerciseRepo = ExerciseRepository(modelContainer: container)
+        let service = TemplateService(
+            templateRepository: templateRepo,
+            workoutRepository: WorkoutRepository(modelContainer: container),
+            setRepository: SetRepository(modelContainer: container),
+            exerciseRepository: exerciseRepo
+        )
+        return Harness(
+            viewModel: CreateEditTemplateViewModel(
+                templateService: service,
+                exerciseService: InertExerciseService()
+            ),
+            service: service,
+            templateRepo: templateRepo,
+            exerciseRepo: exerciseRepo
+        )
     }
 }
 
