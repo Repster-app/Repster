@@ -14,7 +14,7 @@ struct CreateEditTemplateView: View {
     @State private var viewModel: CreateEditTemplateViewModel
     @State private var draggedExerciseId: UUID? = nil
     @State private var dropTargetExerciseId: UUID? = nil
-    @State private var supersetSubjectIndex: Int? = nil
+    @State private var supersetSubjectId: UUID? = nil
     @State private var showFolderPicker = false
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceContainer.self) private var services
@@ -84,17 +84,17 @@ struct CreateEditTemplateView: View {
             exercisePickerSheet
         }
         .sheet(isPresented: Binding(
-            get: { supersetSubjectIndex != nil },
-            set: { if !$0 { supersetSubjectIndex = nil } }
+            get: { supersetSubjectId != nil },
+            set: { if !$0 { supersetSubjectId = nil } }
         )) {
-            if let index = supersetSubjectIndex {
+            if let subjectId = supersetSubjectId {
                 SupersetPartnerSheet(
-                    subjectName: viewModel.exercises[safe: index]?.exerciseName ?? "",
+                    subjectName: viewModel.exercises.first { $0.id == subjectId }?.exerciseName ?? "",
                     nextLetter: viewModel.nextSupersetLetter,
-                    candidates: viewModel.supersetCandidates(for: index),
-                    onPair: { partnerIndex in
-                        viewModel.pairExercise(at: index, withExerciseAt: partnerIndex)
-                        supersetSubjectIndex = nil
+                    candidates: viewModel.supersetCandidates(forExerciseId: subjectId),
+                    onPair: { partnerId in
+                        viewModel.pairExercise(exerciseId: subjectId, withPartnerId: partnerId)
+                        supersetSubjectId = nil
                     }
                 )
             }
@@ -199,7 +199,7 @@ struct CreateEditTemplateView: View {
                         viewModel: viewModel,
                         draggedExerciseId: $draggedExerciseId,
                         dropTargetExerciseId: $dropTargetExerciseId,
-                        onRequestSuperset: { supersetSubjectIndex = $0 }
+                        onRequestSuperset: { supersetSubjectId = $0 }
                     )
                 }
             }
@@ -275,7 +275,7 @@ private struct TemplateExerciseCard: View {
     var viewModel: CreateEditTemplateViewModel
     @Binding var draggedExerciseId: UUID?
     @Binding var dropTargetExerciseId: UUID?
-    let onRequestSuperset: (Int) -> Void
+    let onRequestSuperset: (UUID) -> Void
 
     private var isDraggedCard: Bool {
         draggedExerciseId == exercise.id
@@ -357,7 +357,7 @@ private struct TemplateExerciseCard: View {
                 .accessibilityLabel("Reorder exercise")
 
             Button {
-                viewModel.toggleExpanded(at: exerciseIndex)
+                viewModel.toggleExpanded(id: exercise.id)
             } label: {
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -490,7 +490,7 @@ private struct TemplateExerciseCard: View {
     private var addSetButtons: some View {
         HStack(spacing: 7) {
             Button {
-                viewModel.addWarmupSet(to: exerciseIndex)
+                viewModel.addWarmupSet(toExerciseId: exercise.id)
             } label: {
                 Text("＋ Warmup")
                     .font(.system(size: 12, weight: .semibold))
@@ -503,7 +503,7 @@ private struct TemplateExerciseCard: View {
             .buttonStyle(.plain)
 
             Button {
-                viewModel.addWorkingSet(to: exerciseIndex)
+                viewModel.addWorkingSet(toExerciseId: exercise.id)
             } label: {
                 Text("＋ Working Set")
                     .font(.system(size: 12.5, weight: .semibold))
@@ -540,13 +540,13 @@ private struct TemplateExerciseCard: View {
     private var exerciseActions: some View {
         if exercise.supersetGroupId == nil {
             Button {
-                onRequestSuperset(exerciseIndex)
+                onRequestSuperset(exercise.id)
             } label: {
                 Label("Superset with…", systemImage: "link")
             }
         } else {
             Button {
-                viewModel.removeFromSuperset(at: exerciseIndex)
+                viewModel.removeFromSuperset(exerciseId: exercise.id)
             } label: {
                 Label("Remove from superset", systemImage: "link.badge.plus")
             }
@@ -562,7 +562,7 @@ private struct TemplateExerciseCard: View {
         Divider()
 
         Button(role: .destructive) {
-            viewModel.removeExercise(at: exerciseIndex)
+            viewModel.removeExercise(id: exercise.id)
         } label: {
             Label("Remove exercise", systemImage: "trash")
         }
@@ -835,7 +835,7 @@ private struct SupersetPartnerSheet: View {
     let subjectName: String
     let nextLetter: String
     let candidates: [SupersetCandidate]
-    let onPair: (Int) -> Void
+    let onPair: (UUID) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
@@ -853,7 +853,7 @@ private struct SupersetPartnerSheet: View {
                     ForEach(Array(candidates.enumerated()), id: \.element.id) { offset, candidate in
                         Button {
                             guard candidate.isSelectable else { return }
-                            onPair(candidate.index)
+                            onPair(candidate.id)
                         } label: {
                             HStack(spacing: 12) {
                                 VStack(alignment: .leading, spacing: 3) {

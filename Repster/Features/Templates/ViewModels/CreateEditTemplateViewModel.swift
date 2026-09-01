@@ -278,9 +278,11 @@ final class CreateEditTemplateViewModel {
         }
     }
 
-    func removeExercise(at index: Int) {
-        guard index >= 0, index < exercises.count else { return }
-        exercises.remove(at: index)
+    /// By id, not position. The card that renders these buttons captured its index when it was built,
+    /// and `moveExercise` mutates the array on every `dropEntered` during a drag — so a tap arriving
+    /// after a reorder acted on whatever had moved into that slot.
+    func removeExercise(id: UUID) {
+        exercises.removeAll { $0.id == id }
     }
 
     func moveExercise(from source: IndexSet, to destination: Int) {
@@ -302,8 +304,8 @@ final class CreateEditTemplateViewModel {
         exercises.insert(draggedExercise, at: adjustedTargetIndex)
     }
 
-    func toggleExpanded(at index: Int) {
-        guard index >= 0, index < exercises.count else { return }
+    func toggleExpanded(id: UUID) {
+        guard let index = exercises.firstIndex(where: { $0.id == id }) else { return }
         exercises[index].isExpanded.toggle()
     }
 
@@ -344,41 +346,24 @@ final class CreateEditTemplateViewModel {
 
     // MARK: - Set Operations
 
-    func addWorkingSet(to exerciseIndex: Int) {
-        guard exerciseIndex >= 0, exerciseIndex < exercises.count else { return }
-        let newSet = EditorSet(id: UUID(), setType: .working, targetRepMin: nil, targetRepMax: nil, targetRIR: nil)
-        exercises[exerciseIndex].sets.append(newSet)
-    }
-
-    func addWarmupSet(to exerciseIndex: Int) {
-        guard exerciseIndex >= 0, exerciseIndex < exercises.count else { return }
-
-        // Insert before first non-warmup
-        let insertIndex = exercises[exerciseIndex].sets.firstIndex(where: { $0.setType != .warmup })
-            ?? exercises[exerciseIndex].sets.count
-
-        let newSet = EditorSet(id: UUID(), setType: .warmup, targetRepMin: nil, targetRepMax: nil, targetRIR: nil)
-        exercises[exerciseIndex].sets.insert(newSet, at: insertIndex)
-    }
-
-    func duplicateSet(exerciseIndex: Int, setIndex: Int) {
-        guard exerciseIndex >= 0, exerciseIndex < exercises.count,
-              setIndex >= 0, setIndex < exercises[exerciseIndex].sets.count else { return }
-        let source = exercises[exerciseIndex].sets[setIndex]
-        let copy = EditorSet(
-            id: UUID(),
-            setType: source.setType,
-            targetRepMin: source.targetRepMin,
-            targetRepMax: source.targetRepMax,
-            targetRIR: source.targetRIR
+    func addWorkingSet(toExerciseId exerciseId: UUID) {
+        guard let index = exercises.firstIndex(where: { $0.id == exerciseId }) else { return }
+        exercises[index].sets.append(
+            EditorSet(id: UUID(), setType: .working, targetRepMin: nil, targetRepMax: nil, targetRIR: nil)
         )
-        exercises[exerciseIndex].sets.insert(copy, at: setIndex + 1)
     }
 
-    func removeSet(exerciseIndex: Int, setIndex: Int) {
-        guard exerciseIndex >= 0, exerciseIndex < exercises.count,
-              setIndex >= 0, setIndex < exercises[exerciseIndex].sets.count else { return }
-        exercises[exerciseIndex].sets.remove(at: setIndex)
+    func addWarmupSet(toExerciseId exerciseId: UUID) {
+        guard let index = exercises.firstIndex(where: { $0.id == exerciseId }) else { return }
+
+        // Insert before the first non-warmup
+        let insertIndex = exercises[index].sets.firstIndex(where: { $0.setType != .warmup })
+            ?? exercises[index].sets.count
+
+        exercises[index].sets.insert(
+            EditorSet(id: UUID(), setType: .warmup, targetRepMin: nil, targetRepMax: nil, targetRIR: nil),
+            at: insertIndex
+        )
     }
 
     // MARK: - Superset Operations
@@ -407,8 +392,8 @@ final class CreateEditTemplateViewModel {
     ///
     /// Already-grouped exercises are returned too, flagged, so the picker can show them disabled
     /// rather than hiding them — the model stays visible instead of silently shrinking the list.
-    func supersetCandidates(for exerciseIndex: Int) -> [SupersetCandidate] {
-        guard exercises.indices.contains(exerciseIndex) else { return [] }
+    func supersetCandidates(forExerciseId exerciseId: UUID) -> [SupersetCandidate] {
+        guard let exerciseIndex = exercises.firstIndex(where: { $0.id == exerciseId }) else { return [] }
         let subject = exercises[exerciseIndex]
 
         return exercises.enumerated().compactMap { index, candidate in
@@ -439,16 +424,13 @@ final class CreateEditTemplateViewModel {
     /// Replaces a menu of letters assigned one exercise at a time. That flow needed the same letter
     /// picked twice on two different exercises with nothing saying a second step existed, and it left
     /// a group of one whenever the second step was missed. Picking a partner makes that unreachable.
-    func pairExercise(at exerciseIndex: Int, withExerciseAt partnerIndex: Int) {
-        guard exercises.indices.contains(exerciseIndex),
-              exercises.indices.contains(partnerIndex),
-              exerciseIndex != partnerIndex else { return }
+    func pairExercise(exerciseId subjectId: UUID, withPartnerId partnerId: UUID) {
+        guard subjectId != partnerId,
+              exercises.contains(where: { $0.id == subjectId }),
+              exercises.contains(where: { $0.id == partnerId }) else { return }
 
         let groupId = UUID()
         supersetGroupLabels[groupId] = nextSupersetLetter
-
-        let subjectId = exercises[exerciseIndex].id
-        let partnerId = exercises[partnerIndex].id
 
         // Dissolve whatever either was in first, so nothing is left in a group of one.
         for id in [subjectId, partnerId] {
@@ -474,9 +456,9 @@ final class CreateEditTemplateViewModel {
     ///
     /// Groups are pairs for now (§6 constraint 2), so clearing one side would leave the other in a
     /// group of one — the exact state the pairing flow exists to prevent.
-    func removeFromSuperset(at exerciseIndex: Int) {
-        guard exercises.indices.contains(exerciseIndex) else { return }
-        dissolveGroup(containing: exerciseIndex)
+    func removeFromSuperset(exerciseId: UUID) {
+        guard let index = exercises.firstIndex(where: { $0.id == exerciseId }) else { return }
+        dissolveGroup(containing: index)
     }
 
     private func dissolveGroup(containing exerciseIndex: Int) {

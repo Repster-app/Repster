@@ -1232,7 +1232,7 @@ final class TemplateEditorSupersetTests: XCTestCase {
         let viewModel = try makeViewModel(exerciseNames: ["Bench Press", "Cable Fly", "Lateral Raise"])
 
         XCTAssertEqual(viewModel.nextSupersetLetter, "A")
-        viewModel.pairExercise(at: 1, withExerciseAt: 2)
+        viewModel.pairExercise(exerciseId: viewModel.exercises[1].id, withPartnerId: viewModel.exercises[2].id)
 
         let groups = viewModel.exercises.map(\.supersetGroupId)
         XCTAssertNil(groups[0])
@@ -1247,7 +1247,7 @@ final class TemplateEditorSupersetTests: XCTestCase {
         // this will happen; this is the move itself.
         let viewModel = try makeViewModel(exerciseNames: ["Bench Press", "Incline DB Press", "Rope Pushdown"])
 
-        viewModel.pairExercise(at: 0, withExerciseAt: 2)
+        viewModel.pairExercise(exerciseId: viewModel.exercises[0].id, withPartnerId: viewModel.exercises[2].id)
 
         XCTAssertEqual(viewModel.exercises.map(\.exerciseName), ["Bench Press", "Rope Pushdown", "Incline DB Press"])
         XCTAssertEqual(viewModel.exercises[0].supersetGroupId, viewModel.exercises[1].supersetGroupId)
@@ -1258,10 +1258,10 @@ final class TemplateEditorSupersetTests: XCTestCase {
         // Groups are pairs for now, so clearing one side would leave the other in a group of one —
         // the state the whole pairing flow exists to prevent.
         let viewModel = try makeViewModel(exerciseNames: ["Cable Fly", "Lateral Raise"])
-        viewModel.pairExercise(at: 0, withExerciseAt: 1)
+        viewModel.pairExercise(exerciseId: viewModel.exercises[0].id, withPartnerId: viewModel.exercises[1].id)
         XCTAssertNotNil(viewModel.exercises[0].supersetGroupId)
 
-        viewModel.removeFromSuperset(at: 0)
+        viewModel.removeFromSuperset(exerciseId: viewModel.exercises[0].id)
 
         XCTAssertTrue(viewModel.exercises.allSatisfy { $0.supersetGroupId == nil })
         XCTAssertEqual(viewModel.nextSupersetLetter, "A", "The letter is free again")
@@ -1269,12 +1269,12 @@ final class TemplateEditorSupersetTests: XCTestCase {
 
     func testRepairingAnAlreadyGroupedExerciseDoesNotStrandItsOldPartner() throws {
         let viewModel = try makeViewModel(exerciseNames: ["A", "B", "C", "D"])
-        viewModel.pairExercise(at: 0, withExerciseAt: 1)
+        viewModel.pairExercise(exerciseId: viewModel.exercises[0].id, withPartnerId: viewModel.exercises[1].id)
 
         // Pair A with C instead. B must not be left holding a group by itself.
-        let indexOfC = try XCTUnwrap(viewModel.exercises.firstIndex { $0.exerciseName == "C" })
-        let indexOfA = try XCTUnwrap(viewModel.exercises.firstIndex { $0.exerciseName == "A" })
-        viewModel.pairExercise(at: indexOfA, withExerciseAt: indexOfC)
+        let idOfC = try XCTUnwrap(viewModel.exercises.first { $0.exerciseName == "C" }?.id)
+        let idOfA = try XCTUnwrap(viewModel.exercises.first { $0.exerciseName == "A" }?.id)
+        viewModel.pairExercise(exerciseId: idOfA, withPartnerId: idOfC)
 
         let byName = Dictionary(uniqueKeysWithValues: viewModel.exercises.map { ($0.exerciseName, $0.supersetGroupId) })
         XCTAssertNotNil(byName["A"] ?? nil)
@@ -1285,10 +1285,10 @@ final class TemplateEditorSupersetTests: XCTestCase {
 
     func testCandidatesExcludeSelfAndMarkAlreadyGroupedOnesUnselectable() throws {
         let viewModel = try makeViewModel(exerciseNames: ["Bench", "Fly", "Raise", "Pushdown"])
-        viewModel.pairExercise(at: 1, withExerciseAt: 2)
+        viewModel.pairExercise(exerciseId: viewModel.exercises[1].id, withPartnerId: viewModel.exercises[2].id)
 
-        let indexOfBench = try XCTUnwrap(viewModel.exercises.firstIndex { $0.exerciseName == "Bench" })
-        let candidates = viewModel.supersetCandidates(for: indexOfBench)
+        let idOfBench = try XCTUnwrap(viewModel.exercises.first { $0.exerciseName == "Bench" }?.id)
+        let candidates = viewModel.supersetCandidates(forExerciseId: idOfBench)
 
         XCTAssertEqual(candidates.count, 3, "Everything except the subject")
         XCTAssertFalse(candidates.contains { $0.name == "Bench" })
@@ -1304,7 +1304,7 @@ final class TemplateEditorSupersetTests: XCTestCase {
 
     func testCandidateSaysWhenPairingWouldReorder() throws {
         let viewModel = try makeViewModel(exerciseNames: ["Bench", "Incline", "Pushdown"])
-        let candidates = viewModel.supersetCandidates(for: 0)
+        let candidates = viewModel.supersetCandidates(forExerciseId: viewModel.exercises[0].id)
 
         let adjacent = try XCTUnwrap(candidates.first { $0.name == "Incline" })
         XCTAssertFalse(adjacent.wouldMove)
@@ -1316,11 +1316,11 @@ final class TemplateEditorSupersetTests: XCTestCase {
 
     func testLettersAreReusedOnceAGroupIsDissolved() throws {
         let viewModel = try makeViewModel(exerciseNames: ["A", "B", "C", "D"])
-        viewModel.pairExercise(at: 0, withExerciseAt: 1)
-        viewModel.pairExercise(at: 2, withExerciseAt: 3)
+        viewModel.pairExercise(exerciseId: viewModel.exercises[0].id, withPartnerId: viewModel.exercises[1].id)
+        viewModel.pairExercise(exerciseId: viewModel.exercises[2].id, withPartnerId: viewModel.exercises[3].id)
         XCTAssertEqual(viewModel.nextSupersetLetter, "C")
 
-        viewModel.removeFromSuperset(at: 0)
+        viewModel.removeFromSuperset(exerciseId: viewModel.exercises[0].id)
         XCTAssertEqual(viewModel.nextSupersetLetter, "A", "A is free again and gets reused")
     }
 
@@ -1334,7 +1334,7 @@ final class TemplateEditorSupersetTests: XCTestCase {
         let pushdownSetId = viewModel.exercises[2].sets[0].id
 
         // Bench + Pushdown: Pushdown moves from index 2 to index 1.
-        viewModel.pairExercise(at: 0, withExerciseAt: 2)
+        viewModel.pairExercise(exerciseId: viewModel.exercises[0].id, withPartnerId: viewModel.exercises[2].id)
         XCTAssertEqual(viewModel.exercises.map(\.exerciseName), ["Bench", "Pushdown", "Incline"])
 
         viewModel.updateSet(exerciseId: pushdownId, setId: pushdownSetId) { $0.targetRepMin = 5 }
@@ -1350,7 +1350,7 @@ final class TemplateEditorSupersetTests: XCTestCase {
     func testRemovingASetByIdRemovesOnlyThatSet() throws {
         let viewModel = try makeViewModel(exerciseNames: ["Bench", "Incline"])
         let benchId = viewModel.exercises[0].id
-        viewModel.addWorkingSet(to: 0)
+        viewModel.addWorkingSet(toExerciseId: benchId)
         XCTAssertEqual(viewModel.exercises[0].sets.count, 2)
 
         let firstSetId = viewModel.exercises[0].sets[0].id
