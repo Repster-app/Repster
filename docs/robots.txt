@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://repster-app.github.io/Repster/sitemap.xml

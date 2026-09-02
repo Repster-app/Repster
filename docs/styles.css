@@ -172,6 +172,17 @@ h1,
   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.24);
 }
 
+.badge-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.badge-link img {
+  height: 48px;
+  width: auto;
+}
+
 .button.secondary {
   background: rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(14px);
