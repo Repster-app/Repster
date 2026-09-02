@@ -89,6 +89,7 @@
 		AC0012 /* ExercisePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0012 /* ExercisePickerSheet.swift */; };
 		AC0013 /* RestTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0013 /* RestTimerView.swift */; };
 		AC0014 /* WorkoutSummarySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0014 /* WorkoutSummarySheet.swift */; };
+		AC9001 /* WorkoutShareCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC9001 /* WorkoutShareCard.swift */; };
 		AC0015 /* ExerciseInfoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0015 /* ExerciseInfoData.swift */; };
 		AC0016 /* ExerciseInfoProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0016 /* ExerciseInfoProvider.swift */; };
 		AC0017 /* E1RMCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0017 /* E1RMCardView.swift */; };
@@ -249,6 +250,7 @@
 		RV0001 /* ReviewPromptService.swift in Sources */ = {isa = PBXBuildFile; fileRef = RV1001 /* ReviewPromptService.swift */; };
 		SB0001 /* SmartSuggestionBehaviorScenarioTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SB1001 /* SmartSuggestionBehaviorScenarioTests.swift */; };
 		TT0001 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */; };
+		TT9201 /* WorkoutShareCardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT9202 /* WorkoutShareCardTests.swift */; };
 		TT0002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = TT2003 /* XCTest.framework */; };
 		TT0003 /* ChartDataServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2004 /* ChartDataServiceTests.swift */; };
 		TT0004 /* WorkoutHistoryBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2005 /* WorkoutHistoryBackupTests.swift */; };
@@ -414,6 +416,7 @@
 		BC0012 /* ExercisePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExercisePickerSheet.swift; sourceTree = "<group>"; };
 		BC0013 /* RestTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerView.swift; sourceTree = "<group>"; };
 		BC0014 /* WorkoutSummarySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSummarySheet.swift; sourceTree = "<group>"; };
+		BC9001 /* WorkoutShareCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutShareCard.swift; sourceTree = "<group>"; };
 		BC0015 /* ExerciseInfoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseInfoData.swift; sourceTree = "<group>"; };
 		BC0016 /* ExerciseInfoProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseInfoProvider.swift; sourceTree = "<group>"; };
 		BC0017 /* E1RMCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E1RMCardView.swift; sourceTree = "<group>"; };
@@ -568,6 +571,7 @@
 		SB1001 /* SmartSuggestionBehaviorScenarioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSuggestionBehaviorScenarioTests.swift; sourceTree = "<group>"; };
 		TT2001 /* RepsterTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RepsterTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutViewModelSuggestionRefreshTests.swift; sourceTree = "<group>"; };
+		TT9202 /* WorkoutShareCardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutShareCardTests.swift; sourceTree = "<group>"; };
 		TT2003 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 		TT2004 /* ChartDataServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartDataServiceTests.swift; sourceTree = "<group>"; };
 		TT2005 /* WorkoutHistoryBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutHistoryBackupTests.swift; sourceTree = "<group>"; };
@@ -857,6 +861,7 @@
 				BC0013 /* RestTimerView.swift */,
 				RTA1002 /* RestAlarmPromptView.swift */,
 				BC0014 /* WorkoutSummarySheet.swift */,
+				BC9001 /* WorkoutShareCard.swift */,
 				BC0023 /* EditWorkoutView.swift */,
 			);
 			path = Views;
@@ -1449,6 +1454,7 @@
 			children = (
 				HK1003 /* HealthKitEnergyEstimateTests.swift */,
 				TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */,
+				TT9202 /* WorkoutShareCardTests.swift */,
 				TT2004 /* ChartDataServiceTests.swift */,
 				TT2005 /* WorkoutHistoryBackupTests.swift */,
 				TTF002 /* TemplateServiceTests.swift */,
@@ -1747,6 +1753,7 @@
 				AC0013 /* RestTimerView.swift in Sources */,
 				RTA0002 /* RestAlarmPromptView.swift in Sources */,
 				AC0014 /* WorkoutSummarySheet.swift in Sources */,
+				AC9001 /* WorkoutShareCard.swift in Sources */,
 				AC0023 /* EditWorkoutView.swift in Sources */,
 				AC0021 /* SetTableDataSource.swift in Sources */,
 				AC0022 /* EditWorkoutViewModel.swift in Sources */,
@@ -1922,6 +1929,7 @@
 			files = (
 				HK0003 /* HealthKitEnergyEstimateTests.swift in Sources */,
 				TT0001 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift in Sources */,
+				TT9201 /* WorkoutShareCardTests.swift in Sources */,
 				IN0009 /* InsightsServiceTests.swift in Sources */,
 				IN0031 /* ExerciseWorkoutCountTests.swift in Sources */,
 				IN0033 /* BaselineMeterGeometryTests.swift in Sources */,

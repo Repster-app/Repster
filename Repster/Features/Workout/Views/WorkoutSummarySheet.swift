@@ -8,6 +8,21 @@
 
 import SwiftUI
 
+/// Preferences for the Coach surfaces on this screen.
+enum CoachPreferences {
+    static let summaryTeaserKey = "coach.showsSummaryTeaser"
+
+    /// Whether the unbuilt "Analyse with Coach" teaser is shown on the summary sheet.
+    ///
+    /// Defaults to `true` but is readable from `UserDefaults`, so the teaser can be pulled
+    /// without a release if Coach slips. A permanent "Soon" is a broken promise, and per
+    /// REPSTER_COACH_SCOPING §2.5 the coach cannot initiate — this is one of the few moments
+    /// it has the user's attention, so it has to be credible or absent.
+    static var showsSummaryTeaser: Bool {
+        UserDefaults.standard.object(forKey: summaryTeaserKey) as? Bool ?? true
+    }
+}
+
 /// Summary sheet presenting workout statistics, notes, and effort input.
 ///
 /// Shown as a sheet from ActiveWorkoutView when "Finish" is tapped.
@@ -32,6 +47,7 @@ struct WorkoutSummarySheet: View {
     // MARK: - Environment
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(ServiceContainer.self) private var services
     @FocusState private var focusedField: FocusField?
 
     // MARK: - State
@@ -69,8 +85,17 @@ struct WorkoutSummarySheet: View {
     /// Whether suggestion feedback is expanded.
     @State private var isSuggestionFeedbackExpanded = false
 
-    /// Whether the compact effort selector popover is showing.
-    @State private var showEffortOptions = false
+    /// Whether the details screen is pushed.
+    @State private var showDetails = false
+
+    /// Whether the share preview is showing.
+    @State private var showSharePreview = false
+
+    /// MET-based active-energy estimate for this session, or `nil` when no bodyweight has
+    /// ever been logged. Deliberately independent of `HealthKitPreferences.writesEstimatedEnergy`:
+    /// "show me my own estimate" and "write this to my Move ring" are different consents, and
+    /// reusing one flag for both would blank this line for anyone who declined the Health write.
+    @State private var estimatedCalories: Int?
 
     /// The summary as it stood the moment saving or discarding began.
     ///
@@ -86,46 +111,61 @@ struct WorkoutSummarySheet: View {
     // MARK: - Body
 
     var body: some View {
-        VStack(spacing: 0) {
-            headerBar
+        NavigationStack {
+            VStack(spacing: 0) {
+                headerBar
 
-            if let summary = displaySummary {
-                ScrollView {
-                    VStack(spacing: 18) {
-                        recapHero(summary: summary)
+                if let summary = displaySummary {
+                    ScrollView {
+                        VStack(spacing: 14) {
+                            recapHero(summary: summary)
 
-                        if !summary.exerciseSummaries.isEmpty {
-                            exerciseRecapSection(summary: summary)
+                            if !summary.exerciseSummaries.isEmpty {
+                                exerciseRecapSection(summary: summary)
+                            }
+
+                            if CoachPreferences.showsSummaryTeaser {
+                                coachTeaserCard
+                            }
+
+                            addDetailsRow
                         }
-
-                        if !exercisesForFeedback(summary: summary).isEmpty {
-                            suggestionFeedbackSection(summary: summary)
-                        }
-
-                        secondaryActionsSection
+                        .padding(.horizontal, 14)
+                        .padding(.top, 16)
+                        .padding(.bottom, 28)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.top, 16)
-                    .padding(.bottom, 28)
+                    .scrollIndicators(.hidden)
+                    .scrollDismissesKeyboard(.interactively)
+                } else {
+                    emptyWorkoutMessage
                 }
-                .scrollIndicators(.hidden)
-                .scrollDismissesKeyboard(.interactively)
-            } else {
-                emptyWorkoutMessage
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if viewModel.workout != nil || viewModel.isWorkoutFinished {
+                    saveActionBar
+                }
+            }
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(isPresented: $showDetails) {
+                detailsScreen
+                    .toolbar(.hidden, for: .navigationBar)
             }
         }
         .background(Color.bg.ignoresSafeArea())
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if viewModel.workout != nil || viewModel.isWorkoutFinished {
-                saveActionBar
-            }
-        }
         .onAppear {
             workoutTitle = viewModel.workout?.title ?? ""
             notes = viewModel.workout?.notes ?? ""
 
             if let perceivedEffort = viewModel.workout?.perceivedEffort {
                 selectedEffort = min(max(perceivedEffort.rounded(), 1), 10)
+            }
+        }
+        .task {
+            await loadCalorieEstimate()
+        }
+        .sheet(isPresented: $showSharePreview) {
+            if let summary = displaySummary {
+                WorkoutSharePreviewSheet(data: shareCardData(summary: summary))
             }
         }
         .alert("Discard Workout?", isPresented: $showDiscardAlert) {
@@ -164,28 +204,32 @@ struct WorkoutSummarySheet: View {
 
     // MARK: - Header
 
+    /// Left-aligned title rather than centred, because "Share workout" needs the right-hand
+    /// side and a centred title collides with it on a 390 pt screen.
     private var headerBar: some View {
-        ZStack {
+        HStack(spacing: 10) {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.textSecondary)
+                    .frame(width: 32, height: 32)
+                    .background(Color.bgInput)
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close")
+
             Text("Workout complete")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(.textPrimary)
                 .lineLimit(1)
 
-            HStack {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.textSecondary)
-                        .frame(width: 32, height: 32)
-                        .background(Color.bgInput)
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Close")
+            Spacer(minLength: 8)
 
-                Spacer()
+            if let summary = displaySummary {
+                shareWorkoutButton(hasPR: summary.prsHit > 0)
             }
         }
         .padding(.horizontal, 16)
@@ -199,50 +243,79 @@ struct WorkoutSummarySheet: View {
         }
     }
 
+    private func shareWorkoutButton(hasPR: Bool) -> some View {
+        Button {
+            showSharePreview = true
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 13, weight: .semibold))
+
+                Text("Share workout")
+                    .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            .foregroundColor(hasPR ? .gold : .accent)
+            .padding(.horizontal, 11)
+            .frame(height: 32)
+            .background(hasPR ? Color.goldSoft : Color.accentSoft)
+            .clipShape(Capsule())
+            .overlay {
+                Capsule()
+                    .stroke((hasPR ? Color.gold : Color.accent).opacity(0.28), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Share workout")
+    }
+
     // MARK: - Recap Hero
 
     private func recapHero(summary: WorkoutSummaryData) -> some View {
-        VStack(spacing: 10) {
-            sectionCard {
-                VStack(alignment: .leading, spacing: 14) {
-                    summaryTitleSection(summary: summary)
+        sectionCard {
+            VStack(alignment: .leading, spacing: 14) {
+                summaryTitleSection(summary: summary)
 
-                    HStack(spacing: 10) {
+                // No tile is promoted. Time carried the only accent before, which pointed the
+                // card's single emphasis at how long you were in the gym rather than at
+                // anything you did there. PRs now read off the exercise list instead.
+                HStack(spacing: 10) {
+                    compactSummaryMetric(label: "Time", value: formatDuration(summary.duration))
+                    compactSummaryMetric(label: "Sets", value: "\(summary.totalSets)")
+                    if let primaryMetric = summary.primaryMetric {
                         compactSummaryMetric(
-                            label: "Time",
-                            value: formatDuration(summary.duration),
-                            prominent: true
-                        )
-                        compactSummaryMetric(label: "Sets", value: "\(summary.totalSets)")
-                        if let primaryMetric = summary.primaryMetric {
-                            compactSummaryMetric(
-                                label: primaryMetric.label,
-                                value: primaryMetric.formattedValue(
-                                    style: .detailed,
-                                    unitPreference: viewModel.unitPreference
-                                )
+                            label: primaryMetric.label,
+                            value: primaryMetric.formattedValue(
+                                style: .detailed,
+                                unitPreference: viewModel.unitPreference
                             )
-                        }
+                        )
                     }
+                }
 
-                    if summary.prsHit > 0 {
-                        HStack(spacing: 8) {
-                            PRBadgeView(status: .current)
+                if let estimatedCalories {
+                    HStack(spacing: 6) {
+                        Text("~\(estimatedCalories) kcal estimated")
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundColor(.textTertiary)
 
-                            Text(summary.prsHit == 1 ? "1 PR this session" : "\(summary.prsHit) PRs this session")
-                                .font(.caption)
-                                .foregroundColor(.textSecondary)
-                        }
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 11))
+                            .foregroundColor(.textTertiary)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Around \(estimatedCalories) kilocalories, estimated from duration and bodyweight")
                 }
             }
         }
     }
 
-    private func compactSummaryMetric(label: String, value: String, prominent: Bool = false) -> some View {
+    private func compactSummaryMetric(label: String, value: String) -> some View {
         VStack(spacing: 6) {
             Text(value)
-                .font(.system(size: prominent ? 20 : 18, weight: .bold, design: prominent ? .rounded : .default))
+                .font(.system(size: 18, weight: .bold))
                 .monospacedDigit()
                 .foregroundColor(.textPrimary)
                 .lineLimit(1)
@@ -252,12 +325,12 @@ struct WorkoutSummarySheet: View {
                 .font(.caption)
                 .foregroundColor(.textSecondary)
         }
-        .frame(maxWidth: .infinity, minHeight: 62)
+        .frame(maxWidth: .infinity, minHeight: 56)
         .padding(.horizontal, 8)
-        .background(prominent ? Color.accentSoft : Color.bgInput)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.bgInput)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Color.border, lineWidth: 1)
         }
     }
@@ -265,32 +338,11 @@ struct WorkoutSummarySheet: View {
     // MARK: - Title
 
     private func summaryTitleSection(summary: WorkoutSummaryData) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center, spacing: 12) {
-                Text(summaryDateLabel(summary.date))
-                    .font(.caption)
-                    .foregroundColor(.textSecondary)
-                    .lineLimit(1)
-
-                Spacer()
-
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        isEditingTitle.toggle()
-                    }
-
-                    if isEditingTitle {
-                        focusedField = .title
-                    } else {
-                        focusedField = nil
-                    }
-                } label: {
-                    Label(isEditingTitle ? "Done" : "Edit", systemImage: isEditingTitle ? "checkmark.circle.fill" : "pencil")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(isEditingTitle ? .accent : .textSecondary)
-                }
-                .buttonStyle(.plain)
-            }
+        VStack(alignment: .leading, spacing: 6) {
+            Text(summaryDateLabel(summary.date))
+                .font(.caption)
+                .foregroundColor(.textSecondary)
+                .lineLimit(1)
 
             if isEditingTitle {
                 TextField("", text: $workoutTitle, prompt: Text(automaticWorkoutTitle).foregroundColor(.textSecondary))
@@ -317,11 +369,29 @@ struct WorkoutSummarySheet: View {
                         focusedField = nil
                     }
             } else {
-                Text(resolvedWorkoutTitle)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.textPrimary)
-                    .multilineTextAlignment(.leading)
+                // The title is its own edit affordance. A persistent pencil button held the
+                // card's best corner for one of its rarest actions.
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isEditingTitle = true
+                    }
+                    focusedField = .title
+                } label: {
+                    HStack(spacing: 8) {
+                        Text(resolvedWorkoutTitle)
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(.textPrimary)
+                            .multilineTextAlignment(.leading)
+
+                        Image(systemName: "pencil")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.textTertiary)
+                    }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Workout title, \(resolvedWorkoutTitle)")
+                .accessibilityHint("Double tap to rename")
             }
         }
     }
@@ -369,83 +439,70 @@ struct WorkoutSummarySheet: View {
 
     // MARK: - Effort
 
+    /// Inline rather than a popover: this is the one input `deloadReadiness` reads, and a
+    /// value hidden behind a chevron on a screen people are trying to leave does not get set.
     private var effortSection: some View {
         sectionCard {
-            HStack(spacing: 12) {
-                Text("How hard did it feel?")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.textPrimary)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text("How hard did it feel?")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.textPrimary)
 
-                Spacer()
+                    Spacer()
 
-                Button {
-                    showEffortOptions = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Text(effortValueLabel)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(selectedEffort == nil ? .textSecondary : .textPrimary)
-
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(.textSecondary)
+                    Button("Clear") {
+                        selectedEffort = nil
                     }
-                    .padding(.horizontal, 10)
-                    .frame(height: 32)
-                    .background(Color.bgInput)
-                    .clipShape(Capsule())
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.accent)
+                    .opacity(selectedEffort == nil ? 0 : 1)
+                    .disabled(selectedEffort == nil)
+                    .accessibilityHidden(selectedEffort == nil)
                 }
-                .buttonStyle(.plain)
-                .popover(isPresented: $showEffortOptions, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
-                    effortPickerPopover
-                        .presentationCompactAdaptation(.popover)
+
+                VStack(spacing: 8) {
+                    effortRow(1...5)
+                    effortRow(6...10)
+
+                    HStack {
+                        Text("Easy")
+                        Spacer()
+                        Text("All out")
+                    }
+                    .font(.caption2)
+                    .foregroundColor(.textTertiary)
                 }
             }
         }
     }
 
-    private var effortPickerPopover: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                Text("Effort")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.textPrimary)
+    private func effortRow(_ range: ClosedRange<Int>) -> some View {
+        HStack(spacing: 8) {
+            ForEach(Array(range), id: \.self) { effort in
+                let isSelected = selectedEffort == Double(effort)
 
-                Spacer()
-
-                Button("Clear") {
-                    selectedEffort = nil
-                    showEffortOptions = false
+                Button {
+                    selectedEffort = isSelected ? nil : Double(effort)
+                } label: {
+                    Text("\(effort)")
+                        .font(.system(size: 15, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundColor(isSelected ? .white : .textPrimary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .background(isSelected ? Color.accent : Color.bgInput)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(isSelected ? Color.clear : Color.border, lineWidth: 1)
+                        }
                 }
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.textSecondary)
-                .opacity(selectedEffort == nil ? 0.5 : 1)
-                .disabled(selectedEffort == nil)
-            }
-
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
-                ForEach(1...10, id: \.self) { effort in
-                    let isSelected = selectedEffort == Double(effort)
-
-                    Button {
-                        selectedEffort = Double(effort)
-                        showEffortOptions = false
-                    } label: {
-                        Text("\(effort)/10")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(isSelected ? .white : .textPrimary)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 36)
-                            .background(isSelected ? Color.accent : Color.bgInput)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Effort \(effort) out of 10")
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
-        .padding(14)
-        .frame(width: 280)
-        .background(Color.bgCard)
     }
 
     // MARK: - Exercise Recap
@@ -460,7 +517,7 @@ struct WorkoutSummarySheet: View {
 
                     Spacer()
 
-                    Text("\(summary.exerciseSummaries.count) logged")
+                    Text(exerciseRecapCaption(summary: summary))
                         .font(.caption)
                         .foregroundColor(.textSecondary)
                 }
@@ -480,6 +537,8 @@ struct WorkoutSummarySheet: View {
         }
     }
 
+    /// Which lifts set a record, without the amounts. The numbers are the part you have just
+    /// spent an hour looking at; which lifts they landed on is the part worth a second look.
     private func exerciseSummaryRow(_ exercise: ExerciseSummary) -> some View {
         HStack(spacing: 10) {
             Text(exercise.exerciseName)
@@ -490,16 +549,9 @@ struct WorkoutSummarySheet: View {
 
             Spacer()
 
-            HStack(spacing: 8) {
-                Text("\(exercise.setCount) sets")
-                    .font(.caption)
-                    .foregroundColor(.textSecondary)
-                    .frame(width: 44, alignment: .trailing)
-
-                exercisePRTag(isVisible: exercise.hadPR)
-            }
+            exercisePRTag(isVisible: exercise.hadPR)
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
     }
 
     private func exercisePRTag(isVisible: Bool) -> some View {
@@ -633,51 +685,217 @@ struct WorkoutSummarySheet: View {
 
     // MARK: - Secondary Actions
 
-    private var secondaryActionsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                Button {
-                    saveAsTemplateController.begin(defaultName: resolvedWorkoutTitle)
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: templateSavedSuccessfully ? "checkmark.circle.fill" : "doc.text")
-                        Text(templateSavedSuccessfully ? "Template Saved" : "Save as Template")
-                    }
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(templateSavedSuccessfully ? .success : .accent)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 42)
-                    .background(templateSavedSuccessfully ? Color.successSoft : Color.accentSoft)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .disabled(templateSavedSuccessfully || saveAsTemplateController.isSaving || isSaving || viewModel.workout?.id == nil)
+    // MARK: - Details
 
-                Button(role: .destructive) {
-                    showDiscardAlert = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "trash")
-                        Text("Discard Workout")
+    /// Notes, effort, suggestion feedback and save-as-template, moved off the recap.
+    ///
+    /// Notes and effort were unreachable before this: `notesSection` and `effortSection`
+    /// existed but were never placed in the body, while `finishWorkout` went on passing both.
+    /// `InsightRules+Readiness` is the only reader of `perceivedEffort`, so `deloadReadiness`
+    /// had no input from this screen at all.
+    private var detailsScreen: some View {
+        VStack(spacing: 0) {
+            detailsHeaderBar
+
+            ScrollView {
+                VStack(spacing: 14) {
+                    notesSection
+
+                    effortSection
+
+                    if let summary = displaySummary,
+                       !exercisesForFeedback(summary: summary).isEmpty {
+                        suggestionFeedbackSection(summary: summary)
                     }
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.danger)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 42)
-                    .background(Color.dangerSoft)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+                    saveAsTemplateRow
                 }
-                .buttonStyle(.plain)
-                .disabled(isDiscarding || isSaving)
+                .padding(.horizontal, 14)
+                .padding(.top, 16)
+                .padding(.bottom, 28)
             }
+            .scrollIndicators(.hidden)
+            .scrollDismissesKeyboard(.interactively)
+        }
+        .background(Color.bg.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            detailsDoneBar
+        }
+    }
 
-            if templateSavedSuccessfully {
-                Text("Template saved for reuse.")
-                    .font(.caption)
-                    .foregroundColor(.success)
+    private var detailsDoneBar: some View {
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(Color.border)
+                .frame(height: 1)
+
+            Button {
+                showDetails = false
+            } label: {
+                Text("Done")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .background(Color.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+        .background(Color.bg)
+    }
+
+    private var detailsHeaderBar: some View {
+        ZStack {
+            Text("Details")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.textPrimary)
+                .lineLimit(1)
+
+            HStack {
+                Button {
+                    showDetails = false
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.textPrimary)
+                        .frame(width: 32, height: 32)
+                        .background(Color.bgInput)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
+
+                Spacer()
             }
         }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 16)
+        .background(Color.bg)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.border)
+                .frame(height: 1)
+        }
+    }
+
+    private var saveAsTemplateRow: some View {
+        Button {
+            saveAsTemplateController.begin(defaultName: resolvedWorkoutTitle)
+        } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(templateSavedSuccessfully ? "Template saved" : "Save as template")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(templateSavedSuccessfully ? .success : .textPrimary)
+
+                    Text("Reuse this workout later")
+                        .font(.caption)
+                        .foregroundColor(.textTertiary)
+                }
+
+                Spacer()
+
+                Image(systemName: templateSavedSuccessfully ? "checkmark.circle.fill" : "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(templateSavedSuccessfully ? .success : .textTertiary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+            .background(Color.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.border, lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(templateSavedSuccessfully || saveAsTemplateController.isSaving || isSaving || viewModel.workout?.id == nil)
+    }
+
+    // MARK: - Coach
+
+    /// Unbuilt on purpose: no tap target and no destination. A teaser that opens a
+    /// "coming soon" screen is worse than one that plainly is not a button.
+    private var coachTeaserCard: some View {
+        HStack(spacing: 11) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.accent.opacity(0.55))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Analyse with Coach")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.textSecondary)
+
+                Text("What changed, and what's next")
+                    .font(.caption)
+                    .foregroundColor(.textTertiary)
+            }
+
+            Spacer()
+
+            Text("SOON")
+                .font(.system(size: 11, weight: .bold))
+                .kerning(0.6)
+                .foregroundColor(.textSecondary)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(Color.bgSubtle)
+                .clipShape(Capsule())
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.bgCard.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.accent.opacity(0.28), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Analyse with Coach, coming soon")
+    }
+
+    // MARK: - Details Row
+
+    private var addDetailsRow: some View {
+        Button {
+            showDetails = true
+        } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Add details")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.textPrimary)
+
+                    Text("Notes, effort, save as template")
+                        .font(.caption)
+                        .foregroundColor(.textTertiary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.textTertiary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+            .background(Color.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.border, lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(isSaving || isDiscarding)
     }
 
     // MARK: - Save Bar
@@ -688,26 +906,45 @@ struct WorkoutSummarySheet: View {
                 .fill(Color.border)
                 .frame(height: 1)
 
-            Button {
-                Task { await saveAndClose() }
-            } label: {
-                HStack(spacing: 8) {
-                    if isSaving {
-                        ProgressView()
-                            .tint(.white)
-                    }
-
-                    Text(isSaving ? "Saving..." : "Save & Close")
-                        .font(.system(size: 16, weight: .semibold))
+            HStack(spacing: 10) {
+                Button(role: .destructive) {
+                    showDiscardAlert = true
+                } label: {
+                    Text("Discard")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.danger)
+                        .frame(width: 96, height: 52)
+                        .background(Color.dangerSoft)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(Color.danger.opacity(0.35), lineWidth: 1)
+                        }
                 }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 52)
-                .background(Color.accent)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .buttonStyle(.plain)
+                .disabled(isSaving || isDiscarding)
+
+                Button {
+                    Task { await saveAndClose() }
+                } label: {
+                    HStack(spacing: 8) {
+                        if isSaving {
+                            ProgressView()
+                                .tint(.white)
+                        }
+
+                        Text(isSaving ? "Saving..." : "Save & Close")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .background(Color.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(isSaving || isDiscarding)
             }
-            .buttonStyle(.plain)
-            .disabled(isSaving || isDiscarding)
             .padding(.horizontal, 16)
             .padding(.top, 12)
             .padding(.bottom, 12)
@@ -807,9 +1044,71 @@ struct WorkoutSummarySheet: View {
         normalizedWorkoutTitle ?? automaticWorkoutTitle
     }
 
-    private var effortValueLabel: String {
-        guard let selectedEffort else { return "Optional" }
-        return "\(Int(selectedEffort))/10"
+    /// `HealthKitService.estimatedKilocalories` is pure and `static`, so this reuses the
+    /// shipped rule rather than restating it. It returns `nil` with no bodyweight logged, and
+    /// substituting a population average was considered and rejected there — an absent number
+    /// is better than a wrong one, on screen as much as in the Move ring.
+    private func loadCalorieEstimate() async {
+        guard let summary = viewModel.computeSummary() else { return }
+
+        let start = summary.date
+        let end = start.addingTimeInterval(summary.duration)
+        let entry = try? await services.bodyweightService.closestBodyweight(to: start)
+
+        guard let kilocalories = HealthKitService.estimatedKilocalories(
+            bodyweightKg: entry?.bodyweightKg,
+            start: start,
+            end: end
+        ) else { return }
+
+        estimatedCalories = Int(kilocalories.rounded())
+    }
+
+    private func exerciseRecapCaption(summary: WorkoutSummaryData) -> String {
+        let logged = "\(summary.exerciseSummaries.count) logged"
+        guard summary.prsHit > 0 else { return logged }
+        return "\(logged) · \(summary.prsHit) PR\(summary.prsHit == 1 ? "" : "s")"
+    }
+
+    /// Builds the pure value the share card draws from. Formatting happens here, in the view
+    /// that already knows the unit preference, so the card itself stays free of services.
+    private func shareCardData(summary: WorkoutSummaryData) -> WorkoutShareCardData {
+        let unit = viewModel.unitPreference
+
+        func lift(_ exercise: ExerciseSummary) -> WorkoutShareCardData.Lift {
+            var detail = "\(exercise.setCount) sets"
+            if let weight = exercise.bestWeight {
+                let weightLabel = UnitConversion.formatWeightLabel(weight, unitPreference: unit)
+                detail = exercise.bestReps.map { "\(weightLabel) × \($0)" } ?? weightLabel
+            }
+            return WorkoutShareCardData.Lift(
+                id: exercise.id,
+                name: exercise.exerciseName,
+                detail: detail,
+                setCountLabel: "\(exercise.setCount) sets"
+            )
+        }
+
+        // The single best record, which is what B3 makes the headline.
+        let prExercise = summary.exerciseSummaries.first { $0.hadPR && $0.bestWeight != nil }
+            ?? summary.exerciseSummaries.first { $0.hadPR }
+
+        let topLifts = summary.exerciseSummaries
+            .sorted { $0.setCount > $1.setCount }
+            .prefix(3)
+            .map(lift)
+
+        return WorkoutShareCardData(
+            title: resolvedWorkoutTitle,
+            dateLabel: summaryDateLabel(summary.date),
+            durationLabel: formatDuration(summary.duration),
+            setCountLabel: "\(summary.totalSets)",
+            volumeLabel: summary.primaryMetric?.formattedValue(style: .detailed, unitPreference: unit),
+            liftCountLabel: "\(summary.exerciseSummaries.count)",
+            prLift: prExercise.map(lift),
+            lifts: Array(topLifts),
+            extraLiftCount: max(0, summary.exerciseSummaries.count - topLifts.count)
+        )
     }
 
     private func summaryDateLabel(_ date: Date) -> String {

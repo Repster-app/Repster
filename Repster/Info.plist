@@ -67,6 +67,8 @@
 	<string>Repster only looks up the workouts it added to Apple Health itself, so it can remove them again when you delete a workout in Repster. It never reads any other health data.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Repster adds your finished workouts to Apple Health so they appear alongside the rest of your activity.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Repster saves your workout card to Photos when you tap Save to Photos. It only ever adds the image you asked it to save, and never reads your photo library.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
