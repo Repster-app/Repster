@@ -198,7 +198,7 @@ struct HowItWorksView: View {
 
         case .suggestions:
             VStack(spacing: 8) {
-                illoRow("sparkles", .accent, "Set 3: 62.5 kg × 8 @ RIR 2", "LAST TOP · 60 kg × 8", highlighted: true)
+                illoRow("sparkles", .accent, "Set 3: 62.5 kg × 8 @ RIR 2", "Nudging up from your last workout's peak", highlighted: true)
                 illoRow("trophy", .gold, "Bench press", "Best e1RM 78 kg · 12 sessions")
             }
 

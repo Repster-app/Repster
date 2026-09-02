@@ -5051,7 +5051,7 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
     var editedSetIds: [UUID] = []
     var uncompletedSetIds: [UUID] = []
     var deletedSetIds: [UUID] = []
-    var targetOverrideUpdates: [(setId: UUID, min: Int?, max: Int?)] = []
+    var targetOverrideUpdates: [(setId: UUID, min: Int?, max: Int?, clearsInheritedTarget: Bool)] = []
     var workoutSets: [UUID: [WorkoutSet]] = [:]
     var exerciseSets: [UUID: [WorkoutSet]] = [:]
     var fetchSetsForExerciseCallCount = 0
@@ -5234,22 +5234,30 @@ private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
     func updateInProgressTargetRepOverride(
         setId: UUID,
         min: Int?,
-        max: Int?
+        max: Int?,
+        clearsInheritedTarget: Bool
     ) async throws {
-        targetOverrideUpdates.append((setId, min, max))
+        targetOverrideUpdates.append((setId, min, max, clearsInheritedTarget))
 
         for sets in workoutSets.values {
             if let set = sets.first(where: { $0.id == setId }) {
-                set.overrideTargetRepMin = min
-                set.overrideTargetRepMax = max
+                apply(min: min, max: max, clearsInheritedTarget: clearsInheritedTarget, to: set)
             }
         }
 
         for sets in exerciseSets.values {
             if let set = sets.first(where: { $0.id == setId }) {
-                set.overrideTargetRepMin = min
-                set.overrideTargetRepMax = max
+                apply(min: min, max: max, clearsInheritedTarget: clearsInheritedTarget, to: set)
             }
+        }
+    }
+
+    private func apply(min: Int?, max: Int?, clearsInheritedTarget: Bool, to set: WorkoutSet) {
+        set.overrideTargetRepMin = min
+        set.overrideTargetRepMax = max
+        if clearsInheritedTarget {
+            set.targetRepMin = nil
+            set.targetRepMax = nil
         }
     }
 

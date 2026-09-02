@@ -363,7 +363,8 @@ struct SuggestionEngineInput: Sendable {
     /// UI can surface anchor dates without re-querying.
     let baseSourceWorkoutDate: Date?
     /// The actual top set behind `baseE1RM`. Threaded through to
-    /// `SuggestionDecision` so the UI can render the "last top" reference.
+    /// `SuggestionDecision` as baseline provenance. Not currently surfaced in
+    /// the UI — the "last top" reference chip was removed.
     let baseSourceTopSet: HistoricalSetSnapshot?
     let completedSessionSets: [SessionSetContext]
     let pendingSets: [SuggestionPendingSetInput]
@@ -533,9 +534,9 @@ struct PrescriptionResult: Sendable {
     }
 }
 
-/// Snapshot of a logged set from history, used as a UI-facing reference
-/// (e.g. "last top set: 52 kg × 8 · RIR 1"). The snapshot is the actual
-/// set behind the baseline e1RM — see `LoadPrescriptionService.peakAcrossRecentWorkouts`.
+/// Snapshot of a logged set from history, kept as baseline provenance
+/// (e.g. "52 kg × 8 · RIR 1"). The snapshot is the actual set behind the
+/// baseline e1RM — see `LoadPrescriptionService.peakAcrossRecentWorkouts`.
 struct HistoricalSetSnapshot: Sendable, Equatable {
     let weight: Double
     let reps: Int
@@ -553,7 +554,7 @@ struct BaseE1RMEstimate: Sendable {
     let sourceWorkoutDate: Date?
     /// The actual top set (highest implied e1RM) behind this baseline.
     /// Nil for `.noData` or when no eligible source set could be identified.
-    /// Used by the UI to render "last top: 52 kg × 8 · RIR 1" footer chip.
+    /// Kept as provenance for the baseline; not surfaced in the UI.
     let topSet: HistoricalSetSnapshot?
     /// True when a usable older baseline existed but was deliberately withheld because the
     /// exercise has been logged more recently at bodyweight. Lets the caller distinguish

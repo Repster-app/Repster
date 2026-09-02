@@ -42,67 +42,8 @@ struct WeightSuggestionCardView: View {
             ForEach(Array(data.rowStates.enumerated()), id: \.element.id) { _, rowState in
                 rowStateRow(rowState)
             }
-
-            // Last-top reference footer — quiet single-line chip.
-            if let topSet = data.baselineTopSet {
-                lastTopChip(topSet)
-                    .padding(.top, 4)
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    // MARK: - Last-top reference chip (C10)
-
-    private func lastTopChip(_ topSet: HistoricalSetSnapshot) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "clock.arrow.circlepath")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Color.textTertiary)
-
-            Text("LAST TOP")
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .foregroundStyle(Color.textTertiary)
-                .kerning(0.7)
-
-            Text(formatTopSetValue(topSet))
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(Color.textSecondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-
-            Spacer(minLength: 6)
-
-            if let relative = relativeDateLabel(topSet.date) {
-                Text(relative)
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(Color.textTertiary)
-                    .lineLimit(1)
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(Color.bgCard.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color.border, lineWidth: 1)
-        )
-    }
-
-    /// Renders e.g. "52 kg × 8 · RIR 1" or "52 kg × 8" when RIR is unknown.
-    private func formatTopSetValue(_ topSet: HistoricalSetSnapshot) -> String {
-        let base = "\(formatWeight(topSet.weight)) × \(topSet.reps)"
-        guard let rir = topSet.rir else { return base }
-        return "\(base) · RIR \(formatSimpleNumber(rir))"
-    }
-
-    /// Short relative date like "8d ago" / "3w ago" / "Just now".
-    private func relativeDateLabel(_ date: Date) -> String? {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        formatter.dateTimeStyle = .numeric
-        return formatter.localizedString(for: date, relativeTo: Date())
     }
 
     // MARK: - Stale banner

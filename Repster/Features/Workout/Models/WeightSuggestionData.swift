@@ -201,9 +201,6 @@ struct WeightSuggestionData: Sendable {
     /// Date of the workout the base e1RM is anchored on (nil when not derived
     /// from a specific workout). Used by the stale banner copy.
     let e1RMSourceWorkoutDate: Date?
-    /// The actual top set behind the baseline e1RM, when available. Surfaced
-    /// in the "last top" footer chip ("52 kg × 8 · RIR 1 · 8d ago").
-    let baselineTopSet: HistoricalSetSnapshot?
     /// Working sets completed in the current session for this exercise, in
     /// workout order. Surfaced as compact done strips above the pending strips
     /// in the redesigned module. Each entry optionally carries the suggestion
@@ -740,8 +737,6 @@ enum SuggestionExplainer {
             e1RMSource: evaluation.decisions.first?.e1RMSource ?? evaluation.input?.baseSource ?? .noData,
             e1RMSourceWorkoutDate: evaluation.decisions.first?.e1RMSourceWorkoutDate
                 ?? evaluation.input?.baseSourceWorkoutDate,
-            baselineTopSet: evaluation.decisions.first?.e1RMSourceTopSet
-                ?? evaluation.input?.baseSourceTopSet,
             completedInSessionSets: completedInSessionSets,
             availability: availability
         )
