@@ -1,0 +1,521 @@
+{
+  "pages": [
+    {
+      "id": "page-8",
+      "name": "Where this landed"
+    },
+    {
+      "id": "page-1",
+      "name": "Within reach"
+    },
+    {
+      "id": "page-2",
+      "name": "Further out"
+    },
+    {
+      "id": "page-3",
+      "name": "Coach rules"
+    },
+    {
+      "id": "page-5",
+      "name": "The screen"
+    },
+    {
+      "id": "page-6",
+      "name": "To the brief"
+    },
+    {
+      "id": "page-7",
+      "name": "Share cards"
+    }
+  ],
+  "artboards": [
+    {
+      "file": "Current.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 500,
+      "page": "page-1",
+      "title": "Current — what ships today"
+    },
+    {
+      "file": "Main.dc.html",
+      "x": 470,
+      "y": 0,
+      "w": 390,
+      "h": 500,
+      "page": "page-1",
+      "title": "Option A — One number that matters"
+    },
+    {
+      "file": "OptionB.dc.html",
+      "x": 940,
+      "y": 0,
+      "w": 390,
+      "h": 500,
+      "page": "page-1",
+      "title": "Option B — Against last time"
+    },
+    {
+      "file": "OptionC.dc.html",
+      "x": 1410,
+      "y": 0,
+      "w": 390,
+      "h": 500,
+      "page": "page-1",
+      "title": "Option C — Shape of the session"
+    },
+    {
+      "file": "OptionD.dc.html",
+      "x": 1880,
+      "y": 0,
+      "w": 390,
+      "h": 500,
+      "page": "page-1",
+      "title": "Option D — Receipt"
+    },
+    {
+      "file": "OptionE.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 780,
+      "page": "page-2",
+      "title": "Option E — The model reports back"
+    },
+    {
+      "file": "OptionF.dc.html",
+      "x": 470,
+      "y": 0,
+      "w": 390,
+      "h": 780,
+      "page": "page-2",
+      "title": "Option F — Session trace"
+    },
+    {
+      "file": "OptionG.dc.html",
+      "x": 940,
+      "y": 0,
+      "w": 390,
+      "h": 780,
+      "page": "page-2",
+      "title": "Option G — No card at all"
+    },
+    {
+      "file": "OptionH.dc.html",
+      "x": 1410,
+      "y": 0,
+      "w": 390,
+      "h": 780,
+      "page": "page-2",
+      "title": "Option H — The coach speaks"
+    },
+    {
+      "file": "OptionI.dc.html",
+      "x": 1880,
+      "y": 0,
+      "w": 390,
+      "h": 780,
+      "page": "page-2",
+      "title": "Option I — Get out of the way"
+    },
+    {
+      "file": "OptionJ.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 780,
+      "page": "page-3",
+      "title": "Option J — One line, sometimes none"
+    },
+    {
+      "file": "OptionK.dc.html",
+      "x": 470,
+      "y": 0,
+      "w": 390,
+      "h": 780,
+      "page": "page-3",
+      "title": "Option K — On pace, hedge showing"
+    },
+    {
+      "file": "OptionL.dc.html",
+      "x": 940,
+      "y": 0,
+      "w": 390,
+      "h": 780,
+      "page": "page-3",
+      "title": "Option L — The Insights register"
+    },
+    {
+      "file": "OptionO.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 360,
+      "h": 640,
+      "page": "page-7",
+      "title": "Share C — Weights hidden"
+    },
+    {
+      "file": "ScreenS1.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 780,
+      "page": "page-5",
+      "title": "S1 — One screen, one action"
+    },
+    {
+      "file": "ScreenS2.dc.html",
+      "x": 470,
+      "y": 0,
+      "w": 390,
+      "h": 780,
+      "page": "page-5",
+      "title": "S2 — Already saved"
+    },
+    {
+      "file": "ScreenS3.dc.html",
+      "x": 940,
+      "y": 0,
+      "w": 390,
+      "h": 780,
+      "page": "page-5",
+      "title": "S3 — Ask one thing"
+    },
+    {
+      "file": "ScreenS4.dc.html",
+      "x": 1410,
+      "y": 0,
+      "w": 390,
+      "h": 780,
+      "page": "page-5",
+      "title": "S4 — The form, honestly"
+    },
+    {
+      "file": "SumV1.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 780,
+      "page": "page-6",
+      "title": "V1 — Everything visible"
+    },
+    {
+      "file": "SumV2.dc.html",
+      "x": 470,
+      "y": 0,
+      "w": 390,
+      "h": 780,
+      "page": "page-6",
+      "title": "V2 — Exercises as chips"
+    },
+    {
+      "file": "SumV3.dc.html",
+      "x": 940,
+      "y": 0,
+      "w": 390,
+      "h": 780,
+      "page": "page-6",
+      "title": "V3 — Coach first"
+    },
+    {
+      "file": "BrandGround.dc.html",
+      "x": 440,
+      "y": 0,
+      "w": 360,
+      "h": 640,
+      "page": "page-7",
+      "title": "Branding — mark as ground"
+    },
+    {
+      "file": "SumV4.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 780,
+      "page": "page-8",
+      "title": "V4 — The summary screen"
+    },
+    {
+      "file": "ScreenDetails.dc.html",
+      "x": 470,
+      "y": 0,
+      "w": 390,
+      "h": 780,
+      "page": "page-8",
+      "title": "Add details"
+    },
+    {
+      "file": "BrandBar.dc.html",
+      "x": 880,
+      "y": 0,
+      "w": 360,
+      "h": 640,
+      "page": "page-7",
+      "title": "Branding — brand bar"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "note-brief",
+      "x": 0,
+      "y": -560,
+      "w": 860,
+      "page": "page-1",
+      "text": "Finish-workout recap card — directions within today's constraints.\n\nEvery colour, radius, type size and spacing value is lifted from DesignTokens.swift and WorkoutSummarySheet.swift, so these sit next to the real screen honestly. Static mockups, not a prototype. Leftmost frame is what ships today."
+    },
+    {
+      "id": "note-current",
+      "x": 0,
+      "y": -300,
+      "w": 390,
+      "page": "page-1",
+      "text": "CURRENT\n\nFour things work against it:\n\n· Time gets the only tinted tile, and it is the least informative of the three numbers — it measures how long you were in the gym, not how well you trained.\n· The PR line is the smallest thing on the card, below three tiles that are all bigger.\n· No number has a baseline, so 18 sets and 12,450 kg carry no verdict.\n· Edit sits in the card's best corner for a rare action."
+    },
+    {
+      "id": "note-a",
+      "x": 470,
+      "y": -300,
+      "w": 390,
+      "page": "page-1",
+      "text": "OPTION A — One number that matters\n\nLeads with the best thing that happened and demotes the rest to one quiet line. The band is always there; only its temperature changes.\n\nBuildable today — prsHit is on WorkoutSummaryData, bestWeight/bestReps/hadPR are on ExerciseSummary. No new data.\n\nFlip the Session tweak to see the no-PR case, which is most sessions.\n\nTradeoff: time and sets stop being scannable at a glance."
+    },
+    {
+      "id": "note-b",
+      "x": 940,
+      "y": -300,
+      "w": 390,
+      "page": "page-1",
+      "text": "OPTION B — Against last time\n\nKeeps the three-tile shape but gives every number a baseline. That is what turns a report into a verdict.\n\nTime's delta stays grey on purpose — shorter is not better. Volume splits value from unit so long numbers stop shrinking to fit.\n\nTradeoff: needs previous-session data the summary does not carry today, and a deload or a first session has nothing to compare against."
+    },
+    {
+      "id": "note-c",
+      "x": 1410,
+      "y": -300,
+      "w": 390,
+      "page": "page-1",
+      "text": "OPTION C — Shape of the session\n\nShows where the volume actually went, using the muscle-group colours already in MuscleGroupColors.swift. Fastest read of the four.\n\nTradeoffs: it partly repeats the Exercises list directly below it, the split is a weak signal on a three-exercise day, and it needs per-muscle volume the summary does not carry."
+    },
+    {
+      "id": "note-d",
+      "x": 1880,
+      "y": -300,
+      "w": 390,
+      "page": "page-1",
+      "text": "OPTION D — Receipt\n\nNo tiles. Type sizes go up rather than down, so long numbers, imperial units and any locale fit without a minimumScaleFactor shrinking them.\n\nCalmest of the four and the cheapest to build.\n\nTradeoff: it reads like a log, not a moment — the least celebratory option for the emotional peak of the session."
+    },
+    {
+      "id": "note-brief-2",
+      "x": 0,
+      "y": -560,
+      "w": 860,
+      "page": "page-2",
+      "text": "Further out — the card as an open question.\n\nNothing here is constrained by what the summary carries today, or by the card staying a card. These are whole-sheet frames (390 x 780) rather than card crops, because most of them change the screen and not just the box at the top of it."
+    },
+    {
+      "id": "note-e",
+      "x": 0,
+      "y": -300,
+      "w": 390,
+      "page": "page-2",
+      "text": "OPTION E — The model reports back\n\nStops reporting what you did and reports what it CHANGED: where each lift's estimated 1RM sat before, and where it sits now. The one version that makes the recap carry what Repster is actually selling.\n\nCost: high. The estimates exist in the engine; a stable per-session before/after snapshot does not.\n\nTradeoff: the model goes on stage every session. One visibly wrong number costs more trust than ten good ones earn."
+    },
+    {
+      "id": "note-f",
+      "x": 470,
+      "y": -300,
+      "w": 390,
+      "page": "page-2",
+      "text": "OPTION F — Session trace\n\nThe session as an object with a shape: every set a mark across the hour, height for effort, colour for muscle group, a gold diamond where a PR landed.\n\nCost: high. Needs per-set timestamps and an intensity value per set on the summary.\n\nTradeoff: only as honest as the RIR behind it. Sparse effort logging turns this into a beautiful graphic making a claim the data cannot support."
+    },
+    {
+      "id": "note-g",
+      "x": 940,
+      "y": -300,
+      "w": 390,
+      "page": "page-2",
+      "text": "OPTION G — No card at all\n\nThe recap stops being a card in a scroll view and becomes the screen. One number at 82 pt, a gold rule, everything else whispered.\n\nCost: low to build, high to decide — notes, effort and save-as-template need somewhere else to live.\n\nTradeoff: one number has to be right for everybody, and volume flatters high-rep days while underselling heavy triples."
+    },
+    {
+      "id": "note-h",
+      "x": 1410,
+      "y": -300,
+      "w": 390,
+      "page": "page-2",
+      "text": "OPTION H — The coach speaks\n\nThe card interprets instead of reporting. Numbers drop to one line; a sentence takes the top. Closest to where Repster Coach is already heading.\n\nCost: the sentence is the whole feature.\n\nTradeoff: a generic sentence is worse than none. 'Great job!' after every session teaches people to stop reading within a week."
+    },
+    {
+      "id": "note-i",
+      "x": 1880,
+      "y": -300,
+      "w": 390,
+      "page": "page-2",
+      "text": "OPTION I — Get out of the way\n\nThe provocation: reviewing a session is something you do later, on the sofa, not standing sweating next to a rack.\n\nCost: negative — less code than exists today.\n\nTradeoff: throws away the only celebratory moment, and notes/effort/save-as-template all need a home. Worth pinning up mainly for the question it forces: does this screen need to exist?"
+    },
+    {
+      "id": "note-brief-3",
+      "x": 0,
+      "y": -560,
+      "w": 860,
+      "page": "page-3",
+      "text": "Drawn to the rules in REPSTER_COACH_SCOPING.md.\n\nR4 gives the summary sheet at most ONE line, positive-only, or nothing at all. §5.3 fixes the grammar: the subject of the sentence is the model, not the lifter. §2.5 bans streaks, obligation, and outcome claims without a hedge. These three are what survives all of it."
+    },
+    {
+      "id": "note-j",
+      "x": 0,
+      "y": -300,
+      "w": 390,
+      "page": "page-3",
+      "text": "OPTION J — One line, sometimes none\n\nR4 read literally, plus the §5.3 tone rule: the app expected less, you did more, it has adjusted.\n\nThe design problem is the SILENT state, not this one. A card that looks incomplete without its coach line will get one forced in every session, and within a month it is saying 'solid work!' to people who deloaded.\n\nBonus: because it only speaks on the upside, it steps around §1 entirely — it can ship before the engine program, not behind it."
+    },
+    {
+      "id": "note-k",
+      "x": 470,
+      "y": -300,
+      "w": 390,
+      "page": "page-3",
+      "text": "OPTION K — On pace, with the hedge showing\n\nT6. The scoping calls it nearly free and the riskiest to get wrong: 'a dashed line is a promise'. So the hedge is drawn as part of the component, not fine print someone deletes later.\n\ncomputeE1RMTrendSlope exists. The dependency is not code — T6 needs a goal the user CONFIRMED, not one taken at install.\n\nTradeoff: linear extrapolation of strength ages badly in public."
+    },
+    {
+      "id": "note-l",
+      "x": 940,
+      "y": -300,
+      "w": 390,
+      "page": "page-3",
+      "text": "OPTION L — The Insights register\n\n§2.1's load-bearing distinction, made visible: Insights DESCRIBES (arithmetic on your own data, always renders, cannot be wrong); Coach PRESCRIBES (gated, occasional, allowed to say nothing).\n\nSo: no accent colour, no next step. Every line is a fact set against the lifter's own history.\n\nTradeoff: it never tells you anything you could act on. If the recap is the Coach's best moment to speak, this option declines to use it."
+    },
+    {
+      "id": "note-o",
+      "x": 880,
+      "y": -300,
+      "w": 360,
+      "page": "page-7",
+      "text": "SHARE C — Weights hidden\n\nB4's privacy toggle, drawn in the redacted state rather than described. The claim is that it converts a silent non-share into a share — which only holds if the card still looks worth posting with the numbers gone.\n\nSo the achievement is carried by words and type size: lift name as headline, volume swapped for a lift count, set counts kept. No holes where a number used to be."
+    },
+    {
+      "id": "note-brief-5",
+      "x": 0,
+      "y": -560,
+      "w": 860,
+      "page": "page-5",
+      "text": "The screen, not the card.\n\nEvery other page here redesigns the box at the top. But the sheet still asks for SIX things at the moment someone wants to leave the gym — title, notes, effort out of ten, per-exercise suggestion feedback, save-as-template, discard — and no card treatment touches that count. R4 already says: less, not more.\n\nThese four change the screen instead. Each answers a different question about why it exists."
+    },
+    {
+      "id": "note-s1",
+      "x": 0,
+      "y": -300,
+      "w": 390,
+      "page": "page-5",
+      "text": "S1 — One screen, one action\n\nWhat if it asked for one thing instead of six? Everything optional collapses into a single door you can walk past. Nothing is removed; it stops being PRESENTED.\n\nCheapest honest version, and Option A's shape drops straight in.\n\nTradeoff: effort and suggestion feedback are the two inputs the engine actually reads. Burying them will cut fill-in rate — measure it, don't assume."
+    },
+    {
+      "id": "note-s2",
+      "x": 470,
+      "y": -300,
+      "w": 390,
+      "page": "page-5",
+      "text": "S2 — Already saved\n\nWhy is finishing a decision at all? The sets are already logged. Write on appear, and the sheet becomes a review you may dismiss: no Save button, no save-vs-discard fork at the tiredest moment of the session.\n\nCost is real — moves finishWorkout() to the top of the flow, and discard becomes deleting a saved workout.\n\nTradeoff: you lose the escape hatch for an accidental workout."
+    },
+    {
+      "id": "note-s3",
+      "x": 940,
+      "y": -300,
+      "w": 390,
+      "page": "page-5",
+      "text": "S3 — Ask one thing\n\nIf six is too many and zero costs the engine its inputs, ask ONE — whichever this session most needs — large, obvious, skippable.\n\nThe scoping did the homework: perceivedEffort has exactly one reader (InsightRules+Readiness), and per-exercise feedback feeds the fatigue taper. The app knows which answer is worth most.\n\nTradeoff: a question that moves is harder to build a habit around."
+    },
+    {
+      "id": "note-s4",
+      "x": 1410,
+      "y": -300,
+      "w": 390,
+      "page": "page-5",
+      "text": "S4 — The form, honestly\n\nWhat if all six asks earn their place? Then stop dressing the screen as a celebration. Recap collapses to two lines; the rest is a well-ordered form that admits what it is.\n\nSmallest cost of the four — mostly reordering.\n\nTradeoff: gives up the moment entirely. Decides it was never the job."
+    },
+    {
+      "id": "note-brief-6",
+      "x": 0,
+      "y": -560,
+      "w": 860,
+      "page": "page-6",
+      "text": "Built to the settled brief.\n\nAll three carry: Save and Discard both visible, the Add details row, time / sets / volume, an exercise overview naming WHICH lifts got PRs without the amounts, and an Analyse with Coach action. They differ in how exercises are shown and how loudly Coach is pitched.\n\nCALORIES: HealthKitService.estimatedKilocalories already exists and is pure — kcal = MET x bodyweightKg x hours, MET fixed at 3.5. Two catches. It returns nil with no bodyweight logged and the toggle defaults to OFF, so a four-up stat row shows three cells for many users. And because it is bodyweight x hours, it is duration wearing a different hat — heavy triples and light curls for 64 minutes give the same number. The file names the fix: scale MET by perceivedEffort, 3.5 to 6.0."
+    },
+    {
+      "id": "note-v1",
+      "x": 0,
+      "y": -300,
+      "w": 390,
+      "page": "page-6",
+      "text": "V1 — Everything visible\n\nNothing folded away: 2x2 stat grid, all five exercises with PR marks and no amounts, Coach, Add details, Save with Discard beneath.\n\nTradeoff: it only just fits. The tiles and rows had to be tightened to hold one screen, and a seven-exercise session pushes Add details under the fold."
+    },
+    {
+      "id": "note-v2",
+      "x": 470,
+      "y": -300,
+      "w": 390,
+      "page": "page-6",
+      "text": "V2 — Exercises as chips  ** the one I'd build **\n\nThe list collapses to wrapped pills, gold where you set a record. Answers 'which lifts did I PR in' at a glance in a third of the height, and it does not change shape at nine exercises.\n\nCalories sit under the tiles as a quiet estimate rather than a fourth peer — which is what the nil case demands.\n\nTradeoff: chips scan worse once names get long."
+    },
+    {
+      "id": "note-v3",
+      "x": 940,
+      "y": -300,
+      "w": 390,
+      "page": "page-6",
+      "text": "V3 — Coach first\n\nStats, then Coach as the most prominent thing on the sheet, exercises collapsed to one openable row. Shortest of the three; treats analysis rather than review as the point.\n\nTradeoff: it says '2 PRs' but not which lifts, so it costs a tap for the thing you said you liked seeing.\n\nNOTE on Analyse with Coach: a button is not a verdict. R4 caps the SHEET at one positive-only line because a verdict handed to a tired lifter reads as a grade — but the user asking for analysis opts in, so the sharper things can live on the screen the tap leads to."
+    },
+    {
+      "id": "note-brief-7",
+      "x": 0,
+      "y": -560,
+      "w": 800,
+      "page": "page-7",
+      "text": "Signing the card.\n\nThe kept cards carry the spec's footer — date, wordmark, URL — which is correct and almost invisible at 13 px. These are the same PR card with attribution dialled up, quiet to loud. B3 requires the footer be present and never removable; none of these remove it."
+    },
+    {
+      "id": "note-bg",
+      "x": 440,
+      "y": -300,
+      "w": 360,
+      "page": "page-7",
+      "text": "FOOTER LOCKUP\n\nWatermark removed. Attribution is the bottom line only: date, mark, wordmark, URL.\n\nTradeoff: quietest of the two, and the first thing lost when someone crops the card to post just the number."
+    },
+    {
+      "id": "note-brief-8",
+      "x": 0,
+      "y": -560,
+      "w": 860,
+      "page": "page-8",
+      "text": "Where this landed.\n\nV2's stats and Coach card carrying V1's exercise list, plus the screen behind the Add details row.\n\nCALORIES: HealthKitService.estimatedKilocalories already exists and is pure — kcal = MET x bodyweightKg x hours, MET fixed at 3.5. It returns nil with no bodyweight logged and the toggle defaults to OFF, so it stays on a quiet line rather than becoming a fourth tile. And being bodyweight x hours it is duration wearing a different hat — heavy triples and light curls for 64 minutes give the same figure. The fix your own comment names: scale MET by perceivedEffort, 3.5 to 6.0."
+    },
+    {
+      "id": "note-v4",
+      "x": 0,
+      "y": -300,
+      "w": 390,
+      "page": "page-8",
+      "text": "V4 — The summary screen\n\nV2's stats and Coach card with V1's exercise list. Save and Discard both present, Add details as one row, exercises naming WHICH lifts set records without the weights.\n\nClears its frame by ~75 px, so a nine-exercise session still holds — that was V1's failure mode and this does not inherit it."
+    },
+    {
+      "id": "note-details",
+      "x": 470,
+      "y": -300,
+      "w": 390,
+      "page": "page-8",
+      "text": "ADD DETAILS — what the row opens\n\nNotes, effort, suggestion feedback, save as template: the four asks pulled off the main sheet, with room to answer properly.\n\nEffort gets the full 1-10 scale at 44 px targets rather than today's popover. That matters twice: deloadReadiness is its only reader, and the calorie estimate could be scaled by it.\n\nOpen question: a push inside the sheet as drawn, or a second sheet? A push keeps one dismissal gesture; a sheet makes it feel more optional."
+    },
+    {
+      "id": "note-bb2",
+      "x": 880,
+      "y": -300,
+      "w": 360,
+      "page": "page-7",
+      "text": "BRAND BAR\n\nThe other reading of 'keep the bottom thing' — a solid accent band across the foot with the app icon on it. Both are bottom treatments, so both are drawn rather than guessed.\n\nTradeoff: the only version that survives being screenshotted, cropped and reposted, and the one that most reads as an ad."
+    }
+  ],
+  "launch": {
+    "view": "canvas",
+    "page": "page-8"
+  }
+}

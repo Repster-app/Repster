@@ -1,0 +1,249 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap">
+  <style>
+    body { margin: 0; font-family: "DM Sans", system-ui, -apple-system, sans-serif; background: #111113; }
+    a { color: #5B8DEF; } a:hover { color: #7BA4F2; }
+    * { box-sizing: border-box; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; background: #111113; display: flex; flex-direction: column; overflow: hidden; color: #EAEAEF;">
+
+  <!-- Header bar -->
+  <div style="display: flex; align-items: center; gap: 8px; padding: 4px 20px;">
+    <div style="width: 44px; height: 36px; display: flex; align-items: center;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#EAEAEF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+    </div>
+    <div style="flex-grow: 1;"></div>
+    <div style="min-width: 76px; height: 32px; background: #262630; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+      <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; font-weight: 600; color: #EAEAEF;">42:18</span>
+    </div>
+    <div style="flex-grow: 1;"></div>
+    <div style="width: 44px; height: 36px; display: flex; align-items: center; justify-content: center;">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#EAEAEF" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+    </div>
+    <div style="height: 36px; padding: 0 12px; background: #5B8DEF; border-radius: 8px; display: flex; align-items: center;">
+      <span style="font-size: 14px; font-weight: 600; color: #FFFFFF;">Finish</span>
+    </div>
+  </div>
+
+  <!-- Tab strip: the pair collapses into ONE tab -->
+  <div style="display: flex; align-items: center; gap: 7px; padding: 5px 18px;">
+    <div style="height: 36px; padding: 0 10px 0 8px; border-radius: 7px; background: #5B8DEF; display: flex; align-items: center; gap: 7px;">
+      <div style="width: 18px; height: 18px; border-radius: 5px; background: rgba(255,255,255,0.22); display: flex; align-items: center; justify-content: center;">
+        <span style="font-size: 10px; font-weight: 700; color: #FFFFFF;">A</span>
+      </div>
+      <span style="font-size: 13px; font-weight: 500; color: #FFFFFF; white-space: nowrap;">Bench + Incline DB</span>
+    </div>
+    <div style="height: 36px; padding: 0 14px; border-radius: 7px; background: #1B1B1F; display: flex; align-items: center;">
+      <span style="font-size: 13px; font-weight: 500; color: #5C5C6E; white-space: nowrap;">Cable Fly</span>
+    </div>
+  </div>
+
+  <!-- Sub-tab picker -->
+  <div style="display: flex; align-items: center; gap: 8px; padding: 2px 16px;">
+    <div style="flex-grow: 1; display: flex; gap: 4px; padding: 2px; background: rgba(27,27,31,0.9); border: 1px solid rgba(255,255,255,0.06); border-radius: 11px;">
+      <div style="flex-grow: 1; min-height: 32px; display: flex; align-items: center; justify-content: center; background: #262630; border-radius: 8px;">
+        <span style="font-size: 12px; font-weight: 600; color: #EAEAEF;">Sets</span>
+      </div>
+      <div style="flex-grow: 1; min-height: 32px; display: flex; align-items: center; justify-content: center;">
+        <span style="font-size: 12px; font-weight: 500; color: #9999A8;">History</span>
+      </div>
+      <div style="flex-grow: 1; min-height: 32px; display: flex; align-items: center; justify-content: center;">
+        <span style="font-size: 12px; font-weight: 500; color: #9999A8;">PRs</span>
+      </div>
+      <div style="flex-grow: 1; min-height: 32px; display: flex; align-items: center; justify-content: center;">
+        <span style="font-size: 12px; font-weight: 500; color: #9999A8;">Charts</span>
+      </div>
+    </div>
+    <div style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2a2 2 0 110-4h.09A1.65 1.65 0 004.6 8a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 3.68 1.65 1.65 0 0010 2.17V2a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 8v0a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"></path></svg>
+    </div>
+  </div>
+
+  <!-- Round cards. The set table is restructured: rounds, not per-exercise rows. -->
+  <div style="padding: 6px 20px 0 20px; display: flex; flex-direction: column; gap: 8px;">
+
+    <sc-for list="{{rounds}}" as="round" hint-placeholder-count="3">
+      <div style="background: #1B1B1F; border-radius: 12px; display: flex; overflow: hidden;">
+        <div style="width: 4px; background: {{round.rail}};"></div>
+        <div style="flex-grow: 1; padding: 8px 10px 10px 10px;">
+
+          <div style="display: flex; align-items: center; gap: 8px; height: 20px;">
+            <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: {{round.labelColor}};">ROUND {{round.number}}</span>
+            <div style="flex-grow: 1;"></div>
+            <span style="font-size: 10px; font-weight: 600; color: #5C5C6E;">{{round.status}}</span>
+          </div>
+
+          <sc-for list="{{round.entries}}" as="entry" hint-placeholder-count="2">
+            <div style="display: flex; align-items: center; gap: 8px; height: 46px; background: {{entry.rowBg}}; border-radius: 8px; padding: 0 4px;">
+              <div style="width: 112px; display: flex; align-items: center; gap: 6px;">
+                <span style="font-size: 10px; font-weight: 700; color: {{entry.letterColor}}; width: 10px;">{{entry.letter}}</span>
+                <span style="font-size: 12px; font-weight: 500; color: {{entry.nameColor}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{entry.name}}</span>
+              </div>
+              <div style="width: 60px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: {{entry.fieldBg}}; border: 1px solid {{entry.fieldBorder}};">
+                <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">{{entry.weight}}</span>
+              </div>
+              <div style="width: 48px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: {{entry.fieldBg}}; border: 1px solid {{entry.fieldBorder}};">
+                <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">{{entry.reps}}</span>
+              </div>
+              <div style="width: 32px; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06);">
+                <span style="font-size: 12px; font-weight: 600; color: {{entry.rirColor}};">{{entry.rir}}</span>
+              </div>
+              <div onClick="{{ entry.toggle }}" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                <div style="width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; background: {{entry.checkBg}}; border: {{entry.checkBorder}};">
+                  <sc-if value="{{entry.done}}" hint-placeholder-val="{{ true }}">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"></path></svg>
+                  </sc-if>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+
+        </div>
+      </div>
+    </sc-for>
+
+    <div style="min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 8px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); border-radius: 10px;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#EAEAEF" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      <span style="font-size: 14px; font-weight: 600; color: #EAEAEF;">Add Round</span>
+    </div>
+
+  </div>
+
+  <div style="flex-grow: 1;"></div>
+
+  <!-- One rest timer per round, not per set -->
+  <sc-if value="{{resting}}" hint-placeholder-val="{{ true }}">
+    <div>
+      <div style="height: 2px; background: rgba(255,255,255,0.06);">
+        <div style="height: 2px; width: 48%; background: #5B8DEF;"></div>
+      </div>
+      <div style="height: 43px; background: #1B1B1F; display: flex; align-items: center; gap: 8px; padding: 0 20px;">
+        <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24px; font-weight: 700; color: #EAEAEF;">1:45</span>
+        <span style="font-size: 12px; font-weight: 500; color: #5C5C6E;">round {{restedRound}} done</span>
+        <div style="flex-grow: 1;"></div>
+        <div style="width: 46px; height: 30px; border-radius: 8px; background: #262630; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 12px; font-weight: 600; color: #EAEAEF;">-15s</span>
+        </div>
+        <div style="width: 46px; height: 30px; border-radius: 8px; background: #262630; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 12px; font-weight: 600; color: #EAEAEF;">+15s</span>
+        </div>
+        <div onClick="{{ dismissRest }}" style="width: 26px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{idle}}" hint-placeholder-val="{{ false }}">
+    <div style="height: 45px;"></div>
+  </sc-if>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{
+  "groupColor": {"editor": "color", "default": "#5B8DEF", "options": ["#5B8DEF", "#A87EE6", "#4ECDC4", "#E89B3E"], "section": "Superset"}
+}'>
+class Component extends DCLogic {
+
+  constructor(props) {
+    super(props);
+    this.state = {
+      // [round][slot] — a is Bench, b is Incline DB
+      done: [[true, true], [true, false], [false, false]],
+      rest: 'idle',
+      restedRound: 1
+    };
+  }
+
+  plan() {
+    return [
+      [ { letter: 'a', name: 'Bench Press', weight: '80', reps: '8', rir: '2' },
+        { letter: 'b', name: 'Incline DB Press', weight: '30', reps: '12', rir: '3' } ],
+      [ { letter: 'a', name: 'Bench Press', weight: '82.5', reps: '8', rir: '1' },
+        { letter: 'b', name: 'Incline DB Press', weight: '32.5', reps: '10', rir: '2' } ],
+      [ { letter: 'a', name: 'Bench Press', weight: '82.5', reps: '7', rir: '1' },
+        { letter: 'b', name: 'Incline DB Press', weight: '32.5', reps: '9', rir: '1' } ]
+    ];
+  }
+
+  rirColor(v) {
+    const map = { '0': '#E05555', '1': '#E07040', '2': '#E89B3E', '3': '#D4A23A', '4': '#A0B83C', '5': '#5EC269' };
+    return map[v] || '#5C5C6E';
+  }
+
+  hexAlpha(hex, alpha) {
+    const h = (hex || '#5B8DEF').replace('#', '');
+    return 'rgba(' + parseInt(h.substring(0, 2), 16) + ',' + parseInt(h.substring(2, 4), 16) + ',' + parseInt(h.substring(4, 6), 16) + ',' + alpha + ')';
+  }
+
+  toggle(roundIndex, slot) {
+    const done = JSON.parse(JSON.stringify(this.state.done));
+    const wasDone = done[roundIndex][slot] === true;
+    done[roundIndex][slot] = !wasDone;
+
+    // Rest fires when the ROUND closes, never between the two lifts in it.
+    const roundNowComplete = !wasDone && done[roundIndex].every((d) => d === true);
+    this.setState({
+      done: done,
+      rest: roundNowComplete ? 'resting' : this.state.rest,
+      restedRound: roundNowComplete ? roundIndex + 1 : this.state.restedRound
+    });
+  }
+
+  renderVals() {
+    const groupColor = this.props.groupColor ?? '#5B8DEF';
+    const done = this.state.done;
+
+    const rounds = this.plan().map((entries, r) => {
+      const complete = done[r].every((d) => d === true);
+      const started = done[r].some((d) => d === true);
+      return {
+        number: r + 1,
+        rail: complete ? '#5EC269' : (started ? groupColor : this.hexAlpha(groupColor, 0.30)),
+        labelColor: complete ? '#5EC269' : (started ? groupColor : '#5C5C6E'),
+        status: complete ? 'complete' : (started ? 'in progress' : ''),
+        entries: entries.map((e, i) => {
+          const isDone = done[r][i] === true;
+          return {
+            letter: e.letter,
+            letterColor: isDone ? '#5EC269' : groupColor,
+            name: e.name,
+            nameColor: isDone ? '#9999A8' : '#EAEAEF',
+            weight: e.weight,
+            reps: e.reps,
+            rir: e.rir,
+            rirColor: this.rirColor(e.rir),
+            done: isDone,
+            rowBg: isDone ? 'rgba(94,194,105,0.08)' : 'transparent',
+            fieldBg: isDone ? 'rgba(94,194,105,0.06)' : '#1F1F25',
+            fieldBorder: isDone ? 'rgba(94,194,105,0.15)' : 'rgba(255,255,255,0.06)',
+            checkBg: isDone ? '#5B8DEF' : 'transparent',
+            checkBorder: isDone ? 'none' : '2px solid #5C5C6E',
+            toggle: () => this.toggle(r, i)
+          };
+        })
+      };
+    });
+
+    return {
+      rounds: rounds,
+      resting: this.state.rest === 'resting',
+      idle: this.state.rest === 'idle',
+      restedRound: this.state.restedRound,
+      dismissRest: () => this.setState({ rest: 'idle' })
+    };
+  }
+}
+</script>
+</body>
+</html>

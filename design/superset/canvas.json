@@ -1,0 +1,53 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "title": "B · Auto-advance", "x": 0, "y": 0, "w": 390, "h": 844, "is_interactive": true },
+    { "file": "GroupedA.dc.html", "title": "A · Grouped rounds", "x": 500, "y": 0, "w": 390, "h": 844, "is_interactive": true },
+    { "file": "MarkedC.dc.html", "title": "C · Marked only", "x": 1000, "y": 0, "w": 390, "h": 844, "is_interactive": true },
+    { "file": "Authoring.dc.html", "title": "Making one mid-workout", "x": 1500, "y": 0, "w": 390, "h": 844, "is_interactive": true }
+  ],
+  "annotations": [
+    {
+      "id": "note-brief",
+      "x": 0,
+      "y": -330,
+      "w": 890,
+      "text": "Three answers to the question FEATURE_SCOPING_BRIEF.md §7 leaves open: how does a superset behave once you are actually training?\n\nAll three read supersetGroupId, which templates already write. Tick a checkbox in any of them to feel the difference — that is the whole decision."
+    },
+    {
+      "id": "note-b",
+      "x": 0,
+      "y": -180,
+      "w": 390,
+      "text": "B · AUTO-ADVANCE — the brief's recommendation, and the leading candidate.\n\nTicking a set jumps you to the paired lift. A bracket under the tabs shows the pairing; the un-selected half carries a ring so you can see where the tick sends you. Rest inside the group is a short transition bar with a Go now; full rest only after the last lift.\n\nTradeoff: SetTableView is untouched, but the screen moves under you — a mis-tap lands you on the wrong lift."
+    },
+    {
+      "id": "note-a",
+      "x": 500,
+      "y": -180,
+      "w": 390,
+      "text": "A · GROUPED ROUNDS — the pair collapses into one tab and the set table becomes rounds.\n\nBest match for how people actually think (1a/1b, three rounds), and one rest timer per round rather than per set.\n\nTradeoff: this is a restructure of the set table, not an addition to it. The 36/74/74/42/44/40 row does not fit two exercise names, so the row had to be redesigned — which is the ~5,300 lines the decision record deferred."
+    },
+    {
+      "id": "note-c",
+      "x": 1000,
+      "y": -180,
+      "w": 390,
+      "text": "C · MARKED ONLY — the bracket, no rest inside the group, and a prompt. Navigation never changes.\n\nCheapest by a wide margin and nothing can surprise you mid-set.\n\nTradeoff: you still walk yourself between tabs, which is the part that makes supersets tedious today. This mostly sells the feature rather than delivering it."
+    },
+    {
+      "id": "note-auth",
+      "x": 1500,
+      "y": -180,
+      "w": 390,
+      "text": "MAKING ONE MID-WORKOUT — needed by all three, and absent today: grouping only exists in the template editor.\n\nThe tab strip already has a long-press menu (Move Left/Right, Replace, Delete), so Superset with… has an obvious home and no new surface. Long-press the tab, pick the partner, done."
+    },
+    {
+      "id": "note-gap",
+      "x": 1000,
+      "y": 900,
+      "w": 890,
+      "text": "One thing to fix underneath, whichever wins: SetRepository.create takes no supersetGroupId, so a set added during a live workout is silently ungrouped even on a paired exercise. Grouping is stored per set, not per exercise — so a real session ends up half-tagged the moment anything starts reading the field."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

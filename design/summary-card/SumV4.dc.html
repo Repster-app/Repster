@@ -1,0 +1,111 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #111113;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: #5B8DEF; }
+    a:hover { color: #7BA5F3; }
+  </style>
+</helmet>
+<div style="width: 390px; height: 780px; background: #111113; color: #EAEAEF; display: flex; flex-direction: column;">
+  <div style="display: flex; align-items: center; padding: 12px 16px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); position: relative; flex: none;">
+    <div style="width: 32px; height: 32px; border-radius: 50%; background: #1F1F25; display: flex; align-items: center; justify-content: center;"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M1.5 1.5 L10.5 10.5 M10.5 1.5 L1.5 10.5" stroke="#9999A8" stroke-width="1.8" stroke-linecap="round"></path></svg></div>
+    <div style="flex-grow: 1;"></div>
+    <div style="width: 32px; height: 32px; border-radius: 50%; background: rgba(212,162,58,0.12); border: 1px solid rgba(212,162,58,0.28); display: flex; align-items: center; justify-content: center;"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 10.4 V2.4 M5.2 5 L8 2.2 L10.8 5" stroke="#D4A23A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path><path d="M3.4 8.6 V12.4 A1.2 1.2 0 0 0 4.6 13.6 H11.4 A1.2 1.2 0 0 0 12.6 12.4 V8.6" stroke="#D4A23A" stroke-width="1.6" stroke-linecap="round"></path></svg></div>
+    <div style="position: absolute; left: 0; right: 0; top: 12px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 600; color: #EAEAEF; pointer-events: none;">Workout complete</div>
+  </div>
+  <div style="flex-grow: 1; overflow: hidden; padding: 16px 14px 0; display: flex; flex-direction: column; gap: 14px;">
+    <div style="background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; flex-direction: column; gap: 3px;">
+        <div style="font-size: 12px; color: #9999A8;">Sat, Aug 30</div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="font-size: 20px; font-weight: 600; color: #EAEAEF;">Push Day A</div>
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M11.2 2.3a1.6 1.6 0 0 1 2.3 2.3L5.6 12.5l-3 .7.7-3 7.9-7.9Z" stroke="#5C5C6E" stroke-width="1.4" stroke-linejoin="round"></path></svg>
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <div style="flex-grow: 1; flex-basis: 0; min-height: 56px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 0 6px;">
+          <div style="display: flex; align-items: baseline; gap: 3px;"><span style="font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; color: #EAEAEF;">1h 4m</span></div>
+          <div style="font-size: 11px; color: #5C5C6E;">Time</div>
+        </div>
+        <div style="flex-grow: 1; flex-basis: 0; min-height: 56px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 0 6px;">
+          <div style="display: flex; align-items: baseline; gap: 3px;"><span style="font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; color: #EAEAEF;">18</span></div>
+          <div style="font-size: 11px; color: #5C5C6E;">Sets</div>
+        </div>
+        <div style="flex-grow: 1; flex-basis: 0; min-height: 56px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 0 6px;">
+          <div style="display: flex; align-items: baseline; gap: 3px;"><span style="font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; color: #EAEAEF;">12,450</span><span style="font-size: 12px; font-weight: 500; color: #9999A8;">kg</span></div>
+          <div style="font-size: 11px; color: #5C5C6E;">Volume</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #5C5C6E;">
+        <span style="font-variant-numeric: tabular-nums;">~299 kcal estimated</span>
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><circle cx="6" cy="6" r="4.6" stroke="#5C5C6E" stroke-width="1.1"></circle><path d="M6 5.4 V8.4 M6 3.6 v0.6" stroke="#5C5C6E" stroke-width="1.1" stroke-linecap="round"></path></svg>
+      </div>
+    </div>
+    <div style="background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; align-items: baseline; gap: 10px;">
+        <div style="font-size: 13px; font-weight: 600; color: #EAEAEF;">Exercises</div>
+        <div style="flex-grow: 1;"></div>
+        <div style="font-size: 12px; color: #5C5C6E;">5 &middot; 2 PRs</div>
+      </div>
+      <div style="display: flex; flex-direction: column;">
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <span style="font-size: 14px; color: #EAEAEF;">Barbell Bench Press</span>
+            <span style="flex-grow: 1;"></span><span style="display: flex; align-items: center; gap: 3px;"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 .8l1.6 3.3 3.6.5-2.6 2.5.6 3.6L6 9l-3.2 1.7.6-3.6L.8 4.6l3.6-.5L6 .8Z" fill="#D4A23A"></path></svg><span style="font-size: 11px; font-weight: 700; color: #D4A23A;">PR</span></span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <span style="font-size: 14px; color: #EAEAEF;">Overhead Press</span>
+            <span style="flex-grow: 1;"></span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <span style="font-size: 14px; color: #EAEAEF;">Incline Dumbbell Press</span>
+            <span style="flex-grow: 1;"></span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <span style="font-size: 14px; color: #EAEAEF;">Barbell Row</span>
+            <span style="flex-grow: 1;"></span><span style="display: flex; align-items: center; gap: 3px;"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 .8l1.6 3.3 3.6.5-2.6 2.5.6 3.6L6 9l-3.2 1.7.6-3.6L.8 4.6l3.6-.5L6 .8Z" fill="#D4A23A"></path></svg><span style="font-size: 11px; font-weight: 700; color: #D4A23A;">PR</span></span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0;">
+            <span style="font-size: 14px; color: #EAEAEF;">Cable Pushdown</span>
+            <span style="flex-grow: 1;"></span>
+          </div>
+      </div>
+    </div>
+    <div style="background: #17171B; border: 1px dashed rgba(91,141,239,0.30); border-radius: 18px; padding: 14px 16px; display: flex; align-items: center; gap: 11px;">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 1 L8.6 5.4 L13 7 L8.6 8.6 L7 13 L5.4 8.6 L1 7 L5.4 5.4 Z" fill="#5B8DEF" fill-opacity="0.5"></path></svg>
+      <div style="display: flex; flex-direction: column; gap: 2px;">
+        <div style="font-size: 15px; font-weight: 600; color: #9999A8;">Analyse with Coach</div>
+        <div style="font-size: 12px; color: #5C5C6E;">What changed, and what&rsquo;s next</div>
+      </div>
+      <span style="flex-grow: 1;"></span>
+      <span style="flex: none; padding: 4px 9px; background: #262630; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #9999A8;">Soon</span>
+    </div>
+    <div style="background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; min-height: 56px;">
+      <div style="display: flex; flex-direction: column;">
+        <div style="font-size: 15px; font-weight: 500; color: #EAEAEF;">Add details</div>
+        <div style="font-size: 12px; color: #5C5C6E; padding-top: 2px;">Notes, effort, save as template</div>
+      </div>
+      <div style="flex-grow: 1;"></div>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4 2 L8 6 L4 10" stroke="#5C5C6E" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    </div>
+  </div>
+  <div style="flex: none; border-top: 1px solid rgba(255,255,255,0.06); padding: 12px 16px; display: flex; gap: 10px;">
+    <div style="flex: none; width: 96px; height: 52px; border-radius: 16px; border: 1px solid rgba(224,85,85,0.35); background: rgba(224,85,85,0.08); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; color: #E05555;">Discard</div>
+    <div style="flex-grow: 1; height: 52px; background: #5B8DEF; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 600; color: #FFFFFF;">Save &amp; Close</div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

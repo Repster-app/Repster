@@ -1,0 +1,366 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,600&display=swap">
+  <style>
+    body { margin: 0; font-family: "DM Sans", system-ui, -apple-system, sans-serif; background: #111113; }
+    a { color: #5B8DEF; } a:hover { color: #7BA4F2; }
+    * { box-sizing: border-box; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; background: #111113; display: flex; flex-direction: column; overflow: hidden; color: #EAEAEF;">
+
+  <!-- Header bar -->
+  <div style="display: flex; align-items: center; gap: 8px; padding: 4px 20px;">
+    <div style="width: 44px; height: 36px; display: flex; align-items: center; justify-content: flex-start;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#EAEAEF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+    </div>
+    <div style="flex-grow: 1;"></div>
+    <div style="min-width: 76px; height: 32px; background: #262630; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+      <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; font-weight: 600; color: #EAEAEF;">42:18</span>
+    </div>
+    <div style="flex-grow: 1;"></div>
+    <div style="width: 44px; height: 36px; display: flex; align-items: center; justify-content: center;">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#EAEAEF" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+    </div>
+    <div style="height: 36px; padding: 0 12px; background: #5B8DEF; border-radius: 8px; display: flex; align-items: center;">
+      <span style="font-size: 14px; font-weight: 600; color: #FFFFFF;">Finish</span>
+    </div>
+  </div>
+
+  <!-- Exercise tab strip, with the superset bracket -->
+  <div style="display: flex; align-items: flex-start; gap: 7px; padding: 5px 18px 6px 18px;">
+
+    <div style="display: flex; flex-direction: column; gap: 3px; position: relative;">
+      <div style="display: flex; gap: 7px;">
+        <sc-for list="{{groupTabs}}" as="tab" hint-placeholder-count="2">
+          <div onClick="{{ tab.pick }}" style="height: 36px; padding: 0 14px; border-radius: 7px; display: flex; align-items: center; gap: 6px; cursor: pointer; background: {{tab.bg}}; color: {{tab.fg}}; box-shadow: {{tab.ring}};">
+            <span style="font-size: 13px; font-weight: 500; white-space: nowrap;">{{tab.name}}</span>
+            <sc-if value="{{tab.done}}" hint-placeholder-val="{{ false }}">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="{{tab.checkColor}}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" stroke-width="2.2"></circle><path d="M8 12.5l2.5 2.5L16 9.5"></path></svg>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+      <div style="height: 9px; border-left: 1.5px solid {{groupLine}}; border-right: 1.5px solid {{groupLine}}; border-bottom: 1.5px solid {{groupLine}}; border-radius: 0 0 6px 6px;"></div>
+      <div style="position: absolute; left: 50%; bottom: -4px; transform: translateX(-50%); background: #111113; padding: 0 5px;">
+        <span style="font-size: 9px; font-weight: 700; letter-spacing: 0.07em; color: {{groupColor}}; white-space: nowrap;">SUPERSET A</span>
+      </div>
+    </div>
+
+    <sc-for list="{{soloTabs}}" as="tab" hint-placeholder-count="1">
+      <div onClick="{{ tab.pick }}" style="height: 36px; padding: 0 14px; border-radius: 7px; display: flex; align-items: center; cursor: pointer; background: {{tab.bg}}; color: {{tab.fg}};">
+        <span style="font-size: 13px; font-weight: 500; white-space: nowrap;">{{tab.name}}</span>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- Sub-tab picker -->
+  <div style="display: flex; align-items: center; gap: 8px; padding: 2px 16px;">
+    <div style="flex-grow: 1; display: flex; gap: 4px; padding: 2px; background: rgba(27,27,31,0.9); border: 1px solid rgba(255,255,255,0.06); border-radius: 11px;">
+      <div style="flex-grow: 1; min-height: 32px; display: flex; align-items: center; justify-content: center; background: #262630; border-radius: 8px;">
+        <span style="font-size: 12px; font-weight: 600; color: #EAEAEF;">Sets</span>
+      </div>
+      <div style="flex-grow: 1; min-height: 32px; display: flex; align-items: center; justify-content: center;">
+        <span style="font-size: 12px; font-weight: 500; color: #9999A8;">History</span>
+      </div>
+      <div style="flex-grow: 1; min-height: 32px; display: flex; align-items: center; justify-content: center;">
+        <span style="font-size: 12px; font-weight: 500; color: #9999A8;">PRs</span>
+      </div>
+      <div style="flex-grow: 1; min-height: 32px; display: flex; align-items: center; justify-content: center;">
+        <span style="font-size: 12px; font-weight: 500; color: #9999A8;">Charts</span>
+      </div>
+    </div>
+    <div style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2a2 2 0 110-4h.09A1.65 1.65 0 004.6 8a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 3.68 1.65 1.65 0 0010 2.17V2a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 8v0a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"></path></svg>
+    </div>
+  </div>
+
+  <!-- Set table -->
+  <div style="padding: 4px 20px 0 20px;">
+    <div style="background: #1B1B1F; border-radius: 12px; overflow: hidden;">
+
+      <div style="display: flex; align-items: center; gap: 4px; height: 34px; padding: 0 8px; background: rgba(31,31,37,0.78); border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 11px; font-weight: 600; letter-spacing: 0.8px; color: rgba(234,234,239,0.78);">
+        <div style="width: 36px; text-align: center;">SET</div>
+        <div style="flex-grow: 1; text-align: center;">KG</div>
+        <div style="flex-grow: 1; text-align: center;">REPS</div>
+        <div style="width: 42px; text-align: center;">RIR</div>
+        <div style="width: 44px; text-align: center;">PR</div>
+        <div style="width: 40px; display: flex; justify-content: center;">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(234,234,239,0.78)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"></path></svg>
+        </div>
+      </div>
+
+      <sc-for list="{{rows}}" as="row" hint-placeholder-count="4">
+        <div style="display: flex; align-items: center; gap: 4px; height: 52px; padding: 0 8px; background: {{row.rowBg}}; border-bottom: 1px solid rgba(255,255,255,0.03);">
+          <div style="width: 36px; display: flex; justify-content: center;">
+            <div style="width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: {{row.badgeBg}};">
+              <span style="font-size: 13px; font-weight: 600; color: {{row.badgeFg}};">{{row.number}}</span>
+            </div>
+          </div>
+          <div style="flex-grow: 1; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: {{row.fieldBg}}; border: 1px solid {{row.fieldBorder}};">
+            <span style="font-size: 16px; font-weight: 600; color: #EAEAEF;">{{row.weight}}</span>
+          </div>
+          <div style="flex-grow: 1; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: {{row.fieldBg}}; border: 1px solid {{row.fieldBorder}};">
+            <span style="font-size: 16px; font-weight: 600; color: #EAEAEF;">{{row.reps}}</span>
+          </div>
+          <div style="width: 42px; display: flex; justify-content: center;">
+            <div style="width: 36px; height: 32px; border-radius: 7px; display: flex; align-items: center; justify-content: center; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06);">
+              <span style="font-size: 13px; font-weight: 600; color: {{row.rirColor}};">{{row.rir}}</span>
+            </div>
+          </div>
+          <div style="width: 44px; display: flex; justify-content: center;">
+            <sc-if value="{{row.pr}}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; align-items: center; gap: 2px; padding: 3px 5px; border-radius: 5px; background: rgba(212,162,58,0.10); border: 1px solid rgba(212,162,58,0.20);">
+                <svg width="8" height="8" viewBox="0 0 24 24" fill="#D4A23A"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.3 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"></path></svg>
+                <span style="font-size: 9px; font-weight: 700; color: #D4A23A;">PR</span>
+              </div>
+            </sc-if>
+          </div>
+          <div onClick="{{ row.toggle }}" style="width: 40px; height: 44px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+            <div style="width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; background: {{row.checkBg}}; border: {{row.checkBorder}};">
+              <sc-if value="{{row.done}}" hint-placeholder-val="{{ true }}">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"></path></svg>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+
+      <div style="display: flex; gap: 12px; padding: 8px 8px 10px 8px;">
+        <div style="flex-grow: 1; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 8px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); border-radius: 10px;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#EAEAEF" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+          <span style="font-size: 14px; font-weight: 600; color: #EAEAEF;">Add Set</span>
+        </div>
+        <div style="flex-grow: 1; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 8px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); border-radius: 10px;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#EAEAEF" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+          <span style="font-size: 14px; font-weight: 600; color: #EAEAEF;">Add Warmup</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="flex-grow: 1;"></div>
+
+  <!-- Bottom accessory: rest timer, transition or full -->
+  <sc-if value="{{restTransition}}" hint-placeholder-val="{{ true }}">
+    <div>
+      <div style="height: 2px; background: rgba(255,255,255,0.06);">
+        <div style="height: 2px; width: 34%; background: {{groupColor}};"></div>
+      </div>
+      <div style="height: 43px; background: #1B1B1F; display: flex; align-items: center; gap: 10px; padding: 0 20px;">
+        <div style="width: 20px; height: 20px; border-radius: 6px; display: flex; align-items: center; justify-content: center; background: {{groupSoft}};">
+          <span style="font-size: 10px; font-weight: 700; color: {{groupColor}};">A</span>
+        </div>
+        <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 20px; font-weight: 700; color: #EAEAEF;">{{transitionClock}}</span>
+        <span style="font-size: 13px; font-weight: 500; color: #9999A8;">then {{nextName}}</span>
+        <div style="flex-grow: 1;"></div>
+        <div onClick="{{ skipRest }}" style="height: 30px; padding: 0 12px; border-radius: 8px; background: #262630; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+          <span style="font-size: 12px; font-weight: 600; color: #EAEAEF;">Go now</span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#EAEAEF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"></path></svg>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{restFull}}" hint-placeholder-val="{{ false }}">
+    <div>
+      <div style="height: 2px; background: rgba(255,255,255,0.06);">
+        <div style="height: 2px; width: 62%; background: #5B8DEF;"></div>
+      </div>
+      <div style="height: 43px; background: #1B1B1F; display: flex; align-items: center; gap: 8px; padding: 0 20px;">
+        <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24px; font-weight: 700; color: #EAEAEF;">1:45</span>
+        <div style="flex-grow: 1;"></div>
+        <div style="width: 46px; height: 30px; border-radius: 8px; background: #262630; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 12px; font-weight: 600; color: #EAEAEF;">-15s</span>
+        </div>
+        <div style="width: 46px; height: 30px; border-radius: 8px; background: #262630; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 12px; font-weight: 600; color: #EAEAEF;">+15s</span>
+        </div>
+        <div style="width: 30px; height: 32px; display: flex; align-items: center; justify-content: center;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.4" stroke-linecap="round"><path d="M8 5v14M16 5v14"></path></svg>
+        </div>
+        <div onClick="{{ skipRest }}" style="width: 26px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{restIdle}}" hint-placeholder-val="{{ false }}">
+    <div style="height: 45px;"></div>
+  </sc-if>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{
+  "groupColor": {"editor": "color", "default": "#5B8DEF", "options": ["#5B8DEF", "#A87EE6", "#4ECDC4", "#E89B3E"], "section": "Superset"},
+  "transitionRest": {"editor": "range", "default": 15, "min": 0, "max": 60, "step": 5, "unit": "s", "section": "Superset"}
+}'>
+class Component extends DCLogic {
+
+  constructor(props) {
+    super(props);
+    this.state = {
+      active: 0,
+      rest: 'idle',
+      done: {
+        bench: [true, true, false, false],
+        incline: [true, false, false, false],
+        fly: [false, false, false]
+      }
+    };
+  }
+
+  exercises() {
+    return [
+      { key: 'bench', name: 'Bench Press', group: true, sets: [
+        { weight: '60', reps: '10', rir: '4' },
+        { weight: '80', reps: '8', rir: '2' },
+        { weight: '82.5', reps: '8', rir: '1', pr: true },
+        { weight: '82.5', reps: '7', rir: '1' }
+      ]},
+      { key: 'incline', name: 'Incline DB Press', group: true, sets: [
+        { weight: '30', reps: '12', rir: '3' },
+        { weight: '32.5', reps: '10', rir: '2' },
+        { weight: '32.5', reps: '9', rir: '1' },
+        { weight: '32.5', reps: '8', rir: '0' }
+      ]},
+      { key: 'fly', name: 'Cable Fly', group: false, sets: [
+        { weight: '17.5', reps: '15', rir: '3' },
+        { weight: '17.5', reps: '14', rir: '2' },
+        { weight: '17.5', reps: '12', rir: '1' }
+      ]}
+    ];
+  }
+
+  rirColor(v) {
+    const map = { '0': '#E05555', '1': '#E07040', '2': '#E89B3E', '3': '#D4A23A', '4': '#A0B83C', '5': '#5EC269' };
+    return map[v] || '#5C5C6E';
+  }
+
+  hexAlpha(hex, alpha) {
+    const h = (hex || '#5B8DEF').replace('#', '');
+    const r = parseInt(h.substring(0, 2), 16);
+    const g = parseInt(h.substring(2, 4), 16);
+    const b = parseInt(h.substring(4, 6), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+  }
+
+  allDone(key) {
+    const ex = this.exercises().filter((e) => e.key === key)[0];
+    const flags = this.state.done[key] || [];
+    return flags.length >= ex.sets.length && flags.slice(0, ex.sets.length).every((d) => d === true);
+  }
+
+  toggleSet(exIndex, setIndex) {
+    const list = this.exercises();
+    const ex = list[exIndex];
+    const done = JSON.parse(JSON.stringify(this.state.done));
+    const wasDone = done[ex.key][setIndex] === true;
+    done[ex.key][setIndex] = !wasDone;
+
+    // Un-ticking never navigates: it is a correction, not progress.
+    if (wasDone) {
+      this.setState({ done: done });
+      return;
+    }
+
+    if (!ex.group) {
+      this.setState({ done: done, rest: 'full' });
+      return;
+    }
+
+    const members = [];
+    list.forEach((e, i) => { if (e.group) members.push(i); });
+    const at = members.indexOf(exIndex);
+    const isLast = at === members.length - 1;
+
+    this.setState({
+      done: done,
+      active: isLast ? members[0] : members[at + 1],
+      rest: isLast ? 'full' : 'transition'
+    });
+  }
+
+  renderVals() {
+    const list = this.exercises();
+    const active = this.state.active;
+    const groupColor = this.props.groupColor ?? '#5B8DEF';
+    const transitionRest = this.props.transitionRest ?? 15;
+
+    const makeTab = (ex, index) => {
+      const isActive = index === active;
+      const inGroupNotActive = ex.group && !isActive;
+      return {
+        name: ex.name,
+        bg: isActive ? '#5B8DEF' : '#1B1B1F',
+        fg: isActive ? '#FFFFFF' : '#5C5C6E',
+        // The un-selected half of the pair carries a ring, so where the tick sends you is visible
+        // before you tick. Selection is still the only solid fill.
+        ring: inGroupNotActive ? 'inset 0 0 0 1px ' + this.hexAlpha(groupColor, 0.38) : 'none',
+        done: this.allDone(ex.key),
+        checkColor: isActive ? 'rgba(255,255,255,0.8)' : '#5EC269',
+        pick: () => this.setState({ active: index })
+      };
+    };
+
+    const groupTabs = [];
+    const soloTabs = [];
+    list.forEach((ex, i) => {
+      if (ex.group) { groupTabs.push(makeTab(ex, i)); } else { soloTabs.push(makeTab(ex, i)); }
+    });
+
+    const current = list[active];
+    const flags = this.state.done[current.key] || [];
+    const rows = current.sets.map((s, i) => {
+      const done = flags[i] === true;
+      return {
+        number: i + 1,
+        weight: s.weight,
+        reps: s.reps,
+        rir: s.rir,
+        rirColor: this.rirColor(s.rir),
+        pr: s.pr === true && done,
+        done: done,
+        rowBg: done ? 'rgba(94,194,105,0.08)' : 'transparent',
+        badgeBg: done ? '#5EC269' : '#262630',
+        badgeFg: done ? '#111113' : '#5C5C6E',
+        fieldBg: done ? 'rgba(94,194,105,0.06)' : '#1F1F25',
+        fieldBorder: done ? 'rgba(94,194,105,0.15)' : 'rgba(255,255,255,0.06)',
+        checkBg: done ? '#5B8DEF' : 'transparent',
+        checkBorder: done ? 'none' : '2px solid #5C5C6E',
+        toggle: () => this.toggleSet(active, i)
+      };
+    });
+
+    const clock = transitionRest < 10 ? '0:0' + transitionRest : '0:' + transitionRest;
+
+    return {
+      groupTabs: groupTabs,
+      soloTabs: soloTabs,
+      rows: rows,
+      groupColor: groupColor,
+      groupLine: this.hexAlpha(groupColor, 0.45),
+      groupSoft: this.hexAlpha(groupColor, 0.14),
+      restTransition: this.state.rest === 'transition',
+      restFull: this.state.rest === 'full',
+      restIdle: this.state.rest === 'idle',
+      transitionClock: transitionRest === 0 ? '0:00' : clock,
+      nextName: current.name,
+      skipRest: () => this.setState({ rest: 'idle' })
+    };
+  }
+}
+</script>
+</body>
+</html>

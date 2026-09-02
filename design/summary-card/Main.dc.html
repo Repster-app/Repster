@@ -1,0 +1,124 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #111113;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: #5B8DEF; }
+    a:hover { color: #7BA5F3; }
+  </style>
+</helmet>
+
+<div style="width: 390px; min-height: 480px; background: #111113; color: #EAEAEF;">
+
+  <div style="display: flex; align-items: center; padding: 12px 16px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); position: relative;">
+    <div style="width: 32px; height: 32px; border-radius: 50%; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M1.5 1.5 L10.5 10.5 M10.5 1.5 L1.5 10.5" stroke="#9999A8" stroke-width="1.8" stroke-linecap="round"></path></svg>
+    </div>
+    <div style="position: absolute; left: 0; right: 0; top: 12px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 600; color: #EAEAEF;">Workout complete</div>
+  </div>
+
+  <div style="padding: 16px 14px 0; display: flex; flex-direction: column; gap: 18px;">
+
+    <div style="background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 14px;">
+
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <div style="font-size: 12px; color: #9999A8;">Sat, Aug 30</div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="font-size: 20px; font-weight: 600; color: #EAEAEF;">Push Day A</div>
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M11.2 2.3a1.6 1.6 0 0 1 2.3 2.3L5.6 12.5l-3 .7.7-3 7.9-7.9Z" stroke="#5C5C6E" stroke-width="1.4" stroke-linejoin="round"></path></svg>
+        </div>
+      </div>
+
+      <sc-if value="{{withPR}}" hint-placeholder-val="{{true}}">
+        <div style="background: rgba(212,162,58,0.10); border: 1px solid rgba(212,162,58,0.20); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 .8l1.6 3.3 3.6.5-2.6 2.5.6 3.6L6 9l-3.2 1.7.6-3.6L.8 4.6l3.6-.5L6 .8Z" fill="#D4A23A"></path></svg>
+            <span style="font-size: 15px; font-weight: 600; color: #D4A23A;">2 personal records</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <div style="display: flex; align-items: baseline; gap: 10px;">
+              <span style="font-size: 13px; color: #EAEAEF;">Barbell Bench Press</span>
+              <span style="flex-grow: 1;"></span>
+              <span style="font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: #D4A23A;">92.5 kg &times; 5</span>
+            </div>
+            <div style="display: flex; align-items: baseline; gap: 10px;">
+              <span style="font-size: 13px; color: #EAEAEF;">Barbell Row</span>
+              <span style="flex-grow: 1;"></span>
+              <span style="font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: #D4A23A;">80 kg &times; 8</span>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{withoutPR}}" hint-placeholder-val="{{false}}">
+        <div style="background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M1.5 9.5 L4.3 6.2 L6.9 8.1 L10.5 3.2" stroke="#9999A8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <span style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Top set of the session</span>
+          </div>
+          <div style="display: flex; align-items: baseline; gap: 10px;">
+            <span style="font-size: 13px; color: #EAEAEF;">Barbell Bench Press</span>
+            <span style="flex-grow: 1;"></span>
+            <span style="font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: #9999A8;">90 kg &times; 5</span>
+          </div>
+        </div>
+      </sc-if>
+
+      <div style="display: flex; align-items: center; gap: 7px; font-size: 13px; font-variant-numeric: tabular-nums; color: #9999A8;">
+        <span>1h 4m</span>
+        <span style="color: #5C5C6E;">&middot;</span>
+        <span>18 sets</span>
+        <span style="color: #5C5C6E;">&middot;</span>
+        <span>12,450 kg</span>
+      </div>
+
+    </div>
+
+    <div style="background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; align-items: baseline; gap: 12px;">
+        <div style="font-size: 16px; font-weight: 600; color: #EAEAEF;">Exercises</div>
+        <div style="flex-grow: 1;"></div>
+        <div style="font-size: 12px; color: #9999A8;">5 logged</div>
+      </div>
+      <div style="display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; gap: 10px; padding: 12px 0;">
+          <div style="font-size: 15px; font-weight: 500; color: #EAEAEF;">Barbell Bench Press</div>
+          <div style="flex-grow: 1;"></div>
+          <div style="font-size: 12px; color: #9999A8;">4 sets</div>
+          <div style="font-size: 12px; font-weight: 600; color: #D4A23A; background: rgba(212,162,58,0.10); border-radius: 12px; width: 46px; height: 24px; display: flex; align-items: center; justify-content: center;">PR</div>
+        </div>
+        <div style="height: 1px; background: rgba(255,255,255,0.06);"></div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 12px 0;">
+          <div style="font-size: 15px; font-weight: 500; color: #EAEAEF;">Overhead Press</div>
+          <div style="flex-grow: 1;"></div>
+          <div style="font-size: 12px; color: #9999A8;">4 sets</div>
+          <div style="width: 46px; height: 24px;"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"prState":{"editor":"enum","options":["With a PR","No PR"],"default":"With a PR","section":"Session"},"$preview":{"width":390,"height":480}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const withPR = (this.props.prState ?? 'With a PR') === 'With a PR';
+    return { withPR: withPR, withoutPR: !withPR };
+  }
+}
+</script>
+</body>
+</html>

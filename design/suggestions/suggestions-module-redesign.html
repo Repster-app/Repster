@@ -1,0 +1,766 @@
+<title>Suggestions Module Redesign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+:root{
+  --ground:#EFF1F6;
+  --surface:#FFFFFF;
+  --sunk:#E4E7EF;
+  --ink:#15161B;
+  --ink-2:#4C5162;
+  --ink-3:#767C90;
+  --rule:#D7DAE4;
+  --accent:#2F55B8;
+  --accent-soft:rgba(47,85,184,.09);
+  --flag:#8A5A00;
+  --flag-soft:rgba(138,90,0,.10);
+  --shadow:0 1px 2px rgba(20,22,32,.05), 0 12px 32px -12px rgba(20,22,32,.22);
+  --panel-ring:rgba(20,22,32,.14);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#1B1D23;
+    --surface:#24262E;
+    --sunk:#1F2128;
+    --ink:#ECEDF2;
+    --ink-2:#A9AEBE;
+    --ink-3:#7A8092;
+    --rule:#343743;
+    --accent:#8AA9F2;
+    --accent-soft:rgba(138,169,242,.13);
+    --flag:#D9A94A;
+    --flag-soft:rgba(217,169,74,.14);
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 18px 40px -16px rgba(0,0,0,.6);
+    --panel-ring:rgba(255,255,255,.14);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#1B1D23;
+  --surface:#24262E;
+  --sunk:#1F2128;
+  --ink:#ECEDF2;
+  --ink-2:#A9AEBE;
+  --ink-3:#7A8092;
+  --rule:#343743;
+  --accent:#8AA9F2;
+  --accent-soft:rgba(138,169,242,.13);
+  --flag:#D9A94A;
+  --flag-soft:rgba(217,169,74,.14);
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 18px 40px -16px rgba(0,0,0,.6);
+  --panel-ring:rgba(255,255,255,.14);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--ground);color:var(--ink);
+  font-family:"Source Serif 4",Georgia,"Times New Roman",serif;
+  font-size:17px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1380px;margin:0 auto;padding:56px 28px 96px}
+h1,h2,h3,.eyebrow,.meta,.chip,.tag{font-family:Archivo,"Helvetica Neue",Arial,sans-serif}
+.eyebrow{
+  font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-3);margin:0 0 14px
+}
+h1{
+  font-size:clamp(34px,5.2vw,54px);line-height:1.04;font-weight:700;letter-spacing:-.022em;
+  margin:0 0 18px;text-wrap:balance;max-width:16ch
+}
+.standfirst{max-width:62ch;font-size:19px;color:var(--ink-2);margin:0}
+.standfirst b{color:var(--ink);font-weight:600}
+
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:30px}
+.chip{
+  font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+  padding:5px 10px;border-radius:5px;background:var(--accent-soft);color:var(--accent);
+  font-family:"IBM Plex Mono",ui-monospace,monospace
+}
+.chip.flagged{background:var(--flag-soft);color:var(--flag)}
+
+hr.rule{border:0;border-top:1px solid var(--rule);margin:56px 0}
+
+h2{
+  font-size:clamp(24px,3vw,32px);font-weight:700;letter-spacing:-.018em;line-height:1.15;
+  margin:0 0 10px;text-wrap:balance
+}
+.section-note{max-width:60ch;color:var(--ink-2);margin:0 0 32px;font-size:18px}
+
+/* ---- reference block ---- */
+.reference{display:grid;grid-template-columns:minmax(min(390px,100%),430px) minmax(0,1fr);gap:44px;align-items:start}
+@media (max-width:900px){.reference{grid-template-columns:1fr;gap:32px}}
+.findings{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:22px}
+.findings li{padding-left:20px;border-left:2px solid var(--rule)}
+.findings .f-head{font-family:Archivo,sans-serif;font-weight:600;font-size:17px;letter-spacing:-.01em;margin:0 0 4px}
+.findings p{margin:0;color:var(--ink-2);font-size:16px}
+code{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.86em;
+  background:var(--sunk);padding:1px 5px;border-radius:4px;color:var(--ink)
+}
+
+/* ---- option grid ---- */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(400px,100%),1fr));gap:28px}
+@media (max-width:460px){.grid{grid-template-columns:1fr}}
+.card{
+  background:var(--surface);border:1px solid var(--rule);border-radius:14px;
+  padding:22px;display:flex;flex-direction:column;gap:18px;box-shadow:var(--shadow)
+}
+.card h3{
+  font-size:21px;font-weight:700;letter-spacing:-.015em;margin:0 0 6px
+}
+.thesis{margin:0;color:var(--ink-2);font-size:16.5px}
+.ledger{display:flex;flex-direction:column;gap:9px;margin:0;padding:0;list-style:none}
+.ledger div{display:grid;grid-template-columns:64px minmax(0,1fr);gap:12px;align-items:baseline}
+.tag{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)
+}
+.ledger p{margin:0;font-size:15.5px;color:var(--ink-2)}
+.card-foot{margin-top:auto;padding-top:4px}
+
+/* ---- closer ---- */
+.closer{
+  background:var(--surface);border:1px solid var(--rule);border-radius:14px;
+  padding:30px 32px;max-width:70ch;box-shadow:var(--shadow)
+}
+.closer h2{margin-bottom:12px}
+.closer p{margin:0 0 14px;color:var(--ink-2)}
+.closer p:last-child{margin-bottom:0}
+.closer b{color:var(--ink);font-weight:600}
+
+/* =========================================================
+   PHONE PANELS — Repster's own tokens, fixed in both themes.
+   Every colour below is lifted from DesignTokens.swift.
+   ========================================================= */
+.pv{
+  width:390px;max-width:100%;
+  background:#111113;border-radius:16px;
+  border:1px solid var(--panel-ring);
+  box-shadow:var(--shadow);
+  padding:14px 0 18px;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+  color:#EAEAEF;
+  font-size:14px;line-height:1.25;
+  color-scheme:dark;
+}
+.pv *{box-sizing:border-box}
+.pv svg{display:block}
+.pv .pad{padding:0 20px}
+.pv .tbl{background:#1B1B1F;border-radius:12px;overflow:hidden}
+.pv .thead,.pv .trow{
+  display:grid;grid-template-columns:36px minmax(0,1fr) minmax(0,1fr) 42px 44px 40px;
+  gap:4px;align-items:center;padding:0 8px
+}
+.pv .thead{
+  height:34px;background:rgba(31,31,37,.78);
+  border-bottom:1px solid rgba(255,255,255,.08);
+  font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;
+  color:rgba(234,234,239,.78);text-align:center
+}
+.pv .thead .ic{display:flex;justify-content:center;color:rgba(234,234,239,.78)}
+.pv .thead .wcol{display:flex;align-items:center;justify-content:center;gap:4px}
+.pv .trow{height:52px;border-bottom:1px solid rgba(255,255,255,.03)}
+.pv .badge{
+  width:26px;height:26px;border-radius:8px;background:#262630;color:#5C5C6E;
+  font-size:13px;font-weight:600;display:grid;place-items:center;margin:0 auto
+}
+.pv .badge.on{background:#5EC269;color:#fff}
+.pv .fld{
+  height:36px;border-radius:8px;background:#1F1F25;border:1px solid rgba(255,255,255,.06);
+  display:grid;place-items:center;font-size:16px;font-weight:600;color:#EAEAEF
+}
+.pv .fld.ph{color:#5C5C6E}
+.pv .fld.on{background:rgba(94,194,105,.06);border-color:rgba(94,194,105,.15)}
+.pv .fld.ghost{color:rgba(91,141,239,.55)}
+.pv .rir{
+  width:36px;height:32px;border-radius:7px;background:#1F1F25;border:1px solid rgba(255,255,255,.06);
+  display:grid;place-items:center;font-size:13px;font-weight:600;color:rgba(224,112,64,.45);margin:0 auto
+}
+.pv .rir.on{background:rgba(224,112,64,.08);border-color:rgba(224,112,64,.30);color:#E07040}
+.pv .chk{width:26px;height:26px;border-radius:6px;border:2px solid #5C5C6E;margin:0 auto}
+.pv .chk.on{background:#5B8DEF;border:0;display:grid;place-items:center;color:#fff}
+.pv .adds{display:flex;gap:12px;padding:12px}
+.pv .add{
+  flex:1;height:36px;border-radius:8px;background:#222228;border:1px solid rgba(255,255,255,.06);
+  display:grid;place-items:center;font-size:13px;font-weight:600;color:#9999A8
+}
+.pv .mhead{display:flex;align-items:center;gap:8px;height:28px;margin-top:12px}
+.pv .mtitle{font-size:11px;font-weight:600;letter-spacing:.8px;color:#5C5C6E}
+.pv .mcount{font-size:11px;font-weight:500;color:#5C5C6E}
+.pv .refresh{
+  width:28px;height:28px;border-radius:8px;background:#1B1B1F;
+  display:grid;place-items:center;color:#9999A8;margin-left:auto
+}
+.pv .stack{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.pv .strip{display:flex;background:#1B1B1F;border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden}
+.pv .rail{width:3px;flex:none;background:#5B8DEF}
+.pv .sbody{flex:1;min-width:0;display:flex;gap:10px;align-items:center;padding:10px 12px}
+.pv .tile{
+  width:36px;height:36px;flex:none;border-radius:8px;background:rgba(91,141,239,.12);
+  display:grid;place-items:center;color:#5B8DEF
+}
+.pv .l1{font-size:15px;font-weight:600;color:#EAEAEF}
+.pv .l1 b{font-weight:700;color:#5B8DEF}
+.pv .l1 .dim{font-size:14px;font-weight:500;color:#9999A8}
+.pv .l2{font-size:11px;color:#5C5C6E;margin-top:3px}
+.pv .delta{
+  font-family:-apple-system,sans-serif;font-size:11px;font-weight:700;
+  padding:2px 6px;border-radius:5px;margin-left:6px;vertical-align:1px;
+  display:inline-flex;align-items:center;gap:3px
+}
+.pv .delta.up{background:rgba(94,194,105,.12);color:#5EC269}
+.pv .delta.flat{background:rgba(92,92,110,.18);color:#9999A8}
+.pv .delta.down{background:rgba(148,163,178,.14);color:#94A3B8}
+/* next-up hero */
+.pv .hero{padding:13px 14px;flex:1;min-width:0}
+.pv .hero .eb{display:flex;align-items:center;gap:6px;color:#5B8DEF}
+.pv .hero .eb span{font-size:10px;font-weight:700;letter-spacing:.8px;color:#5C5C6E}
+.pv .hero .num{display:flex;align-items:baseline;gap:9px;margin-top:7px}
+.pv .hero .num b{font-size:30px;font-weight:700;letter-spacing:-.6px;color:#5B8DEF;line-height:1}
+.pv .hero .num i{font-style:normal;font-size:14px;font-weight:500;color:#9999A8}
+.pv .then{
+  display:flex;align-items:center;gap:9px;background:#1B1B1F;
+  border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:9px 12px
+}
+.pv .then .lbl{font-size:9px;font-weight:700;letter-spacing:.8px;color:#5C5C6E}
+.pv .qchip{
+  font-size:12px;font-weight:600;color:#9999A8;background:#262630;
+  border-radius:8px;padding:5px 9px;white-space:nowrap
+}
+.pv .qchip.next{background:rgba(91,141,239,.12);border:1px solid rgba(91,141,239,.30);color:#5B8DEF}
+/* ledger rows */
+.pv .lcard{background:#1B1B1F;border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden;margin-top:8px}
+.pv .lrow{display:grid;grid-template-columns:46px auto 1fr auto;gap:10px;align-items:baseline;padding:11px 14px}
+.pv .lrow + .lrow{border-top:1px solid rgba(255,255,255,.05)}
+.pv .lset{font-size:10px;font-weight:700;letter-spacing:.7px;color:#5C5C6E}
+.pv .lwt{font-size:16px;font-weight:700;color:#5B8DEF}
+.pv .lrep{font-size:13px;font-weight:500;color:#9999A8}
+.pv .ltag{font-size:10px;font-weight:600;letter-spacing:.4px;color:#5C5C6E;text-transform:uppercase}
+.pv .lsum{font-size:11px;color:#5C5C6E;margin-top:7px;padding-left:2px}
+/* footer line + why panel */
+.pv .foot{
+  display:flex;align-items:center;gap:9px;background:#1B1B1F;
+  border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:11px 12px;margin-top:12px
+}
+.pv .foot .txt{font-size:12px;color:#9999A8;flex:1;min-width:0}
+.pv .foot .why{font-size:11px;font-weight:600;color:#5B8DEF;white-space:nowrap}
+.pv .whypanel{background:#1F1F25;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:11px 12px;margin-top:6px}
+.pv .whypanel div{font-size:11px;color:#5C5C6E;line-height:1.45}
+.pv .whypanel div + div{margin-top:6px}
+.pv .whypanel b{color:#9999A8;font-weight:600}
+/* plan bar */
+.pv .planbar{
+  display:flex;align-items:center;gap:8px;background:#1B1B1F;
+  border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:8px 10px
+}
+.pv .planbar .chips{display:flex;gap:6px;flex:1;min-width:0;overflow:hidden}
+.pv .planreason{font-size:11px;color:#5C5C6E;margin:7px 0 12px;padding-left:2px}
+
+/* ============ round two ============ */
+.pv .tblcut{
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 34px);
+  mask-image:linear-gradient(to bottom,transparent 0,#000 34px)
+}
+.pv .tbl.cut{border-radius:0 0 12px 12px}
+.pv .num-t{font-variant-numeric:tabular-nums}
+
+/* ledger, refined */
+.pv .lrow2{display:grid;grid-template-columns:44px minmax(0,1fr) 28px 62px;gap:10px;align-items:baseline;padding:11px 14px}
+.pv .lrow2 + .lrow2{border-top:1px solid rgba(255,255,255,.05)}
+.pv .lrow2 .lwt{text-align:right;font-variant-numeric:tabular-nums}
+.pv .lrow2 .ltag{text-align:right}
+
+/* ticket */
+.pv .mono{font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace}
+.pv .ticket{margin-top:14px}
+.pv .tkrule{height:2px;width:32px;background:#5B8DEF;border-radius:1px}
+.pv .tkhead{display:flex;align-items:baseline;justify-content:space-between;margin:11px 0 4px}
+.pv .tklabel{font-size:10px;font-weight:600;letter-spacing:1.4px;color:#9999A8}
+.pv .tkcount{font-size:10px;font-weight:500;letter-spacing:1.1px;color:#5C5C6E}
+.pv .tkrow{
+  display:grid;grid-template-columns:46px minmax(0,1fr) 34px;gap:10px;align-items:baseline;
+  padding:10px 0;border-top:1px solid rgba(255,255,255,.07)
+}
+.pv .tkrow .s{font-size:11px;font-weight:500;letter-spacing:.6px;color:#5C5C6E}
+.pv .tkrow .w{font-size:17px;font-weight:600;color:#EAEAEF;font-variant-numeric:tabular-nums}
+.pv .tkrow.next .w{color:#5B8DEF}
+.pv .tkrow .r{font-size:12px;font-weight:500;color:#5C5C6E;text-align:right}
+.pv .tkfoot{
+  border-top:1px solid rgba(255,255,255,.07);padding-top:9px;margin-top:2px;
+  font-size:11px;color:#5C5C6E;letter-spacing:.2px
+}
+
+/* tiles */
+.pv .tiles{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.pv .tile2{background:#1B1B1F;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:10px 12px}
+.pv .tile2.next{background:rgba(91,141,239,.10);border-color:rgba(91,141,239,.30)}
+.pv .tile2 .tset{font-size:9px;font-weight:700;letter-spacing:.8px;color:#5C5C6E}
+.pv .tile2.next .tset{color:#5B8DEF}
+.pv .tile2 .twt{font-size:21px;font-weight:700;color:#EAEAEF;margin-top:5px;letter-spacing:-.4px;font-variant-numeric:tabular-nums;line-height:1}
+.pv .tile2.next .twt{color:#5B8DEF}
+.pv .tile2 .trep{font-size:12px;font-weight:500;color:#9999A8;margin-top:4px}
+.pv .tilereason{font-size:11px;color:#5C5C6E;margin-top:8px;padding-left:2px}
+
+/* states */
+.pv .banner{
+  display:flex;gap:8px;align-items:flex-start;background:rgba(148,163,178,.10);
+  border:1px solid rgba(148,163,178,.30);border-radius:10px;padding:8px 10px;margin-top:8px
+}
+.pv .banner .txt{font-size:11px;color:#9999A8;line-height:1.35}
+.pv .rail.stale{background:#94A3B8}
+.pv .hero .num b.stale{color:#94A3B8}
+.pv .hero .eb span.stale{color:#94A3B8}
+.pv .qchip.warn{border:1px dashed rgba(92,92,110,.7);background:transparent;color:#5C5C6E;display:flex;align-items:center;gap:5px}
+.pv .updating{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:500;color:#9999A8}
+.pv .dim-block{opacity:.45}
+
+.states{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(330px,100%),1fr));gap:26px}
+.state{display:flex;flex-direction:column;gap:14px}
+.state .pv{width:100%}
+.state h4{
+  font-family:Archivo,sans-serif;font-size:16px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px
+}
+.state p{margin:0;font-size:15.5px;color:var(--ink-2)}
+.ruled-out{
+  display:flex;gap:12px;align-items:baseline;background:var(--sunk);border-radius:10px;
+  padding:14px 18px;margin-top:26px;max-width:74ch
+}
+.ruled-out p{margin:0;font-size:15.5px;color:var(--ink-2)}
+.ruled-out .tag{white-space:nowrap;flex:none;padding-top:2px}
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Repster · Active workout · Sets tab · Round two</p>
+    <h1>Same slot, four treatments</h1>
+    <p class="standfirst">
+      Placement is settled: the section stays below the set table, keeps its
+      <b>SMART SUGGESTIONS</b> header, its count summary and its refresh button. What is in play is
+      everything inside — how many numbers appear, how loud they are, and whether the engine's
+      reasoning gets a line per set or one line total. Each panel shows the bottom of the set table
+      so the seam is visible.
+    </p>
+    <div class="legend">
+      <span class="chip">Every treatment here builds from data the view already has</span>
+    </div>
+  </header>
+
+  <div class="ruled-out">
+    <span class="tag">Ruled out</span>
+    <p>The two options that moved the suggestion out of this section — ghost placeholders in the
+    weight fields, and a plan bar above the table — are off the table on your call.</p>
+  </div>
+
+  <hr class="rule">
+
+  <h2>Four treatments</h2>
+  <p class="section-note">
+    Each answers the same question differently: how much of the engine's thinking earns space in a
+    screen you look at between sets, with a barbell waiting.
+  </p>
+
+  <div class="grid">
+
+    <!-- ============ NEXT UP ============ -->
+    <div class="card">
+      <div>
+        <h3>Next up</h3>
+        <p class="thesis">One set is next. Give it the card, and let the rest be a line. The
+        prescription is readable at arm's length; the reason is said once.</p>
+      </div>
+      <div class="pv">
+        <div class="pad">
+          <div class="tblcut">
+            <div class="tbl cut">
+              <div class="trow">
+                <div><div class="badge">2</div></div>
+                <div class="fld ph">0</div><div class="fld ph">8</div>
+                <div><div class="rir">1</div></div><div></div><div><div class="chk"></div></div>
+              </div>
+              <div class="trow">
+                <div><div class="badge">3</div></div>
+                <div class="fld ph">0</div><div class="fld ph">8</div>
+                <div><div class="rir">1</div></div><div></div><div><div class="chk"></div></div>
+              </div>
+              <div class="trow">
+                <div><div class="badge">4</div></div>
+                <div class="fld ph">0</div><div class="fld ph">8</div>
+                <div><div class="rir">1</div></div><div></div><div><div class="chk"></div></div>
+              </div>
+              <div class="adds"><div class="add">Add Set</div><div class="add">Add Warmup</div></div>
+            </div>
+          </div>
+
+          <div class="mhead">
+            <span class="mtitle">SMART SUGGESTIONS</span>
+            <span class="mcount">· 3 ready</span>
+            <span class="refresh"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.6h-4.6"/></svg></span>
+          </div>
+          <div class="stack">
+            <div class="strip"><div class="rail"></div><div class="hero">
+              <div class="eb">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 14.5 9.5"/><path d="M13 8l3 3"/><path d="M18.4 2.6l.86 2.04 2.04.86-2.04.86-.86 2.04-.86-2.04L15.5 5.5l2.04-.86z" fill="currentColor" stroke="none"/><path d="M8.6 2.9l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" fill="currentColor" stroke="none"/></svg>
+                <span>NEXT UP · SET 2</span>
+              </div>
+              <div class="num"><b class="num-t">55 kg</b><i>for 8 reps</i></div>
+              <div class="l2">Nudging up from your last workout's peak.</div>
+            </div></div>
+            <div class="then">
+              <span class="lbl">THEN</span>
+              <span class="qchip num-t">3 · 55 kg</span>
+              <span class="qchip num-t">4 · 52.5 kg</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <ul class="ledger">
+        <li><div><span class="tag">Gains</span><p>Kills the repetition outright. The number you need is the biggest thing in the section, and the reason gets room to be a sentence rather than a squeezed caption.</p></div></li>
+        <li><div><span class="tag">Costs</span><p>Sets 3 and 4 lose their own reasons until they come up. Tallest of the four when there are several sets left.</p></div></li>
+      </ul>
+      <div class="card-foot"><span class="chip">Header, count and refresh unchanged</span></div>
+    </div>
+
+    <!-- ============ QUIET LEDGER ============ -->
+    <div class="card">
+      <div>
+        <h3>Quiet ledger</h3>
+        <p class="thesis">Treat it as a table, not a feed. Weights right-aligned in tabular figures
+        so the column can be read down; a tag only where a set deviates.</p>
+      </div>
+      <div class="pv">
+        <div class="pad">
+          <div class="tblcut">
+            <div class="tbl cut">
+              <div class="trow">
+                <div><div class="badge">2</div></div>
+                <div class="fld ph">0</div><div class="fld ph">8</div>
+                <div><div class="rir">1</div></div><div></div><div><div class="chk"></div></div>
+              </div>
+              <div class="trow">
+                <div><div class="badge">3</div></div>
+                <div class="fld ph">0</div><div class="fld ph">8</div>
+                <div><div class="rir">1</div></div><div></div><div><div class="chk"></div></div>
+              </div>
+              <div class="trow">
+                <div><div class="badge">4</div></div>
+                <div class="fld ph">0</div><div class="fld ph">8</div>
+                <div><div class="rir">1</div></div><div></div><div><div class="chk"></div></div>
+              </div>
+              <div class="adds"><div class="add">Add Set</div><div class="add">Add Warmup</div></div>
+            </div>
+          </div>
+
+          <div class="mhead">
+            <span class="mtitle">SMART SUGGESTIONS</span>
+            <span class="mcount">· 3 ready</span>
+            <span class="refresh"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.6h-4.6"/></svg></span>
+          </div>
+          <div class="lcard">
+            <div class="lrow2"><span class="lset">SET 2</span><span class="lwt">55 kg</span><span class="lrep">× 8</span><span class="ltag"></span></div>
+            <div class="lrow2"><span class="lset">SET 3</span><span class="lwt">55 kg</span><span class="lrep">× 8</span><span class="ltag"></span></div>
+            <div class="lrow2"><span class="lset">SET 4</span><span class="lwt">52.5 kg</span><span class="lrep">× 8</span><span class="ltag">easing off</span></div>
+          </div>
+          <div class="lsum">Nudging up from your last workout's peak.</div>
+        </div>
+      </div>
+      <ul class="ledger">
+        <li><div><span class="tag">Gains</span><p>Shortest of the four, and the only one where the three loads can be compared as a column. Silence carries meaning: a tag means this set is different.</p></div></li>
+        <li><div><span class="tag">Costs</span><p>Stops announcing itself — no wand, no accent block, easy to skim past. The tag vocabulary ("easing off") is new copy that has to be written and kept in step with the engine.</p></div></li>
+      </ul>
+      <div class="card-foot"><span class="chip">Needs short tag copy per reason</span></div>
+    </div>
+
+    <!-- ============ TICKET ============ -->
+    <div class="card">
+      <div>
+        <h3>Ticket</h3>
+        <p class="thesis">Drop the card entirely. Set the section as instrumentation — monospaced,
+        hairline-ruled, printed straight onto the screen ground. The app already speaks this
+        language in admin mode.</p>
+      </div>
+      <div class="pv">
+        <div class="pad">
+          <div class="tblcut">
+            <div class="tbl cut">
+              <div class="trow">
+                <div><div class="badge">2</div></div>
+                <div class="fld ph">0</div><div class="fld ph">8</div>
+                <div><div class="rir">1</div></div><div></div><div><div class="chk"></div></div>
+              </div>
+              <div class="trow">
+                <div><div class="badge">3</div></div>
+                <div class="fld ph">0</div><div class="fld ph">8</div>
+                <div><div class="rir">1</div></div><div></div><div><div class="chk"></div></div>
+              </div>
+              <div class="trow">
+                <div><div class="badge">4</div></div>
+                <div class="fld ph">0</div><div class="fld ph">8</div>
+                <div><div class="rir">1</div></div><div></div><div><div class="chk"></div></div>
+              </div>
+              <div class="adds"><div class="add">Add Set</div><div class="add">Add Warmup</div></div>
+            </div>
+          </div>
+
+          <div class="ticket">
+            <div class="tkrule"></div>
+            <div class="tkhead">
+              <span class="mono tklabel">SMART SUGGESTIONS</span>
+              <span style="display:flex;align-items:center;gap:9px">
+                <span class="mono tkcount">3 READY</span>
+                <span style="color:#5C5C6E"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.6h-4.6"/></svg></span>
+              </span>
+            </div>
+            <div class="tkrow next mono"><span class="s">SET 2</span><span class="w">55 kg</span><span class="r">×8</span></div>
+            <div class="tkrow mono"><span class="s">SET 3</span><span class="w">55 kg</span><span class="r">×8</span></div>
+            <div class="tkrow mono"><span class="s">SET 4</span><span class="w">52.5 kg</span><span class="r">×8</span></div>
+            <div class="tkfoot">Nudging up from your last workout's peak.</div>
+          </div>
+        </div>
+      </div>
+      <ul class="ledger">
+        <li><div><span class="tag">Gains</span><p>The most distinct of the four, and the cheapest in pixels — no card, no tiles, no rails. Monospaced figures make the loads line up without any alignment work, and it looks like a machine calculated it, which is true.</p></div></li>
+        <li><div><span class="tag">Costs</span><p>Monospace is currently the app's admin and diagnostics voice. Promoting it to the main surface either widens that voice deliberately or muddies it. Reads as technical, which suits some of your users and not all of them.</p></div></li>
+      </ul>
+      <div class="card-foot"><span class="chip">Reuses the admin monospace vocabulary</span></div>
+    </div>
+
+    <!-- ============ TILES ============ -->
+    <div class="card">
+      <div>
+        <h3>Tiles</h3>
+        <p class="thesis">Two columns of compact tiles. Every set keeps its own number, but four
+        sets cost two rows instead of four — and the next one is lit.</p>
+      </div>
+      <div class="pv">
+        <div class="pad">
+          <div class="tblcut">
+            <div class="tbl cut">
+              <div class="trow">
+                <div><div class="badge">2</div></div>
+                <div class="fld ph">0</div><div class="fld ph">8</div>
+                <div><div class="rir">1</div></div><div></div><div><div class="chk"></div></div>
+              </div>
+              <div class="trow">
+                <div><div class="badge">3</div></div>
+                <div class="fld ph">0</div><div class="fld ph">8</div>
+                <div><div class="rir">1</div></div><div></div><div><div class="chk"></div></div>
+              </div>
+              <div class="trow">
+                <div><div class="badge">4</div></div>
+                <div class="fld ph">0</div><div class="fld ph">8</div>
+                <div><div class="rir">1</div></div><div></div><div><div class="chk"></div></div>
+              </div>
+              <div class="adds"><div class="add">Add Set</div><div class="add">Add Warmup</div></div>
+            </div>
+          </div>
+
+          <div class="mhead">
+            <span class="mtitle">SMART SUGGESTIONS</span>
+            <span class="mcount">· 3 ready</span>
+            <span class="refresh"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.6h-4.6"/></svg></span>
+          </div>
+          <div class="tiles">
+            <div class="tile2 next">
+              <div class="tset">SET 2 · NEXT</div>
+              <div class="twt">55 kg</div>
+              <div class="trep">× 8 reps</div>
+            </div>
+            <div class="tile2">
+              <div class="tset">SET 3</div>
+              <div class="twt">55 kg</div>
+              <div class="trep">× 8 reps</div>
+            </div>
+            <div class="tile2">
+              <div class="tset">SET 4</div>
+              <div class="twt">52.5 kg</div>
+              <div class="trep">× 8 reps</div>
+            </div>
+          </div>
+          <div class="tilereason">Nudging up from your last workout's peak.</div>
+        </div>
+      </div>
+      <ul class="ledger">
+        <li><div><span class="tag">Gains</span><p>Scales best: six sets is three rows, not six strips. Every set keeps a visible load, and the next one is unmistakable without a rail or an icon.</p></div></li>
+        <li><div><span class="tag">Costs</span><p>An odd number of sets leaves a hole in the grid. Tiles are too small to carry a reason, so the section still needs one summary line underneath.</p></div></li>
+      </ul>
+      <div class="card-foot"><span class="chip">Same height for 3 sets or 6</span></div>
+    </div>
+
+  </div>
+
+  <hr class="rule">
+
+  <h2>States it has to survive</h2>
+  <p class="section-note">
+    Four states the section handles today, drawn in the Next up treatment because it is the one that
+    changes them most. Copy is verbatim from the engine — only the layout is proposed.
+  </p>
+
+  <div class="states">
+
+    <div class="state">
+      <div>
+        <h4>Stale baseline</h4>
+        <p>The banner already exists and already suppresses the per-set reason. In this treatment it
+        sits above the hero, and the hero's rail and figure swap to slate.</p>
+      </div>
+      <div class="pv">
+        <div class="pad">
+          <div class="mhead">
+            <span class="mtitle">SMART SUGGESTIONS</span>
+            <span class="mcount">· 3 ready</span>
+            <span class="refresh"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.6h-4.6"/></svg></span>
+          </div>
+          <div class="banner">
+            <span style="color:#94A3B8;flex:none"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.4V12l3 1.9"/></svg></span>
+            <span class="txt">Based on a workout from Mar 1 — outside your recency window. Estimate may be optimistic.</span>
+          </div>
+          <div class="stack">
+            <div class="strip"><div class="rail stale"></div><div class="hero">
+              <div class="eb">
+                <span style="color:#94A3B8;display:flex"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 14.5 9.5"/><path d="M13 8l3 3"/><path d="M18.4 2.6l.86 2.04 2.04.86-2.04.86-.86 2.04-.86-2.04L15.5 5.5l2.04-.86z" fill="currentColor" stroke="none"/></svg></span>
+                <span class="stale">NEXT UP · SET 2</span>
+              </div>
+              <div class="num"><b class="stale num-t">55 kg</b><i>for 8 reps</i></div>
+            </div></div>
+            <div class="then">
+              <span class="lbl">THEN</span>
+              <span class="qchip num-t">3 · 55 kg</span>
+              <span class="qchip num-t">4 · 52.5 kg</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="state">
+      <div>
+        <h4>One set left</h4>
+        <p>The hero is the whole section — no Then row, nothing collapsed. This is the state the
+        current design serves worst, because one strip in a stack of one still looks like a list.</p>
+      </div>
+      <div class="pv">
+        <div class="pad">
+          <div class="mhead">
+            <span class="mtitle">SMART SUGGESTIONS</span>
+            <span class="mcount">· 1 ready</span>
+            <span class="refresh"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.6h-4.6"/></svg></span>
+          </div>
+          <div class="stack">
+            <div class="strip"><div class="rail"></div><div class="hero">
+              <div class="eb">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 14.5 9.5"/><path d="M13 8l3 3"/><path d="M18.4 2.6l.86 2.04 2.04.86-2.04.86-.86 2.04-.86-2.04L15.5 5.5l2.04-.86z" fill="currentColor" stroke="none"/><path d="M8.6 2.9l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" fill="currentColor" stroke="none"/></svg>
+                <span>LAST SET · SET 4</span>
+              </div>
+              <div class="num"><b class="num-t">52.5 kg</b><i>for 8 reps</i></div>
+              <div class="l2">Easing off slightly to manage session fatigue.</div>
+            </div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="state">
+      <div>
+        <h4>A set with no target</h4>
+        <p>Today an unavailable set gets a full strip of its own. Here the Then row carries it as a
+        dashed chip and the explanation is written once, below.</p>
+      </div>
+      <div class="pv">
+        <div class="pad">
+          <div class="mhead">
+            <span class="mtitle">SMART SUGGESTIONS</span>
+            <span class="mcount">· 2 ready · 1 unavailable</span>
+            <span class="refresh"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.6h-4.6"/></svg></span>
+          </div>
+          <div class="stack">
+            <div class="strip"><div class="rail"></div><div class="hero">
+              <div class="eb">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 14.5 9.5"/><path d="M13 8l3 3"/><path d="M18.4 2.6l.86 2.04 2.04.86-2.04.86-.86 2.04-.86-2.04L15.5 5.5l2.04-.86z" fill="currentColor" stroke="none"/><path d="M8.6 2.9l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" fill="currentColor" stroke="none"/></svg>
+                <span>NEXT UP · SET 2</span>
+              </div>
+              <div class="num"><b class="num-t">55 kg</b><i>for 8 reps</i></div>
+              <div class="l2">Nudging up from your last workout's peak.</div>
+            </div></div>
+            <div class="then">
+              <span class="lbl">THEN</span>
+              <span class="qchip num-t">3 · 55 kg</span>
+              <span class="qchip warn">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.6v5"/><path d="M12 16.2v.1"/></svg>
+                4 · Missing target
+              </span>
+            </div>
+          </div>
+          <div class="lsum">Set 4 needs reps or RIR guidance from the set entry, template, or Smart Suggestions defaults.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="state">
+      <div>
+        <h4>Refreshing</h4>
+        <p>A refresh keeps the existing suggestions on screen while it recalculates. Dimming them
+        while the header spins is the proposal — it says stale-but-still-true rather than blanking
+        the section.</p>
+      </div>
+      <div class="pv">
+        <div class="pad">
+          <div class="mhead">
+            <span class="mtitle">SMART SUGGESTIONS</span>
+            <span class="updating">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 3.6a8.4 8.4 0 1 1-5.9 2.5"/></svg>
+              Updating...
+            </span>
+            <span class="refresh" style="opacity:.4;margin-left:auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.6h-4.6"/></svg></span>
+          </div>
+          <div class="stack dim-block">
+            <div class="strip"><div class="rail"></div><div class="hero">
+              <div class="eb">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 14.5 9.5"/><path d="M13 8l3 3"/><path d="M18.4 2.6l.86 2.04 2.04.86-2.04.86-.86 2.04-.86-2.04L15.5 5.5l2.04-.86z" fill="currentColor" stroke="none"/><path d="M8.6 2.9l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" fill="currentColor" stroke="none"/></svg>
+                <span>NEXT UP · SET 2</span>
+              </div>
+              <div class="num"><b class="num-t">55 kg</b><i>for 8 reps</i></div>
+              <div class="l2">Nudging up from your last workout's peak.</div>
+            </div></div>
+            <div class="then">
+              <span class="lbl">THEN</span>
+              <span class="qchip num-t">3 · 55 kg</span>
+              <span class="qchip num-t">4 · 52.5 kg</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <hr class="rule">
+
+  <div class="closer">
+    <h2>Where I'd land</h2>
+    <p>
+      <b>Next up.</b> It is the only one that changes what the section is for: not a list of what the
+      engine computed, but the one instruction you need before you pick the bar up. It also handles
+      the awkward states best — one set left stops looking like a list of one, and an unavailable set
+      becomes a chip instead of a full strip.
+    </p>
+    <p>
+      <b>Tiles is the pick if set count is the thing that bothers you</b> — it is the only treatment
+      whose height barely moves between three sets and six. <b>Ticket is the one with a real
+      opinion</b>, and the one that carries a risk worth naming out loud: it moves the app's
+      diagnostics voice onto the main surface.
+    </p>
+    <p>
+      <b>One decision drives all four:</b> does a set that is not next keep its own reason? Next up
+      and Tiles say no — one reason, for the set you are about to do. Ledger says only when the set
+      deviates. If the answer is that every set keeps its reason, none of these four is right and the
+      current strips were closer than they look.
+    </p>
+  </div>
+
+</div>

@@ -1,0 +1,98 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #111113;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: #5B8DEF; }
+    a:hover { color: #7BA5F3; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 780px; background: #111113; color: #EAEAEF; display: flex; flex-direction: column;">
+  <div style="display: flex; align-items: center; padding: 12px 16px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); position: relative; flex: none;">
+    <div style="width: 32px; height: 32px; border-radius: 50%; background: #1F1F25; display: flex; align-items: center; justify-content: center;"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M1.5 1.5 L10.5 10.5 M10.5 1.5 L1.5 10.5" stroke="#9999A8" stroke-width="1.8" stroke-linecap="round"></path></svg></div>
+    <div style="position: absolute; left: 0; right: 0; top: 12px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 600; color: #EAEAEF;">Workout complete</div>
+  </div>
+  <div style="flex-grow: 1; overflow: hidden; padding: 16px 14px 0; display: flex; flex-direction: column; gap: 18px;">
+    <div style="background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <div style="font-size: 12px; color: #9999A8;">Sat, Aug 30</div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="font-size: 20px; font-weight: 600; color: #EAEAEF;">Push Day A</div>
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M11.2 2.3a1.6 1.6 0 0 1 2.3 2.3L5.6 12.5l-3 .7.7-3 7.9-7.9Z" stroke="#5C5C6E" stroke-width="1.4" stroke-linejoin="round"></path></svg>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: baseline; gap: 8px;">
+          <span style="font-size: 11px; font-weight: 500; color: #5C5C6E;">Effort across the session</span>
+          <span style="flex-grow: 1;"></span>
+          <span style="font-size: 10px; font-variant-numeric: tabular-nums; color: #5C5C6E;">64 min</span>
+        </div>
+        <svg width="100%" height="96" viewBox="0 0 304 96" fill="none" preserveAspectRatio="xMidYMax meet" aria-hidden="true"><line x1="0" y1="85.5" x2="304" y2="85.5" stroke="rgba(255,255,255,0.10)" stroke-width="1"></line><rect x="0" y="46" width="10" height="38" rx="3" fill="#5B8DEF"></rect><rect x="14" y="38" width="10" height="46" rx="3" fill="#5B8DEF"></rect><rect x="28" y="30" width="10" height="54" rx="3" fill="#5B8DEF"></rect><rect x="42" y="22" width="10" height="62" rx="3" fill="#5B8DEF"></rect><rect x="70" y="40" width="10" height="44" rx="3" fill="#D4A23A"></rect><rect x="84" y="32" width="10" height="52" rx="3" fill="#D4A23A"></rect><rect x="98" y="26" width="10" height="58" rx="3" fill="#D4A23A"></rect><rect x="112" y="34" width="10" height="50" rx="3" fill="#D4A23A"></rect><rect x="140" y="44" width="10" height="40" rx="3" fill="#5B8DEF"></rect><rect x="154" y="36" width="10" height="48" rx="3" fill="#5B8DEF"></rect><rect x="168" y="42" width="10" height="42" rx="3" fill="#5B8DEF"></rect><rect x="196" y="54" width="10" height="30" rx="3" fill="#D4A23A"></rect><rect x="210" y="48" width="10" height="36" rx="3" fill="#D4A23A"></rect><rect x="224" y="50" width="10" height="34" rx="3" fill="#D4A23A"></rect><rect x="238" y="56" width="10" height="28" rx="3" fill="#D4A23A"></rect><rect x="266" y="50" width="10" height="34" rx="3" fill="#4ECDC4"></rect><rect x="280" y="44" width="10" height="40" rx="3" fill="#4ECDC4"></rect><rect x="294" y="48" width="10" height="36" rx="3" fill="#4ECDC4"></rect><path d="M 47 9.4 L 50.6 13 L 47 16.6 L 43.4 13 Z" fill="#D4A23A"></path><path d="M 103 13.4 L 106.6 17 L 103 20.6 L 99.4 17 Z" fill="#D4A23A"></path></svg>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 2px;">
+          <div style="display: flex; align-items: center; gap: 5px;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #5B8DEF;"></span><span style="font-size: 11px; color: #9999A8;">Chest</span></div><div style="display: flex; align-items: center; gap: 5px;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #D4A23A;"></span><span style="font-size: 11px; color: #9999A8;">Shoulders</span></div><div style="display: flex; align-items: center; gap: 5px;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #4ECDC4;"></span><span style="font-size: 11px; color: #9999A8;">Triceps</span></div>
+          <span style="flex-grow: 1;"></span>
+          <div style="display: flex; align-items: center; gap: 5px;">
+            <svg width="9" height="9" viewBox="0 0 9 9" aria-hidden="true"><path d="M 4.5 0.6 L 8.4 4.5 L 4.5 8.4 L 0.6 4.5 Z" fill="#D4A23A"></path></svg>
+            <span style="font-size: 11px; color: #5C5C6E;">PR set</span>
+          </div>
+        </div>
+      </div>
+      <div style="height: 1px; background: rgba(255,255,255,0.06);"></div>
+      <div style="display: flex; align-items: center; gap: 7px; font-size: 13px; font-variant-numeric: tabular-nums; color: #9999A8;">
+        <span>1h 4m</span>
+        <span style="color: #5C5C6E;">&middot;</span>
+        <span>18 sets</span>
+        <span style="color: #5C5C6E;">&middot;</span>
+        <span>12,450 kg</span>
+      </div>
+    </div>
+    <div style="background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; align-items: baseline; gap: 12px;">
+        <div style="font-size: 16px; font-weight: 600; color: #EAEAEF;">Exercises</div>
+        <div style="flex-grow: 1;"></div>
+        <div style="font-size: 12px; color: #9999A8;">5 logged</div>
+      </div>
+      <div style="display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; gap: 10px; padding: 12px 0;">
+          <div style="font-size: 15px; font-weight: 500; color: #EAEAEF;">Barbell Bench Press</div>
+          <div style="flex-grow: 1;"></div>
+          <div style="font-size: 12px; color: #9999A8;">4 sets</div>
+          <div style="font-size: 12px; font-weight: 600; color: #D4A23A; background: rgba(212,162,58,0.10); border-radius: 12px; width: 46px; height: 24px; display: flex; align-items: center; justify-content: center;">PR</div>
+        </div>
+        <div style="height: 1px; background: rgba(255,255,255,0.06);"></div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 12px 0;">
+          <div style="font-size: 15px; font-weight: 500; color: #EAEAEF;">Overhead Press</div>
+          <div style="flex-grow: 1;"></div>
+          <div style="font-size: 12px; color: #9999A8;">4 sets</div>
+          <div style="width: 46px; height: 24px;"></div>
+        </div>
+        <div style="height: 1px; background: rgba(255,255,255,0.06);"></div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 12px 0;">
+          <div style="font-size: 15px; font-weight: 500; color: #EAEAEF;">Incline Dumbbell Press</div>
+          <div style="flex-grow: 1;"></div>
+          <div style="font-size: 12px; color: #9999A8;">3 sets</div>
+          <div style="width: 46px; height: 24px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="flex: none; border-top: 1px solid rgba(255,255,255,0.06); padding: 12px 16px;">
+    <div style="height: 52px; background: #5B8DEF; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 600; color: #FFFFFF;">Save &amp; Close</div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

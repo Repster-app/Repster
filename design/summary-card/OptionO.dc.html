@@ -1,0 +1,84 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #111113;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: #5B8DEF; }
+    a:hover { color: #7BA5F3; }
+  </style>
+</helmet>
+<div style="width: 360px; height: 640px; background: #0E0E11; color: #EAEAEF; display: flex; flex-direction: column; padding: 34px 30px 30px; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;">
+  <div style="flex-grow: 0.55;"></div>
+
+  <div style="flex: none; display: flex; align-items: center; gap: 7px;">
+    <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 .8l1.6 3.3 3.6.5-2.6 2.5.6 3.6L6 9l-3.2 1.7.6-3.6L.8 4.6l3.6-.5L6 .8Z" fill="#D4A23A"></path></svg>
+    <span style="font-size: 12px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #D4A23A;">New PR</span>
+  </div>
+
+  <div style="height: 26px; flex: none;"></div>
+
+  <div style="flex: none; display: flex; flex-direction: column; gap: 10px;">
+    <div style="font-family: ui-rounded, 'SF Pro Rounded', -apple-system, system-ui, sans-serif; font-size: 40px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.06; color: #EAEAEF;">Barbell<br>Bench Press</div>
+    <div style="font-size: 15px; font-weight: 500; color: #D4A23A;">Best set I&rsquo;ve logged</div>
+  </div>
+
+  <div style="height: 34px; flex: none;"></div>
+  <div style="flex: none; display: flex; gap: 10px;">
+    <div style="flex-grow: 1; flex-basis: 0; display: flex; flex-direction: column; gap: 3px;">
+      <div style="display: flex; align-items: baseline; gap: 3px;"><span style="font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; color: #EAEAEF;">1h 4m</span></div>
+      <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #5C5C6E;">Time</div>
+    </div>
+    <div style="flex-grow: 1; flex-basis: 0; display: flex; flex-direction: column; gap: 3px;">
+      <div style="display: flex; align-items: baseline; gap: 3px;"><span style="font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; color: #EAEAEF;">18</span></div>
+      <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #5C5C6E;">Sets</div>
+    </div>
+    <div style="flex-grow: 1; flex-basis: 0; display: flex; flex-direction: column; gap: 3px;">
+      <div style="display: flex; align-items: baseline; gap: 3px;"><span style="font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; color: #EAEAEF;">5</span></div>
+      <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #5C5C6E;">Lifts</div>
+    </div>
+  </div>
+
+  <div style="height: 30px; flex: none;"></div>
+
+  <div style="flex: none; display: flex; flex-direction: column;">
+      <div style="display: flex; align-items: baseline; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <span style="font-size: 14px; color: #9999A8;">Barbell Bench Press</span>
+        <span style="flex-grow: 1;"></span><span style="font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: #EAEAEF;">4 sets</span>
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <span style="font-size: 14px; color: #9999A8;">Overhead Press</span>
+        <span style="flex-grow: 1;"></span><span style="font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: #EAEAEF;">4 sets</span>
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 12px; padding: 11px 0;">
+        <span style="font-size: 14px; color: #9999A8;">Incline Dumbbell Press</span>
+        <span style="flex-grow: 1;"></span><span style="font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: #EAEAEF;">3 sets</span>
+      </div>
+    <div style="padding-top: 11px; font-size: 12px; color: #5C5C6E;">+2 more</div>
+  </div>
+
+  <div style="flex-grow: 1;"></div>
+  <div style="flex: none; display: flex; align-items: center; gap: 10px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.08);">
+    <span style="font-size: 11px; font-variant-numeric: tabular-nums; color: #5C5C6E;">Sat, Aug 30</span>
+    <span style="flex-grow: 1;"></span>
+    <span style="display: flex; align-items: center; gap: 7px;">
+      <img src="repster-mark.png" alt="" width="16" height="16" style="display: block; flex: none;">
+      <span style="font-size: 13px; font-weight: 700; letter-spacing: -0.01em; color: #EAEAEF;">Repster</span>
+      <span style="font-size: 11px; color: #5C5C6E;">repster.app</span>
+    </span>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
