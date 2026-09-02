@@ -201,7 +201,8 @@ protocol SetServiceProtocol: Sendable {
     func updateInProgressTargetRepOverride(
         setId: UUID,
         min: Int?,
-        max: Int?
+        max: Int?,
+        clearsInheritedTarget: Bool
     ) async throws
 
     /// Persist a batch of set-ordering changes in one transaction, without invoking the

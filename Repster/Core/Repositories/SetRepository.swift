@@ -201,12 +201,27 @@ actor SetRepository: SetRepositoryProtocol {
     }
 
     /// Persist rep-target override guidance without touching any other field.
-    func applyTargetRepOverride(setId: UUID, min: Int?, max: Int?) throws {
+    ///
+    /// `clearsInheritedTarget` additionally drops the target the set inherited from its
+    /// template. Only the range editor's empty Apply passes it: `preferredTargetRepBounds`
+    /// falls back to `targetRepMin/Max` whenever the override is nil, so a target the user
+    /// deleted would otherwise be read straight back off the template layer. Emptying the
+    /// reps text field is a different gesture and leaves that layer alone.
+    func applyTargetRepOverride(
+        setId: UUID,
+        min: Int?,
+        max: Int?,
+        clearsInheritedTarget: Bool = false
+    ) throws {
         guard let set = try fetch(byId: setId) else {
             throw SetServiceError.setNotFound(setId)
         }
         set.overrideTargetRepMin = min
         set.overrideTargetRepMax = max
+        if clearsInheritedTarget {
+            set.targetRepMin = nil
+            set.targetRepMax = nil
+        }
         set.updatedAt = Date()
         try modelContext.save()
     }

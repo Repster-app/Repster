@@ -480,9 +480,15 @@ final class SetService: SetServiceProtocol {
     func updateInProgressTargetRepOverride(
         setId: UUID,
         min: Int?,
-        max: Int?
+        max: Int?,
+        clearsInheritedTarget: Bool = false
     ) async throws {
-        try await setRepo.applyTargetRepOverride(setId: setId, min: min, max: max)
+        try await setRepo.applyTargetRepOverride(
+            setId: setId,
+            min: min,
+            max: max,
+            clearsInheritedTarget: clearsInheritedTarget
+        )
     }
 
     /// Which exercises shared a superset with `exerciseId` in each of these workouts.

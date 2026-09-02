@@ -74,6 +74,12 @@ enum CustomRepRangeCommitter {
         case .empty:
             set.overrideTargetRepMin = nil
             set.overrideTargetRepMax = nil
+            // Emptying the range editor is the user removing the target, so the target the
+            // set inherited from its template goes with it. Leaving those two fields set
+            // hands `preferredTargetRepBounds` a fallback and the deleted number comes
+            // straight back on the next read.
+            set.targetRepMin = nil
+            set.targetRepMax = nil
         case let .single(reps):
             set.overrideTargetRepMin = reps
             set.overrideTargetRepMax = reps
@@ -769,10 +775,13 @@ private struct SetRowWrapper: View {
         guard !startedAutoUncomplete else { return }
 
         Task {
+            // Emptying the reps field is "never mind", not "remove the target" — the template's
+            // prescription has to survive a backspace, so the inherited layer is left alone.
             await dataSource.persistTargetRepOverride(
                 set,
                 min: set.overrideTargetRepMin,
-                max: set.overrideTargetRepMax
+                max: set.overrideTargetRepMax,
+                clearsInheritedTarget: false
             )
         }
     }
@@ -800,7 +809,8 @@ private struct SetRowWrapper: View {
             await dataSource.persistTargetRepOverride(
                 set,
                 min: set.overrideTargetRepMin,
-                max: set.overrideTargetRepMax
+                max: set.overrideTargetRepMax,
+                clearsInheritedTarget: min == nil && max == nil
             )
         }
     }

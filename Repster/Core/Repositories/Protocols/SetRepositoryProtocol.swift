@@ -130,7 +130,12 @@ protocol SetRepositoryProtocol: Sendable {
     func applyPRStatus(setId: UUID, status: CachedPRStatus?) async throws
 
     /// Persist rep-target override guidance without touching any other field.
-    func applyTargetRepOverride(setId: UUID, min: Int?, max: Int?) async throws
+    func applyTargetRepOverride(
+        setId: UUID,
+        min: Int?,
+        max: Int?,
+        clearsInheritedTarget: Bool
+    ) async throws
 
     // MARK: - Workout Queries
 

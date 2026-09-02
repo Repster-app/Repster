@@ -179,7 +179,12 @@ protocol SetTableDataSource: AnyObject, Observable {
     func updateSetNote(_ set: WorkoutSet, note: String?) async
 
     /// Persist rep-target override guidance without invoking the full set edit pipeline.
-    func persistTargetRepOverride(_ set: WorkoutSet, min: Int?, max: Int?) async
+    func persistTargetRepOverride(
+        _ set: WorkoutSet,
+        min: Int?,
+        max: Int?,
+        clearsInheritedTarget: Bool
+    ) async
 
     // MARK: - Exercise Actions
 
@@ -417,9 +422,15 @@ extension SetTableDataSource {
     func suggestedWeight(for setId: UUID) -> Double? {
         suggestionState(for: setId)?.suggestion?.suggestedWeight
     }
-    func persistTargetRepOverride(_ set: WorkoutSet, min: Int?, max: Int?) async {
+    func persistTargetRepOverride(
+        _ set: WorkoutSet,
+        min: Int?,
+        max: Int?,
+        clearsInheritedTarget: Bool
+    ) async {
         let _ = set
         let _ = min
         let _ = max
+        let _ = clearsInheritedTarget
     }
 }

@@ -2690,12 +2690,18 @@ extension ActiveWorkoutViewModel: SetTableDataSource {
         weightSuggestionData?.suggestedWeight(for: setId)
     }
 
-    func persistTargetRepOverride(_ set: WorkoutSet, min: Int?, max: Int?) async {
+    func persistTargetRepOverride(
+        _ set: WorkoutSet,
+        min: Int?,
+        max: Int?,
+        clearsInheritedTarget: Bool = false
+    ) async {
         do {
             try await setService.updateInProgressTargetRepOverride(
                 setId: set.id,
                 min: min,
-                max: max
+                max: max,
+                clearsInheritedTarget: clearsInheritedTarget
             )
 
             if let sets = setsByExercise[set.exerciseId] {

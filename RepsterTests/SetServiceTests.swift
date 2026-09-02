@@ -187,6 +187,55 @@ final class SetServiceTests: XCTestCase {
         XCTAssertEqual(persisted?.orderInExercise, originalOrder)
     }
 
+    /// A template-started set carries the template's target in `targetRepMin/Max`. Clearing
+    /// the target in the workout has to clear that layer too — otherwise the override goes
+    /// nil, the read falls back to the template bounds, and the number the user just deleted
+    /// is on screen again.
+    func testClearingTargetRepOverrideAlsoClearsTheInheritedTemplateTarget() async throws {
+        let context = try makeContext()
+        let records = try await seedTrackedCompletedSet(in: context, order: 1)
+        records.set.targetRepMin = 8
+        records.set.targetRepMax = 12
+        try await context.setRepo.save(records.set)
+
+        try await context.setService.updateInProgressTargetRepOverride(
+            setId: records.set.id,
+            min: nil,
+            max: nil,
+            clearsInheritedTarget: true
+        )
+
+        let persisted = try await context.setRepo.fetch(byId: records.set.id)
+        XCTAssertNil(persisted?.overrideTargetRepMin)
+        XCTAssertNil(persisted?.overrideTargetRepMax)
+        XCTAssertNil(persisted?.targetRepMin)
+        XCTAssertNil(persisted?.targetRepMax)
+        XCTAssertNil(persisted?.preferredTargetRepBounds.min)
+        XCTAssertNil(persisted?.preferredTargetRepBounds.max)
+    }
+
+    /// Emptying the reps text field is not the same gesture as removing the target. That path
+    /// drops the override only, and the template's prescription has to survive it.
+    func testClearingOnlyTheOverrideKeepsTheInheritedTemplateTarget() async throws {
+        let context = try makeContext()
+        let records = try await seedTrackedCompletedSet(in: context, order: 1)
+        records.set.targetRepMin = 8
+        records.set.targetRepMax = 12
+        try await context.setRepo.save(records.set)
+
+        try await context.setService.updateInProgressTargetRepOverride(
+            setId: records.set.id,
+            min: nil,
+            max: nil
+        )
+
+        let persisted = try await context.setRepo.fetch(byId: records.set.id)
+        XCTAssertNil(persisted?.overrideTargetRepMin)
+        XCTAssertNil(persisted?.overrideTargetRepMax)
+        XCTAssertEqual(persisted?.targetRepMin, 8)
+        XCTAssertEqual(persisted?.targetRepMax, 12)
+    }
+
     func testTargetRepOverrideThrowsForUnknownSet() async throws {
         let context = try makeContext()
 

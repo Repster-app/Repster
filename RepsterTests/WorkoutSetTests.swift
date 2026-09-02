@@ -55,6 +55,53 @@ final class WorkoutSetTests: XCTestCase {
         XCTAssertEqual(set.overrideTargetRepMax, 8)
     }
 
+    /// Removing the rep target on a set that inherited one from a template has to actually
+    /// remove it. Nilling only the override layer hands the read back to `targetRepMin/Max`,
+    /// so the template's number reappears the instant the editor closes.
+    func testClearingTheCustomRepRangeAlsoRemovesTheInheritedTemplateTarget() {
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: UUID(),
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            targetRepMin: 8,
+            targetRepMax: 12
+        )
+        set.overrideTargetRepMin = 10
+        set.overrideTargetRepMax = 10
+
+        let didCommit = CustomRepRangeCommitter.commit(min: nil, max: nil, to: set)
+
+        XCTAssertTrue(didCommit)
+        XCTAssertNil(set.overrideTargetRepMin)
+        XCTAssertNil(set.overrideTargetRepMax)
+        XCTAssertNil(set.targetRepMin)
+        XCTAssertNil(set.targetRepMax)
+        XCTAssertNil(set.preferredTargetRepBounds.min)
+        XCTAssertNil(set.preferredTargetRepBounds.max)
+        XCTAssertFalse(set.hasOverrideRepTarget)
+    }
+
+    /// The same clear on a set the user never gave a target keeps working, and leaves the
+    /// logged reps alone.
+    func testClearingTheCustomRepRangeLeavesLoggedRepsIntact() {
+        let set = WorkoutSet(
+            workoutId: UUID(),
+            exerciseId: UUID(),
+            reps: 6,
+            orderInWorkout: 1,
+            orderInExercise: 1,
+            targetRepMin: 8,
+            targetRepMax: 12
+        )
+
+        XCTAssertTrue(CustomRepRangeCommitter.commit(min: nil, max: nil, to: set))
+
+        XCTAssertEqual(set.reps, 6)
+        XCTAssertNil(set.targetRepMin)
+        XCTAssertNil(set.targetRepMax)
+    }
+
     func testTemplateSaveTargetRepBoundsNormalizeSingleValueOverride() {
         let set = WorkoutSet(
             workoutId: UUID(),
