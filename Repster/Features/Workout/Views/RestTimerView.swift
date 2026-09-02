@@ -188,31 +188,45 @@ struct RestTimerView: View {
     // MARK: - Finished State
 
     /// "Rest complete" message in the same band, rule filled green.
+    ///
+    /// The base is `bgCard`, the same as the countdown band, with the green wash layered over it.
+    /// `successSoft` is 8% green: alone it is not a background at all, and because the band is a
+    /// bottom safe-area inset the set list scrolled straight through the words.
+    ///
+    /// Dismiss carries the same pill as the ±15s controls rather than sitting as bare text — it is
+    /// the only control in this state, so it has to read as one and take a thumb-sized tap.
     private var finishedBand: some View {
         VStack(spacing: 0) {
             progressRule(progress: 1, color: .success)
 
             HStack(spacing: 10) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 19))
+                    .font(.system(size: 17))
                     .foregroundColor(.success)
 
                 Text("Rest complete")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.textPrimary)
 
-                Spacer()
+                Spacer(minLength: 4)
 
-                Button("Dismiss") { onDismiss() }
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.textSecondary)
-                    .frame(height: 32)
+                Button(action: onDismiss) {
+                    Text("Dismiss")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.textSecondary)
+                        .frame(height: 30)
+                        .padding(.horizontal, 14)
+                        .background(Color.bgSubtle)
+                        .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss rest timer")
             }
             .padding(.horizontal, 20)
             .frame(height: Self.rowHeight)
         }
         .frame(maxWidth: .infinity)
-        .background(Color.successSoft)
+        .background(Color.bgCard.overlay(Color.successSoft))
     }
 
     // MARK: - Formatting
