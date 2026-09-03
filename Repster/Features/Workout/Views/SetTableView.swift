@@ -1205,7 +1205,6 @@ struct SetEntryKeyboardOverlay: View {
     @ObservedObject var manager: SetEntryKeyboardManager
 
     @State private var rirMode = false
-    @State private var repMode: String = "F"
     @State private var refreshTick = 0
     @State private var repRangeEditMode = false
     @State private var repRangeMinText = ""
@@ -1214,12 +1213,20 @@ struct SetEntryKeyboardOverlay: View {
 
     private enum RepRangeField { case min, max }
 
+    /// Height of the top strip's single content slot.
+    ///
+    /// The RIR chips and the rep-range editor swap in and out of it, so they must match exactly —
+    /// any difference shows up as the set list nudging every time you toggle the editor.
+    private static let slotHeight: CGFloat = 44
+
     var body: some View {
         Group {
             if let context = manager.context, context.trackedField != nil {
                 VStack(spacing: 0) {
                     topStrip(for: context)
-                    Divider().background(Color.border)
+                    if hasTopStripContent(for: context) {
+                        Divider().background(Color.border)
+                    }
                     HStack(alignment: .top, spacing: 8) {
                         numberPad(for: context)
                         actionRail(for: context)
@@ -1238,7 +1245,6 @@ struct SetEntryKeyboardOverlay: View {
                 .background(Color.bgCard.ignoresSafeArea(.all, edges: .bottom))
                 .onChange(of: manager.context?.ownerSetID) { _, _ in
                     rirMode = false
-                    repMode = "F"
                     repRangeEditMode = false
                     refreshTick = 0
                 }
@@ -1251,102 +1257,119 @@ struct SetEntryKeyboardOverlay: View {
         .animation(.easeInOut(duration: 0.2), value: manager.context?.ownerSetID)
     }
 
+    /// The band above the keys: one `slotHeight` row, or nothing at all.
+    ///
+    /// There is no longer a "Set · Reps" label above it. Which field has focus is already said by
+    /// the table's column headers, by the `L` / `R` labels beside each unilateral reps field, and
+    /// by the accent border on the field itself — so the label row was 37pt spent on a duplicate.
+    /// Note that this makes the slot the card's first child, against an 18pt corner radius, which
+    /// is why every occupant centres its content in a fixed height rather than sitting flush.
     @ViewBuilder
     private func topStrip(for context: SetEntryKeyboardContext) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("Set")
-                    .foregroundColor(.accent)
-                    .font(.system(size: 14, weight: .semibold))
-                Text("· \(fieldTitle(context.trackedField))")
-                    .foregroundColor(.textSecondary)
-                    .font(.system(size: 14, weight: .semibold))
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-
-            if showRIRChips(for: context) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        rirChip(context, label: "—", value: nil)
-                        rirChip(context, label: "0", value: 0)
-                        rirChip(context, label: "1", value: 1)
-                        rirChip(context, label: "2", value: 2)
-                        rirChip(context, label: "3", value: 3)
-                        rirChip(context, label: "4", value: 4)
-                        rirChip(context, label: "5+", value: 5)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 10)
+        // One slot, three possible occupants, and the rep-range editor takes precedence while it
+        // is open. It and the chips answer to exactly the same three fields (`canEditActiveRIR`
+        // and `supportsRepRangeEditing` gate on reps / leftReps / rightReps), so replacing one
+        // with the other leaves no state uncovered. Stacking them — which is what this did —
+        // dropped the set list 88pt the moment you opened the editor, with a thumb on the keypad.
+        if repRangeEditMode {
+            repRangeEditor(for: context)
+        } else if showRIRChips(for: context) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    rirChip(context, label: "—", value: nil)
+                    rirChip(context, label: "0", value: 0)
+                    rirChip(context, label: "1", value: 1)
+                    rirChip(context, label: "2", value: 2)
+                    rirChip(context, label: "3", value: 3)
+                    rirChip(context, label: "4", value: 4)
+                    rirChip(context, label: "5+", value: 5)
                 }
-            } else if shouldShowWeightHelper(for: context) {
-                Text(weightHelperText(context))
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.textSecondary)
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 10)
+                .padding(.horizontal, 12)
             }
-
-            if repRangeEditMode {
-                repRangeEditor(for: context)
-            }
+            .frame(height: Self.slotHeight)
+        } else if shouldShowWeightHelper(for: context) {
+            Text(weightHelperText(context))
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.textSecondary)
+                .padding(.horizontal, 12)
+                .frame(height: Self.slotHeight, alignment: .leading)
         }
     }
 
+    /// Whether `topStrip` renders anything for this state.
+    ///
+    /// Drives the divider: on a duration or distance field the strip is empty, and without this
+    /// the divider would sit flush against the card's rounded top edge with nothing above it.
+    private func hasTopStripContent(for context: SetEntryKeyboardContext) -> Bool {
+        repRangeEditMode || showRIRChips(for: context) || shouldShowWeightHelper(for: context)
+    }
+
+    /// The rep-range editor, as one fixed-height row sharing the top strip's single slot with the
+    /// RIR chips. `Self.slotHeight` is deliberately the same height as the chips: the two swap in
+    /// place, so opening the editor must not move the set list underneath it.
+    ///
+    /// There is no Cancel. The rail's rep-range button already calls `dismissRepRangeEditMode`
+    /// while it reads "Editing", and `onChange` closes edit mode when focus leaves a reps field,
+    /// so a third exit is a duplicate — and it does not fit: with Cancel and the full "Rep Range"
+    /// label the row needs 402pt inside a 378pt card, 40pt more than an iPhone SE has.
     private func repRangeEditor(for context: SetEntryKeyboardContext) -> some View {
         let hasInvalidDraft = repRangeDraftState == .invalid
 
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                Label("Rep Range", systemImage: "target")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.accent)
+        return HStack(spacing: 8) {
+            // The label doubles as the error line. The long form ("Use one rep value or an
+            // ascending range.") has nowhere to live in a fixed-height row, and letting the row
+            // grow to hold it would reintroduce the shift this layout exists to remove. The
+            // fields and Apply hold their widths; the label scales down ahead of them.
+            Label(
+                hasInvalidDraft ? repRangeErrorText : "Range",
+                systemImage: hasInvalidDraft ? "exclamationmark.triangle.fill" : "target"
+            )
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundColor(hasInvalidDraft ? .danger : .accent)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
 
-                Spacer(minLength: 0)
+            repRangeInputField(
+                text: $repRangeMinText,
+                placeholder: "Min",
+                isActive: repRangeActiveField == .min,
+                showsError: hasInvalidDraft
+            )
+            .onTapGesture { repRangeActiveField = .min }
+            .layoutPriority(1)
 
-                repRangeEditorButton(title: "Cancel", prominent: false, disabled: false) {
-                    dismissRepRangeEditMode(context)
-                }
+            Text("—")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.textSecondary)
+                .layoutPriority(1)
 
-                repRangeEditorButton(title: "Apply", prominent: true, disabled: hasInvalidDraft) {
-                    applyRepRange(context)
-                }
+            repRangeInputField(
+                text: $repRangeMaxText,
+                placeholder: "Max",
+                isActive: repRangeActiveField == .max,
+                showsError: hasInvalidDraft
+            )
+            .onTapGesture { repRangeActiveField = .max }
+            .layoutPriority(1)
+
+            Spacer(minLength: 0)
+
+            repRangeEditorButton(title: "Apply", prominent: true, disabled: hasInvalidDraft) {
+                applyRepRange(context)
             }
-
-            HStack(spacing: 8) {
-                repRangeInputField(
-                    text: $repRangeMinText,
-                    placeholder: "Min",
-                    isActive: repRangeActiveField == .min,
-                    showsError: hasInvalidDraft
-                )
-                .onTapGesture { repRangeActiveField = .min }
-
-                Text("—")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.textSecondary)
-
-                repRangeInputField(
-                    text: $repRangeMaxText,
-                    placeholder: "Max",
-                    isActive: repRangeActiveField == .max,
-                    showsError: hasInvalidDraft
-                )
-                .onTapGesture { repRangeActiveField = .max }
-
-                Spacer(minLength: 0)
-            }
-
-            if hasInvalidDraft {
-                Text("Use one rep value or an ascending range.")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.danger)
-            }
+            .layoutPriority(1)
         }
         .padding(.horizontal, 12)
-        .padding(.top, 2)
-        .padding(.bottom, 10)
+        .frame(height: Self.slotHeight)
+    }
+
+    /// Which half of the draft is wrong, short enough to sit in the label's place.
+    ///
+    /// `repRangeDraftState` collapses both failures into `.invalid`, but they need different
+    /// wording: a zero is reachable because `handleRepRangeKey` accepts "0" as a first digit.
+    private var repRangeErrorText: String {
+        let values = [Int(repRangeMinText), Int(repRangeMaxText)].compactMap { $0 }
+        return values.contains(where: { $0 <= 0 }) ? "Reps must be 1+" : "Min below max"
     }
 
     private func repRangeEditorButton(
@@ -1786,18 +1809,6 @@ struct SetEntryKeyboardOverlay: View {
 
     private func allowsDecimal(_ field: SetRowInputField?) -> Bool {
         field == .weight || field == .distance
-    }
-
-    private func fieldTitle(_ field: SetRowInputField?) -> String {
-        switch field {
-        case .weight: return "Weight"
-        case .reps: return "Reps"
-        case .leftReps: return "Left Reps"
-        case .rightReps: return "Right Reps"
-        case .duration: return "Duration"
-        case .distance: return "Distance"
-        case .none: return "Input"
-        }
     }
 
     private var repRangeDraftState: RepsTargetInput {
