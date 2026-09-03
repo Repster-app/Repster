@@ -20,7 +20,10 @@ Visual comparison of all four states: <https://claude.ai/code/artifact/0210f7c9-
 
 ---
 
-## 1. What the strip is today
+## 1. What the strip was
+
+> Line anchors in §1–§6 point at the code **as it stood before `c1a6c52`**. They are kept as the
+> record of the analysis; they no longer resolve to the same lines in the current file.
 
 `topStrip` ([SetTableView.swift:1262](Repster/Features/Workout/Views/SetTableView.swift:1262)) is a
 `VStack(spacing: 0)` of up to three blocks:
