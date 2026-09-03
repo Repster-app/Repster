@@ -1,176 +1,222 @@
 # 1.5 Release Plan
 
-**Date:** 2026-08-18
-**Current version:** 1.4 (build 4) — **not yet shipped**
-**Status:** scope planning. Nothing here is committed except Part 1.
+**Originally written:** 2026-08-18 · **Revised against the tree:** 2026-09-01
+**Live:** 1.4 (build 4), released 2026-08-20
+**In the project right now:** `MARKETING_VERSION = 1.4.1`, build 5 — the number is
+**not settled**; that decision lives in [PRE_1.5_CHECKLIST.md §0](PRE_1.5_CHECKLIST.md)
+**Status:** no longer scope planning. Most of this release is built. The open work
+is deciding what ships under one name.
 
 ## What this document is
 
 Scope planning for 1.5 — what goes in, what doesn't, and what has to be decided
 before the scope can lock.
 
-It is deliberately **not** a launch checklist. [PRE_1.4_CHECKLIST.md](PRE_1.4_CHECKLIST.md)
-is the model for that, and 1.5 gets its own once scope is settled. Launch
-mechanics (App Store Connect, privacy policy, TestFlight verification) are out of
-scope here.
+It is deliberately **not** a launch checklist. [PRE_1.5_CHECKLIST.md](PRE_1.5_CHECKLIST.md)
+is that, and it now exists. Launch mechanics (App Store Connect, privacy policy,
+TestFlight verification) are out of scope here.
 
-## Standing constraint — 1.4 first
+## What changed in the 2026-09-01 revision
 
-**1.4 has not shipped.** [PRE_1.4_CHECKLIST.md](PRE_1.4_CHECKLIST.md) still has
-~138 open items, most of them outside Xcode: App Store Connect privacy
-declarations, PostHog settings, and on-device HealthKit verification.
+The 2026-08-18 draft was written before 1.4 shipped and before two weeks of work
+landed. Corrected here:
 
-Nothing in Parts 2–4 below starts until 1.4 is out. The reason is in the 1.4 doc
-itself: attribution is forward-only and cannot be backfilled, so delaying 1.4 to
-add features to it costs measurement that can never be recovered.
+| Then | Now |
+|---|---|
+| "1.4 has not shipped" — a hard gate on everything below | 1.4 shipped 2026-08-20. Gate removed |
+| Share card is a candidate needing ~1 week | Built and committed, as W7 of a wider summary-screen rebuild |
+| Backup: templates undecided | Templates are **in** the archive (`archiveVersion 2`) |
+| Two `performanceLabel` consumers disagree | The formatter is unified; only the *meaning* choice is left |
+| Custom-exercise analytics: not built | Event exists, but without the properties that were its whole point |
+| Part 6 "already in the tree, needs a home" | All three shipped in 1.4. Replaced with what is in the tree now |
+| Part 7 lists replace/reorder as design only | Built. So are supersets and the templates redesign, neither of which this doc had heard of |
+| "1.5 should be small, visible, and quick to follow" | It is now large and visible. The question flipped from what to add to what to cut |
 
 ---
 
 # Part 1 — Carried over from 1.4 (decided, not candidates)
 
 Two items were explicitly deferred to 1.5 on 2026-08-14. These are commitments.
+**Neither is done.**
 
-## 1.1 Backup scope — `BodyweightEntry` first
+## 1.1 Backup scope — `BodyweightEntry` first · **partly resolved**
 
 [PRE_1.4_CHECKLIST.md §8](PRE_1.4_CHECKLIST.md), with the full audit in
 [BACKUP_EXPORT_SCOPING.md](BACKUP_EXPORT_SCOPING.md).
 
-A backup excludes `BodyweightEntry`, templates, programs, `InsightRecord`, and 21
-of 24 `HealthProfile` fields. Not a regression — pre-existing, and the in-app copy
-is technically accurate. The gap is that "restore replaces workout history only"
-describes what restore won't *overwrite*, not what the backup doesn't *contain*.
-Those two readings coincide on the device you exported from and diverge completely
-on a new one, which is the case where someone actually reaches for a backup.
+The gap was that "restore replaces workout history only" describes what restore
+won't *overwrite*, not what the backup doesn't *contain*. Those two readings
+coincide on the device you exported from and diverge completely on a new one,
+which is the case where someone actually reaches for a backup.
 
-- [ ] Add `BodyweightEntry` to the archive — strongest candidate by far, since
-      `effectiveWeight` for future bodyweight-style sets depends on the log
-- [ ] Decide on templates and programs: include, or say plainly they aren't covered
-- [ ] Reword the export screen to describe *contents* rather than restore semantics
+- [x] **Decide on templates** — decided by building. `WorkoutHistoryArchive` is at
+      `currentVersion = 2` and carries a nested `templates` array
+      ([ExportServiceProtocol.swift:110](Repster/Core/Services/Protocols/ExportServiceProtocol.swift:110)),
+      folders, superset pairings and all
+- [ ] **Add `BodyweightEntry` to the archive** — still absent, and still the
+      strongest candidate, since `effectiveWeight` for future bodyweight-style sets
+      depends on the log
+- [ ] **Programs** — still not covered, still not said out loud anywhere
+- [ ] **Reword the export screen to describe *contents*.**
+      [ExportView.swift:30](Repster/Features/Settings/Views/ExportView.swift:30) still
+      reads "workout history, workout metadata, and set details" — which is now
+      *understated* (templates ride along, silently) and still silent on the
+      bodyweight log. Adding templates without touching the copy made this worse,
+      not better
 
-**Note:** Phases 2 and 4 of `BACKUP_EXPORT_SCOPING.md` were implemented 2026-08-17
-and are uncommitted on `NewMain`. Confirm whether those ride 1.4 or 1.5 before
-planning around them.
+**Superseded note:** the old caveat about backup phases 2 and 4 being uncommitted
+is gone — they shipped in 1.4.
 
-## 1.2 Bodyweight-style set labels
+## 1.2 Bodyweight-style set labels · **half the problem dissolved**
 
 [PRE_1.4_CHECKLIST.md §9](PRE_1.4_CHECKLIST.md).
 
-A Pull Up logged at +10 kg renders as `10 kg` in the History tab and Exercise Info
-card, but `90` on calendar/detail cards. Two entry points on the same formatter
-with different rules. Cosmetic — no data is wrong — but `10 kg` on a Pull Up reads
-as a bare weight.
+The original complaint had two halves: two formatter entry points with different
+rules, and neither rule being right.
+
+**The disagreement is gone.** Every overload in
+[`WorkoutSetPerformanceFormatter`](Repster/Core/Formatting/WorkoutSetPerformanceFormatter.swift)
+now funnels into one `display(weight:reps:…)` core and one
+[`weightLabel`](Repster/Core/Formatting/WorkoutSetPerformanceFormatter.swift:408).
+Fixing this is now a one-place change rather than a two-place one.
+
+**The meaning is still wrong.** `weightLabel` returns `"BW"` only when
+`weight <= 0`. A Pull Up at +10 kg still renders `10 kg`, which reads as a bare
+weight.
 
 - [ ] Pick one meaning: `BW+10 kg` or `90 kg`. The current `10 kg` is the one
       option not worth keeping
-- [ ] Apply to **both** `performanceLabel` consumers, or the two active-workout
-      surfaces still disagree with each other
 - [ ] Update `WorkoutJourneyTests.testHistorySubTabShowsPastSessionsNewestFirst`,
       which pins the current behaviour
 
----
-
-# Part 2 — The headline candidate: shareable workout card
-
-**Recommended by its own design doc**, and the strongest claim on 1.5's headline
-slot.
-
-[SHARE_CARD_FEATURE_DESIGN.md](SHARE_CARD_FEATURE_DESIGN.md) makes the sequencing
-call directly: don't bundle the card into 1.4, get the privacy work out, then ship
-the card as 1.5 with its own release note — *"the first user-visible feature since
-launch, and it deserves not to be buried under a privacy release."*
-
-That reasoning holds. 1.4 is a privacy-and-measurement release with almost nothing
-a user can see. 1.5 should be the opposite.
-
-- **Phase 1 scope:** `ShareCardContent` + mapping, card view, renderer, preview
-  sheet with two privacy toggles, summary-sheet entry point, shared
-  `ActivityShareSheet`, Info.plist key, analytics, tests — plus the
-  campaign-tagged App Store link and landing page
-- **Estimate:** ~1 week, design iteration being the larger half
-- **Dependencies:** none. Doesn't block anything else
-- **Phase 2 gate:** open rate ≥ 8% before building retroactive sharing
-
-Also item 1 and "your top pick" in [FEATURE_SCOPING_BRIEF.md](FEATURE_SCOPING_BRIEF.md).
-
-**Open decision carried from that doc:** whether a short domain exists for the
-card's face. The GitHub Pages URL works but wastes the impression.
+The "apply to **both** consumers" bullet is retired — there is one consumer now.
 
 ---
 
-# Part 3 — Muscle group coverage
+# Part 2 — The headline: workout summary screen + shareable card · **built, committed 2026-09-02**
+
+**This grew.** The 2026-08-18 draft scoped a share card hanging off the existing
+summary sheet. What was actually built rebuilds the sheet itself and makes the card
+one of seven work packages:
+[SUMMARY_SCREEN_IMPLEMENTATION_PLAN.md](SUMMARY_SCREEN_IMPLEMENTATION_PLAN.md),
+W1–W7, built 2026-09-01, app target clean, five new tests passing.
+
+The reasoning that put it in the headline slot still holds: 1.4 was a
+privacy-and-measurement release with almost nothing a user can see, and 1.5 should
+be the opposite. It is now emphatically the opposite.
+
+**Committed 2026-09-02 as "Give the finished workout a card worth sharing":**
+
+- [`WorkoutShareCard.swift`](Repster/Features/Workout/Views/WorkoutShareCard.swift) — 502
+  lines: pure card view, `ImageRenderer`, `WorkoutSharePreviewSheet`, the two privacy
+  toggles (`hideWeights` and the exercise list)
+- [`WorkoutSummarySheet.swift:168`](Repster/Features/Workout/Views/WorkoutSummarySheet.swift:168) —
+  entry point wired
+- [`WorkoutShareCardTests.swift`](RepsterTests/WorkoutShareCardTests.swift) — 127 lines
+- `RepsterMark.imageset` and the `design/summary-card/` artboards
+
+**Still missing from the original Phase 1 scope:**
+
+- [ ] **Analytics — nothing at all.** There is no share event anywhere in the card
+      or the summary sheet. This is the piece that gates Phase 2: the design doc's
+      "open rate ≥ 8% before building retroactive sharing" cannot be evaluated
+      against a metric that isn't collected
+- [ ] **`NSPhotoLibraryAddUsageDescription`** — not in the project. Save-to-photos
+      will crash the moment someone taps it
+- [ ] **Campaign-tagged App Store link and landing page** — the card prints a URL;
+      nothing measures it
+- [ ] **Device pass** — never run on hardware
+
+**Open decisions inherited from the implementation plan:** footer lockup vs. brand
+bar (built with the lockup — a five-minute change now, a re-render later), push vs.
+sheet for Add details, and whether the effort question survives at all.
+
+**Open decision still carried from the design doc:** whether a short domain exists
+for the card's face. The GitHub Pages URL works but wastes the impression.
+
+---
+
+# Part 3 — Muscle group coverage · **unchanged, nothing built**
 
 Scoped in **[SECONDARY_MUSCLES_SCOPING.md](SECONDARY_MUSCLES_SCOPING.md)**.
 
-Users want to track which muscles they're training — while planning a routine,
-right after a workout, and over time. Two of those three surfaces don't exist
-today: `CreateEditTemplateView` shows no muscle overview while editing, and
-`WorkoutSummarySheet` shows none at all. `Exercise.secondaryMuscles` is already
-persisted, seeded, and exported, and read by nothing.
+Verified 2026-09-01: no `MuscleAttribution` type exists, and
+`Exercise.secondaryMuscles` is still persisted, seeded, exported and read by
+nothing user-facing.
 
-The scoping doc splits it into three phases. **Phases 1 and 2 are the feature**;
-Phase 3 is refinement of an existing panel.
-
-| Phase | Contents | Fit for 1.5 |
+| Phase | Contents | Fit |
 |---|---|---|
 | 1 | Taxonomy rollup, `MuscleAttribution` helper, secondary picker in the exercise editor, display on exercise detail | Good — small, self-contained, no arithmetic |
 | 2 | Live coverage overview in the routine editor; muscle summary on the post-workout sheet | The actual feature. Sizeable |
-| 3 | Insights panel weighting, chart/list filters, `HealthProfile` toggle | **Defer.** Not needed for the feature to land |
+| 3 | Insights panel weighting, chart/list filters, `HealthProfile` toggle | **Defer** |
 
-**Why Phase 3 can wait:** coverage display answers "does this routine hit back?" —
-no weighting, no baseline, no credit constant. The 0.5-credit question that
-dominated the original scoping applies only to the insights panel and is not a
-blocker for anything users asked for.
+**What changed underneath it:** Phase 2's two surfaces both got rebuilt without it.
+The templates redesign shipped a new editor and detail view; the summary sheet was
+just rebuilt. Both are now places a coverage panel can hang off cleanly — but both
+were designed without a slot reserved for one. Phase 2 got cheaper to build and
+slightly more disruptive to insert.
 
-**Blocking work regardless of phase:** the taxonomy mismatch. Primary and
-secondary are drawn from different vocabularies — 42 of 96 seed secondary tags
-(glutes, quads, hamstrings, calves) aren't in the 10-value catalog. The
-recommendation is a rollup to `legs`, which is cheap but must happen first.
+**Blocking work regardless of phase:** the taxonomy mismatch. 42 of 96 seed
+secondary tags (glutes, quads, hamstrings, calves) aren't in the 10-value catalog.
+The recommendation is a rollup to `legs`, which is cheap but must happen first.
 
-**Ranking caveat:** [COMPETITIVE_FEATURE_ANALYSIS.md](COMPETITIVE_FEATURE_ANALYSIS.md)
-puts this **4th**, behind three smaller items with louder demand (Part 4 below).
-That ranking is sound. Phase 1 is small enough to ride along with them; Phase 2 is
-what earns a slot of its own.
+**Still 4th** in [COMPETITIVE_FEATURE_ANALYSIS.md](COMPETITIVE_FEATURE_ANALYSIS.md).
+That ranking is sound.
 
 ---
 
 # Part 4 — Ahead of muscle coverage in the competitive ranking
 
 From [COMPETITIVE_FEATURE_ANALYSIS.md](COMPETITIVE_FEATURE_ANALYSIS.md) Part 3.
-All three are small, and items 1–3 there are independent enough to ship together.
 
-## 4.1 `bilateralLoadFactor` wiring — size S
+## 4.1 `bilateralLoadFactor` wiring — size S · **not started**
+
+Verified: the field is read and written across the model, services, export,
+templates, charts and
+[`CreateEditExerciseViewModel`](Repster/Features/Exercise/ViewModels/CreateEditExerciseViewModel.swift) —
+and referenced by **no view in the app**. Still exactly the two gaps named in
+August: a control in the editor, and one branch in `computeEffectiveWeight`.
 
 Highest demand-to-effort ratio available. Per-dumbbell weight entry was the single
-most-repeated concrete complaint in a ~500-comment Hevy thread, and the field
-already exists on `Exercise`, already round-trips through export/templates/charts,
-and is already read and written by `CreateEditExerciseViewModel`. Missing: a
-control in the editor, and one branch in `computeEffectiveWeight`.
+most-repeated concrete complaint in a ~500-comment Hevy thread.
 
 **Blocked on a decision, not on engineering** — see §5.1.
 
-## 4.2 `Exercise.notes` — size S
+## 4.2 `Exercise.notes` — size S · **not started**
 
-Smallest gap on the list with the largest matching demand. `notes` exists on
-`WorkoutSet`, `TemplateExercise`, `Workout`, and `WorkoutTemplate` — but not on
-`Exercise`, which is exactly the "I paste the same setup note into every routine"
-complaint. Lightweight SwiftData migration.
+Verified against [Exercise.swift:81–117](Repster/Data/Models/Exercise.swift:81):
+there is no `notes` property. It still exists on `WorkoutSet`, `TemplateExercise`,
+`Workout` and `WorkoutTemplate` — which is exactly the "I paste the same setup note
+into every routine" complaint. Lightweight SwiftData migration.
 
 May want to be the same field as custom-exercise instructions — see §5.3.
 
-## 4.3 Custom-exercise creation analytics — size XS
+## 4.3 Custom-exercise creation analytics — size XS · **built, but not the useful half**
 
-One PostHog event capturing name and equipment type on custom-exercise create.
-Turns "our library is too small" from an unbounded content problem into a ranked
-list driven by real user data.
+The event exists and fires:
+[`exerciseCreated(source:)`](Repster/Core/Services/Protocols/AnalyticsServiceProtocol.swift:535),
+called from
+[CreateEditExerciseViewModel.swift:173](Repster/Features/Exercise/ViewModels/CreateEditExerciseViewModel.swift:173).
 
-**Should go first regardless of everything else in this document**, because it
-starts collecting data that informs later decisions. Given that post-install
-activation is the current growth bottleneck, "the exercise I do isn't in the app"
-during a first session is a plausible activation killer worth measuring directly.
+**It carries only `source`.** The point of the item was name and equipment type —
+turning "our library is too small" from an unbounded content problem into a ranked
+list. A count of creations does not do that. What shipped answers "how often", which
+was never the question.
+
+- [ ] Add `equipmentType` — no privacy question, do it
+- [ ] Decide on the exercise **name**. Under the inverted replay-masking posture
+      ([PRE_1.5_CHECKLIST.md §2.3](PRE_1.5_CHECKLIST.md)), user-authored strings are
+      the category that gets masked. A free-text exercise name is user-authored.
+      This is now a deliberate decision, not a property you add in passing
+
+Still **should go first** among the unbuilt items, because it starts collecting data
+that informs later decisions.
 
 ---
 
 # Part 5 — Decisions that block scope lock
+
+Unchanged in substance. §5.4 has grown.
 
 ## 5.1 Backfill policy for `effectiveWeight` — blocking §4.1
 
@@ -179,47 +225,65 @@ during a first session is a plausible activation killer worth measuring directly
 logged sets, and will produce a visible step change in that exercise's e1RM and
 volume charts.
 
-The same question applies to the machine starting-weight offset (a later item), so
-it needs **one answer applied consistently to both**. Shipping the two with
-different behaviours would be worse than either choice.
-
-Recommendation on file: an explicit, opt-in, one-time backfill action with clear
-copy — matching the pattern already recommended for the HealthKit historical
-backfill.
+The same question applies to the machine starting-weight offset, so it needs **one
+answer applied consistently to both**. Recommendation on file: an explicit, opt-in,
+one-time backfill action with clear copy.
 
 ## 5.2 Should seeded dumbbell exercises default to `bilateralLoadFactor = 2.0`?
 
-Convenient, but changes existing users' numbers on update. Recommendation on file
-is to ship the field off by default and let users opt in per exercise.
+Recommendation on file is to ship the field off by default and let users opt in per
+exercise.
 
 ## 5.3 One field or two for notes and instructions?
 
-One is simpler; two allows a short cue in the workout versus a longer how-to on
-the detail screen. Affects §4.2's shape.
+One is simpler; two allows a short cue in the workout versus a longer how-to on the
+detail screen. Affects §4.2's shape.
 
-## 5.4 Free vs. RevenueCat entitlement
+## 5.4 Free vs. RevenueCat entitlement · **now overdue**
 
 Reads as core logging correctness and should probably be free: `bilateralLoadFactor`,
-`Exercise.notes`. Less obvious: muscle coverage. Worth settling before the release
-note is written.
+`Exercise.notes`.
+
+**Newly urgent:** supersets, the templates redesign and the share card all shipped
+into the tree with no entitlement decision taken. Whatever the answer, it is cheaper
+to decide before the release note than after users have had them free for a version.
 
 ## 5.5 Is 0.5 the right secondary-muscle credit?
 
-**Not blocking** — it applies only to Phase 3 of the muscle work, which is deferred.
-Recorded here so it isn't rediscovered as a surprise later.
+**Not blocking** — Phase 3 only. Recorded so it isn't rediscovered as a surprise.
 
 ---
 
-# Part 6 — Already in the tree, needs a home
+# Part 6 — What is actually in this release
 
-Implemented but not yet attached to a release. **Confirm whether these ride 1.4 or
-1.5** before planning around them.
+Replaces the old "already in the tree, needs a home" table, whose three rows all
+shipped in 1.4.
+
+**Committed on `NewMain` since the 1.4 release:**
+
+| Work | Doc | Landed |
+|---|---|---|
+| Epoch-2 suggestion engine — RIR floor, one set can't crater the estimate, drop sets don't grade the model, learned-rate reset | [SUGGESTION_ENGINE_IMPLEMENTATION_PLAN.md](SUGGESTION_ENGINE_IMPLEMENTATION_PLAN.md) | 2026-08-27 |
+| Capacity-guard kill switch (`prescriptionCapacityGuardsEnabled`) | same | 2026-08-27 |
+| Backup restore hardening — a new enum case can't fail a whole decode | [BACKUP_EXPORT_SCOPING.md](BACKUP_EXPORT_SCOPING.md) | 2026-08-27 |
+| Exercise replace in place + reorder, 4 defects fixed | [EXERCISE_REPLACE_AND_REORDER_DESIGN.md](EXERCISE_REPLACE_AND_REORDER_DESIGN.md) | 2026-08-30 |
+| Session replay masking **inverted** — legible by default, named values masked | [PRE_1.5_CHECKLIST.md §2.3](PRE_1.5_CHECKLIST.md) | 2026-08-30 |
+| Progression exclusion visibility — history chip + workout-detail banner | [PROGRESSION_EXCLUSION_VISIBILITY_SCOPING.md](PROGRESSION_EXCLUSION_VISIBILITY_SCOPING.md) | 2026-08-30 |
+| **Supersets** — marked-only, PR1–PR9 + PR11, both prompt directions, partner rest fixed | [SUPERSETS_IMPLEMENTATION_PLAN.md](SUPERSETS_IMPLEMENTATION_PLAN.md) | 2026-08-31 |
+| **Templates redesign** — folders, detail view, paired supersets, AI helper deleted, 62 template tests | [TEMPLATES_IMPLEMENTATION_PLAN.md](TEMPLATES_IMPLEMENTATION_PLAN.md) | 2026-09-01 |
+| Template data-loss hardening — identity-addressed edits, export survives a dangling exercise | [TEMPLATE_HARDENING_SCOPING.md](TEMPLATE_HARDENING_SCOPING.md) | 2026-09-01 |
+
+**Uncommitted on `NewMain`:**
 
 | Work | Doc | State |
 |---|---|---|
-| Rest timer alarm D1–D6 | [REST_TIMER_ALARM_SCOPING.md](REST_TIMER_ALARM_SCOPING.md) | Implemented 2026-08-18. D3 needs provisioning work; D7 instrumentation deliberately not done — it turns on an unanswered privacy decision |
-| Discard use-after-delete crash fix | [DISCARD_USE_AFTER_DELETE_SCOPING.md](DISCARD_USE_AFTER_DELETE_SCOPING.md) | Implemented 2026-08-17, reproduced and controlled 2026-08-18 |
-| Backup export phases 2 and 4 | [BACKUP_EXPORT_SCOPING.md](BACKUP_EXPORT_SCOPING.md) | Implemented 2026-08-17, uncommitted on `NewMain` |
+| Summary screen rebuild W1–W6 | [SUMMARY_SCREEN_IMPLEMENTATION_PLAN.md](SUMMARY_SCREEN_IMPLEMENTATION_PLAN.md) | Builds clean, no device pass |
+| Share card W7 | same + [SHARE_CARD_FEATURE_DESIGN.md](SHARE_CARD_FEATURE_DESIGN.md) | See Part 2 — missing analytics and the Info.plist key |
+| Coach artboards, superset and summary-card designs | [REPSTER_COACH_SCOPING.md](REPSTER_COACH_SCOPING.md) | Design only |
+
+**Known open defect riding this release:**
+[UNPERFORMED_SETS_SCOPING.md](UNPERFORMED_SETS_SCOPING.md) — Copy Previous rows never
+ticked still count as logged. Live on shipped builds. Not fixed, not scheduled.
 
 ---
 
@@ -227,41 +291,64 @@ Implemented but not yet attached to a release. **Confirm whether these ride 1.4 
 
 Open design docs, listed so they aren't forgotten. None are commitments.
 
-- [SET_TYPES_SCOPING.md](SET_TYPES_SCOPING.md) — 12 of 13 `SetType` cases are
-  labels attached to features that were never built. Includes undocumented fatigue
-  multipliers worth writing down regardless
-- [UNPERFORMED_SETS_SCOPING.md](UNPERFORMED_SETS_SCOPING.md) — never-started
-  exercises appear in history as if logged
-- [EXERCISE_REPLACE_AND_REORDER_DESIGN.md](EXERCISE_REPLACE_AND_REORDER_DESIGN.md) — design only
+- [REPSTER_COACH_SCOPING.md](REPSTER_COACH_SCOPING.md) — new since this doc was
+  written. Collapses Smart Suggestions, Insights and coaching tiles under one name.
+  W5 of the summary plan already ships a flag-gated Coach teaser, so a naming
+  decision is closer than "scoping" suggests
+- [SET_TYPES_SCOPING.md](SET_TYPES_SCOPING.md) — 12 of 13 `SetType` cases are labels
+  attached to features that were never built
+- [DROP_SETS_SCOPING.md](DROP_SETS_SCOPING.md) — partly overtaken: drop sets no
+  longer grade the fatigue model as of 2026-08-27. The remaining defects are real
+- [SUGGESTION_FLOOR_GUARDRAIL_DESIGN.md](SUGGESTION_FLOOR_GUARDRAIL_DESIGN.md) —
+  design only
+- Workout blocks — interaction design in progress, artifacts only, no doc yet
 - [COACHING_TILES_EXPLORATION.md](COACHING_TILES_EXPLORATION.md) — parked 2026-08-11
 - Machine setup as structured data — strongest differentiator in the competitive
   analysis, but size M and prone to multi-gym scope creep
 - Programs UI / forward scheduling — models exist, `Features/Programs/Views/` is empty
 
+**Removed from this list because they were built:** exercise replace & reorder,
+supersets, templates redesign.
+
 ---
 
 # Suggested shape for 1.5
 
-Deliberately conservative. 1.4 is a large, unshipped, mostly invisible release;
-1.5 should be small, visible, and quick to follow.
+The August version of this section proposed seven items to add, sized XS to
+one week, and called the release "deliberately conservative." That is no longer the
+situation. Supersets, a rebuilt templates system, a rebuilt summary screen and a
+share card are all in the tree. The release is large and visible whether or not
+anything else goes in.
 
-| Priority | Item | Size | Source |
+**So the recommendation inverts: add almost nothing, and finish what is there.**
+
+| Priority | Item | Size | Why now |
 |---|---|---|---|
-| 1 | Custom-exercise creation analytics | XS | §4.3 — do first, independent of everything |
-| 2 | Share card Phase 1 | ~1 week | Part 2 — the headline |
-| 3 | `bilateralLoadFactor` wiring | S | §4.1 — settle §5.1 first |
-| 4 | `Exercise.notes` | S | §4.2 |
-| 5 | Backup `BodyweightEntry` + copy fix | S | §1.1 — carried from 1.4 |
-| 6 | Bodyweight label consistency | XS | §1.2 — carried from 1.4 |
-| 7 | Muscle coverage Phase 1 | S | Part 3 — rides along if convenient |
+| 1 | `NSPhotoLibraryAddUsageDescription` | XS | Save-to-photos crashes without it. Not optional |
+| 2 | Share analytics — open and share events | XS | Phase 2's gate is unmeasurable otherwise, and the metric only counts forward |
+| 3 | `equipmentType` on `exerciseCreated` | XS | §4.3. Same forward-only argument |
+| 4 | Commit and device-pass the summary screen | — | It is the release's face and has never run on hardware |
+| 5 | Settle §5.4 entitlements | — | Three shipped features have no answer |
+| 6 | Export screen copy | S | §1.1. Templates ride the archive silently today |
+| 7 | Bodyweight label meaning | XS | §1.2. Now a one-place change |
 
-**Muscle coverage Phase 2 is the natural headline for 1.6**, once Phase 1's
-foundation is in and the seed tags have been seen in a real UI — which is itself
-the cheapest way to find the wrong ones.
+**Deferred to 1.6, with no loss:** `bilateralLoadFactor` (§4.1, still blocked on
+§5.1), `Exercise.notes` (§4.2), `BodyweightEntry` in the backup (§1.1), muscle
+coverage Phase 1 (Part 3).
+
+**Muscle coverage Phase 2 remains the natural 1.6 headline** — and its two surfaces
+now exist to hang it on.
 
 ## Open question on the release itself
 
-Is 1.5 one release or two? Items 1–4 are a coherent "logging correctness +
-sharing" release that could ship quickly. Items 5–7 are a tidier second pass.
-Splitting keeps the visible feature from waiting on the carried-over work; not
-splitting means one release note instead of two.
+**The split question is settled by circumstance.** Items 1–4 are finishing work on
+code that already exists; there is nothing coherent left to split off. What replaces
+it is the version number, and it is sharper than a preference:
+
+`WhatsNewRelease.current` matches `CFBundleShortVersionString` by **exact string
+equality**, and `WhatsNewRelease.all` holds entries for `"1.4"` and `"1.5"` only.
+The project currently reads `1.4.1`. **Shipping as 1.4.1 shows the What's New sheet
+to nobody, silently.** For a release containing supersets, a rebuilt templates
+system, a new summary screen and an inverted replay-masking posture, that is the
+wrong outcome. See [PRE_1.5_CHECKLIST.md §0](PRE_1.5_CHECKLIST.md), which is where
+the decision belongs.

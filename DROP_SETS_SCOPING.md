@@ -1,7 +1,7 @@
 # Drop Sets — Scoping
 
-**Status:** scoping only, nothing built
-**Date:** 2026-08-26
+**Status:** Phase 1 built. Phase 2 half-built and **not wired**. Phases 3–4 outstanding.
+**Date:** 2026-08-26, status audited 2026-09-02
 **Supersedes:** [SET_TYPES_SCOPING.md](SET_TYPES_SCOPING.md) Phase 1 and Decision 4. That doc stays
 as the full survey of all 13 types; this one is the build scope for the decision actually taken —
 hide the unbuilt types, ship drop sets for real, and fix the engine defects that make a tagged
@@ -26,28 +26,35 @@ choice, people will use it, and every one of these becomes a user-facing bug.
 
 The actionable form of everything below. Phase order is deliberate — see the sequencing note.
 
-**Phase 1 — engine fixes (ship alone, nothing user-visible)**
-- [ ] Capacity-evidence predicate in `normalizedObservedCapability` — accept only `working`, `amrap`, `failure`
-- [ ] Use a **new** predicate; do not narrow `isCapabilityTrackingSetType` (it also drives the freshness bonus)
-- [ ] Make the `.observed` blend asymmetric — upward replaces freely, downward capped per set
-- [ ] Exclude non-capacity types from fatigue learning via a new audit status
-- [ ] Tests: drop-set-craters-capability, freshness bonus not re-armed after a drop set, clamp bounds
+**Phase 1 — engine fixes — DONE**
+- [x] `SetType.isCapacityPointEstimate` gates `normalizedObservedCapability` (`working`/`amrap`/`failure` only)
+- [x] Separate predicate; `isCapabilityTrackingSetType` left alone, so the freshness bonus is unaffected
+- [x] `clampDownwardCapabilityMove`, `maxDownwardCapabilityMove = 0.20` — one set can't drop capability >20%
+- [x] `FatigueLearningAuditStatus.nonCapacitySetType` — excluded but still visible in diagnostics and export
+- [x] Tests in `FatigueLearningServiceTests`, `SmartSuggestionBehaviorScenarioTests`, `ActiveWorkoutViewModelSuggestionRefreshTests`
+- [x] *Beyond scope, also shipped:* all of it behind `prescriptionCapacityGuardsEnabled` (default on) with a
+      Settings toggle, plus the suggestion floor (`isCapacityLowerBound`) from
+      [SUGGESTION_FLOOR_GUARDRAIL_DESIGN.md](SUGGESTION_FLOOR_GUARDRAIL_DESIGN.md)
 
-**Phase 2 — hide the unbuilt types**
-- [ ] `SetType.userSelectable` = warm-up, working, drop set; picker uses it instead of `allCases`
-- [ ] Picker also shows the set's current type when it's a hidden one (imported `failure` etc.)
-- [ ] Narrow the AI template prompt vocabulary to the same list
-- [ ] No enum cases removed, no migration
+**Phase 2 — hide the unbuilt types — HALF DONE, AND THE HALF THAT SHIPPED DOES NOTHING**
+- [x] `SetType.userSelectable` = `[.warmup, .working, .dropset]`, with tests
+- [ ] ⚠️ **Picker still renders `SetType.allCases`** ([SetRowView.swift:259](Repster/Features/Workout/Views/SetRowView.swift:259)).
+      `userSelectable` is referenced only by tests — dead in the app. All 13 types are still offered.
+- [ ] Picker shows the set's current type when it's a hidden one
+- [x] ~~Narrow the AI template prompt vocabulary~~ — moot, the AI template helper was deleted in the templates rebuild
+- [x] No enum cases removed, no migration
 
-**Phase 3 — drop sets visible**
+**Phase 3 — drop sets visible — NOT STARTED**
 - [ ] Extract a shared badge + numbering helper across the three renderers
 - [ ] Fix history numbering counting warm-ups; add the missing warm-up letter on the calendar card
 - [ ] Add the `D1`/`D2` badge variant; drop sets don't consume working-set numbers
-- [ ] Resolve the ten `== .working` sites behind two named predicates, audited per site
+- [ ] ⚠️ Resolve the ten `== .working` sites. The predicates exist (`countsAsPerformedWork`,
+      `isStraightWorkingSet`) but **no call site was migrated** — `isStraightWorkingSet` is dead in the app,
+      and all ten sites still compare raw. The split described below is still live.
 
-**Phase 4 — instrument, then flatten**
-- [ ] Add `setType` to `FatigueObservation`
-- [ ] Flatten `setTypeMultiplier`; update the two ordering tests
+**Phase 4 — instrument, then flatten — HALF DONE**
+- [x] `FatigueObservation.setTypeRawValue` added and written on capture
+- [ ] Flatten `setTypeMultiplier` — `.dropset` is still 1.4
 - [ ] Release note for shifted suggestions on imported Strong/Hevy sessions
 
 **Blocked on a product decision** (see Open questions)
