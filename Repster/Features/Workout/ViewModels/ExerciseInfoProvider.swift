@@ -48,8 +48,11 @@ enum ExerciseInfoProvider {
         // Step 5: Compute Estimated Reps info
         let estimatedRepsInfo: EstimatedRepsInfo?
         if supportsE1RM, let bestE1RM = bestAvailableE1RM, bestE1RM > 0 {
+            // Straight sets only, deliberately. This seeds the default rep target from the
+            // last set logged, and a drop set is the one thing most likely to be trailing —
+            // seeding "8 reps" from a 5-rep drop would quietly move the next prescription.
             let targetReps = currentSets
-                .last(where: { $0.setType == .working && $0.hasData })?.prReps ?? 8
+                .last(where: { $0.setType.isStraightWorkingSet && $0.hasData })?.prReps ?? 8
 
             let increment = UnitConversion.resolvedStoredWeightIncrement(
                 exerciseIncrement: weightIncrement,
@@ -105,7 +108,7 @@ enum ExerciseInfoProvider {
 
         // Find best e1RM from current session working sets
         let currentWorkingSets = currentSets.filter {
-            $0.setType == .working && $0.hasData && $0.e1RM != nil
+            $0.setType.countsAsPerformedWork && $0.hasData && $0.e1RM != nil
         }
         let bestToday = currentWorkingSets.max(by: { ($0.e1RM ?? 0) < ($1.e1RM ?? 0) })
 
@@ -115,7 +118,7 @@ enum ExerciseInfoProvider {
 
         if bestToday == nil {
             let bestHistoricalSet = historicalSets
-                .filter { $0.setType == .working && $0.hasData && $0.e1RM != nil }
+                .filter { $0.setType.countsAsPerformedWork && $0.hasData && $0.e1RM != nil }
                 .max(by: { ($0.e1RM ?? 0) < ($1.e1RM ?? 0) })
             bestSetWeight = bestHistoricalSet?.effectiveWeight ?? 0
             bestSetReps = bestHistoricalSet?.prReps ?? 0
@@ -131,7 +134,7 @@ enum ExerciseInfoProvider {
         let windowEnd = calendar.date(byAdding: .day, value: 7, to: targetDate)!
 
         let windowSets = historicalSets.filter { set in
-            set.setType == .working && set.hasData && set.e1RM != nil
+            set.setType.countsAsPerformedWork && set.hasData && set.e1RM != nil
                 && set.date >= windowStart && set.date <= windowEnd
         }
 
@@ -144,7 +147,7 @@ enum ExerciseInfoProvider {
         } else {
             // Fallback: nearest available historical e1RM
             let nearest = historicalSets
-                .filter { $0.setType == .working && $0.hasData && $0.e1RM != nil }
+                .filter { $0.setType.countsAsPerformedWork && $0.hasData && $0.e1RM != nil }
                 .sorted { $0.date > $1.date }
                 .first
 
@@ -193,7 +196,7 @@ enum ExerciseInfoProvider {
         guard let lastGroup = sortedGroups.first else { return nil }
 
         let workingSets = lastGroup
-            .filter { $0.setType == .working && $0.hasData }
+            .filter { $0.setType.countsAsPerformedWork && $0.hasData }
             .sorted { compareTopSetPriority(lhs: $0, rhs: $1) }
 
         let topSets = workingSets.prefix(2).map { set -> TopSet in

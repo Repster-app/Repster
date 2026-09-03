@@ -117,7 +117,7 @@ struct InsightAnalysisContext {
             guard !workout.excludesEntireWorkoutFromProgressionHistory else { return [] }
             let excluded = workout.excludedExerciseIdsForProgressionHistory
             return (setsByWorkout[workout.id] ?? []).filter {
-                $0.setType == .working && !excluded.contains($0.exerciseId)
+                $0.setType.countsAsPerformedWork && !excluded.contains($0.exerciseId)
             }
         }
     }

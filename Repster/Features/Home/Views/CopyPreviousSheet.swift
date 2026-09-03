@@ -175,7 +175,9 @@ struct CopyPreviousSheet: View {
             var items: [CopyPreviousWorkout] = []
             for workout in completed {
                 let sets = try await services.setService.fetchSetSnapshots(for: workout.id)
-                let workingSetsWithData = sets.filter { $0.setType == .working && $0.hasData }
+                // Performed work, not just straight sets: you are copying a session you did,
+                // and the drop sets were part of it.
+                let workingSetsWithData = sets.filter { $0.setType.countsAsPerformedWork && $0.hasData }
                 // First-appearance order, not Set order. Sets come back sorted by
                 // orderInWorkout, so this lists muscles in the order they were trained —
                 // and stays put between launches, which Set iteration does not.

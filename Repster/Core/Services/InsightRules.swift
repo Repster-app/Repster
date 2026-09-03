@@ -29,7 +29,10 @@ struct RestSweetSpotInsightRule: InsightRule {
             guard !workout.excludesEntireWorkoutFromProgressionHistory else { continue }
             let excluded = workout.excludedExerciseIdsForProgressionHistory
             let sets = (context.setsByWorkout[workout.id] ?? [])
-                .filter { $0.setType == .working && !excluded.contains($0.exerciseId) }
+                // Straight sets only, deliberately: this pairs consecutive sets to read rest
+                // against reps, and a drop set's near-zero rest is noise in that signal, not
+                // evidence about how rest affects performance.
+                .filter { $0.setType.isStraightWorkingSet && !excluded.contains($0.exerciseId) }
             let byExercise = Dictionary(grouping: sets, by: \.exerciseId)
 
             for (exerciseId, exerciseSets) in byExercise {

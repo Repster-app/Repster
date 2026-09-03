@@ -345,7 +345,8 @@ final class HomeViewModel {
             var summaries: [RecentWorkoutSummary] = []
             for workout in completed {
                 let sets = try await setService.fetchSetSnapshots(for: workout.id)
-                let workingSetsWithData = sets.filter { $0.setType == .working && $0.hasData }
+                // "Last performance" that silently omitted half the session was the bug here.
+                let workingSetsWithData = sets.filter { $0.setType.countsAsPerformedWork && $0.hasData }
                 // First-appearance order, not Set order. Sets come back sorted by
                 // orderInWorkout, so this lists muscles in the order they were trained —
                 // and stays put between launches, which Set iteration does not.
