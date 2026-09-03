@@ -102,6 +102,20 @@ extension SetType {
     static var userSelectable: [SetType] {
         [.warmup, .working, .dropset]
     }
+
+    /// What a set-type picker should offer for a set that is currently `current`.
+    ///
+    /// The supported types, plus `current` when it is not one of them. Imported sets can carry
+    /// a type the picker no longer offers — both CSV importers emit `failure` — and rendering
+    /// such a set as "Working" would misreport stored data. The user can move off it, they just
+    /// cannot newly assign it.
+    static func pickerOptions(current: SetType) -> [SetType] {
+        var types = userSelectable
+        if !types.contains(current) {
+            types.append(current)
+        }
+        return types
+    }
 }
 
 enum FatigueLearningAuditStatus: String, Codable, CaseIterable, Sendable {

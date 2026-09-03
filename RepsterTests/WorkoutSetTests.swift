@@ -1688,4 +1688,52 @@ final class SetTypeSemanticPredicateTests: XCTestCase {
             XCTAssertFalse(type.displayName.isEmpty)
         }
     }
+
+    // MARK: - Picker options
+
+    func testPickerOffersOnlyTheSupportedTypesForAnOrdinarySet() {
+        XCTAssertEqual(SetType.pickerOptions(current: .working), [.warmup, .working, .dropset])
+        XCTAssertEqual(SetType.pickerOptions(current: .dropset), [.warmup, .working, .dropset])
+        XCTAssertEqual(SetType.pickerOptions(current: .warmup), [.warmup, .working, .dropset])
+    }
+
+    /// An imported `failure` set must still show as Failure, or the picker misreports what is
+    /// stored. The user can move off it; it just is not on offer for other sets.
+    func testPickerKeepsAHiddenTypeVisibleOnTheSetThatCarriesIt() {
+        XCTAssertEqual(
+            SetType.pickerOptions(current: .failure),
+            [.warmup, .working, .dropset, .failure]
+        )
+        XCTAssertFalse(SetType.pickerOptions(current: .working).contains(.failure))
+    }
+
+    // MARK: - Set badge numbering
+
+    func testWarmupsAndDropSetsNumberIndependentlyOfWorkingSets() {
+        let labels = SetBadgeLabel.assign(for: [.warmup, .warmup, .working, .working, .dropset, .dropset, .working])
+        XCTAssertEqual(labels.map(\.text), ["W1", "W2", "1", "2", "D1", "D2", "3"])
+    }
+
+    /// The bug this replaced: history numbered `index + 1` across every set, so two warm-ups
+    /// pushed the first working set to "3" while the workout screen called it "1".
+    func testWarmupsDoNotConsumeWorkingSetNumbers() {
+        let labels = SetBadgeLabel.assign(for: [.warmup, .warmup, .working])
+        XCTAssertEqual(labels.last?.text, "1")
+    }
+
+    func testDropSetsDoNotConsumeWorkingSetNumbers() {
+        let labels = SetBadgeLabel.assign(for: [.working, .dropset, .dropset, .working])
+        XCTAssertEqual(labels.map(\.text), ["1", "D1", "D2", "2"])
+    }
+
+    /// Every other annotated type still numbers as a working set — they are ordinary sets with
+    /// a label, and none of them is offered by the picker anyway.
+    func testOtherAnnotatedTypesNumberAsWorkingSets() {
+        let labels = SetBadgeLabel.assign(for: [.working, .failure, .amrap, .backoff])
+        XCTAssertEqual(labels.map(\.text), ["1", "2", "3", "4"])
+    }
+
+    func testAssigningLabelsToNoSetsIsEmpty() {
+        XCTAssertTrue(SetBadgeLabel.assign(for: []).isEmpty)
+    }
 }

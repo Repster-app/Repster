@@ -54,8 +54,9 @@ struct ExerciseHistoryView: View {
             }
 
             VStack(spacing: 0) {
+                let labels = SetBadgeLabel.assign(for: group.sets.map(\.setType))
                 ForEach(Array(group.sets.enumerated()), id: \.element.id) { index, set in
-                    setRow(set, index: index, siblings: group.sets)
+                    setRow(set, label: labels[index], siblings: group.sets)
                     if index < group.sets.count - 1 {
                         Divider()
                             .background(Color.border)
@@ -70,7 +71,7 @@ struct ExerciseHistoryView: View {
 
     // MARK: - Set Row
 
-    private func setRow(_ set: ChartSetData, index: Int, siblings: [ChartSetData]) -> some View {
+    private func setRow(_ set: ChartSetData, label: SetBadgeLabel, siblings: [ChartSetData]) -> some View {
         let hasNote = set.hasNote
         let isWarmup = set.setType == .warmup
         let display = WorkoutSetPerformanceFormatter.display(
@@ -82,12 +83,20 @@ struct ExerciseHistoryView: View {
         return HStack(spacing: 8) {
             // Set number with note indicator and set type badge
             ZStack(alignment: .topTrailing) {
-                if isWarmup {
-                    Text("W")
+                // Numbering comes from `SetBadgeLabel`, shared with the live set table. It
+                // used to be `index + 1` across every set in the group, so two warm-ups made
+                // the first working set read as "3" here while the workout screen said "1".
+                switch label {
+                case .warmup:
+                    Text(label.text)
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(Color.gold)
-                } else {
-                    Text("\(index + 1)")
+                case .dropset:
+                    Text(label.text)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color.chart5)
+                case .working:
+                    Text(label.text)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Color.textTertiary)
                 }

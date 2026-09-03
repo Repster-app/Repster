@@ -80,23 +80,37 @@ struct CalendarExerciseCard: View {
             .foregroundStyle(Color.textTertiary)
             .padding(.bottom, 6)
 
+            let labels = SetBadgeLabel.assign(for: displaySets.map(\.setType))
             ForEach(Array(displaySets.enumerated()), id: \.element.id) { index, workoutSet in
-                setRow(index: index + 1, workoutSet: workoutSet)
+                setRow(label: labels[index], workoutSet: workoutSet)
             }
+        }
+    }
+
+    /// Warm-ups and drop sets carry the same colours here as everywhere else — gold and
+    /// `chart5` — so the set type is readable without opening the workout.
+    private func labelTint(for label: SetBadgeLabel) -> Color {
+        switch label {
+        case .warmup:  return .gold
+        case .dropset: return .chart5
+        case .working: return .textSecondary
         }
     }
 
     // The `workoutSet.modelContext == nil` guard that used to wrap this row is gone: it
     // existed to swallow crashes from live models detaching mid-render, and a snapshot
     // has no context to detach from.
-    private func setRow(index: Int, workoutSet: ChartSetData) -> some View {
+    private func setRow(label: SetBadgeLabel, workoutSet: ChartSetData) -> some View {
         let isWarmup = workoutSet.setType == .warmup
 
         return HStack {
             ZStack(alignment: .topTrailing) {
-                Text("\(index)")
+                // This card used to print `index + 1` for every set and lean on opacity alone,
+                // so a warm-up was numbered as a working set and looked merely faint. It now
+                // shares `SetBadgeLabel` with the set table and the exercise history.
+                Text(label.text)
                     .font(.system(size: 12))
-                    .foregroundStyle(Color.textSecondary)
+                    .foregroundStyle(labelTint(for: label))
 
                 if workoutSet.hasNote {
                     Circle()

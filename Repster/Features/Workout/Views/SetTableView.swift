@@ -139,21 +139,14 @@ struct SetTableView: View {
                 headerRow(for: exercise)
             }
 
-            // Set rows — warmups get W1/W2, working sets start at 1
+            // Set rows — warmups get W1/W2, drop sets D1/D2, working sets start at 1.
+            // `SetBadgeLabel.assign` is shared with both history renderers so the same set
+            // shows the same number wherever it is drawn.
             LazyVStack(spacing: 0) {
-                let numberedSets: [(set: WorkoutSet, number: Int)] = {
-                    var warmupCount = 0
-                    var workingCount = 0
-                    return sets.map { set in
-                        if set.setType == .warmup {
-                            warmupCount += 1
-                            return (set, warmupCount)
-                        } else {
-                            workingCount += 1
-                            return (set, workingCount)
-                        }
-                    }
-                }()
+                let numberedSets: [(set: WorkoutSet, number: Int)] = zip(
+                    sets,
+                    SetBadgeLabel.assign(for: sets.map(\.setType))
+                ).map { (set: $0, number: $1.number) }
 
                 ForEach(numberedSets, id: \.set.id) { item in
                     SetRowWrapper(

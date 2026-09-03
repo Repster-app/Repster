@@ -254,9 +254,13 @@ struct SetRowView: View {
             alignment: .bottom
         )
         .contextMenu {
-            // Edit Set Type submenu
+            // Edit Set Type submenu — only the types with a feature behind them, plus
+            // whatever this set already is. An imported set can carry a type the picker no
+            // longer offers (both CSV importers emit `failure`), and showing it as "Working"
+            // would misreport the user's own data. They can move off it; they just can't
+            // newly assign it. See `SetType.userSelectable`.
             Menu("Edit Set Type") {
-                ForEach(SetType.allCases, id: \.self) { type in
+                ForEach(SetType.pickerOptions(current: set.setType), id: \.self) { type in
                     Button {
                         onChangeSetType(type)
                     } label: {

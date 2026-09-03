@@ -1,6 +1,6 @@
 # Drop Sets — Scoping
 
-**Status:** Phase 1 built. Phase 2 half-built and **not wired**. Phases 3–4 outstanding.
+**Status:** Phases 1–3 built. Phase 4 outstanding (the multiplier flatten).
 **Date:** 2026-08-26, status audited 2026-09-02
 **Supersedes:** [SET_TYPES_SCOPING.md](SET_TYPES_SCOPING.md) Phase 1 and Decision 4. That doc stays
 as the full survey of all 13 types; this one is the build scope for the decision actually taken —
@@ -36,21 +36,25 @@ The actionable form of everything below. Phase order is deliberate — see the s
       Settings toggle, plus the suggestion floor (`isCapacityLowerBound`) from
       [SUGGESTION_FLOOR_GUARDRAIL_DESIGN.md](SUGGESTION_FLOOR_GUARDRAIL_DESIGN.md)
 
-**Phase 2 — hide the unbuilt types — HALF DONE, AND THE HALF THAT SHIPPED DOES NOTHING**
+**Phase 2 — hide the unbuilt types — DONE**
 - [x] `SetType.userSelectable` = `[.warmup, .working, .dropset]`, with tests
-- [ ] ⚠️ **Picker still renders `SetType.allCases`** ([SetRowView.swift:259](Repster/Features/Workout/Views/SetRowView.swift:259)).
-      `userSelectable` is referenced only by tests — dead in the app. All 13 types are still offered.
-- [ ] Picker shows the set's current type when it's a hidden one
+- [x] Picker renders `SetType.pickerOptions(current:)` — the rule lives on `SetType` so it is testable
+      without a view
+- [x] Picker keeps a hidden type visible on the set that carries it (an imported `failure` still reads
+      as Failure)
 - [x] ~~Narrow the AI template prompt vocabulary~~ — moot, the AI template helper was deleted in the templates rebuild
 - [x] No enum cases removed, no migration
 
-**Phase 3 — drop sets visible — NOT STARTED**
-- [ ] Extract a shared badge + numbering helper across the three renderers
-- [ ] Fix history numbering counting warm-ups; add the missing warm-up letter on the calendar card
-- [ ] Add the `D1`/`D2` badge variant; drop sets don't consume working-set numbers
-- [ ] ⚠️ Resolve the ten `== .working` sites. The predicates exist (`countsAsPerformedWork`,
-      `isStraightWorkingSet`) but **no call site was migrated** — `isStraightWorkingSet` is dead in the app,
-      and all ten sites still compare raw. The split described below is still live.
+**Phase 3 — drop sets visible — DONE**
+- [x] `SetBadgeLabel` is the single source of truth for numbering, shared by the set table and both
+      history renderers
+- [x] History numbering no longer counts warm-ups into working-set numbers; the calendar card shows
+      W/D letters instead of dimming alone
+- [x] `D1`/`D2` badge in `chart5`; drop sets don't consume working-set numbers
+- [x] All ten `== .working` sites migrated. Widened to `countsAsPerformedWork`: Copy Previous, the Home
+      last-performance card, the Insights corpus, and five best-of lookups in `ExerciseInfoProvider`.
+      Kept as `isStraightWorkingSet` on purpose: the rest/rep pair rule (a drop set's ~0s rest is noise)
+      and the default rep target (a trailing drop set would seed the next prescription wrong).
 
 **Phase 4 — instrument, then flatten — HALF DONE**
 - [x] `FatigueObservation.setTypeRawValue` added and written on capture

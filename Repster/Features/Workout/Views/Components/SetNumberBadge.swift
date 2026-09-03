@@ -7,6 +7,62 @@
 
 import SwiftUI
 
+/// How one set is labelled in the set-number column, and the number it carries.
+///
+/// Warm-ups, drop sets and working sets each number within their own series, so a drop set
+/// never consumes a working-set number. `1, 2, D1, D2, 3` reads as "three working sets, with
+/// two drops taken after the second" — which is what a drop set is.
+///
+/// This is the single source of truth for set numbering. The live set table and both history
+/// renderers all go through ``assign(for:)``; before it existed they numbered independently and
+/// disagreed, with history counting warm-ups into the working-set numbers.
+///
+/// Known limitation: two separate drop sequences in one exercise number D1–D4 continuously
+/// rather than restarting, because nothing yet records which working set a drop belongs to.
+/// Suffixed numbering (`3a`, `3b`) is the upgrade once that grouping exists.
+enum SetBadgeLabel: Equatable {
+    case warmup(Int)
+    case dropset(Int)
+    case working(Int)
+
+    /// The text drawn in the badge — "W1", "D1", "3".
+    var text: String {
+        switch self {
+        case let .warmup(number):  return "W\(number)"
+        case let .dropset(number): return "D\(number)"
+        case let .working(number): return "\(number)"
+        }
+    }
+
+    /// The number within this label's own series.
+    var number: Int {
+        switch self {
+        case let .warmup(number), let .dropset(number), let .working(number):
+            return number
+        }
+    }
+
+    /// Label every set in an exercise, in display order.
+    static func assign(for setTypes: [SetType]) -> [SetBadgeLabel] {
+        var warmups = 0
+        var dropsets = 0
+        var working = 0
+        return setTypes.map { type in
+            switch type {
+            case .warmup:
+                warmups += 1
+                return .warmup(warmups)
+            case .dropset:
+                dropsets += 1
+                return .dropset(dropsets)
+            default:
+                working += 1
+                return .working(working)
+            }
+        }
+    }
+}
+
 /// Badge showing set number or warmup "W1", "W2", etc.
 ///
 /// Appears in the "Set" column (42pt wide) of the set table grid.
@@ -33,9 +89,12 @@ struct SetNumberBadge: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Group {
-                if setType == .warmup {
-                    warmupBadge
-                } else {
+                switch setType {
+                case .warmup:
+                    letterBadge(SetBadgeLabel.warmup(number).text, tint: .textTertiary)
+                case .dropset:
+                    letterBadge(SetBadgeLabel.dropset(number).text, tint: .chart5)
+                default:
                     numberedBadge
                 }
             }
@@ -58,12 +117,16 @@ struct SetNumberBadge: View {
 
     // MARK: - Badge Variants
 
-    /// Italic "W1", "W2", etc. with no background for warmup sets.
-    private var warmupBadge: some View {
-        Text("W\(number)")
+    /// Italic "W1" / "D1" with no background — the annotated set types.
+    ///
+    /// `tint` is what separates them at a glance: warm-ups stay in the quiet tertiary grey they
+    /// have always used, drop sets take `chart5` so they read as a deliberate technique rather
+    /// than a set someone went light on.
+    private func letterBadge(_ text: String, tint: Color) -> some View {
+        Text(text)
             .font(.system(size: 11, weight: .semibold))
             .italic()
-            .foregroundColor(isEditing ? .textPrimary : .textTertiary)
+            .foregroundColor(isEditing ? .textPrimary : tint)
             .padding(.horizontal, 5)
             .padding(.vertical, 3)
             .background(isEditing ? Color.accent.opacity(0.08) : Color.clear)
