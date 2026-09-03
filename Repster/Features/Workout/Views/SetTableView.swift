@@ -1204,7 +1204,6 @@ final class SetEntryKeyboardManager: ObservableObject {
 struct SetEntryKeyboardOverlay: View {
     @ObservedObject var manager: SetEntryKeyboardManager
 
-    @State private var rirMode = false
     @State private var refreshTick = 0
     @State private var repRangeEditMode = false
     @State private var repRangeMinText = ""
@@ -1244,7 +1243,6 @@ struct SetEntryKeyboardOverlay: View {
                 .padding(.bottom, 4)
                 .background(Color.bgCard.ignoresSafeArea(.all, edges: .bottom))
                 .onChange(of: manager.context?.ownerSetID) { _, _ in
-                    rirMode = false
                     repRangeEditMode = false
                     refreshTick = 0
                 }
@@ -1570,7 +1568,6 @@ struct SetEntryKeyboardOverlay: View {
         return VStack(spacing: 6) {
             // D1: Keyboard-dismiss icon instead of "Hide" text
             Button {
-                rirMode = false
                 repRangeEditMode = false
                 context.dismiss()
                 manager.hide(ownerSetID: context.ownerSetID)
@@ -1637,7 +1634,6 @@ struct SetEntryKeyboardOverlay: View {
             HStack(spacing: 8) {
                 railNavButton(title: "Prev", disabled: !canGoPrev) {
                     repRangeEditMode = false
-                    if rirMode { rirMode = false }
                     context.movePreviousInTrackedOrder()
                     refreshTick += 1
                     manager.show(context)
@@ -1656,7 +1652,6 @@ struct SetEntryKeyboardOverlay: View {
                 if context.canCompleteSet() {
                     context.onCompleteSet?()
                 }
-                rirMode = false
                 context.dismiss()
                 manager.hide(ownerSetID: context.ownerSetID)
             } label: {
@@ -1735,7 +1730,7 @@ struct SetEntryKeyboardOverlay: View {
             handleRepRangeKey(key)
             return
         }
-        guard !rirMode, let field = context.trackedField else { return }
+        guard let field = context.trackedField else { return }
         var value = context.getFieldValue(field)
 
         if key == "⌫" {
@@ -1833,10 +1828,7 @@ struct SetEntryKeyboardOverlay: View {
     }
 
     private func showRIRChips(for context: SetEntryKeyboardContext) -> Bool {
-        if rirMode {
-            return context.canEditActiveRIR
-        }
-        return context.canEditActiveRIR
+        context.canEditActiveRIR
     }
 
     private func supportsRepRangeEditing(for field: SetRowInputField?) -> Bool {
