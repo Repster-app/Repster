@@ -1212,11 +1212,21 @@ struct SetEntryKeyboardOverlay: View {
 
     private enum RepRangeField { case min, max }
 
+    /// Height of the tallest thing that goes in the top strip's slot: an RIR chip, and the
+    /// rep-range editor's input fields, are both 38pt.
+    private static let slotContentHeight: CGFloat = 38
+
+    /// Breathing room above and below that content.
+    ///
+    /// Sized by eye rather than derived. The slot is the card's first child now, so at the old
+    /// 3pt the chips sat almost on the rounded top edge.
+    private static let slotPadding: CGFloat = 8
+
     /// Height of the top strip's single content slot.
     ///
     /// The RIR chips and the rep-range editor swap in and out of it, so they must match exactly —
     /// any difference shows up as the set list nudging every time you toggle the editor.
-    private static let slotHeight: CGFloat = 44
+    private static let slotHeight: CGFloat = slotContentHeight + slotPadding * 2
 
     var body: some View {
         Group {
@@ -1255,20 +1265,35 @@ struct SetEntryKeyboardOverlay: View {
         .animation(.easeInOut(duration: 0.2), value: manager.context?.ownerSetID)
     }
 
-    /// The band above the keys: one `slotHeight` row, or nothing at all.
+    /// The band above the keys: one `slotHeight` row on a recessed ground, or nothing at all.
     ///
     /// There is no longer a "Set · Reps" label above it. Which field has focus is already said by
     /// the table's column headers, by the `L` / `R` labels beside each unilateral reps field, and
     /// by the accent border on the field itself — so the label row was 37pt spent on a duplicate.
     /// Note that this makes the slot the card's first child, against an 18pt corner radius, which
     /// is why every occupant centres its content in a fixed height rather than sitting flush.
+    ///
+    /// The fill is `bg`, the screen ground, which is a step *down* from the card — so the band
+    /// reads as a well cut into the keypad rather than a strip laid on it. Note this is the
+    /// opposite direction from the set table's own header row, which lifts (`bgInput` over `bg`).
     @ViewBuilder
     private func topStrip(for context: SetEntryKeyboardContext) -> some View {
-        // One slot, three possible occupants, and the rep-range editor takes precedence while it
-        // is open. It and the chips answer to exactly the same three fields (`canEditActiveRIR`
-        // and `supportsRepRangeEditing` gate on reps / leftReps / rightReps), so replacing one
-        // with the other leaves no state uncovered. Stacking them — which is what this did —
-        // dropped the set list 88pt the moment you opened the editor, with a thumb on the keypad.
+        if hasTopStripContent(for: context) {
+            slotContent(for: context)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.bg)
+        }
+    }
+
+    /// Whichever of the three occupants this state calls for.
+    ///
+    /// The rep-range editor takes precedence while it is open. It and the chips answer to exactly
+    /// the same three fields (`canEditActiveRIR` and `supportsRepRangeEditing` both gate on reps /
+    /// leftReps / rightReps), so replacing one with the other leaves no state uncovered. Stacking
+    /// them — which is what this did — dropped the set list 88pt the moment you opened the editor,
+    /// with a thumb already on the keypad.
+    @ViewBuilder
+    private func slotContent(for context: SetEntryKeyboardContext) -> some View {
         if repRangeEditMode {
             repRangeEditor(for: context)
         } else if showRIRChips(for: context) {
