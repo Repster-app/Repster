@@ -1,7 +1,8 @@
 # Set Keypad Top Strip — Scoping
 
 **Date:** 2026-09-02
-**Status:** scoped, nothing implemented.
+**Status:** **built** 2026-09-02 — `c1a6c52` (layout) and `84aad53` (`rirMode`). 788 tests pass.
+Device pass still outstanding; checklist in §8.
 **Origin:** with the set keypad open and a rep range being edited, the set list gets 114pt of an
 844pt screen — two rows. Investigating that turned up a second, worse problem underneath it.
 
@@ -187,11 +188,19 @@ removed.** Three options:
 | c | **Swap the label for a short danger-coloured message** while invalid | Needs a shorter string |
 
 **Recommended: (c).** The label slot is flexible and the row has ~74pt of slack at 390pt width, so
-a string of up to ~13 characters fits without touching the fields or Apply. Something like
-`Min below max`. The full sentence has nowhere to live in a one-line editor, and (a) leaves a red
-field with no explanation.
+a string of up to ~13 characters fits without touching the fields or Apply. The full sentence has
+nowhere to live in a one-line editor, and (a) leaves a red field with no explanation.
 
-This is the only judgement call in the change; everything else is mechanical.
+**As built:** (c), with two refinements the scope did not anticipate.
+
+1. The message is **two strings, not one**. `.invalid` collapses two different failures, and a
+   zero is reachable — `handleRepRangeKey` accepts `"0"` as a first digit. So `repRangeErrorText`
+   returns `Reps must be 1+` for a non-positive value and `Min below max` otherwise. A single
+   string would have been wrong for one of them.
+2. Fitting is by **layout priority, not by counting characters**. The fields, dash and Apply carry
+   `.layoutPriority(1)` and hold their widths; the label takes the remainder with `.lineLimit(1)`
+   and `.minimumScaleFactor(0.75)`, so it shrinks ahead of them. That survives the longer error
+   string on an SE and degrades sanely under Dynamic Type instead of clipping Apply.
 
 ---
 
@@ -284,6 +293,10 @@ hand:
 
 Step 1 carries the real user-visible win and is independently shippable. Steps 2–3 are what make
 the two states identical, so if only part of this lands, land 1 and 3 together.
+
+**As built:** steps 1–3 landed together in `c1a6c52` — they all rewrite `topStrip` and share the
+`slotHeight` constant, so splitting them would have meant unpicking one edit into three. Step 4 is
+`84aad53`, separate as planned.
 
 ---
 
