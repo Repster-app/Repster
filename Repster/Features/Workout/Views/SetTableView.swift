@@ -115,7 +115,7 @@ enum CustomRepRangeCommitter {
 /// The set table for the currently selected exercise.
 ///
 /// Renders a header row with column labels, set rows via `SetRowView`,
-/// and "Add Set" / "Add Warmup" buttons at the bottom.
+/// and "Warmup" / "Add Set" buttons at the bottom.
 /// Columns adapt to the exercise's `trackingType` (T014).
 struct SetTableView: View {
 
@@ -168,6 +168,16 @@ struct SetTableView: View {
         }
         .background(Color.bgCard)
         .cornerRadius(12)
+        // The keypad outlives any single row, so its owner is checked against the exercise's own
+        // set list rather than against a row's lifecycle. `onDisappear` on the row used to do this,
+        // but rows live in a LazyVStack, where disappearing also means "scrolled out of view" — so
+        // editing a set and scrolling down tore the keypad out mid-entry. This fires only when the
+        // owning set genuinely leaves, and sits above the LazyVStack where scrolling can't reach it.
+        .onChange(of: sets.map(\.id)) { _, ids in
+            if let ownerSetID = keyboardManager?.context?.ownerSetID, !ids.contains(ownerSetID) {
+                keyboardManager?.hide(ownerSetID: ownerSetID)
+            }
+        }
     }
 
     // MARK: - Header Row
@@ -311,19 +321,28 @@ struct SetTableView: View {
 
     // MARK: - Add Buttons (T016)
 
-    /// "Add Set" and "Add Warmup" buttons below the set rows.
+    /// "Warmup" and "Add Set" buttons below the set rows.
+    ///
+    /// This is the template editor's row (`CreateEditTemplateView.addSetButtons`): warm-up first
+    /// in a fixed, narrower slot, "Add Set" flexing to fill the rest. The two screens used to
+    /// disagree on both the order and the relative weight of the same pair of actions — here they
+    /// were equal halves with "Add Set" on the left, there a narrow warm-up on the left — so the
+    /// muscle memory built on one misfired on the other.
+    ///
+    /// One deliberate divergence: the buttons stay 44pt tall rather than the template's 38pt.
+    /// This row is tapped mid-set with one hand; the template editor is not.
     @ViewBuilder
     private func addButtons(for exerciseId: UUID) -> some View {
-        HStack(spacing: 12) {
-            addActionButton(title: "Add Set") {
+        HStack(spacing: 8) {
+            addActionButton(title: "Warmup", tint: .warmup, background: .warmupSoft, width: 96) {
                 Task {
-                    await dataSource.addSet(for: exerciseId)
+                    await dataSource.addWarmupSet(for: exerciseId)
                 }
             }
 
-            addActionButton(title: "Add Warmup") {
+            addActionButton(title: "Add Set", tint: .accent, background: .accentSoft, width: nil) {
                 Task {
-                    await dataSource.addWarmupSet(for: exerciseId)
+                    await dataSource.addSet(for: exerciseId)
                 }
             }
         }
@@ -332,26 +351,33 @@ struct SetTableView: View {
         .padding(.bottom, 10)
     }
 
-    private func addActionButton(title: String, action: @escaping () -> Void) -> some View {
+    /// A tinted add button. `width` nil means "take the remaining space" — the primary of the pair.
+    private func addActionButton(
+        title: String,
+        tint: Color,
+        background: Color,
+        width: CGFloat?,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Image(systemName: "plus")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 12, weight: .bold))
 
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            .foregroundColor(.textPrimary)
-            .frame(maxWidth: .infinity)
+            .foregroundColor(tint)
+            .frame(maxWidth: width == nil ? .infinity : nil)
+            .frame(width: width)
             .frame(minHeight: 44)
-            .background(Color.bgInput)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.border, lineWidth: 1)
-            )
+            .background(background)
             .clipShape(RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title == "Warmup" ? "Add warmup set" : "Add set")
     }
 }
 
@@ -1191,7 +1217,10 @@ final class SetEntryKeyboardManager: ObservableObject {
     func hide(ownerSetID: UUID? = nil) {
         guard let current = context else { return }
         if ownerSetID == nil || current.ownerSetID == ownerSetID {
+            // Clear the context before the focus: releasing focus re-enters here through the
+            // row's `onChange(of: focusedInput)`, and the guard above has to already be false.
             context = nil
+            current.setFocusedField(nil)
         }
     }
 
@@ -1211,6 +1240,24 @@ struct SetEntryKeyboardOverlay: View {
     @State private var repRangeActiveField: RepRangeField = .min
 
     private enum RepRangeField { case min, max }
+
+    /// One rung of the RIR scale. A struct rather than a tuple because `ForEach` needs a key path
+    /// for its id, and Swift has none into tuple elements.
+    private struct RIRChoice {
+        let label: String
+        let value: Double?
+    }
+
+    /// The scale, in the order it is offered. `nil` is "not recorded".
+    private static let rirChoices: [RIRChoice] = [
+        RIRChoice(label: "—", value: nil),
+        RIRChoice(label: "0", value: 0),
+        RIRChoice(label: "1", value: 1),
+        RIRChoice(label: "2", value: 2),
+        RIRChoice(label: "3", value: 3),
+        RIRChoice(label: "4", value: 4),
+        RIRChoice(label: "5+", value: 5)
+    ]
 
     /// Height of the tallest thing that goes in the top strip's slot: an RIR chip, and the
     /// rep-range editor's input fields, are both 38pt.
@@ -1273,15 +1320,18 @@ struct SetEntryKeyboardOverlay: View {
     /// Note that this makes the slot the card's first child, against an 18pt corner radius, which
     /// is why every occupant centres its content in a fixed height rather than sitting flush.
     ///
-    /// The fill is `bg`, the screen ground, which is a step *down* from the card — so the band
-    /// reads as a well cut into the keypad rather than a strip laid on it. Note this is the
-    /// opposite direction from the set table's own header row, which lifts (`bgInput` over `bg`).
+    /// The fill is `bgCard`, the keypad's own ground. It was briefly `bg` — a step *down*, so the
+    /// band would read as a well cut into the keys — but the strip is the card's first child, and
+    /// a darker fill running into the 18pt top corners erased the card's silhouette: the band
+    /// merged with the rest-timer bar above it, which is `bgCard` full-bleed. On the card's own
+    /// ground the strip is one surface with the keys, and the chips carry the contrast the same
+    /// way the number keys do (`bgSubtle` on `bgCard`). The divider does the separating.
     @ViewBuilder
     private func topStrip(for context: SetEntryKeyboardContext) -> some View {
         if hasTopStripContent(for: context) {
             slotContent(for: context)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.bg)
+                .background(Color.bgCard)
         }
     }
 
@@ -1297,18 +1347,18 @@ struct SetEntryKeyboardOverlay: View {
         if repRangeEditMode {
             repRangeEditor(for: context)
         } else if showRIRChips(for: context) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    rirChip(context, label: "—", value: nil)
-                    rirChip(context, label: "0", value: 0)
-                    rirChip(context, label: "1", value: 1)
-                    rirChip(context, label: "2", value: 2)
-                    rirChip(context, label: "3", value: 3)
-                    rirChip(context, label: "4", value: 4)
-                    rirChip(context, label: "5+", value: 5)
+            // Seven equal columns across the band, not a left-packed run inside a scroll view.
+            // The chips only need 266pt of the ~378pt the card has, so packing them left put a
+            // hole at the trailing edge — and the scroll view dragged under the thumb even with
+            // nothing to scroll, because a SwiftUI scroll view bounces along its axis whether or
+            // not the content overflows. Equal columns also keep the gaps even at the two ends.
+            HStack(spacing: 0) {
+                ForEach(Self.rirChoices, id: \.label) { choice in
+                    rirChip(context, label: choice.label, value: choice.value)
+                        .frame(maxWidth: .infinity)
                 }
-                .padding(.horizontal, 12)
             }
+            .padding(.horizontal, 6)
             .frame(height: Self.slotHeight)
         } else if shouldShowWeightHelper(for: context) {
             Text(weightHelperText(context))
@@ -1331,10 +1381,11 @@ struct SetEntryKeyboardOverlay: View {
     /// RIR chips. `Self.slotHeight` is deliberately the same height as the chips: the two swap in
     /// place, so opening the editor must not move the set list underneath it.
     ///
-    /// There is no Cancel. The rail's rep-range button already calls `dismissRepRangeEditMode`
-    /// while it reads "Editing", and `onChange` closes edit mode when focus leaves a reps field,
-    /// so a third exit is a duplicate — and it does not fit: with Cancel and the full "Rep Range"
-    /// label the row needs 402pt inside a 378pt card, 40pt more than an iPhone SE has.
+    /// Cancel is an icon, not a word. A text Cancel next to the full "Rep Range" label needed
+    /// 402pt inside the 378pt an SE gives the card, so it was cut altogether — which left Apply
+    /// as the only exit visible from the row itself, the reverting one hidden behind the rail
+    /// button's "Editing" state. A 30pt ✕ puts it back and still fits: worst case (an SE, with
+    /// the error text in the label) the row wants 379pt of 339pt, and only the label scales.
     private func repRangeEditor(for context: SetEntryKeyboardContext) -> some View {
         let hasInvalidDraft = repRangeDraftState == .invalid
 
@@ -1342,7 +1393,8 @@ struct SetEntryKeyboardOverlay: View {
             // The label doubles as the error line. The long form ("Use one rep value or an
             // ascending range.") has nowhere to live in a fixed-height row, and letting the row
             // grow to hold it would reintroduce the shift this layout exists to remove. The
-            // fields and Apply hold their widths; the label scales down ahead of them.
+            // fields and the buttons hold their widths; the label scales down ahead of them, far
+            // enough (0.65) that even the longer error survives the narrowest phone unclipped.
             Label(
                 hasInvalidDraft ? repRangeErrorText : "Range",
                 systemImage: hasInvalidDraft ? "exclamationmark.triangle.fill" : "target"
@@ -1350,32 +1402,37 @@ struct SetEntryKeyboardOverlay: View {
             .font(.system(size: 13, weight: .semibold))
             .foregroundColor(hasInvalidDraft ? .danger : .accent)
             .lineLimit(1)
-            .minimumScaleFactor(0.75)
+            .minimumScaleFactor(0.65)
 
-            repRangeInputField(
-                text: $repRangeMinText,
-                placeholder: "Min",
-                isActive: repRangeActiveField == .min,
-                showsError: hasInvalidDraft
-            )
-            .onTapGesture { repRangeActiveField = .min }
-            .layoutPriority(1)
+            // Min, dash and max are one group on a tighter 6pt rhythm: they read as a single
+            // range, and the 8pt the outer spacing would have spent between them pays for Cancel.
+            HStack(spacing: 6) {
+                repRangeInputField(
+                    text: $repRangeMinText,
+                    placeholder: "Min",
+                    isActive: repRangeActiveField == .min,
+                    showsError: hasInvalidDraft
+                )
+                .onTapGesture { repRangeActiveField = .min }
 
-            Text("—")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.textSecondary)
-                .layoutPriority(1)
+                Text("—")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.textSecondary)
 
-            repRangeInputField(
-                text: $repRangeMaxText,
-                placeholder: "Max",
-                isActive: repRangeActiveField == .max,
-                showsError: hasInvalidDraft
-            )
-            .onTapGesture { repRangeActiveField = .max }
+                repRangeInputField(
+                    text: $repRangeMaxText,
+                    placeholder: "Max",
+                    isActive: repRangeActiveField == .max,
+                    showsError: hasInvalidDraft
+                )
+                .onTapGesture { repRangeActiveField = .max }
+            }
             .layoutPriority(1)
 
             Spacer(minLength: 0)
+
+            repRangeCancelButton { dismissRepRangeEditMode(context) }
+                .layoutPriority(1)
 
             repRangeEditorButton(title: "Apply", prominent: true, disabled: hasInvalidDraft) {
                 applyRepRange(context)
@@ -1384,6 +1441,24 @@ struct SetEntryKeyboardOverlay: View {
         }
         .padding(.horizontal, 12)
         .frame(height: Self.slotHeight)
+    }
+
+    /// Leave the editor without committing the draft, from inside the row.
+    ///
+    /// Reverts rather than closes: `dismissRepRangeEditMode` reloads both fields from the stored
+    /// range, so a half-typed draft does not survive to the next time the editor opens.
+    private func repRangeCancelButton(action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(.textSecondary)
+                .frame(width: 30, height: 30)
+                .background(Color.bgHover)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color.border, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Cancel rep range")
     }
 
     /// Which half of the draft is wrong, short enough to sit in the label's place.
@@ -2064,17 +2139,21 @@ struct SetEntryKeyboardOverlay: View {
             )
 
             // Add buttons
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
+                Text("+ Warmup")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.warmup)
+                    .frame(width: 96)
+                    .frame(minHeight: 44)
+                    .background(Color.warmupSoft)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                 Text("+ Add Set")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.textSecondary)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.accent)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 44)
-                Text("+ Add Warmup")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.textSecondary)
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 44)
+                    .background(Color.accentSoft)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)

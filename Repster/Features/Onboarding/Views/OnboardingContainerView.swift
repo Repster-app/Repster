@@ -7,6 +7,8 @@ import SwiftUI
 
 struct OnboardingContainerView: View {
     @State private var viewModel: OnboardingViewModel
+    @State private var showingImport = false
+    @State private var showingWalkthrough = false
     @Environment(ServiceContainer.self) private var services
     let importService: any ImportServiceProtocol
     let onComplete: () -> Void
@@ -15,11 +17,13 @@ struct OnboardingContainerView: View {
          bodyweightService: any BodyweightServiceProtocol,
          importService: any ImportServiceProtocol,
          analyticsService: any AnalyticsServiceProtocol,
+         programCatalogService: any ProgramCatalogServiceProtocol,
          onComplete: @escaping () -> Void) {
         _viewModel = State(initialValue: OnboardingViewModel(
             settingsService: settingsService,
             bodyweightService: bodyweightService,
-            analyticsService: analyticsService
+            analyticsService: analyticsService,
+            programCatalogService: programCatalogService
         ))
         self.importService = importService
         self.onComplete = onComplete
@@ -42,19 +46,25 @@ struct OnboardingContainerView: View {
                 )
                 .tag(OnboardingStep.unitsAndBodyweight)
 
-                ImportStepView(
-                    importService: importService,
-                    defaultUnitPreference: viewModel.selectedUnit,
-                    exerciseService: services.exerciseService,
+                ProgramPickerView(
+                    programs: viewModel.availablePrograms,
+                    choice: $viewModel.programChoice,
+                    onContinue: { viewModel.confirmProgramSelection() }
+                )
+                .tag(OnboardingStep.program)
+
+                ExtrasStepView(
+                    selectedProgram: viewModel.selectedProgram,
                     isSaving: viewModel.isSaving,
-                    onFinish: {
-                        Task {
-                            await viewModel.finish()
-                            services.updateCachedUnitPreference(viewModel.selectedUnit)
-                            onComplete()
-                        }
+                    onOpenImport: {
+                        viewModel.trackExtraTapped("import")
+                        showingImport = true
                     },
-                    onSkip: {
+                    onOpenWalkthrough: {
+                        viewModel.trackExtraTapped("walkthrough")
+                        showingWalkthrough = true
+                    },
+                    onFinish: {
                         Task {
                             await viewModel.finish()
                             services.updateCachedUnitPreference(viewModel.selectedUnit)
@@ -62,15 +72,35 @@ struct OnboardingContainerView: View {
                         }
                     }
                 )
-                .tag(OnboardingStep.importPrompt)
+                .tag(OnboardingStep.extras)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .animation(.easeInOut, value: viewModel.currentStep)
         }
         .background(Color.bg)
-        .onAppear { trackStep(viewModel.currentStep) }
+        .onAppear {
+            viewModel.loadProgramsIfNeeded()
+            trackStep(viewModel.currentStep)
+        }
         .onChange(of: viewModel.currentStep) { _, step in
             trackStep(step)
+        }
+        // Both extras are sub-screens, not steps. Nobody has to pass through either one, and
+        // dismissing returns to the final step rather than completing onboarding.
+        .sheet(isPresented: $showingImport) {
+            NavigationStack {
+                ImportStepView(
+                    importService: importService,
+                    defaultUnitPreference: viewModel.selectedUnit,
+                    exerciseService: services.exerciseService,
+                    isSaving: false,
+                    onFinish: { showingImport = false },
+                    onSkip: { showingImport = false }
+                )
+            }
+        }
+        .sheet(isPresented: $showingWalkthrough) {
+            HowItWorksView(analyticsService: services.analyticsService)
         }
     }
 

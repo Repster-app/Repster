@@ -1,0 +1,6 @@
+Layout math (390x844):
+0-47 status space (left blank), 47-91 nav bar
+107 TEMPLATE NAME, 128-176 name field, 184-232 folder row
+248-263 EXERCISES header, cards from 273, collapsed card = 63 tall, gap 10
+card1 273-336, card2 346-409, card3 419-482, card4 492-555
+Add Exercise 571-619

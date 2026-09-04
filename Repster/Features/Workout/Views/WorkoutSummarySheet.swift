@@ -1107,8 +1107,99 @@ struct WorkoutSummarySheet: View {
             liftCountLabel: "\(summary.exerciseSummaries.count)",
             prLift: prExercise.map(lift),
             lifts: Array(topLifts),
-            extraLiftCount: max(0, summary.exerciseSummaries.count - topLifts.count)
+            extraLiftCount: max(0, summary.exerciseSummaries.count - topLifts.count),
+            muscleSlices: muscleSlices(),
+            traceBars: traceBars()
         )
+    }
+
+    /// Session volume split by each lift's primary muscle.
+    ///
+    /// Built here rather than in a service because everything it needs is already loaded:
+    /// `setsByExercise` holds every set and `exercises` carries `primaryMuscle`. Groups are
+    /// normalised so they key into `MuscleGroupColors` and match what Insights shows.
+    private func muscleSlices() -> [WorkoutShareCardData.MuscleSlice] {
+        var volumeByGroup: [String: Double] = [:]
+
+        for exercise in viewModel.exercises {
+            guard let raw = exercise.primaryMuscle,
+                  let sets = viewModel.setsByExercise[exercise.id] else { continue }
+
+            let group = ExercisePrimaryGroup.normalizedValue(raw) ?? raw.lowercased()
+            let volume = sets.reduce(into: 0.0) { total, set in
+                guard set.completedAt != nil, set.setType != .warmup else { return }
+                // Bodyweight and cardio sets have no load; reps still represent work done.
+                let weight = set.weight ?? 0
+                let reps = Double(set.reps ?? 0)
+                total += weight > 0 ? weight * reps : reps
+            }
+
+            guard volume > 0 else { continue }
+            volumeByGroup[group, default: 0] += volume
+        }
+
+        let total = volumeByGroup.values.reduce(0, +)
+        guard total > 0 else { return [] }
+
+        return volumeByGroup
+            .map { group, volume in
+                WorkoutShareCardData.MuscleSlice(
+                    group: group,
+                    displayName: ExercisePrimaryGroup.displayName(for: group),
+                    fraction: volume / total
+                )
+            }
+            .sorted { $0.fraction > $1.fraction }
+    }
+
+    /// Every completed set in the order it was performed, sized against the session's biggest.
+    ///
+    /// Magnitude is set volume, not effort. RIR would be the truer axis but it is optional, and
+    /// a chart that silently treats "not logged" as "easy" would be inventing a session.
+    private func traceBars() -> [WorkoutShareCardData.TraceBar] {
+        struct Entry {
+            let set: WorkoutSet
+            let group: String?
+            let exerciseId: UUID
+        }
+
+        let musclesById: [UUID: String?] = Dictionary(
+            uniqueKeysWithValues: viewModel.exercises.map { exercise in
+                (exercise.id, exercise.primaryMuscle.map { ExercisePrimaryGroup.normalizedValue($0) ?? $0.lowercased() })
+            }
+        )
+
+        var entries: [Entry] = []
+        for exercise in viewModel.exercises {
+            guard let sets = viewModel.setsByExercise[exercise.id] else { continue }
+            for set in sets where set.completedAt != nil && set.setType != .warmup {
+                entries.append(Entry(set: set, group: musclesById[exercise.id] ?? nil, exerciseId: exercise.id))
+            }
+        }
+
+        entries.sort { $0.set.orderInWorkout < $1.set.orderInWorkout }
+
+        func volume(_ set: WorkoutSet) -> Double {
+            let weight = set.weight ?? 0
+            let reps = Double(set.reps ?? 0)
+            return weight > 0 ? weight * reps : reps
+        }
+
+        let peak = entries.map { volume($0.set) }.max() ?? 0
+        guard peak > 0 else { return [] }
+
+        var previousExercise: UUID?
+        return entries.map { entry in
+            let bar = WorkoutShareCardData.TraceBar(
+                id: entry.set.id,
+                magnitude: min(1, volume(entry.set) / peak),
+                group: entry.group,
+                isPR: entry.set.cachedPRStatus == .current,
+                startsNewExercise: entry.exerciseId != previousExercise
+            )
+            previousExercise = entry.exerciseId
+            return bar
+        }
     }
 
     private func summaryDateLabel(_ date: Date) -> String {

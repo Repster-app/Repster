@@ -91,7 +91,7 @@ struct SetNumberBadge: View {
             Group {
                 switch setType {
                 case .warmup:
-                    letterBadge(SetBadgeLabel.warmup(number).text, tint: .textTertiary)
+                    letterBadge(SetBadgeLabel.warmup(number).text, tint: .warmup)
                 case .dropset:
                     letterBadge(SetBadgeLabel.dropset(number).text, tint: .chart5)
                 default:
@@ -119,9 +119,10 @@ struct SetNumberBadge: View {
 
     /// Italic "W1" / "D1" with no background — the annotated set types.
     ///
-    /// `tint` is what separates them at a glance: warm-ups stay in the quiet tertiary grey they
-    /// have always used, drop sets take `chart5` so they read as a deliberate technique rather
-    /// than a set someone went light on.
+    /// `tint` is what separates them at a glance: warm-ups take the clay `warmup` token, drop
+    /// sets `chart5` so they read as a deliberate technique rather than a set someone went light
+    /// on. This badge used to be the one place warm-ups were tertiary grey while every other
+    /// screen drew them in gold; both are now the same clay.
     private func letterBadge(_ text: String, tint: Color) -> some View {
         Text(text)
             .font(.system(size: 11, weight: .semibold))

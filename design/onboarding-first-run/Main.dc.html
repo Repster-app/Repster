@@ -1,0 +1,132 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap">
+  <style>
+    body { margin: 0; font-family: "DM Sans", system-ui, -apple-system, sans-serif; }
+    a { color: #5B8DEF; text-decoration: none; }
+    a:hover { color: #7BA5F3; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; background: #111113; display: flex; flex-direction: column; box-sizing: border-box; padding: 60px 20px 34px;">
+
+  <div style="display: flex; align-items: center; gap: 6px; padding-bottom: 18px;">
+    <div style="width: 38px; height: 3px; border-radius: 2px; background: #5B8DEF;"></div>
+    <div style="width: 38px; height: 3px; border-radius: 2px; background: #5B8DEF;"></div>
+    <div style="font-size: 11px; font-weight: 600; color: #5C5C6E; letter-spacing: 0.08em; padding-left: 8px;">STEP 2 OF 2</div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px; padding-bottom: 20px;">
+    <div style="font-size: 26px; font-weight: 700; color: #EAEAEF; line-height: 1.2; letter-spacing: -0.02em;">Pick a program to run</div>
+    <div style="font-size: 14px; font-weight: 400; color: #9999A8; line-height: 1.45; text-wrap: pretty;">
+      We build the sessions for you. Swap exercises, or change program, whenever you like.
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px;">
+    <sc-for list="{{programs}}" as="p" hint-placeholder-count="5">
+      <div onClick="{{ p.pick }}" style="display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; border-radius: 14px; cursor: pointer; background: {{p.cardBg}}; border: 1px solid {{p.cardBorder}};">
+        <div style="display: flex; align-items: center; gap: 9px;">
+          <div style="font-size: 15px; font-weight: 600; color: #EAEAEF; flex-grow: 1;">{{p.name}}</div>
+          <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.06em; border-radius: 5px; padding: 3px 6px; flex-shrink: 0; opacity: {{p.daysOpacity}}; color: {{p.daysColor}}; background: {{p.daysBg}};">{{p.days}}</div>
+          <div style="width: 18px; height: 18px; border-radius: 9px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: {{p.tickBg}};">
+            <svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="opacity: {{p.tickOpacity}};">
+              <path d="M4 10.5l4 4 8-8"></path>
+            </svg>
+          </div>
+        </div>
+        <div style="font-size: 12px; font-weight: 400; color: #5C5C6E;">{{p.detail}}</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{hasRotation}}" hint-placeholder-val="{{true}}">
+    <div style="margin-top: 16px; padding: 14px; border-radius: 14px; background: #1B1B1F;">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 10px;">
+        <div style="font-size: 11px; font-weight: 600; color: #5C5C6E; letter-spacing: 0.08em;">YOUR ROTATION</div>
+        <div style="font-size: 11px; font-weight: 500; color: #5C5C6E;">{{rotationMeta}}</div>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+        <sc-for list="{{rotation}}" as="s" hint-placeholder-count="6">
+          <div style="font-size: 11px; font-weight: 500; color: #9999A8; background: #262630; border-radius: 6px; padding: 5px 9px;">{{s.name}}</div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <div style="flex-grow: 1;"></div>
+
+  <div onClick="{{ start }}" style="width: 100%; height: 52px; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: {{ctaBg}};">
+    <div style="font-size: 16px; font-weight: 600; color: {{ctaColor}};">{{ctaLabel}}</div>
+  </div>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const picked = (this.state && this.state.picked) ? this.state.picked : null;
+
+    const defs = [
+      { id: 'fullbody', name: 'Full Body', days: '3 DAYS', detail: 'Hits everything each session.',
+        sessions: ['Full Body A', 'Full Body B', 'Full Body C'] },
+      { id: 'upperlower', name: 'Upper / Lower', days: '4 DAYS', detail: 'Two upper days, two lower.',
+        sessions: ['Upper A', 'Lower A', 'Upper B', 'Lower B'] },
+      { id: 'ppl', name: 'Push / Pull / Legs', days: '6 DAYS', detail: 'Each muscle twice a week.',
+        sessions: ['Push A', 'Pull A', 'Legs A', 'Push B', 'Pull B', 'Legs B'] },
+      { id: 'fivebyfive', name: '5×5 Strength', days: '3 DAYS', detail: 'Barbell strength, five by five.',
+        sessions: ['Workout A', 'Workout B'] },
+      { id: 'own', name: 'Build my own', days: '', detail: 'Start empty and add your own.',
+        sessions: [] }
+    ];
+
+    const programs = defs.map((d) => {
+      const on = d.id === picked;
+      return {
+        name: d.name,
+        days: d.days,
+        detail: d.detail,
+        daysOpacity: d.days ? '1' : '0',
+        daysColor: on ? '#5B8DEF' : '#5C5C6E',
+        daysBg: on ? 'rgba(91,141,239,0.18)' : '#262630',
+        cardBg: on ? 'rgba(91,141,239,0.10)' : '#1B1B1F',
+        cardBorder: on ? 'rgba(91,141,239,0.35)' : 'rgba(255,255,255,0.06)',
+        tickBg: on ? '#5B8DEF' : 'rgba(255,255,255,0.04)',
+        tickOpacity: on ? '1' : '0',
+        pick: () => this.setState({ picked: d.id })
+      };
+    });
+
+    let sel = null;
+    for (let i = 0; i < defs.length; i++) {
+      if (defs[i].id === picked) { sel = defs[i]; }
+    }
+    const hasRotation = !!(sel && sel.sessions.length);
+
+    let label = 'Choose a program';
+    if (sel && sel.id === 'own') { label = 'Start from scratch'; }
+    else if (sel) { label = 'Start with ' + sel.name; }
+
+    return {
+      programs: programs,
+      hasRotation: hasRotation,
+      rotationMeta: hasRotation ? (sel.sessions.length + ' sessions, saved as templates') : '',
+      rotation: hasRotation ? sel.sessions.map((n) => ({ name: n })) : [],
+      ctaLabel: label,
+      ctaBg: sel ? '#5B8DEF' : '#1F1F25',
+      ctaColor: sel ? '#FFFFFF' : '#5C5C6E',
+      start: () => {}
+    };
+  }
+}
+</script>
+</body>
+</html>

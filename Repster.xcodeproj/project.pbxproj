@@ -25,6 +25,7 @@
 		A10010 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10010 /* Assets.xcassets */; };
 		A10011 /* RepsterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10011 /* RepsterApp.swift */; };
 		A10012 /* seed_exercises.json in Resources */ = {isa = PBXBuildFile; fileRef = B10012 /* seed_exercises.json */; };
+		A10014 /* seed_programs.json in Resources */ = {isa = PBXBuildFile; fileRef = B10014 /* seed_programs.json */; };
 		A19999 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B19999 /* PrivacyInfo.xcprivacy */; };
 		A20001 /* WorkoutSet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20001 /* WorkoutSet.swift */; };
 		A20002 /* Workout.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20002 /* Workout.swift */; };
@@ -74,6 +75,7 @@
 		A80005 /* WorkoutService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80005 /* WorkoutService.swift */; };
 		A80006 /* ExerciseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80006 /* ExerciseService.swift */; };
 		AC0001 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0001 /* DesignTokens.swift */; };
+		ACDT01 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0001 /* DesignTokens.swift */; };
 		AC0002 /* SetInputField.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0002 /* SetInputField.swift */; };
 		AC0003 /* PRBadgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0003 /* PRBadgeView.swift */; };
 		AC0004 /* SetNumberBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0004 /* SetNumberBadge.swift */; };
@@ -146,6 +148,8 @@
 		AK0002 /* OnboardingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0002 /* OnboardingViewModel.swift */; };
 		AK0003 /* OnboardingContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0003 /* OnboardingContainerView.swift */; };
 		AK0004 /* WelcomeStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0004 /* WelcomeStepView.swift */; };
+		OB0101 /* ExtrasStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = OB0201 /* ExtrasStepView.swift */; };
+		OB0102 /* ProgramPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = OB0202 /* ProgramPickerView.swift */; };
 		AK0005 /* UnitsBodyweightStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0005 /* UnitsBodyweightStepView.swift */; };
 		AK0008 /* ImportStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BK0008 /* ImportStepView.swift */; };
 		AL0001 /* CSVParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BL0001 /* CSVParser.swift */; };
@@ -156,6 +160,10 @@
 		AL0006 /* ExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BL0006 /* ExportView.swift */; };
 		AM0001 /* SeedExerciseDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = BM0001 /* SeedExerciseDTO.swift */; };
 		AM0002 /* SeedDataLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BM0002 /* SeedDataLoader.swift */; };
+		AM0007 /* ProgramSeedDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = BM0007 /* ProgramSeedDTO.swift */; };
+		AM0008 /* ProgramSeedLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BM0008 /* ProgramSeedLoader.swift */; };
+		AM0009 /* ProgramCatalogServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = BM0009 /* ProgramCatalogServiceProtocol.swift */; };
+		AM0010 /* ProgramCatalogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BM0010 /* ProgramCatalogService.swift */; };
 		AM0003 /* SeedExerciseDTO+Mapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = BM0003 /* SeedExerciseDTO+Mapping.swift */; };
 		AM0004 /* SeedService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BM0004 /* SeedService.swift */; };
 		AM0005 /* GhostSetRepsBackfillMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BM0005 /* GhostSetRepsBackfillMigration.swift */; };
@@ -262,6 +270,8 @@
 		TT0007 /* SeedExerciseLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2008 /* SeedExerciseLibraryTests.swift */; };
 		TT0008 /* MonetizationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2009 /* MonetizationServiceTests.swift */; };
 		TT0009 /* AnalyticsServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2010 /* AnalyticsServiceTests.swift */; };
+		TT0010 /* ProgramCatalogIntegrityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2011 /* ProgramCatalogIntegrityTests.swift */; };
+		TT0011 /* ProgramCatalogServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2012 /* ProgramCatalogServiceTests.swift */; };
 		TT0099 /* ScreenDataGoldenMasterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2099 /* ScreenDataGoldenMasterTests.swift */; };
 		TT0100 /* WorkoutJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2100 /* WorkoutJourneyTests.swift */; };
 		TT0101 /* CrossContextRaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2101 /* CrossContextRaceTests.swift */; };
@@ -350,6 +360,7 @@
 		B10010 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B10011 /* RepsterApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepsterApp.swift; sourceTree = "<group>"; };
 		B10012 /* seed_exercises.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = seed_exercises.json; sourceTree = "<group>"; };
+		B10014 /* seed_programs.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = seed_programs.json; sourceTree = "<group>"; };
 		B10013 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B19999 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		B20001 /* WorkoutSet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSet.swift; sourceTree = "<group>"; };
@@ -472,6 +483,8 @@
 		BK0002 /* OnboardingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingViewModel.swift; sourceTree = "<group>"; };
 		BK0003 /* OnboardingContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingContainerView.swift; sourceTree = "<group>"; };
 		BK0004 /* WelcomeStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeStepView.swift; sourceTree = "<group>"; };
+		OB0201 /* ExtrasStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtrasStepView.swift; sourceTree = "<group>"; };
+		OB0202 /* ProgramPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ProgramPickerView.swift; path = Repster/Features/Programs/Views/ProgramPickerView.swift; sourceTree = SOURCE_ROOT; };
 		BK0005 /* UnitsBodyweightStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnitsBodyweightStepView.swift; sourceTree = "<group>"; };
 		BK0008 /* ImportStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportStepView.swift; sourceTree = "<group>"; };
 		BL0001 /* CSVParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVParser.swift; sourceTree = "<group>"; };
@@ -482,6 +495,10 @@
 		BL0006 /* ExportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportView.swift; sourceTree = "<group>"; };
 		BM0001 /* SeedExerciseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedExerciseDTO.swift; sourceTree = "<group>"; };
 		BM0002 /* SeedDataLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedDataLoader.swift; sourceTree = "<group>"; };
+		BM0007 /* ProgramSeedDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramSeedDTO.swift; sourceTree = "<group>"; };
+		BM0008 /* ProgramSeedLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramSeedLoader.swift; sourceTree = "<group>"; };
+		BM0009 /* ProgramCatalogServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramCatalogServiceProtocol.swift; sourceTree = "<group>"; };
+		BM0010 /* ProgramCatalogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramCatalogService.swift; sourceTree = "<group>"; };
 		BM0003 /* SeedExerciseDTO+Mapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SeedExerciseDTO+Mapping.swift"; sourceTree = "<group>"; };
 		BM0004 /* SeedService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedService.swift; sourceTree = "<group>"; };
 		BM0005 /* GhostSetRepsBackfillMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhostSetRepsBackfillMigration.swift; sourceTree = "<group>"; };
@@ -583,6 +600,8 @@
 		TT2008 /* SeedExerciseLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedExerciseLibraryTests.swift; sourceTree = "<group>"; };
 		TT2009 /* MonetizationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonetizationServiceTests.swift; sourceTree = "<group>"; };
 		TT2010 /* AnalyticsServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsServiceTests.swift; sourceTree = "<group>"; };
+		TT2011 /* ProgramCatalogIntegrityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramCatalogIntegrityTests.swift; sourceTree = "<group>"; };
+		TT2012 /* ProgramCatalogServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramCatalogServiceTests.swift; sourceTree = "<group>"; };
 		TT2099 /* ScreenDataGoldenMasterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenDataGoldenMasterTests.swift; sourceTree = "<group>"; };
 		TT2100 /* WorkoutJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutJourneyTests.swift; sourceTree = "<group>"; };
 		TT2101 /* CrossContextRaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossContextRaceTests.swift; sourceTree = "<group>"; };
@@ -756,6 +775,7 @@
 			children = (
 				B10010 /* Assets.xcassets */,
 				B10012 /* seed_exercises.json */,
+				B10014 /* seed_programs.json */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -1062,6 +1082,8 @@
 			children = (
 				BK0003 /* OnboardingContainerView.swift */,
 				BK0004 /* WelcomeStepView.swift */,
+				OB0201 /* ExtrasStepView.swift */,
+				OB0202 /* ProgramPickerView.swift */,
 				BK0005 /* UnitsBodyweightStepView.swift */,
 				BK0008 /* ImportStepView.swift */,
 			);
@@ -1132,6 +1154,7 @@
 				BM0006 /* ExerciseWorkoutCountBackfillMigration.swift */,
 				WN1003 /* InsightsSectionPromotionMigration.swift */,
 				BT0007 /* TemplateService.swift */,
+				BM0010 /* ProgramCatalogService.swift */,
 				FL1004 /* FatigueLearningService.swift */,
 				IN1003 /* InsightsService.swift */,
 				IN1004 /* InsightRules.swift */,
@@ -1265,6 +1288,7 @@
 				BL0003 /* ExportServiceProtocol.swift */,
 				IN1002 /* InsightsServiceProtocol.swift */,
 				BT0006 /* TemplateServiceProtocol.swift */,
+				BM0009 /* ProgramCatalogServiceProtocol.swift */,
 				PH1001 /* AnalyticsServiceProtocol.swift */,
 			);
 			path = Protocols;
@@ -1355,6 +1379,8 @@
 				BM0001 /* SeedExerciseDTO.swift */,
 				BM0002 /* SeedDataLoader.swift */,
 				BM0003 /* SeedExerciseDTO+Mapping.swift */,
+				BM0007 /* ProgramSeedDTO.swift */,
+				BM0008 /* ProgramSeedLoader.swift */,
 			);
 			path = Seeding;
 			sourceTree = "<group>";
@@ -1471,6 +1497,8 @@
 				TT2007 /* WorkoutSetTests.swift */,
 				TT2009 /* MonetizationServiceTests.swift */,
 				TT2010 /* AnalyticsServiceTests.swift */,
+				TT2011 /* ProgramCatalogIntegrityTests.swift */,
+				TT2012 /* ProgramCatalogServiceTests.swift */,
 				ATRB2001 /* AttributionServiceTests.swift */,
 				FL1005 /* FatigueLearningServiceTests.swift */,
 				SB1001 /* SmartSuggestionBehaviorScenarioTests.swift */,
@@ -1623,6 +1651,7 @@
 			files = (
 				A10010 /* Assets.xcassets in Resources */,
 				A10012 /* seed_exercises.json in Resources */,
+				A10014 /* seed_programs.json in Resources */,
 				A19999 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1664,6 +1693,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0823BFAE2F5D62E500A513BE /* WorkoutActivityAttributes.swift in Sources */,
+				ACDT01 /* DesignTokens.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1850,6 +1880,8 @@
 				AK0002 /* OnboardingViewModel.swift in Sources */,
 				AK0003 /* OnboardingContainerView.swift in Sources */,
 				AK0004 /* WelcomeStepView.swift in Sources */,
+				OB0101 /* ExtrasStepView.swift in Sources */,
+				OB0102 /* ProgramPickerView.swift in Sources */,
 				AK0005 /* UnitsBodyweightStepView.swift in Sources */,
 				AK0008 /* ImportStepView.swift in Sources */,
 				AIM001 /* ImportService.swift in Sources */,
@@ -1863,6 +1895,10 @@
 				AL0006 /* ExportView.swift in Sources */,
 				AM0001 /* SeedExerciseDTO.swift in Sources */,
 				AM0002 /* SeedDataLoader.swift in Sources */,
+				AM0007 /* ProgramSeedDTO.swift in Sources */,
+				AM0008 /* ProgramSeedLoader.swift in Sources */,
+				AM0009 /* ProgramCatalogServiceProtocol.swift in Sources */,
+				AM0010 /* ProgramCatalogService.swift in Sources */,
 				AM0003 /* SeedExerciseDTO+Mapping.swift in Sources */,
 				AM0004 /* SeedService.swift in Sources */,
 				AM0005 /* GhostSetRepsBackfillMigration.swift in Sources */,
@@ -1952,6 +1988,8 @@
 				TT0006 /* WorkoutSetTests.swift in Sources */,
 				TT0008 /* MonetizationServiceTests.swift in Sources */,
 				TT0009 /* AnalyticsServiceTests.swift in Sources */,
+				TT0010 /* ProgramCatalogIntegrityTests.swift in Sources */,
+				TT0011 /* ProgramCatalogServiceTests.swift in Sources */,
 				ATRB0003 /* AttributionServiceTests.swift in Sources */,
 				FL0005 /* FatigueLearningServiceTests.swift in Sources */,
 				SB0001 /* SmartSuggestionBehaviorScenarioTests.swift in Sources */,

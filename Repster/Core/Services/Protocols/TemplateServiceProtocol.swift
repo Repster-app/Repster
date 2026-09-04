@@ -105,12 +105,22 @@ struct TemplateSaveData: Sendable {
     let name: String
     let notes: String?
     let folder: String?
+    /// Position within `folder`. Only generated programs set this; the editor leaves it nil and
+    /// hand-made templates keep sorting by the existing rules.
+    let orderInFolder: Int?
     let exercises: [TemplateSaveExercise]
 
-    init(name: String, notes: String?, folder: String? = nil, exercises: [TemplateSaveExercise]) {
+    init(
+        name: String,
+        notes: String?,
+        folder: String? = nil,
+        orderInFolder: Int? = nil,
+        exercises: [TemplateSaveExercise]
+    ) {
         self.name = name
         self.notes = notes
         self.folder = TemplateFolder.normalized(folder)
+        self.orderInFolder = orderInFolder
         self.exercises = exercises
     }
 }

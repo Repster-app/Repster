@@ -351,6 +351,26 @@ final class AnalyticsServiceTests: XCTestCase {
         XCTAssertEqual(client.captures.last?.properties["source"] as? String, "paywall")
     }
 
+    /// The Settings paywall used to report `.paywall` too, which made `source` a constant
+    /// and hid whether an unlock attempt came from the workout gate or from Settings.
+    func testPaywallSourcesAreDistinctAndStable() {
+        XCTAssertEqual(PaywallSource.paywall.rawValue, "paywall")
+        XCTAssertEqual(PaywallSource.settings.rawValue, "settings")
+        XCTAssertEqual(PaywallSource.membershipSettings.rawValue, "membership_settings")
+    }
+
+    func testPaywallShownFromSettingsReportsSettingsSource() {
+        let (service, client, defaults) = makeService()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        service.configure()
+        service.paywallShown(source: .settings)
+
+        XCTAssertEqual(client.screens.last?.properties["source"] as? String, "settings")
+        XCTAssertEqual(client.captures.last?.event, "paywall shown")
+        XCTAssertEqual(client.captures.last?.properties["source"] as? String, "settings")
+    }
+
     func testWorkoutStartContextStoreRoundTrips() {
         let defaults = UserDefaults(suiteName: defaultsSuiteName)!
         defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }

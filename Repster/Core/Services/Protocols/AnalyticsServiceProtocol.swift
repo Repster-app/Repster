@@ -84,15 +84,29 @@ enum AnalyticsErrorContext: String {
     case backupExport = "backup_export"
     case backupPreview = "backup_preview"
     case backupRestore = "backup_restore"
+    /// Writing a chosen starter program's templates failed. Swallowed so onboarding can still
+    /// complete, which is exactly the class of failure this enum exists to make visible.
+    case programMaterialisation = "program_materialisation"
 }
 
 // MARK: - AnalyticsEvents helpers
 //
 // Single entry point per event so property names stay in sync across call sites.
 
+/// Where a paywall or purchase was reached from. Every event carrying this must be able
+/// to answer "which entry point?", so all three cases have to stay in use — until
+/// 2026-09-03 both sheets passed `.paywall` and `.settings` was dead, which made the
+/// property a constant and the two entry points indistinguishable in PostHog.
+///
+/// `.paywall` keeps its raw value rather than being renamed to something clearer, because
+/// the events already in PostHog carry `"paywall"` for the workout gate and renaming would
+/// split that history at the cutover.
 enum PaywallSource: String {
+    /// The gate hit when starting a workout with no free workouts left — `ContentView`.
     case paywall
+    /// The "Unlock Repster" row in Settings, which raises the same RevenueCat paywall.
     case settings
+    /// The "Buy Lifetime" row in Settings, which purchases directly without a paywall.
     case membershipSettings = "membership_settings"
 }
 
@@ -519,6 +533,23 @@ extension AnalyticsServiceProtocol {
         ])
     }
 
+    /// Which starter program the user picked, and how many sessions it wrote.
+    /// `programId` is the catalogue key (`full_body_3d`), stable across copy changes.
+    func programSelected(programId: String, sessionCount: Int) {
+        track(.programSelected, properties: [
+            .programId: .string(programId),
+            .sessionCount: .int(sessionCount)
+        ])
+    }
+
+    /// A tap on one of the two optional extras on the final step.
+    /// The old import step could not distinguish "skipped" from "never wired"; this can.
+    func onboardingExtraTapped(extra: String) {
+        track(.onboardingExtraTapped, properties: [
+            .extra: .string(extra)
+        ])
+    }
+
     func onboardingCompleted(lastStep: OnboardingStep, unitSystem: String?) {
         var properties: [AnalyticsPropertyKey: AnalyticsPropertyValue] = [
             .step: .string(lastStep.analyticsName),
@@ -812,7 +843,13 @@ extension OnboardingStep {
         // No `apple_health` case any more: 1.4 had a step here, 1.5 moved the offer to
         // the first workout finish. Historical `onboarding step viewed` rows still carry
         // it, which is why the funnel breaks down on `step` rather than `step_index`.
-        case .importPrompt: return "import_prompt"
+        //
+        // `import_prompt` is likewise gone — the redesign replaced it with these two. Funnels
+        // spanning that release will show the old name before it and these after, so the top of
+        // the funnel (`welcome`, `units_bodyweight`) is deliberately spelled unchanged to stay
+        // comparable across the boundary.
+        case .program: return "program"
+        case .extras: return "extras"
         }
     }
 }
@@ -841,6 +878,8 @@ enum AnalyticsEvent: String, CaseIterable {
     case onboardingStepViewed = "onboarding step viewed"
     case onboardingStepSkipped = "onboarding step skipped"
     case onboardingCompleted = "onboarding completed"
+    case programSelected = "program selected"
+    case onboardingExtraTapped = "onboarding extra tapped"
     case exerciseCreated = "exercise created"
     case templateCreated = "template created"
     case templateEdited = "template edited"
@@ -910,6 +949,9 @@ enum AnalyticsPropertyKey: String, CaseIterable {
     case dayOfWeek = "day_of_week"
     case result
     case unitSystem = "unit_system"
+    case programId = "program_id"
+    case sessionCount = "session_count"
+    case extra
     case errorType = "error_type"
     case errorContext = "error_context"
     case enabled

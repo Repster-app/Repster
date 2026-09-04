@@ -1,0 +1,47 @@
+{
+  "pages": [
+    { "id": "page-1", "name": "Onboarding" },
+    { "id": "page-2", "name": "Landing (open)" }
+  ],
+  "artboards": [
+    { "file": "Welcome.dc.html",   "x": 0,   "y": 0, "w": 390, "h": 844, "title": "Intro · Welcome",    "page": "page-1" },
+    { "file": "StepUnits.dc.html", "x": 470, "y": 0, "w": 390, "h": 844, "title": "Step 1 · Units",     "page": "page-1", "is_interactive": true },
+    { "file": "Main.dc.html",      "x": 940, "y": 0, "w": 390, "h": 844, "title": "Step 2 · Program",   "page": "page-1", "is_interactive": true },
+
+    { "file": "HomeEmpty.dc.html", "x": 0,   "y": 0, "w": 390, "h": 844, "title": "A · Home + example", "page": "page-2", "is_interactive": true },
+    { "file": "Summary.dc.html",   "x": 470, "y": 0, "w": 390, "h": 844, "title": "Post-workout payoff", "page": "page-2", "is_interactive": true }
+  ],
+  "annotations": [
+    {
+      "id": "note-welcome",
+      "page": "page-1",
+      "x": 0, "y": -200, "w": 390,
+      "text": "Only 2 of 57 dropped here, so this screen is not a leak.\nThe three bullets are the canonical value proposition — the same wording should carry to the App Store listing and the paywall."
+    },
+    {
+      "id": "note-units",
+      "page": "page-1",
+      "x": 470, "y": -200, "w": 390,
+      "text": "The one step from the live flow that stays. Units and bodyweight share a screen because a bodyweight figure is meaningless without a unit.\nBodyweight stays optional."
+    },
+    {
+      "id": "note-program",
+      "page": "page-1",
+      "x": 940, "y": -200, "w": 390,
+      "text": "Programs, not one-off splits: a program implies a next session, and it seeds the Templates feature only 3 of 57 people ever found.\nReplaces the import prompt as the terminal step, which lost 5 people and recorded zero skips."
+    },
+    {
+      "id": "note-landing",
+      "page": "page-2",
+      "x": 0, "y": -200, "w": 390,
+      "text": "OPEN QUESTION — not yet decided.\nOption A: land on Home, with example data marked as an example on the surfaces that have nothing in them yet. All 21 non-starters saw an empty Home."
+    },
+    {
+      "id": "note-payoff",
+      "page": "page-2",
+      "x": 470, "y": -200, "w": 390,
+      "text": "Not part of onboarding — this is what a finished first session returns, and where Apple Health is asked.\nKept here because it is the other half of the first-run experience."
+    }
+  ],
+  "launch": { "view": "canvas", "page": "page-1" }
+}

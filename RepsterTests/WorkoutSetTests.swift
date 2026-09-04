@@ -1603,6 +1603,71 @@ final class WorkoutSetTests: XCTestCase {
         XCTAssertEqual(ExercisePrimaryGroup.displayName(for: "core"), "Abs")
         XCTAssertEqual(ExercisePrimaryGroup.displayName(for: "forearm"), "Forearms")
     }
+
+    // MARK: - Keypad Session Lifecycle
+
+    /// Stand-in for one row's keypad session. Only the focus hooks matter here; the rest is inert.
+    private func makeKeypadContext(
+        ownerSetID: UUID,
+        setFocusedField: @escaping (SetRowInputField?) -> Void
+    ) -> SetEntryKeyboardContext {
+        SetEntryKeyboardContext(
+            ownerSetID: ownerSetID,
+            trackingType: .weightReps,
+            equipmentType: .barbell,
+            inputOrder: [.weight, .reps],
+            activeField: .weight,
+            getFocusedField: { .weight },
+            setFocusedField: setFocusedField,
+            getFieldValue: { _ in "" },
+            setFieldValue: { _, _ in },
+            getBilateralRIRValue: { nil },
+            setBilateralRIRValue: { _ in },
+            getSuggestedWeight: { nil },
+            canMovePrevious: { false },
+            canMoveNext: { true },
+            movePrevious: {},
+            moveNext: {},
+            dismiss: {}
+        )
+    }
+
+    func testHidingKeypadReleasesTheOwningRowsFocus() {
+        var focusedField: SetRowInputField? = .weight
+        let setID = UUID()
+        let manager = SetEntryKeyboardManager()
+        manager.show(makeKeypadContext(ownerSetID: setID) { focusedField = $0 })
+
+        manager.hide(ownerSetID: setID)
+
+        XCTAssertNil(manager.context)
+        XCTAssertNil(
+            focusedField,
+            "The row's accent border is drawn from its own focus, so hiding has to release it"
+        )
+    }
+
+    func testHidingKeypadWithoutAnOwnerReleasesWhicheverRowHoldsIt() {
+        var focusedField: SetRowInputField? = .weight
+        let manager = SetEntryKeyboardManager()
+        manager.show(makeKeypadContext(ownerSetID: UUID()) { focusedField = $0 })
+
+        manager.hide()
+
+        XCTAssertNil(manager.context)
+        XCTAssertNil(focusedField)
+    }
+
+    func testHidingKeypadForAnotherRowLeavesTheOwnerUntouched() {
+        var focusedField: SetRowInputField? = .weight
+        let manager = SetEntryKeyboardManager()
+        manager.show(makeKeypadContext(ownerSetID: UUID()) { focusedField = $0 })
+
+        manager.hide(ownerSetID: UUID())
+
+        XCTAssertNotNil(manager.context)
+        XCTAssertEqual(focusedField, .weight)
+    }
 }
 
 /// Pins the semantic predicates on `SetType`.

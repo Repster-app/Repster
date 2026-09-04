@@ -602,24 +602,24 @@ private struct MembershipSettingsView: View {
             Text("Lifetime access unlocks Repster permanently. Your subscription will keep renewing until you cancel it in Apple subscriptions.")
         }
         .sheet(isPresented: $showPaywall, onDismiss: {
-            analyticsService.paywallDismissed(source: .paywall)
+            analyticsService.paywallDismissed(source: .settings)
             Task { await refreshMembershipStatus(forceSubscriptionRefresh: true) }
         }) {
             PaywallView()
                 .onPurchaseStarted { _ in
-                    analyticsService.purchaseStarted(source: .paywall)
+                    analyticsService.purchaseStarted(source: .settings)
                 }
                 .onPurchaseCompleted { _ in
-                    analyticsService.purchaseCompleted(source: .paywall)
+                    analyticsService.purchaseCompleted(source: .settings)
                 }
                 .onPurchaseCancelled {
-                    analyticsService.purchaseCancelled(source: .paywall)
+                    analyticsService.purchaseCancelled(source: .settings)
                 }
                 .onRestoreStarted {
-                    analyticsService.restorePurchasesTapped(source: .paywall)
+                    analyticsService.restorePurchasesTapped(source: .settings)
                 }
                 .onAppear {
-                    analyticsService.paywallShown(source: .paywall)
+                    analyticsService.paywallShown(source: .settings)
                 }
         }
     }

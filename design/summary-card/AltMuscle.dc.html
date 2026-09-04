@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: #111113;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased; }
+    a { color: #5B8DEF; } a:hover { color: #7BA5F3; }
+  </style>
+</helmet>
+<div style="width: 360px; height: 640px; background: #111113; color: #EAEAEF; display: flex; flex-direction: column; padding: 32px 30px 28px; position: relative; overflow: hidden;">
+  <div style="flex: none; font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #5C5C6E;">Push Day A</div>
+  <div style="flex-grow: 1;"></div>
+  <div style="flex: none; display: flex; justify-content: center;">
+    <svg width="200" height="200" viewBox="0 0 200 200" style="transform: rotate(-90deg);" aria-hidden="true">
+      <circle cx="100" cy="100" r="74" fill="none" stroke="#5B8DEF" stroke-width="26" stroke-dasharray="208.88 256.076" stroke-dashoffset="-0" stroke-linecap="butt"></circle><circle cx="100" cy="100" r="74" fill="none" stroke="#D4A23A" stroke-width="26" stroke-dasharray="139.136 325.819" stroke-dashoffset="-213.88" stroke-linecap="butt"></circle><circle cx="100" cy="100" r="74" fill="none" stroke="#4ECDC4" stroke-width="26" stroke-dasharray="101.94 363.016" stroke-dashoffset="-358.016" stroke-linecap="butt"></circle>
+    </svg>
+    <div style="position: absolute; width: 200px; height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+      <div style="font-size: 27px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: #EAEAEF;">12,450</div>
+      <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #5C5C6E;">kg total</div>
+    </div>
+  </div>
+
+  <div style="height: 30px; flex: none;"></div>
+
+  <div style="flex: none; display: flex; flex-direction: column; gap: 11px;">
+      <div style="display: flex; align-items: center; gap: 9px;">
+        <span style="width: 9px; height: 9px; border-radius: 2px; background: #5B8DEF;"></span>
+        <span style="font-size: 14px; color: #EAEAEF;">Chest</span>
+        <span style="flex-grow: 1;"></span>
+        <span style="font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: #9999A8;">46%</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 9px;">
+        <span style="width: 9px; height: 9px; border-radius: 2px; background: #D4A23A;"></span>
+        <span style="font-size: 14px; color: #EAEAEF;">Shoulders</span>
+        <span style="flex-grow: 1;"></span>
+        <span style="font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: #9999A8;">31%</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 9px;">
+        <span style="width: 9px; height: 9px; border-radius: 2px; background: #4ECDC4;"></span>
+        <span style="font-size: 14px; color: #EAEAEF;">Triceps</span>
+        <span style="flex-grow: 1;"></span>
+        <span style="font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: #9999A8;">23%</span>
+      </div>
+  </div>
+
+  <div style="flex-grow: 1;"></div>
+  <div style="flex: none; display: flex; align-items: center; gap: 8px; font-size: 13px; font-variant-numeric: tabular-nums; color: #9999A8;"><span>1h 4m</span><span style="color: #5C5C6E;">&middot;</span><span>18 sets</span><span style="color: #5C5C6E;">&middot;</span><span>5 lifts</span></div>
+  <div style="height: 16px; flex: none;"></div>
+  <div style="flex: none; display: flex; align-items: center; gap: 10px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06);">
+    <span style="font-size: 11px; font-variant-numeric: tabular-nums; color: #5C5C6E;">Sat, Aug 30</span>
+    <span style="flex-grow: 1;"></span>
+    <span style="display: flex; align-items: center; gap: 8px;"><img src="repster-mark.png" alt="" width="16" height="16" style="display: block; flex: none;">
+      <span style="font-size: 15px; font-weight: 700; letter-spacing: -0.015em; color: #EAEAEF;">Repster</span>
+      <span style="font-size: 11px; color: #5C5C6E;">repster.app</span>
+    </span>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

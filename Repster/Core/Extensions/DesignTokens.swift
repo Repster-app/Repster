@@ -54,11 +54,27 @@ extension Color {
     /// Green at 8% opacity — Completed row background
     static let successSoft = success.opacity(0.08)
 
-    /// #D4A23A — PR badges, warmup indicators
+    /// #D4A23A — PR badges and personal-best highlights. Achievement only.
+    ///
+    /// Warm-ups used to share this colour, which made a preparatory set look like the same
+    /// kind of event as a personal record. They now have their own token — see ``warmup``.
     static let gold = Color(red: 0.831, green: 0.635, blue: 0.227)
 
     /// Gold at 10% opacity — PR badge background
     static let goldSoft = gold.opacity(0.10)
+
+    /// #C97B5A — Warm-up sets: the "W1" badge, the add button, warm-up counts in template cards.
+    ///
+    /// Clay rather than a reuse of an existing token, because every neighbouring hue already
+    /// carries a meaning a warm-up would inherit by mistake: gold is a PR, `chart5` purple is a
+    /// drop set, `success` green is a completed row, `orange` is a note, `stale` slate is an
+    /// out-of-window suggestion baseline, and `accent` blue is the primary action. A warm-up is
+    /// none of those — it is a set that happened and does not count.
+    static let warmup = Color(red: 0.788, green: 0.482, blue: 0.353)
+
+    /// Clay at 14% opacity — warm-up badge and button background. Slightly stronger than
+    /// ``goldSoft`` because clay is the darker hue and washes out at 10%.
+    static let warmupSoft = warmup.opacity(0.14)
 
     /// #E05555 — Negative trends, delete actions
     static let danger = Color(red: 0.878, green: 0.333, blue: 0.333)

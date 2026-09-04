@@ -12,6 +12,27 @@ import Photos
 import SwiftUI
 import UniformTypeIdentifiers
 
+// MARK: - Style
+
+/// Which story the card tells about the session. All four draw the same workout.
+enum WorkoutShareCardStyle: String, CaseIterable, Identifiable, Equatable {
+    case record
+    case muscles
+    case volume
+    case trace
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .record:  return "Record"
+        case .muscles: return "Muscles"
+        case .volume:  return "Volume"
+        case .trace:   return "Session"
+        }
+    }
+}
+
 // MARK: - Data
 
 /// Everything the card draws, pre-formatted. No model types, no services.
@@ -39,6 +60,61 @@ struct WorkoutShareCardData: Equatable {
     let lifts: [Lift]
     /// How many lifts did not fit in `lifts`.
     let extraLiftCount: Int
+
+    /// Volume split by the exercise's primary muscle, largest first. Empty when nothing in the
+    /// session resolves to a muscle group.
+    var muscleSlices: [MuscleSlice] = []
+
+    /// Every working set in the order it was performed.
+    var traceBars: [TraceBar] = []
+
+    /// A slice of the session's volume.
+    struct MuscleSlice: Equatable, Identifiable {
+        /// Normalised group, e.g. "chest" — the key `MuscleGroupColors` expects.
+        let group: String
+        let displayName: String
+        /// 0...1 of the session's total volume.
+        let fraction: Double
+        var id: String { group }
+    }
+
+    /// One set, as a bar.
+    struct TraceBar: Equatable, Identifiable {
+        let id: UUID
+        /// Normalised against the session's heaviest set, 0...1.
+        let magnitude: Double
+        /// Normalised muscle group, or nil when the lift has none.
+        let group: String?
+        let isPR: Bool
+        /// True where a new exercise begins, so the trace can be grouped visually.
+        let startsNewExercise: Bool
+    }
+
+    /// "12,450" out of "12,450 kg" — the unit rides in the caption instead of at 96 pt.
+    var volumeHeadline: String {
+        guard let volumeLabel else { return setCountLabel }
+        return volumeLabel.split(separator: " ").first.map(String.init) ?? volumeLabel
+    }
+
+    /// "KILOS MOVED", or the unit the primary metric actually uses.
+    var volumeCaption: String {
+        guard let volumeLabel else { return "SETS LOGGED" }
+        let unit = volumeLabel.split(separator: " ").dropFirst().joined(separator: " ")
+        guard !unit.isEmpty else { return "TOTAL VOLUME" }
+        return "\(unit) moved".uppercased()
+    }
+
+    /// Only offer a style the session can actually fill.
+    var availableStyles: [WorkoutShareCardStyle] {
+        WorkoutShareCardStyle.allCases.filter { style in
+            switch style {
+            case .record:  return prLift != nil
+            case .muscles: return muscleSlices.count >= 2
+            case .volume:  return volumeLabel != nil
+            case .trace:   return traceBars.count >= 3
+            }
+        }
+    }
 }
 
 // MARK: - Privacy
@@ -58,6 +134,20 @@ enum WorkoutShareCardPreferences {
         get { UserDefaults.standard.bool(forKey: hideWeightsKey) }
         set { UserDefaults.standard.set(newValue, forKey: hideWeightsKey) }
     }
+
+    static let styleKey = "shareCard.style"
+
+    /// B3 rejected a picker because "a picker adds a decision at the exact moment where friction
+    /// costs the most". Remembering the choice is what makes a picker compatible with that: it
+    /// is browsed once, not answered every time.
+    static var style: WorkoutShareCardStyle {
+        get {
+            guard let raw = UserDefaults.standard.string(forKey: styleKey),
+                  let style = WorkoutShareCardStyle(rawValue: raw) else { return .record }
+            return style
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: styleKey) }
+    }
 }
 
 // MARK: - Card
@@ -68,10 +158,29 @@ struct WorkoutShareCard: View {
     static let size = CGSize(width: 360, height: 640)
 
     let data: WorkoutShareCardData
+    var style: WorkoutShareCardStyle = .record
     var hidesExerciseList: Bool = false
     var hidesWeights: Bool = false
 
     var body: some View {
+        Group {
+            switch style {
+            case .record:  recordBody
+            case .muscles: musclesBody
+            case .volume:  volumeBody
+            case .trace:   traceBody
+            }
+        }
+        .padding(.horizontal, 30)
+        .padding(.top, 34)
+        .padding(.bottom, 30)
+        .frame(width: Self.size.width, height: Self.size.height, alignment: .topLeading)
+        .background(Color.bg)
+    }
+
+    // MARK: Record (the original)
+
+    private var recordBody: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Story chrome covers roughly the top and bottom sixth, so the block sits high-centre
             // rather than against the top edge.
@@ -94,11 +203,172 @@ struct WorkoutShareCard: View {
 
             footer
         }
-        .padding(.horizontal, 30)
-        .padding(.top, 34)
-        .padding(.bottom, 30)
-        .frame(width: Self.size.width, height: Self.size.height, alignment: .topLeading)
-        .background(Color.shareCardGround)
+    }
+
+    // MARK: Muscles
+
+    private var musclesBody: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            eyebrow(data.title, color: .textTertiary)
+
+            Spacer(minLength: 0).frame(maxHeight: .infinity)
+
+            ZStack {
+                MuscleDonut(slices: data.muscleSlices)
+                    .frame(width: 210, height: 210)
+
+                VStack(spacing: 2) {
+                    Text(data.volumeLabel ?? data.setCountLabel)
+                        .font(.system(size: 26, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundColor(.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+
+                    Text(data.volumeLabel == nil ? "SETS" : "TOTAL")
+                        .font(.system(size: 10, weight: .semibold))
+                        .kerning(1.1)
+                        .foregroundColor(.textTertiary)
+                }
+            }
+            .frame(maxWidth: .infinity)
+
+            Spacer().frame(height: 28)
+
+            VStack(spacing: 11) {
+                ForEach(data.muscleSlices.prefix(4)) { slice in
+                    HStack(spacing: 9) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(MuscleGroupColors.color(for: slice.group))
+                            .frame(width: 9, height: 9)
+
+                        Text(slice.displayName)
+                            .font(.system(size: 14))
+                            .foregroundColor(.textPrimary)
+                            .lineLimit(1)
+
+                        Spacer(minLength: 8)
+
+                        Text("\(Int((slice.fraction * 100).rounded()))%")
+                            .font(.system(size: 14, weight: .semibold))
+                            .monospacedDigit()
+                            .foregroundColor(.textSecondary)
+                    }
+                }
+            }
+
+            Spacer(minLength: 0).frame(maxHeight: .infinity)
+
+            metaRow([data.durationLabel, "\(data.setCountLabel) sets", "\(data.liftCountLabel) lifts"])
+
+            Spacer().frame(height: 16)
+
+            footer
+        }
+    }
+
+    // MARK: Volume
+
+    private var volumeBody: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            eyebrow(data.title, color: .textTertiary)
+
+            Spacer(minLength: 0).frame(maxHeight: .infinity)
+
+            Text(data.volumeHeadline)
+                .font(.system(size: 96, weight: .heavy, design: .rounded))
+                .monospacedDigit()
+                .foregroundColor(.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+
+            Spacer().frame(height: 14)
+
+            Text(data.volumeCaption)
+                .font(.system(size: 15, weight: .bold))
+                .kerning(3.2)
+                .foregroundColor(.accent)
+
+            Spacer().frame(height: 30)
+
+            RoundedRectangle(cornerRadius: 2)
+                .fill(Color.accent)
+                .frame(width: 56, height: 3)
+
+            Spacer(minLength: 0).frame(maxHeight: .infinity)
+
+            metaRow([data.durationLabel, "\(data.setCountLabel) sets", "\(data.liftCountLabel) lifts"])
+
+            Spacer().frame(height: 16)
+
+            footer
+        }
+    }
+
+    // MARK: Trace
+
+    private var traceBody: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(data.title)
+                .font(.system(size: 25, weight: .bold))
+                .foregroundColor(.textPrimary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.7)
+
+            Spacer(minLength: 0).frame(maxHeight: .infinity)
+
+            SessionTrace(bars: data.traceBars)
+                .frame(height: 150)
+
+            Spacer().frame(height: 16)
+
+            HStack(spacing: 16) {
+                ForEach(data.muscleSlices.prefix(3)) { slice in
+                    HStack(spacing: 6) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(MuscleGroupColors.color(for: slice.group))
+                            .frame(width: 9, height: 9)
+                        Text(slice.displayName)
+                            .font(.system(size: 13))
+                            .foregroundColor(.textSecondary)
+                            .lineLimit(1)
+                    }
+                }
+            }
+
+            Spacer(minLength: 0).frame(maxHeight: .infinity)
+
+            metaRow([data.durationLabel, "\(data.setCountLabel) sets", data.volumeLabel].compactMap { $0 })
+
+            Spacer().frame(height: 16)
+
+            footer
+        }
+    }
+
+    // MARK: Shared pieces
+
+    private func eyebrow(_ text: String, color: Color) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .bold))
+            .kerning(2.0)
+            .textCase(.uppercase)
+            .foregroundColor(color)
+            .lineLimit(1)
+    }
+
+    private func metaRow(_ items: [String]) -> some View {
+        HStack(spacing: 8) {
+            ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                if index > 0 {
+                    Text("·").foregroundColor(.textTertiary)
+                }
+                Text(item)
+            }
+        }
+        .font(.system(size: 13))
+        .monospacedDigit()
+        .foregroundColor(.textSecondary)
     }
 
     // MARK: Headline
@@ -154,18 +424,16 @@ struct WorkoutShareCard: View {
             }
         } else {
             // No record: the workout itself is the subject.
-            VStack(alignment: .leading, spacing: 8) {
-                Text(data.title)
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundColor(.textPrimary)
-                    .lineLimit(3)
-                    .minimumScaleFactor(0.7)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Text("\(data.liftCountLabel) · \(data.setCountLabel) · \(data.durationLabel)")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.textTertiary)
-            }
+            //
+            // Deliberately just the title. This carried a "6 · 17 · 52m" line, which was the
+            // same three numbers as the stat row immediately below it, stripped of their labels
+            // and their units — so it read as a meaningless string and then repeated itself.
+            Text(data.title)
+                .font(.system(size: 34, weight: .bold))
+                .foregroundColor(.textPrimary)
+                .lineLimit(3)
+                .minimumScaleFactor(0.7)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -243,7 +511,11 @@ struct WorkoutShareCard: View {
 
     // MARK: Footer
 
-    /// B3: date, wordmark and URL. Always present, never removable.
+    /// B3: date and wordmark. Always present, never removable.
+    ///
+    /// No URL on the face: `repster.app` was never a domain we own — it read back from the
+    /// `com.repster.app` bundle id — and the Pages URL is too long to be typed off an image.
+    /// B3 open decision 1 settles as "no short domain", so the mark carries the brand alone.
     private var footer: some View {
         HStack(spacing: 10) {
             Text(data.dateLabel)
@@ -262,25 +534,115 @@ struct WorkoutShareCard: View {
                 Text("Repster")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(.textPrimary)
-
-                Text("repster.app")
-                    .font(.system(size: 11))
-                    .foregroundColor(.textTertiary)
             }
         }
         .padding(.top, 18)
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(Color.white.opacity(0.08))
+                .fill(Color.border)
                 .frame(height: 1)
         }
     }
 }
 
-private extension Color {
-    /// A touch below `bg`, so the card reads as its own object rather than a screenshot.
-    static let shareCardGround = Color(red: 0.055, green: 0.055, blue: 0.067)
+// MARK: - Drawings
+
+/// Volume by muscle, as a ring. Segments are separated by a small gap so neighbouring colours
+/// never touch.
+private struct MuscleDonut: View {
+    let slices: [WorkoutShareCardData.MuscleSlice]
+
+    var body: some View {
+        Canvas { context, size in
+            let lineWidth: CGFloat = 26
+            let rect = CGRect(origin: .zero, size: size).insetBy(dx: lineWidth / 2, dy: lineWidth / 2)
+            let centre = CGPoint(x: rect.midX, y: rect.midY)
+            let radius = min(rect.width, rect.height) / 2
+            // A gap in degrees, so thin slices still read as separate.
+            let gap: Double = 2.5
+            var start: Double = -90
+
+            for slice in slices {
+                let sweep = slice.fraction * 360
+                guard sweep > gap else {
+                    start += sweep
+                    continue
+                }
+
+                var path = Path()
+                path.addArc(
+                    center: centre,
+                    radius: radius,
+                    startAngle: .degrees(start + gap / 2),
+                    endAngle: .degrees(start + sweep - gap / 2),
+                    clockwise: false
+                )
+                context.stroke(
+                    path,
+                    with: .color(MuscleGroupColors.color(for: slice.group)),
+                    style: StrokeStyle(lineWidth: lineWidth)
+                )
+                start += sweep
+            }
+        }
+    }
 }
+
+/// Every set of the session, in order, as a bar. Height is the set's volume against the
+/// heaviest set of the session; a diamond marks a record.
+private struct SessionTrace: View {
+    let bars: [WorkoutShareCardData.TraceBar]
+
+    var body: some View {
+        GeometryReader { proxy in
+            let gaps = CGFloat(max(bars.count - 1, 0)) * 4
+            let groupGaps = CGFloat(bars.filter(\.startsNewExercise).count) * 8
+            let barWidth = max(4, (proxy.size.width - gaps - groupGaps) / CGFloat(max(bars.count, 1)))
+            let markerRoom: CGFloat = 16
+            let usable = proxy.size.height - markerRoom
+
+            HStack(alignment: .bottom, spacing: 4) {
+                ForEach(Array(bars.enumerated()), id: \.element.id) { index, bar in
+                    let height = max(6, usable * CGFloat(bar.magnitude))
+
+                    VStack(spacing: 5) {
+                        if bar.isPR {
+                            Diamond()
+                                .fill(Color.gold)
+                                .frame(width: 9, height: 9)
+                        } else {
+                            Color.clear.frame(width: 9, height: 9)
+                        }
+
+                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                            .fill(bar.group.map { MuscleGroupColors.color(for: $0) } ?? Color.textTertiary)
+                            .frame(width: barWidth, height: height)
+                    }
+                    .padding(.leading, index > 0 && bar.startsNewExercise ? 8 : 0)
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .bottom)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(Color.border)
+                    .frame(height: 1)
+            }
+        }
+    }
+}
+
+private struct Diamond: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.midY))
+        path.closeSubpath()
+        return path
+    }
+}
+
 
 // MARK: - Renderer
 
@@ -353,11 +715,13 @@ enum WorkoutShareCardRenderer {
     @MainActor
     static func render(
         data: WorkoutShareCardData,
+        style: WorkoutShareCardStyle = .record,
         hidesExerciseList: Bool,
         hidesWeights: Bool
     ) -> UIImage? {
         let card = WorkoutShareCard(
             data: data,
+            style: style,
             hidesExerciseList: hidesExerciseList,
             hidesWeights: hidesWeights
         )
@@ -465,6 +829,7 @@ struct WorkoutSharePreviewSheet: View {
     @State private var hidesWeights = WorkoutShareCardPreferences.hidesWeights
     @State private var rendered: UIImage?
     @State private var fileURL: URL?
+    @State private var style: WorkoutShareCardStyle = WorkoutShareCardPreferences.style
     @State private var saveState: SaveState = .idle
     @State private var showPhotosDeniedAlert = false
 
@@ -481,9 +846,26 @@ struct WorkoutSharePreviewSheet: View {
             // off the bottom of the sheet.
             VStack(spacing: 16) {
                 GeometryReader { proxy in
-                    card(scale: min(proxy.size.width / WorkoutShareCard.size.width,
-                                    proxy.size.height / WorkoutShareCard.size.height))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    let scale = min(proxy.size.width / WorkoutShareCard.size.width,
+                                    proxy.size.height / WorkoutShareCard.size.height)
+
+                    if styles.count > 1 {
+                        TabView(selection: $style) {
+                            ForEach(styles) { candidate in
+                                card(style: candidate, scale: scale)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .tag(candidate)
+                            }
+                        }
+                        .tabViewStyle(.page(indexDisplayMode: .never))
+                    } else {
+                        card(style: style, scale: scale)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
+
+                if styles.count > 1 {
+                    styleBar
                 }
 
                 toggles
@@ -495,13 +877,21 @@ struct WorkoutSharePreviewSheet: View {
             shareBar
         }
         .background(Color.bg.ignoresSafeArea())
-        .task(id: TogglePair(list: hidesExerciseList, weights: hidesWeights)) {
+        .task(id: RenderKey(style: style, list: hidesExerciseList, weights: hidesWeights)) {
             await refreshRender()
+        }
+        .onAppear {
+            // A remembered style the session cannot fill would leave the picker on a blank card.
+            if !styles.contains(style) { style = styles[0] }
+        }
+        .onChange(of: style) { _, value in
+            WorkoutShareCardPreferences.style = value
         }
     }
 
-    /// Re-render only when a toggle actually changes.
-    private struct TogglePair: Equatable {
+    /// Re-render only when something that affects the image changes.
+    private struct RenderKey: Equatable {
+        let style: WorkoutShareCardStyle
         let list: Bool
         let weights: Bool
     }
@@ -536,9 +926,41 @@ struct WorkoutSharePreviewSheet: View {
         }
     }
 
-    private func card(scale: CGFloat) -> some View {
+    /// Styles this session can actually fill, with the remembered one guaranteed present.
+    private var styles: [WorkoutShareCardStyle] {
+        let available = data.availableStyles
+        return available.isEmpty ? [.record] : available
+    }
+
+    /// A row of names under the card, so the choice is visible rather than only discoverable
+    /// by swiping.
+    private var styleBar: some View {
+        HStack(spacing: 8) {
+            ForEach(styles) { candidate in
+                let isSelected = candidate == style
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { style = candidate }
+                } label: {
+                    Text(candidate.displayName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(isSelected ? .white : .textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 34)
+                        .background(isSelected ? Color.accent : Color.bgInput)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(candidate.displayName) card")
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+        }
+    }
+
+    private func card(style: WorkoutShareCardStyle, scale: CGFloat) -> some View {
         WorkoutShareCard(
             data: data,
+            style: style,
             hidesExerciseList: hidesExerciseList,
             hidesWeights: hidesWeights
         )
@@ -732,6 +1154,7 @@ struct WorkoutSharePreviewSheet: View {
     private func refreshRender() async {
         let image = WorkoutShareCardRenderer.render(
             data: data,
+            style: style,
             hidesExerciseList: hidesExerciseList,
             hidesWeights: hidesWeights
         )

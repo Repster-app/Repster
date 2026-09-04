@@ -1,0 +1,143 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif; }
+    a { color: #5B8DEF; } a:hover { color: #7BA5F2; }
+    .screen { position: relative; width: 390px; height: 844px; background: #111113; overflow: hidden; }
+    .under { position: absolute; inset: 0; filter: blur(1.5px) brightness(0.5); }
+    .statusspace { height: 47px; }
+    .nav { height: 44px; display: flex; align-items: center; justify-content: space-between;
+           padding: 0 16px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .nav-side { font-size: 17px; color: #5B8DEF; letter-spacing: -0.2px; }
+    .nav-title { font-size: 17px; font-weight: 600; color: #EAEAEF; letter-spacing: -0.3px; }
+    .body { padding: 16px 16px 40px; display: flex; flex-direction: column; gap: 16px; }
+    .eyebrow { font-size: 11px; font-weight: 600; color: #5C5C6E; letter-spacing: 0.8px; }
+    .namefield { height: 48px; box-sizing: border-box; display: flex; align-items: center;
+                 padding: 0 14px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06);
+                 border-radius: 12px; font-size: 17px; font-weight: 500; color: #EAEAEF; }
+    .folderrow { height: 48px; box-sizing: border-box; display: flex; align-items: center; gap: 10px;
+                 padding: 0 13px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06);
+                 border-radius: 11px; font-size: 14px; font-weight: 500; color: #9999A8; }
+    .card { background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; }
+    .cardhead { display: flex; align-items: center; gap: 10px; padding: 14px; }
+    .grip { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+            color: #5C5C6E; flex-shrink: 0; }
+    .exname { font-size: 15px; font-weight: 600; color: #EAEAEF; letter-spacing: -0.2px; }
+    .exsum { font-size: 12px; color: #9999A8; letter-spacing: -0.1px; }
+    .addex { height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px;
+             background: rgba(91,141,239,0.10); border-radius: 14px;
+             font-size: 15px; font-weight: 600; color: #5B8DEF; }
+    .chev { width: 16px; height: 16px; flex-shrink: 0; }
+  </style>
+</helmet>
+
+<div class="screen">
+
+  <div class="under">
+    <div class="statusspace"></div>
+    <div class="nav">
+      <div class="nav-side">Cancel</div>
+      <div class="nav-title">Edit Template</div>
+      <div class="nav-side" style="font-weight: 600">Save</div>
+    </div>
+    <div class="body">
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <div class="eyebrow">TEMPLATE NAME</div>
+        <div class="namefield">Push Day A</div>
+        <div class="folderrow">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h3l1.5 2h6.5A1.5 1.5 0 0 1 17 8.5v6A1.5 1.5 0 0 1 15.5 16h-11A1.5 1.5 0 0 1 3 14.5z"/></svg>
+          <span>Folder</span>
+          <span style="flex-grow: 1"></span>
+          <span style="font-weight: 600; color: #5C5C6E">None</span>
+          <svg class="chev" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <div class="eyebrow">EXERCISES</div>
+          <div style="font-size: 12px; color: #5C5C6E">4 exercises · 16 sets</div>
+        </div>
+
+        <div class="card"><div class="cardhead">
+          <div class="grip"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6h13M3.5 10h13M3.5 14h13"/></svg></div>
+          <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1">
+            <div class="exname">Barbell Bench Press</div>
+            <div class="exsum">2 warmup · 3 working · 6-8 reps · RIR 2</div>
+          </div>
+          <svg class="chev" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg>
+        </div></div>
+
+        <div class="card" style="border-color: rgba(255,255,255,0.12)"><div class="cardhead">
+          <div class="grip"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6h13M3.5 10h13M3.5 14h13"/></svg></div>
+          <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1">
+            <div class="exname">Incline Dumbbell Press</div>
+            <div class="exsum">3 working · 8-10 reps · RIR 2</div>
+          </div>
+          <svg class="chev" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg>
+        </div></div>
+
+        <div class="card"><div class="cardhead">
+          <div class="grip"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6h13M3.5 10h13M3.5 14h13"/></svg></div>
+          <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1">
+            <div class="exname">Cable Fly</div>
+            <div class="exsum">3 working · 12-15 reps · RIR 1</div>
+          </div>
+          <svg class="chev" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg>
+        </div></div>
+
+        <div class="card"><div class="cardhead">
+          <div class="grip"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6h13M3.5 10h13M3.5 14h13"/></svg></div>
+          <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1">
+            <div class="exname">Overhead Press</div>
+            <div class="exsum">1 warmup · 4 working · 5-7 reps · RIR 2</div>
+          </div>
+          <svg class="chev" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg>
+        </div></div>
+      </div>
+
+      <div class="addex">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 4.5v11M4.5 10h11"/></svg>
+        Add Exercise
+      </div>
+    </div>
+  </div>
+
+  <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.42)"></div>
+
+  <!-- iOS alert -->
+  <div style="position: absolute; top: 344px; left: 60px; width: 270px; border-radius: 14px;
+              overflow: hidden; background: rgba(44,44,46,0.86);
+              backdrop-filter: blur(28px) saturate(1.7); -webkit-backdrop-filter: blur(28px) saturate(1.7);
+              box-shadow: 0 18px 46px rgba(0,0,0,0.5);">
+
+    <div style="padding: 20px 16px; display: flex; flex-direction: column; gap: 4px; text-align: center;">
+      <div style="font-size: 17px; font-weight: 600; color: #FFFFFF; letter-spacing: -0.3px;">Remove from Template?</div>
+      <div style="font-size: 13px; color: rgba(255,255,255,0.92); line-height: 17px; text-wrap: pretty;">This will remove Incline Dumbbell Press and its 3 sets from this template.</div>
+    </div>
+
+    <div style="height: 1px; background: rgba(255,255,255,0.14)"></div>
+
+    <div style="display: flex; height: 44px;">
+      <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center;
+                  font-size: 17px; font-weight: 600; color: #0A84FF; letter-spacing: -0.3px;">Cancel</div>
+      <div style="width: 1px; background: rgba(255,255,255,0.14)"></div>
+      <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center;
+                  font-size: 17px; color: #FF453A; letter-spacing: -0.3px;">Remove</div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {}
+</script>
+</body>
+</html>

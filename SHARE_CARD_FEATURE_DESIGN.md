@@ -242,7 +242,10 @@ Answering the brief's open questions, with reasoning rather than a menu.
 3. **Exercise list.** Top 3 by set count, each with its best set, then "+N more". Off by
    default is tempting for privacy, but the exercise list is the part other lifters actually
    find interesting. **Default on, with a hide toggle** (B4).
-4. **Footer.** Date · Repster wordmark · short URL. Always present, never removable.
+4. **Footer.** Date · Repster mark + wordmark. Always present, never removable.
+   **No URL** — see open decision 1, settled 2026-09-03. The implementation briefly carried
+   `repster.app`, which is not a domain we own; it read back from the `com.repster.app`
+   bundle id. Removed rather than replaced with the Pages URL.
 
 **One layout or a picker?** **One: 9:16 story (1080 × 1920).** A picker adds a decision at
 the exact moment where friction costs the most, and 9:16 renders acceptably in iMessage,
@@ -476,9 +479,11 @@ launch and deserves not to be buried under a privacy release.
 
 # Open decisions — yours to make
 
-1. **Do you own a short domain?** (`repster.site` appears in `PRE_1.4_CHECKLIST.md` §6.) The
-   card needs a URL on its face that a person could plausibly type. If not, the GitHub Pages
-   URL works but wastes the impression.
+1. ~~**Do you own a short domain?**~~ **Settled 2026-09-03: no.** The card carries no URL.
+   The Pages URL (`repster-app.github.io/Repster`) is not typeable off an image, and the
+   `repster.app` that had shipped in the footer was never ours. If a short domain is bought
+   later, the footer is the place to put it — but the card brands fine without one, and the
+   campaign-tagged App Store link (A2 item 1) is the attribution path that actually works.
 2. **Set up the App Store Connect campaign link before or after shipping?** Before, ideally —
    retrofitting attribution means the first weeks of data are unattributable.
 3. **Exercise list on by default?** I recommend yes with a hide toggle (B3/B4); the counter-

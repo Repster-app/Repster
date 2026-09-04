@@ -1,0 +1,163 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap">
+  <style>
+    body { margin: 0; font-family: "DM Sans", system-ui, -apple-system, sans-serif; }
+    a { color: #5B8DEF; text-decoration: none; }
+    a:hover { color: #7BA5F3; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; background: #111113; display: flex; flex-direction: column; box-sizing: border-box; padding: 60px 0 0;">
+
+  <div style="display: flex; align-items: center; padding: 0 20px 18px;">
+    <div style="font-size: 26px; font-weight: 700; color: #EAEAEF; letter-spacing: -0.02em; flex-grow: 1;">Home</div>
+    <div style="width: 34px; height: 34px; border-radius: 10px; background: #1B1B1F; display: flex; align-items: center; justify-content: center;">
+      <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="#9999A8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="10" cy="10" r="2.6"></circle>
+        <path d="M10 2.2v2M10 15.8v2M2.2 10h2M15.8 10h2M4.5 4.5l1.4 1.4M14.1 14.1l1.4 1.4M15.5 4.5l-1.4 1.4M5.9 14.1l-1.4 1.4"></path>
+      </svg>
+    </div>
+  </div>
+
+  <div style="padding: 0 20px;">
+    <div style="display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; background: rgba(91,141,239,0.10); border: 1px solid rgba(91,141,239,0.30);">
+      <div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1;">
+        <div style="font-size: 11px; font-weight: 600; color: #5B8DEF; letter-spacing: 0.08em;">READY WHEN YOU ARE</div>
+        <div style="font-size: 17px; font-weight: 600; color: #EAEAEF;">Start Pull session</div>
+        <div style="font-size: 12px; font-weight: 400; color: #9999A8;">4 exercises queued from your split</div>
+      </div>
+      <div style="width: 44px; height: 44px; border-radius: 22px; background: #5B8DEF; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="#FFFFFF">
+          <path d="M6 4l10 6-10 6z"></path>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div style="font-size: 11px; font-weight: 600; color: #5C5C6E; letter-spacing: 0.08em; padding: 22px 20px 8px;">RECENT</div>
+
+  <div style="padding: 0 20px;">
+    <div style="padding: 14px; border-radius: 14px; background: #1B1B1F;">
+      <div style="display: flex; align-items: baseline; gap: 8px; padding-bottom: 10px;">
+        <div style="font-size: 15px; font-weight: 600; color: #EAEAEF; flex-grow: 1;">Push</div>
+        <div style="font-size: 12px; font-weight: 500; color: #5C5C6E;">Today</div>
+      </div>
+      <div style="display: flex; gap: 22px;">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <div style="font-size: 14px; font-weight: 700; color: #EAEAEF;">12</div>
+          <div style="font-size: 10px; font-weight: 500; color: #5C5C6E; letter-spacing: 0.06em;">SETS</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <div style="font-size: 14px; font-weight: 700; color: #EAEAEF;">3,960</div>
+          <div style="font-size: 10px; font-weight: 500; color: #5C5C6E; letter-spacing: 0.06em;">KG</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <div style="font-size: 14px; font-weight: 700; color: #EAEAEF;">38</div>
+          <div style="font-size: 10px; font-weight: 500; color: #5C5C6E; letter-spacing: 0.06em;">MIN</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="font-size: 11px; font-weight: 600; color: #5C5C6E; letter-spacing: 0.08em; padding: 22px 20px 8px;">TRAINING STATUS</div>
+
+  <div style="padding: 0 20px;">
+
+    <sc-if value="{{previewOn}}" hint-placeholder-val="{{true}}">
+      <div>
+        <div style="padding: 14px; border-radius: 14px; background: #1B1B1F; border: 1px dashed rgba(255,255,255,0.14);">
+          <div style="display: flex; align-items: center; gap: 8px; padding-bottom: 12px;">
+            <div style="font-size: 13px; font-weight: 600; color: #9999A8; flex-grow: 1;">Chest · Fresh</div>
+            <div style="padding: 3px 7px; border-radius: 5px; background: #262630;">
+              <div style="font-size: 9px; font-weight: 700; color: #5C5C6E; letter-spacing: 0.10em;">EXAMPLE</div>
+            </div>
+          </div>
+          <div style="opacity: 0.5; display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; align-items: flex-end; gap: 5px; height: 54px;">
+              <div style="flex-grow: 1; height: 40%; border-radius: 3px; background: #5B8DEF;"></div>
+              <div style="flex-grow: 1; height: 62%; border-radius: 3px; background: #5B8DEF;"></div>
+              <div style="flex-grow: 1; height: 48%; border-radius: 3px; background: #5B8DEF;"></div>
+              <div style="flex-grow: 1; height: 78%; border-radius: 3px; background: #5B8DEF;"></div>
+              <div style="flex-grow: 1; height: 66%; border-radius: 3px; background: #5B8DEF;"></div>
+              <div style="flex-grow: 1; height: 100%; border-radius: 3px; background: #5EC269;"></div>
+            </div>
+            <div style="display: flex; align-items: baseline; gap: 6px;">
+              <div style="font-size: 18px; font-weight: 700; color: #EAEAEF;">1.12×</div>
+              <div style="font-size: 12px; font-weight: 400; color: #9999A8;">of your six-week baseline</div>
+            </div>
+          </div>
+        </div>
+        <div style="font-size: 12px; font-weight: 400; color: #5C5C6E; line-height: 1.45; padding: 9px 2px 0;">
+          A sample, not your data. Log two more sessions and this becomes your real training status.
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{previewOff}}" hint-placeholder-val="{{true}}">
+      <div style="padding: 22px 14px; border-radius: 14px; background: #1B1B1F; display: flex; align-items: center; justify-content: center;">
+        <div style="font-size: 14px; font-weight: 500; color: #5C5C6E;">Unlocks as you log workouts</div>
+      </div>
+    </sc-if>
+
+  </div>
+
+  <div style="flex-grow: 1;"></div>
+
+  <div style="display: flex; align-items: flex-start; padding: 12px 20px 30px; border-top: 1px solid rgba(255,255,255,0.06);">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+      <svg width="21" height="21" viewBox="0 0 20 20" fill="none" stroke="#5B8DEF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 9l7-6 7 6v8a1 1 0 01-1 1H4a1 1 0 01-1-1z"></path>
+      </svg>
+      <div style="font-size: 10px; font-weight: 500; color: #5B8DEF;">Home</div>
+    </div>
+    <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+      <svg width="21" height="21" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4.5" width="14" height="13" rx="2"></rect><path d="M3 8h14M7 2.5v3M13 2.5v3"></path>
+      </svg>
+      <div style="font-size: 10px; font-weight: 500; color: #5C5C6E;">Calendar</div>
+    </div>
+    <div style="flex-grow: 1; display: flex; justify-content: center;">
+      <div style="width: 46px; height: 46px; border-radius: 14px; background: #5B8DEF; display: flex; align-items: center; justify-content: center; margin-top: -16px;">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round">
+          <path d="M10 4v12M4 10h12"></path>
+        </svg>
+      </div>
+    </div>
+    <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+      <svg width="21" height="21" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 16V9M10 16V4M16 16v-5"></path>
+      </svg>
+      <div style="font-size: 10px; font-weight: 500; color: #5C5C6E;">Charts</div>
+    </div>
+    <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+      <svg width="21" height="21" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="10" cy="7" r="3"></circle><path d="M4 17c0-3 2.7-5 6-5s6 2 6 5"></path>
+      </svg>
+      <div style="font-size: 10px; font-weight: 500; color: #5C5C6E;">You</div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"previewMode":{"editor":"boolean","default":true,"section":"Empty states"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const on = this.props.previewMode !== false;
+    return {
+      previewOn: on,
+      previewOff: !on
+    };
+  }
+}
+</script>
+</body>
+</html>

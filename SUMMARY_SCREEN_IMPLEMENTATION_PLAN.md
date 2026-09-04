@@ -223,6 +223,23 @@ New work beyond the doc:
    `testPhotoLibraryAddUsageDescriptionIsDeclared` asserts it is present *and* that the broader
    read-access key is not. Denial routes to an alert offering Settings, and Share still works.
 
+   **Card styles built 2026-09-04.** Four: Record (the PR), Muscles (volume split as a ring),
+   Volume (one number at 96 pt) and Session (every set as a bar, in order, coloured by muscle,
+   gold diamond on a record). Swipeable in the preview sheet, with the choice remembered in
+   `WorkoutShareCardPreferences.style` — which is how a picker stays compatible with B3's
+   objection: it is browsed once, not answered every time. `availableStyles` hides any style the
+   session cannot fill, so a swipe never lands on a blank card.
+
+   Muscles and Session are computed in the sheet from `viewModel.exercises` and
+   `setsByExercise` — no new service, no new storage. Warm-ups are excluded from both. The
+   Session bars are **set volume, not effort**: RIR is the truer axis but it is optional, and a
+   chart that treated "not logged" as "easy" would be inventing a session.
+
+   A fifth card, **this lift over time**, was drawn and not built: it needs a per-session history
+   series for one exercise, and `StatsServiceProtocol` exposes aggregates
+   (`fetchStats`, `fetchStatsSnapshot`) rather than a series. That is the one that needs new
+   data plumbing.
+
    Still open: an **Instagram Stories** hand-off via `instagram-stories://share` (one tap into
    the Stories composer, needs an `LSApplicationQueriesSchemes` entry). Worth doing if the card
    is meant for Stories — a 9:16 card that takes three taps to get there is aimed at a

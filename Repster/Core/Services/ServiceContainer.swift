@@ -24,6 +24,7 @@ final class ServiceContainer {
     let importService: any ImportServiceProtocol
     let workoutHistoryBackupService: any WorkoutHistoryBackupServiceProtocol
     let templateService: any TemplateServiceProtocol
+    let programCatalogService: any ProgramCatalogServiceProtocol
     let loadPrescriptionService: any LoadPrescriptionServiceProtocol
     let subscriptionService: any SubscriptionServiceProtocol
     let accessControlService: any AccessControlServiceProtocol
@@ -171,6 +172,12 @@ final class ServiceContainer {
             modelContainer: repositoryContainer.modelContainer
         )
 
+        // 15. ProgramCatalogService — reads the bundled catalogue, writes through TemplateService
+        let programCatalogService = ProgramCatalogService(
+            templateService: templateService,
+            exerciseRepository: repositoryContainer.exerciseRepository
+        )
+
         self.prService = prService
         self.statsService = statsService
         self.setService = setService
@@ -182,6 +189,7 @@ final class ServiceContainer {
         self.importService = importService
         self.workoutHistoryBackupService = workoutHistoryBackupService
         self.templateService = templateService
+        self.programCatalogService = programCatalogService
         self.loadPrescriptionService = loadPrescriptionService
         self.subscriptionService = subscriptionService
         self.accessControlService = accessControlService

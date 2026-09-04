@@ -1,0 +1,234 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif; }
+    a { color: #5B8DEF; } a:hover { color: #7BA5F2; }
+    .screen { position: relative; width: 390px; height: 844px; background: #111113; overflow: hidden; }
+    .under { position: absolute; inset: 0; filter: blur(3.5px) brightness(0.58) saturate(0.9); }
+    .statusspace { height: 47px; }
+    .nav { height: 44px; display: flex; align-items: center; justify-content: space-between;
+           padding: 0 16px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .nav-side { font-size: 17px; color: #5B8DEF; letter-spacing: -0.2px; }
+    .nav-title { font-size: 17px; font-weight: 600; color: #EAEAEF; letter-spacing: -0.3px; }
+    .body { padding: 16px 16px 40px; display: flex; flex-direction: column; gap: 16px; }
+    .eyebrow { font-size: 11px; font-weight: 600; color: #5C5C6E; letter-spacing: 0.8px; }
+    .namefield { height: 48px; box-sizing: border-box; display: flex; align-items: center;
+                 padding: 0 14px; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06);
+                 border-radius: 12px; font-size: 17px; font-weight: 500; color: #EAEAEF; }
+    .folderrow { height: 48px; box-sizing: border-box; display: flex; align-items: center; gap: 10px;
+                 padding: 0 13px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06);
+                 border-radius: 11px; font-size: 14px; font-weight: 500; color: #9999A8; }
+    .card { background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; }
+    .cardhead { display: flex; align-items: center; gap: 10px; padding: 14px; }
+    .grip { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+            color: #5C5C6E; flex-shrink: 0; }
+    .exname { font-size: 15px; font-weight: 600; color: #EAEAEF; letter-spacing: -0.2px; }
+    .exsum { font-size: 12px; color: #9999A8; letter-spacing: -0.1px; }
+    .chev { width: 16px; height: 16px; flex-shrink: 0; }
+    .colhead { font-size: 9px; font-weight: 700; letter-spacing: 0.6px; color: #5C5C6E; }
+    .setrow { display: flex; align-items: center; gap: 8px; padding: 3px 2px; }
+    .badge { width: 30px; height: 32px; border-radius: 7px; display: flex; align-items: center;
+             justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+    .field { height: 32px; box-sizing: border-box; display: flex; align-items: center;
+             justify-content: center; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06);
+             border-radius: 7px; font-size: 14px; font-weight: 600; color: #EAEAEF; }
+    .iconbtn { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center;
+               justify-content: center; flex-shrink: 0; }
+  </style>
+</helmet>
+
+<div class="screen">
+
+  <div class="under">
+    <div class="statusspace"></div>
+    <div class="nav">
+      <div class="nav-side">Cancel</div>
+      <div class="nav-title">Edit Template</div>
+      <div class="nav-side" style="font-weight: 600">Save</div>
+    </div>
+    <div class="body">
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <div class="eyebrow">TEMPLATE NAME</div>
+        <div class="namefield">Push Day A</div>
+        <div class="folderrow">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h3l1.5 2h6.5A1.5 1.5 0 0 1 17 8.5v6A1.5 1.5 0 0 1 15.5 16h-11A1.5 1.5 0 0 1 3 14.5z"/></svg>
+          <span>Folder</span>
+          <span style="flex-grow: 1"></span>
+          <span style="font-weight: 600; color: #5C5C6E">None</span>
+          <svg class="chev" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <div class="eyebrow">EXERCISES</div>
+          <div style="font-size: 12px; color: #5C5C6E">4 exercises · 16 sets</div>
+        </div>
+
+        <!-- Expanded card -->
+        <div class="card">
+          <div class="cardhead">
+            <div class="grip"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6h13M3.5 10h13M3.5 14h13"/></svg></div>
+            <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1">
+              <div class="exname">Barbell Bench Press</div>
+              <div class="exsum">2 warmup · 3 working · 6-8 reps · RIR 2</div>
+            </div>
+            <svg class="chev" style="transform: rotate(90deg)" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg>
+          </div>
+
+          <div style="height: 1px; background: rgba(255,255,255,0.06)"></div>
+
+          <div style="padding: 12px; display: flex; flex-direction: column; gap: 12px">
+
+            <div style="display: flex; flex-direction: column">
+              <div style="display: flex; gap: 8px; padding: 0 2px 6px">
+                <div class="colhead" style="width: 30px">SET</div>
+                <div class="colhead" style="width: 98px; text-align: center">REP RANGE</div>
+                <div class="colhead" style="width: 46px; text-align: center">RIR</div>
+                <div style="flex-grow: 1"></div>
+              </div>
+
+              <div class="setrow">
+                <div class="badge" style="background: rgba(201,123,90,0.14); color: #C97B5A">W1</div>
+                <div style="display: flex; gap: 5px; width: 98px; align-items: center">
+                  <div class="field" style="flex-grow: 1">10</div>
+                  <div style="font-size: 13px; font-weight: 500; color: #5C5C6E">–</div>
+                  <div class="field" style="flex-grow: 1">12</div>
+                </div>
+                <div class="field" style="width: 46px; color: #A0B83C">4</div>
+                <div style="flex-grow: 1"></div>
+                <div class="iconbtn" style="background: #262630; color: #5C5C6E"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="6.5" y="6.5" width="10" height="10" rx="2.2"/><path d="M13.5 4.5A2 2 0 0 0 11.7 3.5H5.5a2 2 0 0 0-2 2v6.2a2 2 0 0 0 1 1.8"/></svg></div>
+                <div class="iconbtn" style="background: rgba(224,85,85,0.08); color: #E05555"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></div>
+              </div>
+
+              <div class="setrow">
+                <div class="badge" style="background: rgba(201,123,90,0.14); color: #C97B5A">W2</div>
+                <div style="display: flex; gap: 5px; width: 98px; align-items: center">
+                  <div class="field" style="flex-grow: 1">8</div>
+                  <div style="font-size: 13px; font-weight: 500; color: #5C5C6E">–</div>
+                  <div class="field" style="flex-grow: 1">8</div>
+                </div>
+                <div class="field" style="width: 46px; color: #A0B83C">4</div>
+                <div style="flex-grow: 1"></div>
+                <div class="iconbtn" style="background: #262630; color: #5C5C6E"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="6.5" y="6.5" width="10" height="10" rx="2.2"/><path d="M13.5 4.5A2 2 0 0 0 11.7 3.5H5.5a2 2 0 0 0-2 2v6.2a2 2 0 0 0 1 1.8"/></svg></div>
+                <div class="iconbtn" style="background: rgba(224,85,85,0.08); color: #E05555"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></div>
+              </div>
+
+              <div class="setrow">
+                <div class="badge" style="background: #262630; color: #EAEAEF">1</div>
+                <div style="display: flex; gap: 5px; width: 98px; align-items: center">
+                  <div class="field" style="flex-grow: 1">6</div>
+                  <div style="font-size: 13px; font-weight: 500; color: #5C5C6E">–</div>
+                  <div class="field" style="flex-grow: 1">8</div>
+                </div>
+                <div class="field" style="width: 46px; color: #E89B3E">2</div>
+                <div style="flex-grow: 1"></div>
+                <div class="iconbtn" style="background: #262630; color: #5C5C6E"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="6.5" y="6.5" width="10" height="10" rx="2.2"/><path d="M13.5 4.5A2 2 0 0 0 11.7 3.5H5.5a2 2 0 0 0-2 2v6.2a2 2 0 0 0 1 1.8"/></svg></div>
+                <div class="iconbtn" style="background: rgba(224,85,85,0.08); color: #E05555"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></div>
+              </div>
+
+              <div class="setrow">
+                <div class="badge" style="background: #262630; color: #EAEAEF">2</div>
+                <div style="display: flex; gap: 5px; width: 98px; align-items: center">
+                  <div class="field" style="flex-grow: 1">6</div>
+                  <div style="font-size: 13px; font-weight: 500; color: #5C5C6E">–</div>
+                  <div class="field" style="flex-grow: 1">8</div>
+                </div>
+                <div class="field" style="width: 46px; color: #E89B3E">2</div>
+                <div style="flex-grow: 1"></div>
+                <div class="iconbtn" style="background: #262630; color: #5C5C6E"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="6.5" y="6.5" width="10" height="10" rx="2.2"/><path d="M13.5 4.5A2 2 0 0 0 11.7 3.5H5.5a2 2 0 0 0-2 2v6.2a2 2 0 0 0 1 1.8"/></svg></div>
+                <div class="iconbtn" style="background: rgba(224,85,85,0.08); color: #E05555"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></div>
+              </div>
+
+              <div class="setrow">
+                <div class="badge" style="background: #262630; color: #EAEAEF">3</div>
+                <div style="display: flex; gap: 5px; width: 98px; align-items: center">
+                  <div class="field" style="flex-grow: 1">6</div>
+                  <div style="font-size: 13px; font-weight: 500; color: #5C5C6E">–</div>
+                  <div class="field" style="flex-grow: 1">8</div>
+                </div>
+                <div class="field" style="width: 46px; color: #E07040">1</div>
+                <div style="flex-grow: 1"></div>
+                <div class="iconbtn" style="background: #262630; color: #5C5C6E"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="6.5" y="6.5" width="10" height="10" rx="2.2"/><path d="M13.5 4.5A2 2 0 0 0 11.7 3.5H5.5a2 2 0 0 0-2 2v6.2a2 2 0 0 0 1 1.8"/></svg></div>
+                <div class="iconbtn" style="background: rgba(224,85,85,0.08); color: #E05555"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></div>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 7px">
+              <div style="width: 84px; height: 38px; border-radius: 9px; display: flex; align-items: center;
+                          justify-content: center; background: rgba(201,123,90,0.14); color: #C97B5A;
+                          font-size: 12px; font-weight: 600;">＋ Warmup</div>
+              <div style="flex-grow: 1; height: 38px; border-radius: 9px; display: flex; align-items: center;
+                          justify-content: center; background: rgba(91,141,239,0.10); color: #5B8DEF;
+                          font-size: 12.5px; font-weight: 600;">＋ Working Set</div>
+              <div style="width: 78px; height: 38px; box-sizing: border-box; border-radius: 9px; display: flex;
+                          align-items: center; justify-content: center; gap: 5px; background: #262630;
+                          border: 1px solid rgba(255,255,255,0.06); color: #EAEAEF;
+                          font-size: 12.5px; font-weight: 600;">
+                More
+                <svg width="9" height="9" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; padding: 4px 0">
+              <div style="font-size: 14px; font-weight: 500; color: #9999A8">Rest Time</div>
+              <div style="flex-grow: 1"></div>
+              <div style="display: flex; align-items: center; gap: 8px">
+                <div style="width: 72px; height: 29px; box-sizing: border-box; display: flex; align-items: center;
+                            justify-content: center; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06);
+                            border-radius: 8px; font-size: 14px; font-weight: 500; color: #EAEAEF;">180</div>
+                <div style="font-size: 12px; color: #5C5C6E">sec</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.22)"></div>
+
+  <!-- The same menu, reached from the existing More button -->
+  <div style="position: absolute; top: 614px; left: 112px; width: 250px; border-radius: 13px;
+              overflow: hidden; background: rgba(43,43,46,0.82); backdrop-filter: blur(24px) saturate(1.6);
+              -webkit-backdrop-filter: blur(24px) saturate(1.6);
+              box-shadow: 0 16px 40px rgba(0,0,0,0.5);">
+
+    <div style="height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+                font-size: 17px; color: #FFFFFF; letter-spacing: -0.3px;">
+      <span style="flex-grow: 1">Superset with…</span>
+      <svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.6 11.4a3.3 3.3 0 0 0 4.7 0l2-2a3.3 3.3 0 0 0-4.7-4.7l-1 1"/><path d="M11.4 8.6a3.3 3.3 0 0 0-4.7 0l-2 2a3.3 3.3 0 0 0 4.7 4.7l1-1"/></svg>
+    </div>
+
+    <div style="height: 1px; background: rgba(255,255,255,0.09)"></div>
+
+    <div style="height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+                font-size: 17px; color: #FFFFFF; letter-spacing: -0.3px;">
+      <span style="flex-grow: 1">Add note</span>
+      <svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="13" height="13" rx="3"/><path d="M6.6 8h6.8M6.6 11h6.8M6.6 14h4"/></svg>
+    </div>
+
+    <div style="height: 8px; background: rgba(0,0,0,0.30)"></div>
+
+    <div style="height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+                font-size: 17px; color: #FF453A; letter-spacing: -0.3px;">
+      <span style="flex-grow: 1">Remove from Template</span>
+      <svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h12"/><path d="M8 6V4.4h4V6"/><path d="M5.6 6l.8 9.2a1.5 1.5 0 0 0 1.5 1.4h4.2a1.5 1.5 0 0 0 1.5-1.4L14.4 6"/></svg>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {}
+</script>
+</body>
+</html>

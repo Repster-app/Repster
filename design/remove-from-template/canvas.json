@@ -1,0 +1,13 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 390, "h": 844, "title": "Long press · card" },
+    { "file": "Confirm.dc.html", "x": 490, "y": 0, "w": 390, "h": 844, "title": "Confirmation" },
+    { "file": "MoreMenu.dc.html", "x": 980, "y": 0, "w": 390, "h": 844, "title": "Same menu · More button" }
+  ],
+  "annotations": [
+    { "id": "n-press", "x": 0, "y": -132, "w": 390, "text": "Long-press any card — collapsed or expanded. Two steps instead of four, and no need to expand a card to remove it. Matches the exercise tab in the live workout and the rows in the templates list: actions first, section break, destructive last." },
+    { "id": "n-confirm", "x": 490, "y": -132, "w": 390, "text": "Same shape as the live workout's Delete Exercise alert, which is the only other place an exercise gets removed. Message names the exercise and its set count." },
+    { "id": "n-more", "x": 980, "y": -132, "w": 390, "text": "The existing More button, untouched — it opens the same menu, so both paths lead to one place. Nothing here changes except the last item's wording." }
+  ],
+  "launch": { "view": "canvas" }
+}

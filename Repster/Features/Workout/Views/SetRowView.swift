@@ -306,9 +306,6 @@ struct SetRowView: View {
                 activateCustomKeyboard(for: target)
             }
         }
-        .onDisappear {
-            keyboardManager?.hide(ownerSetID: set.id)
-        }
     }
 
     private func firstEmptyRepsField() -> SetRowInputField? {

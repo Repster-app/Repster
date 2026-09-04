@@ -1,0 +1,144 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap">
+  <style>
+    body { margin: 0; font-family: "DM Sans", system-ui, -apple-system, sans-serif; }
+    a { color: #5B8DEF; text-decoration: none; }
+    a:hover { color: #7BA5F3; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; background: #111113; display: flex; flex-direction: column; box-sizing: border-box; padding: 60px 20px 34px;">
+
+  <div style="display: flex; flex-direction: column; gap: 4px; padding-bottom: 16px;">
+    <div style="font-size: 26px; font-weight: 700; color: #EAEAEF; letter-spacing: -0.02em;">Session complete</div>
+    <div style="font-size: 13px; font-weight: 500; color: #5C5C6E;">Push · 38 minutes</div>
+  </div>
+
+  <div style="display: flex; align-items: stretch; padding: 12px 0; border-radius: 14px; background: #1B1B1F;">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;">
+      <div style="font-size: 18px; font-weight: 700; color: #EAEAEF;">12</div>
+      <div style="font-size: 10px; font-weight: 500; color: #5C5C6E; letter-spacing: 0.06em;">SETS</div>
+    </div>
+    <div style="width: 1px; background: rgba(255,255,255,0.06); margin: 2px 0;"></div>
+    <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;">
+      <div style="font-size: 18px; font-weight: 700; color: #EAEAEF;">113</div>
+      <div style="font-size: 10px; font-weight: 500; color: #5C5C6E; letter-spacing: 0.06em;">REPS</div>
+    </div>
+    <div style="width: 1px; background: rgba(255,255,255,0.06); margin: 2px 0;"></div>
+    <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;">
+      <div style="font-size: 18px; font-weight: 700; color: #EAEAEF;">3,960</div>
+      <div style="font-size: 10px; font-weight: 500; color: #5C5C6E; letter-spacing: 0.06em;">KG MOVED</div>
+    </div>
+    <div style="width: 1px; background: rgba(255,255,255,0.06); margin: 2px 0;"></div>
+    <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;">
+      <div style="font-size: 18px; font-weight: 700; color: #EAEAEF;">4</div>
+      <div style="font-size: 10px; font-weight: 500; color: #5C5C6E; letter-spacing: 0.06em;">LIFTS</div>
+    </div>
+  </div>
+
+  <div style="font-size: 11px; font-weight: 600; color: #5C5C6E; letter-spacing: 0.08em; padding: 20px 0 8px;">YOUR STARTING NUMBERS</div>
+
+  <div style="padding: 4px 14px; border-radius: 14px; background: #1B1B1F;">
+    <sc-for list="{{lifts}}" as="lift" hint-placeholder-count="4">
+      <div style="display: flex; align-items: center; gap: 10px; height: 42px; border-top: 1px solid {{lift.divider}};">
+        <div style="font-size: 14px; font-weight: 500; color: #EAEAEF; flex-grow: 1;">{{lift.name}}</div>
+        <div style="font-size: 12px; font-weight: 500; color: #5C5C6E;">{{lift.best}}</div>
+        <div style="display: flex; align-items: baseline; gap: 3px; width: 62px; justify-content: flex-end;">
+          <div style="font-size: 16px; font-weight: 700; color: #EAEAEF;">{{lift.e1rm}}</div>
+          <div style="font-size: 11px; font-weight: 500; color: #5C5C6E;">kg</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="font-size: 12px; font-weight: 400; color: #5C5C6E; line-height: 1.45; padding: 8px 2px 0;">
+    Estimated one-rep maxes from today's sets. They sharpen every session you log.
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; background: rgba(91,141,239,0.10); border: 1px solid rgba(91,141,239,0.20); margin-top: 18px;">
+    <div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1;">
+      <div style="font-size: 11px; font-weight: 600; color: #5B8DEF; letter-spacing: 0.08em;">NEXT PUSH SESSION</div>
+      <div style="font-size: 15px; font-weight: 600; color: #EAEAEF;">Bench Press · 62.5 kg × 8</div>
+      <div style="font-size: 12px; font-weight: 400; color: #9999A8;">A small step up to find your working weight.</div>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 9px; padding: 16px 2px 0;">
+    <div style="display: flex; align-items: baseline; justify-content: space-between;">
+      <div style="font-size: 12px; font-weight: 500; color: #9999A8;">First insight unlocks</div>
+      <div style="font-size: 12px; font-weight: 600; color: #5C5C6E;">1 of 3 sessions</div>
+    </div>
+    <div style="display: flex; gap: 4px;">
+      <div style="flex-grow: 1; height: 4px; border-radius: 2px; background: #5B8DEF;"></div>
+      <div style="flex-grow: 1; height: 4px; border-radius: 2px; background: #262630;"></div>
+      <div style="flex-grow: 1; height: 4px; border-radius: 2px; background: #262630;"></div>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1;"></div>
+
+  <sc-if value="{{healthAsk}}" hint-placeholder-val="{{true}}">
+    <div style="padding: 14px; border-radius: 14px; background: #1B1B1F; margin-bottom: 12px;">
+      <div style="font-size: 14px; font-weight: 600; color: #EAEAEF; padding-bottom: 3px;">Send workouts to Apple Health?</div>
+      <div style="font-size: 12px; font-weight: 400; color: #9999A8; line-height: 1.45; padding-bottom: 12px;">Now that you have one, Repster can write finished sessions across automatically.</div>
+      <div style="display: flex; gap: 8px;">
+        <div onClick="{{ connect }}" style="flex-grow: 1; height: 40px; border-radius: 10px; background: #5B8DEF; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+          <div style="font-size: 14px; font-weight: 600; color: #FFFFFF;">Connect</div>
+        </div>
+        <div onClick="{{ dismiss }}" style="flex-grow: 1; height: 40px; border-radius: 10px; background: #262630; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+          <div style="font-size: 14px; font-weight: 600; color: #9999A8;">Not now</div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{healthDone}}" hint-placeholder-val="{{true}}">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 14px; background: #1B1B1F; margin-bottom: 12px;">
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="{{healthColor}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+        <path d="{{healthIcon}}"></path>
+      </svg>
+      <div style="font-size: 13px; font-weight: 500; color: #9999A8;">{{healthText}}</div>
+    </div>
+  </sc-if>
+
+  <div style="width: 100%; height: 52px; border-radius: 10px; background: #1F1F25; display: flex; align-items: center; justify-content: center;">
+    <div style="font-size: 16px; font-weight: 600; color: #9999A8;">Done</div>
+  </div>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const health = (this.state && this.state.health) ? this.state.health : null;
+    const connected = health === 'connected';
+
+    return {
+      lifts: [
+        { name: 'Bench Press', best: '60 × 8', e1rm: '76', divider: 'rgba(0,0,0,0)' },
+        { name: 'Overhead Press', best: '35 × 8', e1rm: '44', divider: 'rgba(255,255,255,0.06)' },
+        { name: 'Incline DB Press', best: '22 × 10', e1rm: '29', divider: 'rgba(255,255,255,0.06)' },
+        { name: 'Triceps Pushdown', best: '30 × 12', e1rm: '42', divider: 'rgba(255,255,255,0.06)' }
+      ],
+      healthAsk: health === null,
+      healthDone: health !== null,
+      healthText: connected ? 'Finished sessions will be written to Apple Health.' : 'You can turn this on later in Settings.',
+      healthColor: connected ? '#5EC269' : '#5C5C6E',
+      healthIcon: connected ? 'M4 10.5l4 4 8-8' : 'M10 13V9M10 6.6v.1M10 3a7 7 0 100 14 7 7 0 000-14',
+      connect: () => this.setState({ health: 'connected' }),
+      dismiss: () => this.setState({ health: 'dismissed' })
+    };
+  }
+}
+</script>
+</body>
+</html>

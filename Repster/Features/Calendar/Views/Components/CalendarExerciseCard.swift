@@ -87,11 +87,11 @@ struct CalendarExerciseCard: View {
         }
     }
 
-    /// Warm-ups and drop sets carry the same colours here as everywhere else — gold and
+    /// Warm-ups and drop sets carry the same colours here as everywhere else — clay and
     /// `chart5` — so the set type is readable without opening the workout.
     private func labelTint(for label: SetBadgeLabel) -> Color {
         switch label {
-        case .warmup:  return .gold
+        case .warmup:  return .warmup
         case .dropset: return .chart5
         case .working: return .textSecondary
         }

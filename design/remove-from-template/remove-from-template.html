@@ -1,0 +1,532 @@
+<title>Remove from Template</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  --ground: #F1F2F6;
+  --surface: #FFFFFF;
+  --ink: #16171C;
+  --muted: #5E6172;
+  --faint: #8A8DA0;
+  --hair: #D9DBE4;
+  --accent: #3E6FD4;
+  --danger: #C0392F;
+  --panel: #E7E9F0;
+}
+:root:not([data-theme="light"]) {
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0B0C0F;
+    --surface: #141519;
+    --ink: #E8E9EF;
+    --muted: #9295A6;
+    --faint: #6C6F80;
+    --hair: rgba(255,255,255,0.10);
+    --accent: #7BA5F2;
+    --danger: #E8736A;
+    --panel: #191A20;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #0B0C0F;
+  --surface: #141519;
+  --ink: #E8E9EF;
+  --muted: #9295A6;
+  --faint: #6C6F80;
+  --hair: rgba(255,255,255,0.10);
+  --accent: #7BA5F2;
+  --danger: #E8736A;
+  --panel: #191A20;
+}
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1060px; margin: 0 auto; padding: 56px 24px 96px; }
+
+.masthead { display: flex; flex-direction: column; gap: 14px; padding-bottom: 28px; border-bottom: 1px solid var(--hair); }
+.kicker {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint);
+}
+h1 {
+  font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+  font-size: clamp(32px, 5vw, 46px); font-weight: 700; line-height: 1.05;
+  letter-spacing: -0.028em; margin: 0; text-wrap: balance;
+}
+.standfirst { font-size: 18px; line-height: 1.55; color: var(--muted); max-width: 60ch; margin: 0; text-wrap: pretty; }
+
+h2 {
+  font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+  font-size: 13px; font-weight: 600; letter-spacing: 0.11em; text-transform: uppercase;
+  color: var(--faint); margin: 0;
+}
+.section { margin-top: 52px; display: flex; flex-direction: column; gap: 20px; }
+
+/* Wording decision */
+.wording { display: grid; grid-template-columns: repeat(auto-fit, minmax(248px, 1fr)); gap: 1px;
+           background: var(--hair); border: 1px solid var(--hair); border-radius: 4px; overflow: hidden; }
+.opt { background: var(--surface); padding: 20px 22px; display: flex; flex-direction: column; gap: 9px; }
+.opt.picked { background: var(--panel); }
+.opt-label {
+  font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  font-size: 14px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink);
+}
+.opt.picked .opt-label { color: var(--accent); }
+.opt-verdict {
+  font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint);
+}
+.opt.picked .opt-verdict { color: var(--accent); }
+.opt-why { font-size: 14.5px; line-height: 1.5; color: var(--muted); margin: 0; text-wrap: pretty; }
+
+/* Filmstrip */
+.strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 40px 34px; }
+.plate { width: 296px; display: flex; flex-direction: column; gap: 14px; }
+.role { display: flex; align-items: baseline; gap: 9px; }
+.role-name {
+  font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink);
+}
+.role-note {
+  font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  font-size: 10.5px; letter-spacing: 0.04em; color: var(--faint);
+}
+.viewport { width: 296px; height: 641px; overflow: hidden; border-radius: 26px;
+            box-shadow: 0 1px 2px rgba(10,12,20,0.16), 0 18px 40px -14px rgba(10,12,20,0.38); }
+.caption { font-size: 14.5px; line-height: 1.55; color: var(--muted); margin: 0; text-wrap: pretty; }
+
+/* Change list */
+.changes { border-top: 1px solid var(--hair); }
+.change { display: grid; grid-template-columns: 118px 1fr; gap: 8px 22px;
+          padding: 16px 0; border-bottom: 1px solid var(--hair); align-items: baseline; }
+.change-key {
+  font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--faint);
+}
+.change-val { font-size: 15.5px; line-height: 1.55; color: var(--ink); margin: 0; text-wrap: pretty; }
+.change-val .sub { display: block; color: var(--muted); font-size: 14.5px; margin-top: 3px; }
+code {
+  font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  font-size: 0.86em; background: var(--panel); padding: 0.14em 0.42em; border-radius: 3px;
+  color: var(--ink); border: 1px solid var(--hair);
+}
+.strike { color: var(--faint); text-decoration: line-through; text-decoration-thickness: 1px; }
+.open-q { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 11px;
+          font-size: 15.5px; line-height: 1.55; color: var(--muted); }
+.open-q li::marker { color: var(--accent); }
+.open-q b { color: var(--ink); font-weight: 600; }
+
+/* ==== Repster UI, drawn at its own token values ==== */
+.rp-screen {
+  position: relative; width: 390px; height: 844px; background: #111113; overflow: hidden;
+  font-family: -apple-system, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  line-height: normal; transform: scale(0.759); transform-origin: top left;
+}
+.rp-under { position: absolute; inset: 0; filter: blur(3.5px) brightness(0.58) saturate(0.9); }
+.rp-under-soft { filter: blur(1.5px) brightness(0.5); }
+.rp-statusspace { height: 47px; }
+.rp-nav { height: 44px; display: flex; align-items: center; justify-content: space-between;
+          padding: 0 16px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.rp-navside { font-size: 17px; color: #5B8DEF; letter-spacing: -0.2px; }
+.rp-navtitle { font-size: 17px; font-weight: 600; color: #EAEAEF; letter-spacing: -0.3px; }
+.rp-bold { font-weight: 600; }
+.rp-body { padding: 16px 16px 40px; display: flex; flex-direction: column; gap: 16px; }
+.rp-stack8 { display: flex; flex-direction: column; gap: 8px; }
+.rp-stack10 { display: flex; flex-direction: column; gap: 10px; }
+.rp-eyebrow { font-size: 11px; font-weight: 600; color: #5C5C6E; letter-spacing: 0.8px; }
+.rp-namefield { height: 48px; box-sizing: border-box; display: flex; align-items: center; padding: 0 14px;
+                background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px;
+                font-size: 17px; font-weight: 500; color: #EAEAEF; }
+.rp-folderrow { height: 48px; box-sizing: border-box; display: flex; align-items: center; gap: 10px;
+                padding: 0 13px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06);
+                border-radius: 11px; font-size: 14px; font-weight: 500; color: #9999A8; }
+.rp-foldernone { font-weight: 600; color: #5C5C6E; }
+.rp-grow { flex-grow: 1; }
+.rp-chev { width: 16px; height: 16px; flex-shrink: 0; }
+.rp-exhead { display: flex; align-items: center; justify-content: space-between; }
+.rp-count { font-size: 12px; color: #5C5C6E; }
+.rp-card { background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; }
+.rp-ghost { opacity: 0; }
+.rp-hollow { height: 35px; }
+.rp-cardhead { display: flex; align-items: center; gap: 10px; padding: 14px; }
+.rp-grip { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+           color: #5C5C6E; flex-shrink: 0; }
+.rp-exmeta { display: flex; flex-direction: column; gap: 2px; flex-grow: 1; }
+.rp-exname { font-size: 15px; font-weight: 600; color: #EAEAEF; letter-spacing: -0.2px; }
+.rp-exsum { font-size: 12px; color: #9999A8; letter-spacing: -0.1px; }
+.rp-addex { height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px;
+            background: rgba(91,141,239,0.10); border-radius: 14px;
+            font-size: 15px; font-weight: 600; color: #5B8DEF; }
+.rp-scrim { position: absolute; inset: 0; background: rgba(0,0,0,0.22); }
+.rp-scrim-heavy { background: rgba(0,0,0,0.42); }
+.rp-lifted { position: absolute; top: 346px; left: 16px; width: 358px; background: #1B1B1F;
+             border: 1px solid rgba(255,255,255,0.10); border-radius: 14px;
+             transform: scale(1.015); box-shadow: 0 22px 44px rgba(0,0,0,0.55); }
+.rp-menu { position: absolute; width: 250px; border-radius: 13px; overflow: hidden;
+           background: rgba(43,43,46,0.82); backdrop-filter: blur(24px) saturate(1.6);
+           -webkit-backdrop-filter: blur(24px) saturate(1.6); box-shadow: 0 16px 40px rgba(0,0,0,0.5); }
+.rp-menurow { height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+              font-size: 17px; color: #FFFFFF; letter-spacing: -0.3px; }
+.rp-destructive { color: #FF453A; }
+.rp-hair { height: 1px; background: rgba(255,255,255,0.09); }
+.rp-section { height: 8px; background: rgba(0,0,0,0.30); }
+.rp-alert { position: absolute; top: 344px; left: 60px; width: 270px; border-radius: 14px; overflow: hidden;
+            background: rgba(44,44,46,0.86); backdrop-filter: blur(28px) saturate(1.7);
+            -webkit-backdrop-filter: blur(28px) saturate(1.7); box-shadow: 0 18px 46px rgba(0,0,0,0.5); }
+.rp-alertbody { padding: 20px 16px; display: flex; flex-direction: column; gap: 4px; text-align: center; }
+.rp-alerttitle { font-size: 17px; font-weight: 600; color: #FFFFFF; letter-spacing: -0.3px; }
+.rp-alertmsg { font-size: 13px; color: rgba(255,255,255,0.92); line-height: 17px; }
+.rp-hair-strong { height: 1px; background: rgba(255,255,255,0.14); }
+.rp-vhair { width: 1px; background: rgba(255,255,255,0.14); }
+.rp-alertbtns { display: flex; height: 44px; }
+.rp-alertbtn { flex-grow: 1; display: flex; align-items: center; justify-content: center;
+               font-size: 17px; letter-spacing: -0.3px; }
+.rp-alertcancel { font-weight: 600; color: #0A84FF; }
+.rp-alertremove { color: #FF453A; }
+.rp-divider { height: 1px; background: rgba(255,255,255,0.06); }
+.rp-expanded { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.rp-setlist { display: flex; flex-direction: column; }
+.rp-colhead-row { display: flex; gap: 8px; padding: 0 2px 6px; }
+.rp-colhead { font-size: 9px; font-weight: 700; letter-spacing: 0.6px; color: #5C5C6E; }
+.rp-c-set { width: 30px; }
+.rp-c-rep { width: 98px; text-align: center; }
+.rp-c-rir { width: 46px; text-align: center; }
+.rp-setrow { display: flex; align-items: center; gap: 8px; padding: 3px 2px; }
+.rp-badge { width: 30px; height: 32px; border-radius: 7px; display: flex; align-items: center;
+            justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.rp-reps { display: flex; gap: 5px; width: 98px; align-items: center; }
+.rp-field { height: 32px; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+            background: #1F1F25; border: 1px solid rgba(255,255,255,0.06); border-radius: 7px;
+            font-size: 14px; font-weight: 600; color: #EAEAEF; }
+.rp-dash { font-size: 13px; font-weight: 500; color: #5C5C6E; }
+.rp-rir { width: 46px; flex-shrink: 0; }
+.rp-iconbtn { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center;
+              justify-content: center; flex-shrink: 0; }
+.rp-addsets { display: flex; gap: 7px; }
+.rp-btn-warm { width: 84px; height: 38px; border-radius: 9px; display: flex; align-items: center;
+               justify-content: center; background: rgba(201,123,90,0.14); color: #C97B5A;
+               font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.rp-btn-work { flex-grow: 1; height: 38px; border-radius: 9px; display: flex; align-items: center;
+               justify-content: center; background: rgba(91,141,239,0.10); color: #5B8DEF;
+               font-size: 12.5px; font-weight: 600; }
+.rp-btn-more { width: 78px; height: 38px; box-sizing: border-box; border-radius: 9px; display: flex;
+               align-items: center; justify-content: center; gap: 5px; background: #262630;
+               border: 1px solid rgba(255,255,255,0.06); color: #EAEAEF;
+               font-size: 12.5px; font-weight: 600; flex-shrink: 0; }
+.rp-restrow { display: flex; align-items: center; padding: 4px 0; }
+.rp-restlabel { font-size: 14px; font-weight: 500; color: #9999A8; }
+.rp-restgroup { display: flex; align-items: center; gap: 8px; }
+.rp-restfield { width: 72px; height: 29px; box-sizing: border-box; display: flex; align-items: center;
+                justify-content: center; background: #1F1F25; border: 1px solid rgba(255,255,255,0.06);
+                border-radius: 8px; font-size: 14px; font-weight: 500; color: #EAEAEF; }
+.rp-restsec { font-size: 12px; color: #5C5C6E; }
+
+@media (max-width: 560px) {
+  .wrap { padding: 36px 18px 64px; }
+  .change { grid-template-columns: 1fr; gap: 4px; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <div class="masthead">
+    <div class="kicker">Repster · Template editor</div>
+    <h1>Remove from Template</h1>
+    <p class="standfirst">Removing an exercise takes four steps today, and the last one is buried in a menu called More that sits below the set list. This moves it onto the card itself and renames it to say what it actually destroys.</p>
+  </div>
+
+  <div class="section">
+    <h2>The label</h2>
+    <div class="wording">
+      <div class="opt">
+        <div class="opt-label">Delete Exercise</div>
+        <div class="opt-verdict">Matches the app, reads wrong</div>
+        <p class="opt-why">What every other screen says. Here it sounds like deleting the exercise from your library, which is not what happens.</p>
+      </div>
+      <div class="opt">
+        <div class="opt-label">Remove Exercise</div>
+        <div class="opt-verdict">Safe, says nothing</div>
+        <p class="opt-why">Softer than delete, but still silent about what it is being removed from.</p>
+      </div>
+      <div class="opt picked">
+        <div class="opt-label">Remove from Template</div>
+        <div class="opt-verdict">Chosen</div>
+        <p class="opt-why">Names the container, so the scope is unmistakable. Worth breaking the house Delete&nbsp;X pattern for.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>How it looks</h2>
+    <div class="strip">
+
+      <div class="plate">
+        <div class="role">
+          <span class="role-name">Long press</span>
+          <span class="role-note">the card, collapsed or open</span>
+        </div>
+        <div class="viewport"><div class="rp-screen">
+  <div class="rp-under">
+    <div class="rp-statusspace"></div>
+<div class="rp-nav">
+  <div class="rp-navside">Cancel</div>
+  <div class="rp-navtitle">Edit Template</div>
+  <div class="rp-navside rp-bold">Save</div>
+</div>
+    <div class="rp-body">
+      <div class="rp-stack8">
+  <div class="rp-eyebrow">TEMPLATE NAME</div>
+  <div class="rp-namefield">Push Day A</div>
+  <div class="rp-folderrow"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h3l1.5 2h6.5A1.5 1.5 0 0 1 17 8.5v6A1.5 1.5 0 0 1 15.5 16h-11A1.5 1.5 0 0 1 3 14.5z"/></svg><span>Folder</span><span class="rp-grow"></span><span class="rp-foldernone">None</span><svg class="rp-chev" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg></div>
+</div>
+      <div class="rp-stack10">
+        <div class="rp-exhead"><div class="rp-eyebrow">EXERCISES</div><div class="rp-count">4 exercises · 16 sets</div></div>
+        <div class="rp-card"><div class="rp-cardhead">
+  <div class="rp-grip"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6h13M3.5 10h13M3.5 14h13"/></svg></div>
+  <div class="rp-exmeta"><div class="rp-exname">Barbell Bench Press</div><div class="rp-exsum">2 warmup · 3 working · 6-8 reps · RIR 2</div></div>
+  <svg class="rp-chev" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg>
+</div></div>
+        <div class="rp-card rp-ghost"><div class="rp-cardhead rp-hollow"></div></div>
+        <div class="rp-card"><div class="rp-cardhead">
+  <div class="rp-grip"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6h13M3.5 10h13M3.5 14h13"/></svg></div>
+  <div class="rp-exmeta"><div class="rp-exname">Cable Fly</div><div class="rp-exsum">3 working · 12-15 reps · RIR 1</div></div>
+  <svg class="rp-chev" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg>
+</div></div>
+        <div class="rp-card"><div class="rp-cardhead">
+  <div class="rp-grip"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6h13M3.5 10h13M3.5 14h13"/></svg></div>
+  <div class="rp-exmeta"><div class="rp-exname">Overhead Press</div><div class="rp-exsum">1 warmup · 4 working · 5-7 reps · RIR 2</div></div>
+  <svg class="rp-chev" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg>
+</div></div>
+      </div>
+      <div class="rp-addex"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 4.5v11M4.5 10h11"/></svg>Add Exercise</div>
+    </div>
+  </div>
+  <div class="rp-scrim"></div>
+  <div class="rp-lifted">
+    <div class="rp-cardhead">
+      <div class="rp-grip"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6h13M3.5 10h13M3.5 14h13"/></svg></div>
+      <div class="rp-exmeta"><div class="rp-exname">Incline Dumbbell Press</div><div class="rp-exsum">3 working · 8-10 reps · RIR 2</div></div>
+      <svg class="rp-chev" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg>
+    </div>
+  </div>
+  <div class="rp-menu" style="top: 419px; left: 16px"><div class="rp-menurow"><span class="rp-grow">Superset with…</span><svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.6 11.4a3.3 3.3 0 0 0 4.7 0l2-2a3.3 3.3 0 0 0-4.7-4.7l-1 1"/><path d="M11.4 8.6a3.3 3.3 0 0 0-4.7 0l-2 2a3.3 3.3 0 0 0 4.7 4.7l1-1"/></svg></div>
+<div class="rp-hair"></div>
+<div class="rp-menurow"><span class="rp-grow">Add note</span><svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="13" height="13" rx="3"/><path d="M6.6 8h6.8M6.6 11h6.8M6.6 14h4"/></svg></div>
+<div class="rp-section"></div>
+<div class="rp-menurow rp-destructive"><span class="rp-grow">Remove from Template</span><svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h12"/><path d="M8 6V4.4h4V6"/><path d="M5.6 6l.8 9.2a1.5 1.5 0 0 0 1.5 1.4h4.2a1.5 1.5 0 0 0 1.5-1.4L14.4 6"/></svg></div></div>
+</div></div>
+        <p class="caption">Two steps instead of four, with no need to expand a card to remove it. The menu keeps the house grammar: actions first, a section break, destructive last.</p>
+      </div>
+
+      <div class="plate">
+        <div class="role">
+          <span class="role-name">Confirm</span>
+          <span class="role-note">names the exercise</span>
+        </div>
+        <div class="viewport"><div class="rp-screen">
+  <div class="rp-under rp-under-soft">
+    <div class="rp-statusspace"></div>
+<div class="rp-nav">
+  <div class="rp-navside">Cancel</div>
+  <div class="rp-navtitle">Edit Template</div>
+  <div class="rp-navside rp-bold">Save</div>
+</div>
+    <div class="rp-body">
+      <div class="rp-stack8">
+  <div class="rp-eyebrow">TEMPLATE NAME</div>
+  <div class="rp-namefield">Push Day A</div>
+  <div class="rp-folderrow"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h3l1.5 2h6.5A1.5 1.5 0 0 1 17 8.5v6A1.5 1.5 0 0 1 15.5 16h-11A1.5 1.5 0 0 1 3 14.5z"/></svg><span>Folder</span><span class="rp-grow"></span><span class="rp-foldernone">None</span><svg class="rp-chev" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg></div>
+</div>
+      <div class="rp-stack10">
+        <div class="rp-exhead"><div class="rp-eyebrow">EXERCISES</div><div class="rp-count">4 exercises · 16 sets</div></div>
+        <div class="rp-card"><div class="rp-cardhead">
+  <div class="rp-grip"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6h13M3.5 10h13M3.5 14h13"/></svg></div>
+  <div class="rp-exmeta"><div class="rp-exname">Barbell Bench Press</div><div class="rp-exsum">2 warmup · 3 working · 6-8 reps · RIR 2</div></div>
+  <svg class="rp-chev" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg>
+</div></div>
+        <div class="rp-card" style="border-color: rgba(255,255,255,0.12)"><div class="rp-cardhead">
+  <div class="rp-grip"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6h13M3.5 10h13M3.5 14h13"/></svg></div>
+  <div class="rp-exmeta"><div class="rp-exname">Incline Dumbbell Press</div><div class="rp-exsum">3 working · 8-10 reps · RIR 2</div></div>
+  <svg class="rp-chev" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg>
+</div></div>
+        <div class="rp-card"><div class="rp-cardhead">
+  <div class="rp-grip"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6h13M3.5 10h13M3.5 14h13"/></svg></div>
+  <div class="rp-exmeta"><div class="rp-exname">Cable Fly</div><div class="rp-exsum">3 working · 12-15 reps · RIR 1</div></div>
+  <svg class="rp-chev" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg>
+</div></div>
+        <div class="rp-card"><div class="rp-cardhead">
+  <div class="rp-grip"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6h13M3.5 10h13M3.5 14h13"/></svg></div>
+  <div class="rp-exmeta"><div class="rp-exname">Overhead Press</div><div class="rp-exsum">1 warmup · 4 working · 5-7 reps · RIR 2</div></div>
+  <svg class="rp-chev" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg>
+</div></div>
+      </div>
+      <div class="rp-addex"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 4.5v11M4.5 10h11"/></svg>Add Exercise</div>
+    </div>
+  </div>
+  <div class="rp-scrim rp-scrim-heavy"></div>
+  <div class="rp-alert">
+    <div class="rp-alertbody">
+      <div class="rp-alerttitle">Remove from Template?</div>
+      <div class="rp-alertmsg">This will remove Incline Dumbbell Press and its 3 sets from this template.</div>
+    </div>
+    <div class="rp-hair-strong"></div>
+    <div class="rp-alertbtns">
+      <div class="rp-alertbtn rp-alertcancel">Cancel</div>
+      <div class="rp-vhair"></div>
+      <div class="rp-alertbtn rp-alertremove">Remove</div>
+    </div>
+  </div>
+</div></div>
+        <p class="caption">Same shape as the live workout's Delete Exercise alert, the only other place an exercise gets removed. The editor has no confirmation at all today.</p>
+      </div>
+
+      <div class="plate">
+        <div class="role">
+          <span class="role-name">Same menu, from More</span>
+          <span class="role-note">unchanged button</span>
+        </div>
+        <div class="viewport"><div class="rp-screen">
+  <div class="rp-under">
+    <div class="rp-statusspace"></div>
+<div class="rp-nav">
+  <div class="rp-navside">Cancel</div>
+  <div class="rp-navtitle">Edit Template</div>
+  <div class="rp-navside rp-bold">Save</div>
+</div>
+    <div class="rp-body">
+      <div class="rp-stack8">
+  <div class="rp-eyebrow">TEMPLATE NAME</div>
+  <div class="rp-namefield">Push Day A</div>
+  <div class="rp-folderrow"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h3l1.5 2h6.5A1.5 1.5 0 0 1 17 8.5v6A1.5 1.5 0 0 1 15.5 16h-11A1.5 1.5 0 0 1 3 14.5z"/></svg><span>Folder</span><span class="rp-grow"></span><span class="rp-foldernone">None</span><svg class="rp-chev" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg></div>
+</div>
+      <div class="rp-stack10">
+        <div class="rp-exhead"><div class="rp-eyebrow">EXERCISES</div><div class="rp-count">4 exercises · 16 sets</div></div>
+        <div class="rp-card">
+  <div class="rp-cardhead">
+    <div class="rp-grip"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 6h13M3.5 10h13M3.5 14h13"/></svg></div>
+    <div class="rp-exmeta"><div class="rp-exname">Barbell Bench Press</div><div class="rp-exsum">2 warmup · 3 working · 6-8 reps · RIR 2</div></div>
+    <svg class="rp-chev" style="transform: rotate(90deg)" viewBox="0 0 20 20" fill="none" stroke="#5C5C6E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l5 5-5 5"/></svg>
+  </div>
+  <div class="rp-divider"></div>
+  <div class="rp-expanded">
+    <div class="rp-setlist">
+      <div class="rp-colhead-row">
+        <div class="rp-colhead rp-c-set">SET</div>
+        <div class="rp-colhead rp-c-rep">REP RANGE</div>
+        <div class="rp-colhead rp-c-rir">RIR</div>
+        <div class="rp-grow"></div>
+      </div>
+      <div class="rp-setrow">
+  <div class="rp-badge" style="background: rgba(201,123,90,0.14); color: #C97B5A">W1</div>
+  <div class="rp-reps"><div class="rp-field rp-grow">10</div><div class="rp-dash">–</div><div class="rp-field rp-grow">12</div></div>
+  <div class="rp-field rp-rir" style="color: #A0B83C">4</div>
+  <div class="rp-grow"></div>
+  <div class="rp-iconbtn" style="background: #262630; color: #5C5C6E"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="6.5" y="6.5" width="10" height="10" rx="2.2"/><path d="M13.5 4.5A2 2 0 0 0 11.7 3.5H5.5a2 2 0 0 0-2 2v6.2a2 2 0 0 0 1 1.8"/></svg></div>
+  <div class="rp-iconbtn" style="background: rgba(224,85,85,0.08); color: #E05555"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></div>
+</div>
+      <div class="rp-setrow">
+  <div class="rp-badge" style="background: rgba(201,123,90,0.14); color: #C97B5A">W2</div>
+  <div class="rp-reps"><div class="rp-field rp-grow">8</div><div class="rp-dash">–</div><div class="rp-field rp-grow">8</div></div>
+  <div class="rp-field rp-rir" style="color: #A0B83C">4</div>
+  <div class="rp-grow"></div>
+  <div class="rp-iconbtn" style="background: #262630; color: #5C5C6E"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="6.5" y="6.5" width="10" height="10" rx="2.2"/><path d="M13.5 4.5A2 2 0 0 0 11.7 3.5H5.5a2 2 0 0 0-2 2v6.2a2 2 0 0 0 1 1.8"/></svg></div>
+  <div class="rp-iconbtn" style="background: rgba(224,85,85,0.08); color: #E05555"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></div>
+</div>
+      <div class="rp-setrow">
+  <div class="rp-badge" style="background: #262630; color: #EAEAEF">1</div>
+  <div class="rp-reps"><div class="rp-field rp-grow">6</div><div class="rp-dash">–</div><div class="rp-field rp-grow">8</div></div>
+  <div class="rp-field rp-rir" style="color: #E89B3E">2</div>
+  <div class="rp-grow"></div>
+  <div class="rp-iconbtn" style="background: #262630; color: #5C5C6E"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="6.5" y="6.5" width="10" height="10" rx="2.2"/><path d="M13.5 4.5A2 2 0 0 0 11.7 3.5H5.5a2 2 0 0 0-2 2v6.2a2 2 0 0 0 1 1.8"/></svg></div>
+  <div class="rp-iconbtn" style="background: rgba(224,85,85,0.08); color: #E05555"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></div>
+</div>
+      <div class="rp-setrow">
+  <div class="rp-badge" style="background: #262630; color: #EAEAEF">2</div>
+  <div class="rp-reps"><div class="rp-field rp-grow">6</div><div class="rp-dash">–</div><div class="rp-field rp-grow">8</div></div>
+  <div class="rp-field rp-rir" style="color: #E89B3E">2</div>
+  <div class="rp-grow"></div>
+  <div class="rp-iconbtn" style="background: #262630; color: #5C5C6E"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="6.5" y="6.5" width="10" height="10" rx="2.2"/><path d="M13.5 4.5A2 2 0 0 0 11.7 3.5H5.5a2 2 0 0 0-2 2v6.2a2 2 0 0 0 1 1.8"/></svg></div>
+  <div class="rp-iconbtn" style="background: rgba(224,85,85,0.08); color: #E05555"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></div>
+</div>
+      <div class="rp-setrow">
+  <div class="rp-badge" style="background: #262630; color: #EAEAEF">3</div>
+  <div class="rp-reps"><div class="rp-field rp-grow">6</div><div class="rp-dash">–</div><div class="rp-field rp-grow">8</div></div>
+  <div class="rp-field rp-rir" style="color: #E07040">1</div>
+  <div class="rp-grow"></div>
+  <div class="rp-iconbtn" style="background: #262630; color: #5C5C6E"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="6.5" y="6.5" width="10" height="10" rx="2.2"/><path d="M13.5 4.5A2 2 0 0 0 11.7 3.5H5.5a2 2 0 0 0-2 2v6.2a2 2 0 0 0 1 1.8"/></svg></div>
+  <div class="rp-iconbtn" style="background: rgba(224,85,85,0.08); color: #E05555"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></div>
+</div>
+    </div>
+    <div class="rp-addsets">
+      <div class="rp-btn-warm">＋ Warmup</div>
+      <div class="rp-btn-work">＋ Working Set</div>
+      <div class="rp-btn-more">More<svg width="9" height="9" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg></div>
+    </div>
+    <div class="rp-restrow">
+      <div class="rp-restlabel">Rest Time</div><div class="rp-grow"></div>
+      <div class="rp-restgroup"><div class="rp-restfield">180</div><div class="rp-restsec">sec</div></div>
+    </div>
+  </div>
+</div>
+      </div>
+    </div>
+  </div>
+  <div class="rp-scrim"></div>
+  <div class="rp-menu" style="top: 614px; left: 112px"><div class="rp-menurow"><span class="rp-grow">Superset with…</span><svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.6 11.4a3.3 3.3 0 0 0 4.7 0l2-2a3.3 3.3 0 0 0-4.7-4.7l-1 1"/><path d="M11.4 8.6a3.3 3.3 0 0 0-4.7 0l-2 2a3.3 3.3 0 0 0 4.7 4.7l1-1"/></svg></div>
+<div class="rp-hair"></div>
+<div class="rp-menurow"><span class="rp-grow">Add note</span><svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="13" height="13" rx="3"/><path d="M6.6 8h6.8M6.6 11h6.8M6.6 14h4"/></svg></div>
+<div class="rp-section"></div>
+<div class="rp-menurow rp-destructive"><span class="rp-grow">Remove from Template</span><svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h12"/><path d="M8 6V4.4h4V6"/><path d="M5.6 6l.8 9.2a1.5 1.5 0 0 0 1.5 1.4h4.2a1.5 1.5 0 0 0 1.5-1.4L14.4 6"/></svg></div></div>
+</div></div>
+        <p class="caption">The existing button opens the same menu, so the visible path and the gesture lead to one place. Nothing here changes except the last item's wording.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>What changes</h2>
+    <div class="changes">
+      <div class="change">
+        <div class="change-key">Label</div>
+        <p class="change-val"><span class="strike">Remove exercise</span> &nbsp;→&nbsp; <code>Remove from Template</code>
+        <span class="sub">Keeps the trash icon and the destructive role, so it still renders red and still sits last.</span></p>
+      </div>
+      <div class="change">
+        <div class="change-key">Entry point</div>
+        <p class="change-val">The card gains a <code>.contextMenu</code> holding the existing <code>exerciseActions</code>
+        <span class="sub">Long press does nothing on these cards today, so the gesture is free. It is also what the exercise tab and the templates list already use.</span></p>
+      </div>
+      <div class="change">
+        <div class="change-key">Confirmation</div>
+        <p class="change-val">A <code>Remove from Template?</code> alert before anything is removed
+        <span class="sub">Optional. It is the house pattern, but an undo toast would let the removal stay a single tap.</span></p>
+      </div>
+      <div class="change">
+        <div class="change-key">Untouched</div>
+        <p class="change-val">The More button, the set rows, the drag grip, the card layout
+        <span class="sub">The menu gains a second way in; it does not move.</span></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Still open</h2>
+    <ul class="open-q">
+      <li><b>Confirmation or undo.</b> An alert every time is friction on a deliberate action; a <em>Removed Bench Press · Undo</em> toast is cheaper and covers mis-taps better. The app has no toast pattern yet, so the alert is the conservative pick.</li>
+      <li><b>Case, elsewhere in the menu.</b> The app Title-Cases menu items everywhere else, so <em>Add note</em> would become <em>Add Note</em>. Left alone here to keep the change targeted.</li>
+      <li><b>The last exercise.</b> A template cannot save empty, so removing down to zero leaves the editor unsaveable. The live workout dodges this by hiding delete when only one exercise is left.</li>
+    </ul>
+  </div>
+
+</div>

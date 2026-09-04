@@ -1,0 +1,177 @@
+{
+  "_meta": {
+    "description": "Starter program catalogue. Materialised into WorkoutTemplates when a user picks one in onboarding or from the Templates screen. Never seeded automatically.",
+    "version": "1.0",
+    "lastUpdated": "2026-09",
+    "notes": "Every 'exercise' value MUST match a name in seed_exercises.json exactly — ProgramCatalogIntegrityTests enforces this. Structures are generic training conventions, deliberately not reproductions of any named commercial program. Only WEIGHT_REPS exercises are used, so every entry carries a real rep range."
+  },
+  "programs": [
+    {
+      "id": "full_body_3d",
+      "name": "Full Body",
+      "daysPerWeek": 3,
+      "summary": "Hits everything each session.",
+      "sessions": [
+        {
+          "name": "Full Body A",
+          "exercises": [
+            { "exercise": "Barbell Back Squat", "sets": 3, "repMin": 5, "repMax": 8, "rir": 2, "restSeconds": 180 },
+            { "exercise": "Barbell Bench Press", "sets": 3, "repMin": 5, "repMax": 8, "rir": 2, "restSeconds": 180 },
+            { "exercise": "Barbell Row", "sets": 3, "repMin": 6, "repMax": 10, "rir": 2, "restSeconds": 150 },
+            { "exercise": "Tricep Pushdown", "sets": 3, "repMin": 10, "repMax": 15, "rir": 2, "restSeconds": 90 }
+          ]
+        },
+        {
+          "name": "Full Body B",
+          "exercises": [
+            { "exercise": "Romanian Deadlift", "sets": 3, "repMin": 6, "repMax": 10, "rir": 2, "restSeconds": 180 },
+            { "exercise": "Barbell Overhead Press", "sets": 3, "repMin": 6, "repMax": 10, "rir": 2, "restSeconds": 150 },
+            { "exercise": "Lat Pulldown", "sets": 3, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 120 },
+            { "exercise": "Barbell Curl", "sets": 3, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 90 }
+          ]
+        },
+        {
+          "name": "Full Body C",
+          "exercises": [
+            { "exercise": "Leg Press", "sets": 3, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 150 },
+            { "exercise": "Incline Dumbbell Bench Press", "sets": 3, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 150 },
+            { "exercise": "Cable Row", "sets": 3, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 120 },
+            { "exercise": "Cable Crunch", "sets": 3, "repMin": 10, "repMax": 15, "rir": 2, "restSeconds": 90 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "upper_lower_4d",
+      "name": "Upper / Lower",
+      "daysPerWeek": 4,
+      "summary": "Two upper days, two lower.",
+      "sessions": [
+        {
+          "name": "Upper A",
+          "exercises": [
+            { "exercise": "Barbell Bench Press", "sets": 4, "repMin": 5, "repMax": 8, "rir": 2, "restSeconds": 180 },
+            { "exercise": "Barbell Row", "sets": 4, "repMin": 6, "repMax": 10, "rir": 2, "restSeconds": 150 },
+            { "exercise": "Barbell Overhead Press", "sets": 3, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 150 },
+            { "exercise": "Lat Pulldown", "sets": 3, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 120 },
+            { "exercise": "Barbell Curl", "sets": 3, "repMin": 10, "repMax": 15, "rir": 2, "restSeconds": 90 }
+          ]
+        },
+        {
+          "name": "Lower A",
+          "exercises": [
+            { "exercise": "Barbell Back Squat", "sets": 4, "repMin": 5, "repMax": 8, "rir": 2, "restSeconds": 180 },
+            { "exercise": "Romanian Deadlift", "sets": 3, "repMin": 6, "repMax": 10, "rir": 2, "restSeconds": 180 },
+            { "exercise": "Leg Press", "sets": 3, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 150 },
+            { "exercise": "Calf Raise", "sets": 4, "repMin": 10, "repMax": 15, "rir": 1, "restSeconds": 90 }
+          ]
+        },
+        {
+          "name": "Upper B",
+          "exercises": [
+            { "exercise": "Incline Dumbbell Bench Press", "sets": 4, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 150 },
+            { "exercise": "Cable Row", "sets": 4, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 150 },
+            { "exercise": "Dumbbell Shoulder Press", "sets": 3, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 120 },
+            { "exercise": "Dumbbell Lateral Raise", "sets": 3, "repMin": 12, "repMax": 15, "rir": 1, "restSeconds": 90 },
+            { "exercise": "Tricep Pushdown", "sets": 3, "repMin": 10, "repMax": 15, "rir": 2, "restSeconds": 90 }
+          ]
+        },
+        {
+          "name": "Lower B",
+          "exercises": [
+            { "exercise": "Conventional Deadlift", "sets": 3, "repMin": 3, "repMax": 6, "rir": 2, "restSeconds": 210 },
+            { "exercise": "Bulgarian Split Squat", "sets": 3, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 150 },
+            { "exercise": "Leg Curl", "sets": 3, "repMin": 10, "repMax": 15, "rir": 2, "restSeconds": 90 },
+            { "exercise": "Calf Raise", "sets": 4, "repMin": 10, "repMax": 15, "rir": 1, "restSeconds": 90 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "push_pull_legs_6d",
+      "name": "Push / Pull / Legs",
+      "daysPerWeek": 6,
+      "summary": "Each muscle twice a week.",
+      "sessions": [
+        {
+          "name": "Push A",
+          "exercises": [
+            { "exercise": "Barbell Bench Press", "sets": 4, "repMin": 5, "repMax": 8, "rir": 2, "restSeconds": 180 },
+            { "exercise": "Barbell Overhead Press", "sets": 3, "repMin": 6, "repMax": 10, "rir": 2, "restSeconds": 150 },
+            { "exercise": "Incline Dumbbell Bench Press", "sets": 3, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 120 },
+            { "exercise": "Tricep Pushdown", "sets": 3, "repMin": 10, "repMax": 15, "rir": 2, "restSeconds": 90 }
+          ]
+        },
+        {
+          "name": "Pull A",
+          "exercises": [
+            { "exercise": "Barbell Row", "sets": 4, "repMin": 6, "repMax": 10, "rir": 2, "restSeconds": 150 },
+            { "exercise": "Lat Pulldown", "sets": 3, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 120 },
+            { "exercise": "Face Pull", "sets": 3, "repMin": 12, "repMax": 15, "rir": 1, "restSeconds": 90 },
+            { "exercise": "Barbell Curl", "sets": 3, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 90 }
+          ]
+        },
+        {
+          "name": "Legs A",
+          "exercises": [
+            { "exercise": "Barbell Back Squat", "sets": 4, "repMin": 5, "repMax": 8, "rir": 2, "restSeconds": 180 },
+            { "exercise": "Romanian Deadlift", "sets": 3, "repMin": 6, "repMax": 10, "rir": 2, "restSeconds": 180 },
+            { "exercise": "Leg Curl", "sets": 3, "repMin": 10, "repMax": 15, "rir": 2, "restSeconds": 90 },
+            { "exercise": "Calf Raise", "sets": 4, "repMin": 10, "repMax": 15, "rir": 1, "restSeconds": 90 }
+          ]
+        },
+        {
+          "name": "Push B",
+          "exercises": [
+            { "exercise": "Dumbbell Shoulder Press", "sets": 4, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 150 },
+            { "exercise": "Incline Dumbbell Bench Press", "sets": 3, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 150 },
+            { "exercise": "Dumbbell Lateral Raise", "sets": 3, "repMin": 12, "repMax": 15, "rir": 1, "restSeconds": 90 },
+            { "exercise": "Tricep Pushdown", "sets": 3, "repMin": 10, "repMax": 15, "rir": 2, "restSeconds": 90 }
+          ]
+        },
+        {
+          "name": "Pull B",
+          "exercises": [
+            { "exercise": "Pull-up", "sets": 4, "repMin": 5, "repMax": 10, "rir": 2, "restSeconds": 150 },
+            { "exercise": "Cable Row", "sets": 3, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 120 },
+            { "exercise": "Dumbbell Row", "sets": 3, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 120 },
+            { "exercise": "Hammer Curl", "sets": 3, "repMin": 10, "repMax": 15, "rir": 2, "restSeconds": 90 }
+          ]
+        },
+        {
+          "name": "Legs B",
+          "exercises": [
+            { "exercise": "Leg Press", "sets": 4, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 150 },
+            { "exercise": "Bulgarian Split Squat", "sets": 3, "repMin": 8, "repMax": 12, "rir": 2, "restSeconds": 150 },
+            { "exercise": "Leg Extension", "sets": 3, "repMin": 10, "repMax": 15, "rir": 2, "restSeconds": 90 },
+            { "exercise": "Calf Raise", "sets": 4, "repMin": 10, "repMax": 15, "rir": 1, "restSeconds": 90 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "five_by_five_3d",
+      "name": "5×5 Strength",
+      "daysPerWeek": 3,
+      "summary": "Barbell strength, five by five.",
+      "sessions": [
+        {
+          "name": "Workout A",
+          "exercises": [
+            { "exercise": "Barbell Back Squat", "sets": 5, "repMin": 5, "repMax": 5, "rir": 1, "restSeconds": 210 },
+            { "exercise": "Barbell Bench Press", "sets": 5, "repMin": 5, "repMax": 5, "rir": 1, "restSeconds": 210 },
+            { "exercise": "Barbell Row", "sets": 5, "repMin": 5, "repMax": 5, "rir": 1, "restSeconds": 180 }
+          ]
+        },
+        {
+          "name": "Workout B",
+          "exercises": [
+            { "exercise": "Barbell Back Squat", "sets": 5, "repMin": 5, "repMax": 5, "rir": 1, "restSeconds": 210 },
+            { "exercise": "Barbell Overhead Press", "sets": 5, "repMin": 5, "repMax": 5, "rir": 1, "restSeconds": 210 },
+            { "exercise": "Conventional Deadlift", "sets": 1, "repMin": 5, "repMax": 5, "rir": 1, "restSeconds": 240 }
+          ]
+        }
+      ]
+    }
+  ]
+}

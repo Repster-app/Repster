@@ -63,17 +63,23 @@ struct WorkoutLiveActivityWidget: Widget {
                 }
             } compactLeading: {
                 // MARK: - Compact Leading
-                Image(systemName: "dumbbell.fill")
-                    .font(.caption2)
-                    .foregroundStyle(.blue)
+                // Brand mark, not an exercise glyph: this slot's job is to say
+                // which app the activity belongs to. Template asset, tinted here.
+                Image("RepsterMark")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 16, height: 16)
+                    .foregroundStyle(Color.accent)
             } compactTrailing: {
                 // MARK: - Compact Trailing
                 compactTrailingContent(context: context)
             } minimal: {
                 // MARK: - Minimal (multiple Live Activities)
-                Image(systemName: "dumbbell.fill")
-                    .font(.caption2)
-                    .foregroundStyle(.blue)
+                Image("RepsterMark")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 16, height: 16)
+                    .foregroundStyle(Color.accent)
             }
         }
     }

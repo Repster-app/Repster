@@ -1,0 +1,809 @@
+<title>Draw the Evidence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+:root{
+  --ground:#EFF1F6;
+  --surface:#FFFFFF;
+  --sunk:#E4E7EF;
+  --ink:#15161B;
+  --ink-2:#4C5162;
+  --ink-3:#767C90;
+  --rule:#D7DAE4;
+  --accent:#2F55B8;
+  --accent-soft:rgba(47,85,184,.09);
+  --flag:#8A5A00;
+  --flag-soft:rgba(138,90,0,.10);
+  --shadow:0 1px 2px rgba(20,22,32,.05), 0 12px 32px -12px rgba(20,22,32,.22);
+  --panel-ring:rgba(20,22,32,.14);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#1B1D23;
+    --surface:#24262E;
+    --sunk:#1F2128;
+    --ink:#ECEDF2;
+    --ink-2:#A9AEBE;
+    --ink-3:#7A8092;
+    --rule:#343743;
+    --accent:#8AA9F2;
+    --accent-soft:rgba(138,169,242,.13);
+    --flag:#D9A94A;
+    --flag-soft:rgba(217,169,74,.14);
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 18px 40px -16px rgba(0,0,0,.6);
+    --panel-ring:rgba(255,255,255,.14);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#1B1D23;
+  --surface:#24262E;
+  --sunk:#1F2128;
+  --ink:#ECEDF2;
+  --ink-2:#A9AEBE;
+  --ink-3:#7A8092;
+  --rule:#343743;
+  --accent:#8AA9F2;
+  --accent-soft:rgba(138,169,242,.13);
+  --flag:#D9A94A;
+  --flag-soft:rgba(217,169,74,.14);
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 18px 40px -16px rgba(0,0,0,.6);
+  --panel-ring:rgba(255,255,255,.14);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--ground);color:var(--ink);
+  font-family:"Source Serif 4",Georgia,"Times New Roman",serif;
+  font-size:17px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1380px;margin:0 auto;padding:56px 28px 96px}
+h1,h2,h3,.eyebrow,.meta,.chip,.tag{font-family:Archivo,"Helvetica Neue",Arial,sans-serif}
+.eyebrow{
+  font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-3);margin:0 0 14px
+}
+h1{
+  font-size:clamp(34px,5.2vw,54px);line-height:1.04;font-weight:700;letter-spacing:-.022em;
+  margin:0 0 18px;text-wrap:balance;max-width:16ch
+}
+.standfirst{max-width:62ch;font-size:19px;color:var(--ink-2);margin:0}
+.standfirst b{color:var(--ink);font-weight:600}
+
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:30px}
+.chip{
+  font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+  padding:5px 10px;border-radius:5px;background:var(--accent-soft);color:var(--accent);
+  font-family:"IBM Plex Mono",ui-monospace,monospace
+}
+.chip.flagged{background:var(--flag-soft);color:var(--flag)}
+
+hr.rule{border:0;border-top:1px solid var(--rule);margin:56px 0}
+
+h2{
+  font-size:clamp(24px,3vw,32px);font-weight:700;letter-spacing:-.018em;line-height:1.15;
+  margin:0 0 10px;text-wrap:balance
+}
+.section-note{max-width:60ch;color:var(--ink-2);margin:0 0 32px;font-size:18px}
+
+/* ---- reference block ---- */
+.reference{display:grid;grid-template-columns:minmax(min(390px,100%),430px) minmax(0,1fr);gap:44px;align-items:start}
+@media (max-width:900px){.reference{grid-template-columns:1fr;gap:32px}}
+.findings{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:22px}
+.findings li{padding-left:20px;border-left:2px solid var(--rule)}
+.findings .f-head{font-family:Archivo,sans-serif;font-weight:600;font-size:17px;letter-spacing:-.01em;margin:0 0 4px}
+.findings p{margin:0;color:var(--ink-2);font-size:16px}
+code{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.86em;
+  background:var(--sunk);padding:1px 5px;border-radius:4px;color:var(--ink)
+}
+
+/* ---- option grid ---- */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(400px,100%),1fr));gap:28px}
+@media (max-width:460px){.grid{grid-template-columns:1fr}}
+.card{
+  background:var(--surface);border:1px solid var(--rule);border-radius:14px;
+  padding:22px;display:flex;flex-direction:column;gap:18px;box-shadow:var(--shadow)
+}
+.card h3{
+  font-size:21px;font-weight:700;letter-spacing:-.015em;margin:0 0 6px
+}
+.thesis{margin:0;color:var(--ink-2);font-size:16.5px}
+.ledger{display:flex;flex-direction:column;gap:9px;margin:0;padding:0;list-style:none}
+.ledger div{display:grid;grid-template-columns:64px minmax(0,1fr);gap:12px;align-items:baseline}
+.tag{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)
+}
+.ledger p{margin:0;font-size:15.5px;color:var(--ink-2)}
+.card-foot{margin-top:auto;padding-top:4px}
+
+/* ---- closer ---- */
+.closer{
+  background:var(--surface);border:1px solid var(--rule);border-radius:14px;
+  padding:30px 32px;max-width:70ch;box-shadow:var(--shadow)
+}
+.closer h2{margin-bottom:12px}
+.closer p{margin:0 0 14px;color:var(--ink-2)}
+.closer p:last-child{margin-bottom:0}
+.closer b{color:var(--ink);font-weight:600}
+
+/* =========================================================
+   PHONE PANELS — Repster's own tokens, fixed in both themes.
+   Every colour below is lifted from DesignTokens.swift.
+   ========================================================= */
+.pv{
+  width:390px;max-width:100%;
+  background:#111113;border-radius:16px;
+  border:1px solid var(--panel-ring);
+  box-shadow:var(--shadow);
+  padding:14px 0 18px;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+  color:#EAEAEF;
+  font-size:14px;line-height:1.25;
+  color-scheme:dark;
+}
+.pv *{box-sizing:border-box}
+.pv svg{display:block}
+.pv .pad{padding:0 20px}
+.pv .tbl{background:#1B1B1F;border-radius:12px;overflow:hidden}
+.pv .thead,.pv .trow{
+  display:grid;grid-template-columns:36px minmax(0,1fr) minmax(0,1fr) 42px 44px 40px;
+  gap:4px;align-items:center;padding:0 8px
+}
+.pv .thead{
+  height:34px;background:rgba(31,31,37,.78);
+  border-bottom:1px solid rgba(255,255,255,.08);
+  font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;
+  color:rgba(234,234,239,.78);text-align:center
+}
+.pv .thead .ic{display:flex;justify-content:center;color:rgba(234,234,239,.78)}
+.pv .thead .wcol{display:flex;align-items:center;justify-content:center;gap:4px}
+.pv .trow{height:52px;border-bottom:1px solid rgba(255,255,255,.03)}
+.pv .badge{
+  width:26px;height:26px;border-radius:8px;background:#262630;color:#5C5C6E;
+  font-size:13px;font-weight:600;display:grid;place-items:center;margin:0 auto
+}
+.pv .badge.on{background:#5EC269;color:#fff}
+.pv .fld{
+  height:36px;border-radius:8px;background:#1F1F25;border:1px solid rgba(255,255,255,.06);
+  display:grid;place-items:center;font-size:16px;font-weight:600;color:#EAEAEF
+}
+.pv .fld.ph{color:#5C5C6E}
+.pv .fld.on{background:rgba(94,194,105,.06);border-color:rgba(94,194,105,.15)}
+.pv .fld.ghost{color:rgba(91,141,239,.55)}
+.pv .rir{
+  width:36px;height:32px;border-radius:7px;background:#1F1F25;border:1px solid rgba(255,255,255,.06);
+  display:grid;place-items:center;font-size:13px;font-weight:600;color:rgba(224,112,64,.45);margin:0 auto
+}
+.pv .rir.on{background:rgba(224,112,64,.08);border-color:rgba(224,112,64,.30);color:#E07040}
+.pv .chk{width:26px;height:26px;border-radius:6px;border:2px solid #5C5C6E;margin:0 auto}
+.pv .chk.on{background:#5B8DEF;border:0;display:grid;place-items:center;color:#fff}
+.pv .adds{display:flex;gap:12px;padding:12px}
+.pv .add{
+  flex:1;height:36px;border-radius:8px;background:#222228;border:1px solid rgba(255,255,255,.06);
+  display:grid;place-items:center;font-size:13px;font-weight:600;color:#9999A8
+}
+.pv .mhead{display:flex;align-items:center;gap:8px;height:28px;margin-top:12px}
+.pv .mtitle{font-size:11px;font-weight:600;letter-spacing:.8px;color:#5C5C6E}
+.pv .mcount{font-size:11px;font-weight:500;color:#5C5C6E}
+.pv .refresh{
+  width:28px;height:28px;border-radius:8px;background:#1B1B1F;
+  display:grid;place-items:center;color:#9999A8;margin-left:auto
+}
+.pv .stack{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.pv .strip{display:flex;background:#1B1B1F;border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden}
+.pv .rail{width:3px;flex:none;background:#5B8DEF}
+.pv .sbody{flex:1;min-width:0;display:flex;gap:10px;align-items:center;padding:10px 12px}
+.pv .tile{
+  width:36px;height:36px;flex:none;border-radius:8px;background:rgba(91,141,239,.12);
+  display:grid;place-items:center;color:#5B8DEF
+}
+.pv .l1{font-size:15px;font-weight:600;color:#EAEAEF}
+.pv .l1 b{font-weight:700;color:#5B8DEF}
+.pv .l1 .dim{font-size:14px;font-weight:500;color:#9999A8}
+.pv .l2{font-size:11px;color:#5C5C6E;margin-top:3px}
+.pv .delta{
+  font-family:-apple-system,sans-serif;font-size:11px;font-weight:700;
+  padding:2px 6px;border-radius:5px;margin-left:6px;vertical-align:1px;
+  display:inline-flex;align-items:center;gap:3px
+}
+.pv .delta.up{background:rgba(94,194,105,.12);color:#5EC269}
+.pv .delta.flat{background:rgba(92,92,110,.18);color:#9999A8}
+.pv .delta.down{background:rgba(148,163,178,.14);color:#94A3B8}
+/* next-up hero */
+.pv .hero{padding:13px 14px;flex:1;min-width:0}
+.pv .hero .eb{display:flex;align-items:center;gap:6px;color:#5B8DEF}
+.pv .hero .eb span{font-size:10px;font-weight:700;letter-spacing:.8px;color:#5C5C6E}
+.pv .hero .num{display:flex;align-items:baseline;gap:9px;margin-top:7px}
+.pv .hero .num b{font-size:30px;font-weight:700;letter-spacing:-.6px;color:#5B8DEF;line-height:1}
+.pv .hero .num i{font-style:normal;font-size:14px;font-weight:500;color:#9999A8}
+.pv .then{
+  display:flex;align-items:center;gap:9px;background:#1B1B1F;
+  border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:9px 12px
+}
+.pv .then .lbl{font-size:9px;font-weight:700;letter-spacing:.8px;color:#5C5C6E}
+.pv .qchip{
+  font-size:12px;font-weight:600;color:#9999A8;background:#262630;
+  border-radius:8px;padding:5px 9px;white-space:nowrap
+}
+.pv .qchip.next{background:rgba(91,141,239,.12);border:1px solid rgba(91,141,239,.30);color:#5B8DEF}
+/* ledger rows */
+.pv .lcard{background:#1B1B1F;border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden;margin-top:8px}
+.pv .lrow{display:grid;grid-template-columns:46px auto 1fr auto;gap:10px;align-items:baseline;padding:11px 14px}
+.pv .lrow + .lrow{border-top:1px solid rgba(255,255,255,.05)}
+.pv .lset{font-size:10px;font-weight:700;letter-spacing:.7px;color:#5C5C6E}
+.pv .lwt{font-size:16px;font-weight:700;color:#5B8DEF}
+.pv .lrep{font-size:13px;font-weight:500;color:#9999A8}
+.pv .ltag{font-size:10px;font-weight:600;letter-spacing:.4px;color:#5C5C6E;text-transform:uppercase}
+.pv .lsum{font-size:11px;color:#5C5C6E;margin-top:7px;padding-left:2px}
+/* footer line + why panel */
+.pv .foot{
+  display:flex;align-items:center;gap:9px;background:#1B1B1F;
+  border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:11px 12px;margin-top:12px
+}
+.pv .foot .txt{font-size:12px;color:#9999A8;flex:1;min-width:0}
+.pv .foot .why{font-size:11px;font-weight:600;color:#5B8DEF;white-space:nowrap}
+.pv .whypanel{background:#1F1F25;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:11px 12px;margin-top:6px}
+.pv .whypanel div{font-size:11px;color:#5C5C6E;line-height:1.45}
+.pv .whypanel div + div{margin-top:6px}
+.pv .whypanel b{color:#9999A8;font-weight:600}
+/* plan bar */
+.pv .planbar{
+  display:flex;align-items:center;gap:8px;background:#1B1B1F;
+  border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:8px 10px
+}
+.pv .planbar .chips{display:flex;gap:6px;flex:1;min-width:0;overflow:hidden}
+.pv .planreason{font-size:11px;color:#5C5C6E;margin:7px 0 12px;padding-left:2px}
+
+/* ============ round two ============ */
+.pv .tblcut{
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 34px);
+  mask-image:linear-gradient(to bottom,transparent 0,#000 34px)
+}
+.pv .tbl.cut{border-radius:0 0 12px 12px}
+.pv .num-t{font-variant-numeric:tabular-nums}
+
+/* ledger, refined */
+.pv .lrow2{display:grid;grid-template-columns:44px minmax(0,1fr) 28px 62px;gap:10px;align-items:baseline;padding:11px 14px}
+.pv .lrow2 + .lrow2{border-top:1px solid rgba(255,255,255,.05)}
+.pv .lrow2 .lwt{text-align:right;font-variant-numeric:tabular-nums}
+.pv .lrow2 .ltag{text-align:right}
+
+/* ticket */
+.pv .mono{font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace}
+.pv .ticket{margin-top:14px}
+.pv .tkrule{height:2px;width:32px;background:#5B8DEF;border-radius:1px}
+.pv .tkhead{display:flex;align-items:baseline;justify-content:space-between;margin:11px 0 4px}
+.pv .tklabel{font-size:10px;font-weight:600;letter-spacing:1.4px;color:#9999A8}
+.pv .tkcount{font-size:10px;font-weight:500;letter-spacing:1.1px;color:#5C5C6E}
+.pv .tkrow{
+  display:grid;grid-template-columns:46px minmax(0,1fr) 34px;gap:10px;align-items:baseline;
+  padding:10px 0;border-top:1px solid rgba(255,255,255,.07)
+}
+.pv .tkrow .s{font-size:11px;font-weight:500;letter-spacing:.6px;color:#5C5C6E}
+.pv .tkrow .w{font-size:17px;font-weight:600;color:#EAEAEF;font-variant-numeric:tabular-nums}
+.pv .tkrow.next .w{color:#5B8DEF}
+.pv .tkrow .r{font-size:12px;font-weight:500;color:#5C5C6E;text-align:right}
+.pv .tkfoot{
+  border-top:1px solid rgba(255,255,255,.07);padding-top:9px;margin-top:2px;
+  font-size:11px;color:#5C5C6E;letter-spacing:.2px
+}
+
+/* tiles */
+.pv .tiles{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.pv .tile2{background:#1B1B1F;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:10px 12px}
+.pv .tile2.next{background:rgba(91,141,239,.10);border-color:rgba(91,141,239,.30)}
+.pv .tile2 .tset{font-size:9px;font-weight:700;letter-spacing:.8px;color:#5C5C6E}
+.pv .tile2.next .tset{color:#5B8DEF}
+.pv .tile2 .twt{font-size:21px;font-weight:700;color:#EAEAEF;margin-top:5px;letter-spacing:-.4px;font-variant-numeric:tabular-nums;line-height:1}
+.pv .tile2.next .twt{color:#5B8DEF}
+.pv .tile2 .trep{font-size:12px;font-weight:500;color:#9999A8;margin-top:4px}
+.pv .tilereason{font-size:11px;color:#5C5C6E;margin-top:8px;padding-left:2px}
+
+/* states */
+.pv .banner{
+  display:flex;gap:8px;align-items:flex-start;background:rgba(148,163,178,.10);
+  border:1px solid rgba(148,163,178,.30);border-radius:10px;padding:8px 10px;margin-top:8px
+}
+.pv .banner .txt{font-size:11px;color:#9999A8;line-height:1.35}
+.pv .rail.stale{background:#94A3B8}
+.pv .hero .num b.stale{color:#94A3B8}
+.pv .hero .eb span.stale{color:#94A3B8}
+.pv .qchip.warn{border:1px dashed rgba(92,92,110,.7);background:transparent;color:#5C5C6E;display:flex;align-items:center;gap:5px}
+.pv .updating{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:500;color:#9999A8}
+.pv .dim-block{opacity:.45}
+
+.states{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(330px,100%),1fr));gap:26px}
+.state{display:flex;flex-direction:column;gap:14px}
+.state .pv{width:100%}
+.state h4{
+  font-family:Archivo,sans-serif;font-size:16px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px
+}
+.state p{margin:0;font-size:15.5px;color:var(--ink-2)}
+.ruled-out{
+  display:flex;gap:12px;align-items:baseline;background:var(--sunk);border-radius:10px;
+  padding:14px 18px;margin-top:26px;max-width:74ch
+}
+.ruled-out p{margin:0;font-size:15.5px;color:var(--ink-2)}
+
+/* ============ round three: reason icons ============ */
+/* signal tiles inside panels */
+.pv .tile.sm{width:28px;height:28px;border-radius:8px}
+.pv .tile.t-up{background:rgba(94,194,105,.13);color:#5EC269}
+.pv .tile.t-down{background:rgba(148,163,178,.14);color:#94A3B8}
+.pv .tile.t-hold{background:rgba(91,141,239,.12);color:#5B8DEF}
+.pv .tile.t-adj{background:rgba(91,141,239,.12);color:#5B8DEF}
+.pv .tile.t-base{background:rgba(92,92,110,.18);color:#5C5C6E}
+.pv .tilewrap{position:relative;flex:none}
+.pv .dotmod{
+  position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;
+  background:#E89B3E;box-shadow:0 0 0 1.5px #1B1B1F
+}
+.pv .sbody.tight{padding:8px 12px;gap:10px}
+/* trailing badge */
+.pv .badge-trail{
+  width:24px;height:24px;border-radius:50%;display:grid;place-items:center;flex:none;margin-left:auto
+}
+.pv .badge-trail.t-up{background:rgba(94,194,105,.13);color:#5EC269}
+.pv .badge-trail.t-down{background:rgba(148,163,178,.14);color:#94A3B8}
+.pv .badge-trail.t-base{background:rgba(92,92,110,.18);color:#5C5C6E}
+/* glyph + word */
+.pv .gword{display:flex;align-items:center;gap:5px;margin-top:3px;font-size:11px;font-weight:500}
+.pv .gword.t-up{color:#5EC269}
+.pv .gword.t-down{color:#94A3B8}
+.pv .gword.t-base{color:#5C5C6E}
+/* legend line */
+.pv .legendline{
+  display:flex;flex-wrap:wrap;gap:12px;margin-top:9px;padding-left:2px;
+  font-size:10px;color:#5C5C6E
+}
+.pv .legendline span{display:flex;align-items:center;gap:5px}
+/* revealed sentence */
+.pv .reveal{
+  margin-top:6px;background:#1F1F25;border:1px solid rgba(255,255,255,.06);
+  border-radius:10px;padding:9px 11px;font-size:11px;color:#9999A8;line-height:1.4
+}
+
+/* ---- the vocabulary key (page chrome, not panel) ---- */
+.key{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--rule)}
+.keyrow{
+  display:grid;grid-template-columns:64px 150px minmax(0,1fr) 190px;gap:20px;
+  align-items:center;padding:18px 4px;border-bottom:1px solid var(--rule)
+}
+@media (max-width:820px){
+  .keyrow{grid-template-columns:64px minmax(0,1fr);gap:14px}
+  .keyrow .keysays,.keyrow .keysym{grid-column:2}
+}
+.plate{
+  width:56px;height:56px;border-radius:12px;background:#1B1B1F;
+  border:1px solid rgba(255,255,255,.07);display:grid;place-items:center
+}
+.keyname{font-family:Archivo,sans-serif;font-weight:600;font-size:16.5px;letter-spacing:-.01em}
+.keysays{color:var(--ink-2);font-size:16px;font-style:italic}
+.keysym{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;color:var(--ink-3);
+  word-break:break-all
+}
+.keynote{
+  display:grid;grid-template-columns:64px minmax(0,1fr);gap:20px;align-items:baseline;
+  padding:16px 4px 0
+}
+.keynote p{margin:0;color:var(--ink-2);font-size:15.5px}
+
+/* catch list */
+.catch{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:26px}
+.catch li{list-style:none}
+.catch .f-head{font-family:Archivo,sans-serif;font-weight:600;font-size:16.5px;margin:0 0 5px;letter-spacing:-.01em}
+.catch p{margin:0;color:var(--ink-2);font-size:16px}
+.catch > div{padding-left:18px;border-left:2px solid var(--rule)}
+.pairing{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(360px,100%),1fr));gap:28px;align-items:start}
+
+/* ============ round four: evidence graphics ============ */
+.pv .chart{
+  background:#1B1B1F;border:1px solid rgba(255,255,255,.06);border-radius:12px;
+  padding:11px 12px 8px;margin-top:8px
+}
+.pv .charthead{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px}
+.pv .chartunit{font-size:9px;font-weight:600;letter-spacing:.7px;color:#5C5C6E}
+.pv .chartval{font-size:10px;font-weight:600;color:#94A3B8;font-variant-numeric:tabular-nums}
+.pv .track{height:6px;border-radius:3px;background:#262630;position:relative;overflow:hidden}
+.pv .track .fill{position:absolute;left:0;top:0;bottom:0;background:#5B8DEF;border-radius:3px}
+.pv .track .mark{position:absolute;top:-3px;bottom:-3px;width:2px;background:#94A3B8;border-radius:1px}
+.pv .ends{display:flex;justify-content:space-between;margin-top:5px;font-size:9px;letter-spacing:.6px;color:#5C5C6E}
+.pv .dots{display:flex;gap:3px;align-items:center;margin-left:auto;flex:none}
+.pv .dots i{width:6px;height:6px;border-radius:50%;display:block;border:1px solid #5C5C6E}
+.pv .dots i.on{background:#E89B3E;border-color:#E89B3E}
+.pv .rowline{display:flex;align-items:center;gap:10px;padding:9px 12px;flex:1;min-width:0}
+.pv .quiet{font-size:11px;color:#5C5C6E;margin-top:8px;padding-left:2px}
+
+/* evidence audit table */
+.evi{display:flex;flex-direction:column;border-top:1px solid var(--rule)}
+.evirow{
+  display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.3fr) 150px;gap:20px;
+  padding:16px 4px;border-bottom:1px solid var(--rule);align-items:baseline
+}
+@media (max-width:760px){.evirow{grid-template-columns:1fr;gap:6px}}
+.evirow .what{font-family:Archivo,sans-serif;font-weight:600;font-size:16.5px;letter-spacing:-.01em}
+.evirow .where{color:var(--ink-2);font-size:15.5px}
+.evirow .verdict{justify-self:start}
+.chip.no{background:rgba(120,124,140,.14);color:var(--ink-3)}
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Repster · Active workout · Sets tab · Round four</p>
+    <h1>Draw the evidence</h1>
+    <p class="standfirst">
+      The last round was a symbol standing in for a sentence — an arrow you had to be taught, next to
+      a number that already said "up". This one draws the <b>data that produced the weight</b>, at
+      the size of a glyph. Nothing here needs a legend, because nothing here is a symbol.
+    </p>
+    <div class="legend">
+      <span class="chip">One rule: if it can't be drawn honestly, it stays a sentence</span>
+    </div>
+  </header>
+
+  <hr class="rule">
+
+  <h2>What is actually drawable</h2>
+  <p class="section-note">
+    Before picking a graphic, the audit. Three things the view can draw today, one that needs a
+    field, and two that would be a lie.
+  </p>
+
+  <div class="evi">
+    <div class="evirow">
+      <div class="what">The loads across this session</div>
+      <div class="where">Logged sets and pending suggestions are both already in <code>WeightSuggestionData</code>.</div>
+      <div class="verdict"><span class="chip">Free</span></div>
+    </div>
+    <div class="evirow">
+      <div class="what">The size of one step</div>
+      <div class="where"><code>weightIncrement</code> is in the diagnostics — so a step can be drawn in the user's own increment instead of as a proportion.</div>
+      <div class="verdict"><span class="chip">Free</span></div>
+    </div>
+    <div class="evirow">
+      <div class="what">How cooked the session is</div>
+      <div class="where"><code>fatigueDiscount</code> and <code>projectedSessionFatigue</code> ride along on every suggestion.</div>
+      <div class="verdict"><span class="chip">Free</span></div>
+    </div>
+    <div class="evirow">
+      <div class="what">Reps you had left on the last set</div>
+      <div class="where">The floor's <code>completedRIR</code> exists on the engine decision but never reaches the view — today it survives only inside the sentence.</div>
+      <div class="verdict"><span class="chip flagged">One field</span></div>
+    </div>
+    <div class="evirow">
+      <div class="what">How long you actually rested</div>
+      <div class="where">The model assumes full rest unless the timer ran to zero, so a rest graphic would draw an assumption as a measurement.</div>
+      <div class="verdict"><span class="chip no">Won't draw</span></div>
+    </div>
+    <div class="evirow">
+      <div class="what">Last workout's top set</div>
+      <div class="where"><code>baselineTopSet</code> was removed from the display model, so cross-workout comparison isn't free the way within-session comparison is.</div>
+      <div class="verdict"><span class="chip no">Not today</span></div>
+    </div>
+  </div>
+
+  <div class="keynote" style="grid-template-columns:minmax(0,1fr);max-width:74ch">
+    <p>
+      One finding shapes everything below: <b>loads inside a session vary by a few percent</b> — 52.5
+      to 55 kg is 4.5%. A bar chart to scale shows four bars of identical height; one normalised to
+      the session's range shows a 2.5 kg step as a cliff. So none of these graphics encode kilos as
+      height. They encode <b>steps</b> — one step is one of your increments — which is exact,
+      legible, and can't lie.
+    </p>
+  </div>
+
+  <hr class="rule">
+
+  <h2>Four ways to draw it</h2>
+  <p class="section-note">
+    Same session throughout: set 1 logged at 52.5 kg, then 55, 55 and 52.5 pending. Line one is
+    untouched; what changes is what replaces the sentence.
+  </p>
+
+  <div class="grid">
+
+    <!-- ============ A. STEP PROFILE ============ -->
+    <div class="card">
+      <div>
+        <h3>Step profile</h3>
+        <p class="thesis">One small chart for the whole exercise: where each set sits relative to the
+        one you opened with, measured in your own increment. The shape of the session, drawn once,
+        instead of a sentence three times.</p>
+      </div>
+      <div class="pv">
+        <div class="pad">
+          <div class="tblcut">
+            <div class="tbl cut">
+              <div class="trow"><div><div class="badge">3</div></div><div class="fld ph">0</div><div class="fld ph">8</div><div><div class="rir">1</div></div><div></div><div><div class="chk"></div></div></div>
+              <div class="trow"><div><div class="badge">4</div></div><div class="fld ph">0</div><div class="fld ph">8</div><div><div class="rir">1</div></div><div></div><div><div class="chk"></div></div></div>
+              <div class="adds"><div class="add">Add Set</div><div class="add">Add Warmup</div></div>
+            </div>
+          </div>
+
+          <div class="mhead">
+            <span class="mtitle">SMART SUGGESTIONS</span>
+            <span class="mcount">· 3 ready</span>
+            <span class="refresh"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.6h-4.6"/></svg></span>
+          </div>
+
+          <div class="chart">
+            <div class="charthead">
+              <span class="chartunit">EACH STEP = 2.5 KG</span>
+            </div>
+            <svg width="100%" viewBox="0 0 326 52" style="display:block">
+              <line x1="0" y1="32" x2="326" y2="32" stroke="#5C5C6E" stroke-width="1" stroke-dasharray="2 4" opacity=".8"/>
+              <polyline points="24,32 117,18 210,18 302,32" fill="none" stroke="#5B8DEF" stroke-width="1.5" opacity=".45"/>
+              <circle cx="24" cy="32" r="4.5" fill="#5EC269"/>
+              <circle cx="117" cy="18" r="7" fill="none" stroke="#5B8DEF" stroke-width="1.5" opacity=".45"/>
+              <circle cx="117" cy="18" r="4.5" fill="#5B8DEF"/>
+              <circle cx="210" cy="18" r="4.5" fill="#5B8DEF" opacity=".42"/>
+              <circle cx="302" cy="32" r="4.5" fill="#5B8DEF" opacity=".42"/>
+              <text x="24" y="49" text-anchor="middle" fill="#5C5C6E" font-size="9" font-family="-apple-system,sans-serif">1</text>
+              <text x="117" y="49" text-anchor="middle" fill="#5B8DEF" font-size="9" font-weight="600" font-family="-apple-system,sans-serif">2</text>
+              <text x="210" y="49" text-anchor="middle" fill="#5C5C6E" font-size="9" font-family="-apple-system,sans-serif">3</text>
+              <text x="302" y="49" text-anchor="middle" fill="#5C5C6E" font-size="9" font-family="-apple-system,sans-serif">4</text>
+            </svg>
+          </div>
+
+          <div class="stack">
+            <div class="strip"><div class="rail"></div><div class="rowline">
+              <div class="l1">Set 2 · <b class="num-t">55 kg</b><span class="dim"> for 8 reps</span></div>
+            </div></div>
+            <div class="strip"><div class="rail"></div><div class="rowline">
+              <div class="l1">Set 3 · <b class="num-t">55 kg</b><span class="dim"> for 8 reps</span></div>
+            </div></div>
+            <div class="strip"><div class="rail"></div><div class="rowline">
+              <div class="l1">Set 4 · <b class="num-t">52.5 kg</b><span class="dim"> for 8 reps</span></div>
+            </div></div>
+          </div>
+        </div>
+      </div>
+      <ul class="ledger">
+        <li><div><span class="tag">Gains</span><p>The green dot is what you lifted, the ringed one is next, the pale ones are the plan. Up means heavier than you opened with — that reads without being taught, and the dashed line makes "same as set 1" a fact rather than a feeling.</p></div></li>
+        <li><div><span class="tag">Costs</span><p>It shows the shape of the plan, not the reason behind it. You can see set 4 comes back down; you cannot see that fatigue is why.</p></div></li>
+      </ul>
+      <div class="card-foot"><span class="chip">No new data · no legend</span></div>
+    </div>
+
+    <!-- ============ B. EVIDENCE ONLY WHERE THERE IS ANY ============ -->
+    <div class="card">
+      <div>
+        <h3>Evidence only where there is any</h3>
+        <p class="thesis">Ordinary rows say nothing at all — no sentence, no mark. A row earns a mark
+        only when something real happened, and the mark is the measurement itself. Shown here with a
+        floor on set 2.</p>
+      </div>
+      <div class="pv">
+        <div class="pad">
+          <div class="tblcut">
+            <div class="tbl cut">
+              <div class="trow"><div><div class="badge">3</div></div><div class="fld ph">0</div><div class="fld ph">8</div><div><div class="rir">1</div></div><div></div><div><div class="chk"></div></div></div>
+              <div class="trow"><div><div class="badge">4</div></div><div class="fld ph">0</div><div class="fld ph">8</div><div><div class="rir">1</div></div><div></div><div><div class="chk"></div></div></div>
+              <div class="adds"><div class="add">Add Set</div><div class="add">Add Warmup</div></div>
+            </div>
+          </div>
+
+          <div class="mhead">
+            <span class="mtitle">SMART SUGGESTIONS</span>
+            <span class="mcount">· 3 ready</span>
+            <span class="refresh"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.6h-4.6"/></svg></span>
+          </div>
+
+          <div class="stack">
+            <div class="strip"><div class="rail"></div><div class="rowline">
+              <div class="l1">Set 2 · <b class="num-t">55 kg</b><span class="dim"> for 8 reps</span></div>
+              <span class="dots" title="2 reps left on your last set">
+                <i class="on"></i><i class="on"></i><i></i><i></i><i></i>
+              </span>
+            </div></div>
+            <div class="strip"><div class="rail"></div><div class="rowline">
+              <div class="l1">Set 3 · <b class="num-t">55 kg</b><span class="dim"> for 8 reps</span></div>
+            </div></div>
+            <div class="strip"><div class="rail"></div><div class="rowline">
+              <div class="l1">Set 4 · <b class="num-t">52.5 kg</b><span class="dim"> for 8 reps</span></div>
+            </div></div>
+          </div>
+          <div class="quiet">Two dots — the reps you had left on your last set.</div>
+        </div>
+      </div>
+      <ul class="ledger">
+        <li><div><span class="tag">Gains</span><p>The most text removed of anything so far: the common case gets nothing, so a mark always means something happened. The dots keep the number the sentence carried — two dots is two reps, exactly, in the RIR colour the set table already uses.</p></div></li>
+        <li><div><span class="tag">Costs</span><p>Needs the floor's <code>completedRIR</code> plumbed to the view. And the caption under the dots is a sentence again — drop it and the dots are arbitrary on first sight, keep it and it is prose with extra steps.</p></div></li>
+      </ul>
+      <div class="card-foot"><span class="chip flagged">Needs completedRIR on the row</span></div>
+    </div>
+
+    <!-- ============ C. FATIGUE METER ============ -->
+    <div class="card">
+      <div>
+        <h3>Session meter</h3>
+        <p class="thesis">The one variable the sentences keep talking about, drawn once: how much
+        the session has taken out of you, and where the next set lands.</p>
+      </div>
+      <div class="pv">
+        <div class="pad">
+          <div class="tblcut">
+            <div class="tbl cut">
+              <div class="trow"><div><div class="badge">3</div></div><div class="fld ph">0</div><div class="fld ph">8</div><div><div class="rir">1</div></div><div></div><div><div class="chk"></div></div></div>
+              <div class="trow"><div><div class="badge">4</div></div><div class="fld ph">0</div><div class="fld ph">8</div><div><div class="rir">1</div></div><div></div><div><div class="chk"></div></div></div>
+              <div class="adds"><div class="add">Add Set</div><div class="add">Add Warmup</div></div>
+            </div>
+          </div>
+
+          <div class="mhead">
+            <span class="mtitle">SMART SUGGESTIONS</span>
+            <span class="mcount">· 3 ready</span>
+            <span class="refresh"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.6h-4.6"/></svg></span>
+          </div>
+
+          <div class="chart">
+            <div class="charthead">
+              <span class="chartunit">CAPACITY LEFT</span>
+              <span class="chartval">96%</span>
+            </div>
+            <div class="track">
+              <span class="fill" style="width:96%"></span>
+              <span class="mark" style="left:88%"></span>
+            </div>
+            <div class="ends"><span>FRESH</span><span>SET 4 LANDS HERE</span></div>
+          </div>
+
+          <div class="stack">
+            <div class="strip"><div class="rail"></div><div class="rowline">
+              <div class="l1">Set 2 · <b class="num-t">55 kg</b><span class="dim"> for 8 reps</span></div>
+            </div></div>
+            <div class="strip"><div class="rail"></div><div class="rowline">
+              <div class="l1">Set 3 · <b class="num-t">55 kg</b><span class="dim"> for 8 reps</span></div>
+            </div></div>
+            <div class="strip"><div class="rail"></div><div class="rowline">
+              <div class="l1">Set 4 · <b class="num-t">52.5 kg</b><span class="dim"> for 8 reps</span></div>
+            </div></div>
+          </div>
+        </div>
+      </div>
+      <ul class="ledger">
+        <li><div><span class="tag">Gains</span><p>Answers the question the profile can't: why set 4 comes back down. It is also the only graphic that changes between sets, so the section visibly responds to what you just did.</p></div></li>
+        <li><div><span class="tag">Costs</span><p>Percent-of-capacity is a modelled number, not a measured one, and a meter makes it look measured. The range is narrow — most sessions live between 100% and 90% — so the bar barely moves unless the scale is cropped, and a cropped scale overstates.</p></div></li>
+      </ul>
+      <div class="card-foot"><span class="chip flagged">Honest scale is the hard part</span></div>
+    </div>
+
+    <!-- ============ D. BOTH ============ -->
+    <div class="card">
+      <div>
+        <h3>Profile and meter</h3>
+        <p class="thesis">The two session graphics stacked, rows reduced to pure numbers. Between
+        them they answer what the plan is and why it bends — with no prose anywhere in the section.</p>
+      </div>
+      <div class="pv">
+        <div class="pad">
+          <div class="tblcut">
+            <div class="tbl cut">
+              <div class="trow"><div><div class="badge">4</div></div><div class="fld ph">0</div><div class="fld ph">8</div><div><div class="rir">1</div></div><div></div><div><div class="chk"></div></div></div>
+              <div class="adds"><div class="add">Add Set</div><div class="add">Add Warmup</div></div>
+            </div>
+          </div>
+
+          <div class="mhead">
+            <span class="mtitle">SMART SUGGESTIONS</span>
+            <span class="mcount">· 3 ready</span>
+            <span class="refresh"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.6h-4.6"/></svg></span>
+          </div>
+
+          <div class="chart">
+            <div class="charthead">
+              <span class="chartunit">EACH STEP = 2.5 KG</span>
+              <span class="chartval">96% capacity</span>
+            </div>
+            <svg width="100%" viewBox="0 0 326 52" style="display:block">
+              <line x1="0" y1="32" x2="326" y2="32" stroke="#5C5C6E" stroke-width="1" stroke-dasharray="2 4" opacity=".8"/>
+              <polyline points="24,32 117,18 210,18 302,32" fill="none" stroke="#5B8DEF" stroke-width="1.5" opacity=".45"/>
+              <circle cx="24" cy="32" r="4.5" fill="#5EC269"/>
+              <circle cx="117" cy="18" r="7" fill="none" stroke="#5B8DEF" stroke-width="1.5" opacity=".45"/>
+              <circle cx="117" cy="18" r="4.5" fill="#5B8DEF"/>
+              <circle cx="210" cy="18" r="4.5" fill="#5B8DEF" opacity=".42"/>
+              <circle cx="302" cy="32" r="4.5" fill="#5B8DEF" opacity=".42"/>
+              <text x="24" y="49" text-anchor="middle" fill="#5C5C6E" font-size="9" font-family="-apple-system,sans-serif">1</text>
+              <text x="117" y="49" text-anchor="middle" fill="#5B8DEF" font-size="9" font-weight="600" font-family="-apple-system,sans-serif">2</text>
+              <text x="210" y="49" text-anchor="middle" fill="#5C5C6E" font-size="9" font-family="-apple-system,sans-serif">3</text>
+              <text x="302" y="49" text-anchor="middle" fill="#5C5C6E" font-size="9" font-family="-apple-system,sans-serif">4</text>
+            </svg>
+            <div class="track" style="margin-top:8px">
+              <span class="fill" style="width:96%"></span>
+              <span class="mark" style="left:88%"></span>
+            </div>
+          </div>
+
+          <div class="stack">
+            <div class="strip"><div class="rail"></div><div class="rowline">
+              <div class="l1">Set 2 · <b class="num-t">55 kg</b><span class="dim"> for 8 reps</span></div>
+            </div></div>
+            <div class="strip"><div class="rail"></div><div class="rowline">
+              <div class="l1">Set 3 · <b class="num-t">55 kg</b><span class="dim"> for 8 reps</span></div>
+            </div></div>
+            <div class="strip"><div class="rail"></div><div class="rowline">
+              <div class="l1">Set 4 · <b class="num-t">52.5 kg</b><span class="dim"> for 8 reps</span></div>
+            </div></div>
+          </div>
+        </div>
+      </div>
+      <ul class="ledger">
+        <li><div><span class="tag">Gains</span><p>The complete answer with zero sentences: the dots say what, the bar says how much is left in the tank, the rows say the numbers. One block of chart, three lines of data.</p></div></li>
+        <li><div><span class="tag">Costs</span><p>Two charts stacked in a 350 pt column is a lot of instrumentation for a screen you look at holding a barbell — and it is taller than the step profile alone, which was the point of cutting the text.</p></div></li>
+      </ul>
+      <div class="card-foot"><span class="chip">Most complete · least restrained</span></div>
+    </div>
+
+  </div>
+
+  <hr class="rule">
+
+  <div class="pairing">
+    <div>
+      <h2>The set with no evidence yet</h2>
+      <p class="section-note" style="margin-bottom:0">
+        Every graphic here is drawn from the session in progress, which means the first working set
+        of an exercise has nothing behind it. That is the case where a sentence is the honest answer
+        — one line, once, and it disappears the moment set 1 is logged and the chart has something to
+        show. Rather than a weakness, this is what makes the rest defensible: prose where there is no
+        evidence, evidence everywhere else.
+      </p>
+    </div>
+    <div class="pv" style="align-self:start">
+      <div class="pad">
+        <div class="mhead">
+          <span class="mtitle">SMART SUGGESTIONS</span>
+          <span class="mcount">· 4 ready</span>
+          <span class="refresh"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.6h-4.6"/></svg></span>
+        </div>
+        <div class="stack">
+          <div class="strip"><div class="rail"></div><div class="sbody">
+            <div class="tile"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 14.5 9.5"/><path d="M13 8l3 3"/><path d="M18.4 2.6l.86 2.04 2.04.86-2.04.86-.86 2.04-.86-2.04L15.5 5.5l2.04-.86z" fill="currentColor" stroke="none"/><path d="M8.6 2.9l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" fill="currentColor" stroke="none"/></svg></div>
+            <div>
+              <div class="l1">Set 1 · <b class="num-t">52.5 kg</b><span class="dim"> for 8 reps</span></div>
+              <div class="l2">Based on your recent performance for this rep target.</div>
+            </div>
+          </div></div>
+          <div class="strip"><div class="rail"></div><div class="rowline">
+            <div class="l1">Set 2 · <b class="num-t">52.5 kg</b><span class="dim"> for 8 reps</span></div>
+          </div></div>
+          <div class="strip"><div class="rail"></div><div class="rowline">
+            <div class="l1">Set 3 · <b class="num-t">52.5 kg</b><span class="dim"> for 8 reps</span></div>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="rule">
+
+  <div class="closer">
+    <h2>Where I'd land</h2>
+    <p>
+      <b>The step profile, and nothing else.</b> It is the only one of the four that needs no new
+      field, no cropped scale and no caption — a green dot for what you lifted, a ringed dot for what
+      is next, a dashed line for where you started. It kills all three sentences and takes less room
+      than the two it replaces.
+    </p>
+    <p>
+      <b>The meter is the tempting one to add and the one I would hold.</b> Capacity-left is
+      modelled, not measured, and its real range is narrow enough that an honest scale barely moves
+      while a useful-looking scale overstates. If the fatigue model's numbers get more trustworthy,
+      it becomes the best graphic here — but that is a modelling decision, not a design one.
+    </p>
+    <p>
+      <b>The dots are worth doing on their own schedule.</b> They are the one mark that keeps a
+      number the prose was carrying, and they only ever appear on sets where the floor actually
+      fired — but they need <code>completedRIR</code> carried through to the view first.
+    </p>
+  </div>
+
+</div>

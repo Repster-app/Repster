@@ -96,6 +96,7 @@ struct RepsterApp: App {
                     bodyweightService: services.bodyweightService,
                     importService: services.importService,
                     analyticsService: services.analyticsService,
+                    programCatalogService: services.programCatalogService,
                     onComplete: {
                         // A fresh install starts caught up, so What's New never greets
                         // someone with news about the only version they have ever run.

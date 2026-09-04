@@ -90,7 +90,7 @@ struct ExerciseHistoryView: View {
                 case .warmup:
                     Text(label.text)
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Color.gold)
+                        .foregroundStyle(Color.warmup)
                 case .dropset:
                     Text(label.text)
                         .font(.system(size: 11, weight: .bold))

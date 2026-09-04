@@ -271,6 +271,80 @@ final class WorkoutShareCardTests: XCTestCase {
         )
     }
 
+    // MARK: - Card styles
+
+    private func slice(_ group: String, _ fraction: Double) -> WorkoutShareCardData.MuscleSlice {
+        .init(group: group, displayName: group.capitalized, fraction: fraction)
+    }
+
+    private func bar(_ magnitude: Double, group: String = "chest", pr: Bool = false, new: Bool = false) -> WorkoutShareCardData.TraceBar {
+        .init(id: UUID(), magnitude: magnitude, group: group, isPR: pr, startsNewExercise: new)
+    }
+
+    /// A style is only offered when the session can fill it — otherwise swiping lands on a
+    /// blank card.
+    func testOnlyOffersStylesTheSessionCanFill() {
+        var full = data()
+        full.muscleSlices = [slice("chest", 0.6), slice("triceps", 0.4)]
+        full.traceBars = [bar(1), bar(0.8), bar(0.6)]
+        XCTAssertEqual(full.availableStyles, [.record, .muscles, .volume, .trace])
+
+        // One muscle is not a breakdown, and two bars are not a session.
+        var thin = data()
+        thin.muscleSlices = [slice("chest", 1.0)]
+        thin.traceBars = [bar(1), bar(0.5)]
+        XCTAssertEqual(thin.availableStyles, [.record, .volume])
+    }
+
+    func testAStyleIsAlwaysAvailableEvenForAnEmptySession() {
+        let bare = WorkoutShareCardData(
+            title: "Evening Workout", dateLabel: "Fri, 4 Sep", durationLabel: "52m",
+            setCountLabel: "17", volumeLabel: nil, liftCountLabel: "6",
+            prLift: nil, lifts: [], extraLiftCount: 0
+        )
+        // No record, no volume, no muscles, no trace — the picker must still have something.
+        XCTAssertTrue(bare.availableStyles.isEmpty)
+    }
+
+    func testEveryStyleRenders() {
+        var full = data()
+        full.muscleSlices = [slice("chest", 0.46), slice("shoulders", 0.31), slice("triceps", 0.23)]
+        full.traceBars = [bar(1, pr: true, new: true), bar(0.7), bar(0.5, new: true), bar(0.9)]
+
+        for style in WorkoutShareCardStyle.allCases {
+            XCTAssertNotNil(
+                WorkoutShareCardRenderer.render(
+                    data: full, style: style, hidesExerciseList: false, hidesWeights: false
+                ),
+                "\(style.displayName) card failed to render"
+            )
+        }
+    }
+
+    /// The unit belongs in the caption, not at 96 pt beside the number.
+    func testVolumeHeadlineSplitsOffTheUnit() {
+        let d = data()
+        XCTAssertEqual(d.volumeHeadline, "12,450")
+        XCTAssertEqual(d.volumeCaption, "KG MOVED")
+    }
+
+    func testStylePreferenceRoundTrips() {
+        let defaults = UserDefaults.standard
+        let key = WorkoutShareCardPreferences.styleKey
+        let original = defaults.object(forKey: key)
+        defer { defaults.set(original, forKey: key) }
+
+        defaults.removeObject(forKey: key)
+        XCTAssertEqual(WorkoutShareCardPreferences.style, .record)
+
+        WorkoutShareCardPreferences.style = .muscles
+        XCTAssertEqual(WorkoutShareCardPreferences.style, .muscles)
+
+        // A style written by a future build must not crash an older one.
+        defaults.set("somethingElse", forKey: key)
+        XCTAssertEqual(WorkoutShareCardPreferences.style, .record)
+    }
+
     // MARK: - Coach teaser flag
 
     /// The teaser is drawn as unbuilt, so it has to be removable without a release.

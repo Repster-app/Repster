@@ -63,6 +63,28 @@ struct CreateEditTemplateView: View {
             }
         }
         .background(Color.bg)
+        // A drag that ends anywhere but on a card used to leave its highlight behind forever.
+        //
+        // `performDrop` is the only callback that fires when a drag ends, and it only fires on a
+        // card. Release in the 10pt gap between two cards, on the 16pt margins, on the name field,
+        // over the keyboard, or outside the editor entirely and neither it nor `dropExited` runs —
+        // so `dropTargetExerciseId` keeps pointing at whichever card the finger last crossed, and
+        // that card sits lit, scaled and capped with the insertion bar as if a move were still in
+        // flight. Nothing else in the view cleared it. Expanded cards make this the common case
+        // rather than the rare one: editing sets makes a card tall enough that the neighbour you
+        // cross on the way is the last card under your finger, and you let go past the end of it.
+        //
+        // iOS 17 has no drag-cancelled callback for `.onDrag`, so the way out has to be built. The
+        // drop catcher takes every release over the scroll view that no card claimed, and the tap
+        // stands the highlight down after a release the catcher never saw.
+        .onDrop(of: [UTType.text], isTargeted: nil) { _ in
+            clearDragState()
+            return false
+        }
+        .simultaneousGesture(
+            TapGesture().onEnded { clearDragState() },
+            including: hasDragHighlight ? .all : .subviews
+        )
         .navigationTitle(editingTemplateId != nil ? "Edit Template" : "New Template")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -120,6 +142,24 @@ struct CreateEditTemplateView: View {
                     showFolderPicker = false
                 }
             )
+        }
+    }
+
+    // MARK: - Drag State
+
+    private var hasDragHighlight: Bool {
+        draggedExerciseId != nil || dropTargetExerciseId != nil
+    }
+
+    /// Stand down a reorder highlight that no longer belongs to a live drag.
+    ///
+    /// Safe to call at any point: the move itself is committed in `dropEntered`, not on release, so
+    /// this only ever discards presentation state.
+    private func clearDragState() {
+        guard hasDragHighlight else { return }
+        withAnimation(.easeOut(duration: 0.16)) {
+            draggedExerciseId = nil
+            dropTargetExerciseId = nil
         }
     }
 
@@ -327,6 +367,7 @@ private struct TemplateExerciseCard: View {
     @Binding var draggedExerciseId: UUID?
     @Binding var dropTargetExerciseId: UUID?
     let onRequestSuperset: (UUID) -> Void
+    @State private var showRemoveConfirmation = false
 
     private var isDraggedCard: Bool {
         draggedExerciseId == exercise.id
@@ -390,6 +431,17 @@ private struct TemplateExerciseCard: View {
                 viewModel: viewModel
             )
         )
+        // Confirmed, as everywhere else an exercise is removed. The editor discards on Cancel, but
+        // that is all-or-nothing — it takes the rest of the session's edits with it, so it is not a
+        // net for one mis-tap.
+        .alert("Remove from Template?", isPresented: $showRemoveConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Remove", role: .destructive) {
+                viewModel.removeExercise(id: exercise.id)
+            }
+        } message: {
+            Text("This will remove \(exercise.exerciseName) and its \(exercise.sets.count) \(exercise.sets.count == 1 ? "set" : "sets") from this template.")
+        }
     }
 
     // MARK: - Header
@@ -441,6 +493,11 @@ private struct TemplateExerciseCard: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            // Deliberately on the header button and not on the whole card: the card also carries the
+            // grip's `.onDrag`, and two long-press interactions in one view is a coin toss over which
+            // one the gesture belongs to. The button spans everything right of the grip, so the drag
+            // keeps its 28pt target and the menu gets the rest.
+            .contextMenu { exerciseActions }
 
         }
         .padding(14)
@@ -545,10 +602,10 @@ private struct TemplateExerciseCard: View {
             } label: {
                 Text("＋ Warmup")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.gold)
+                    .foregroundColor(.warmup)
                     .frame(width: 84)
                     .frame(height: 38)
-                    .background(Color.goldSoft)
+                    .background(Color.warmupSoft)
                     .cornerRadius(9)
             }
             .buttonStyle(.plain)
@@ -614,10 +671,13 @@ private struct TemplateExerciseCard: View {
 
         Divider()
 
+        // "Remove from Template", not the app's usual "Delete X": deleting an exercise means deleting
+        // it from the library, which is what ExerciseDetailView's Delete Exercise actually does. This
+        // only takes it out of one template, and the label has to say which.
         Button(role: .destructive) {
-            viewModel.removeExercise(id: exercise.id)
+            showRemoveConfirmation = true
         } label: {
-            Label("Remove exercise", systemImage: "trash")
+            Label("Remove from Template", systemImage: "trash")
         }
     }
 
@@ -722,9 +782,9 @@ private struct TemplateSetRow: View {
         HStack(spacing: 8) {
             Text(displayNumber)
                 .font(.system(size: 12, weight: .bold))
-                .foregroundColor(isWarmup ? .gold : .textPrimary)
+                .foregroundColor(isWarmup ? .warmup : .textPrimary)
                 .frame(width: 30, height: 32)
-                .background(isWarmup ? Color.goldSoft : Color.bgSubtle)
+                .background(isWarmup ? Color.warmupSoft : Color.bgSubtle)
                 .cornerRadius(7)
 
             // Two fields, not one free-text box.

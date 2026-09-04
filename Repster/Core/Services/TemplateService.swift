@@ -193,7 +193,12 @@ actor TemplateService: TemplateServiceProtocol {
     }
 
     func createTemplate(_ data: TemplateSaveData) async throws -> UUID {
-        let template = WorkoutTemplate(name: data.name, notes: data.notes, folder: data.folder)
+        let template = WorkoutTemplate(
+            name: data.name,
+            notes: data.notes,
+            folder: data.folder,
+            orderInFolder: data.orderInFolder
+        )
         try await templateRepo.saveTemplate(template)
         try await templateRepo.replaceTemplateContents(templateId: template.id, exercises: data.exercises)
         return template.id
@@ -207,6 +212,7 @@ actor TemplateService: TemplateServiceProtocol {
         template.name = data.name
         template.notes = data.notes
         template.folder = data.folder
+        template.orderInFolder = data.orderInFolder
         template.updatedAt = Date()
         try await templateRepo.saveTemplate(template)
 

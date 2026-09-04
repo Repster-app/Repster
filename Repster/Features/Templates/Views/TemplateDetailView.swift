@@ -256,9 +256,9 @@ struct TemplateDetailView: View {
                 HStack(spacing: 10) {
                     Text(entry.label)
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(entry.set.setType == .warmup ? .gold : .textSecondary)
+                        .foregroundColor(entry.set.setType == .warmup ? .warmup : .textSecondary)
                         .frame(width: 26, height: 24)
-                        .background(entry.set.setType == .warmup ? Color.goldSoft : Color.bgSubtle)
+                        .background(entry.set.setType == .warmup ? Color.warmupSoft : Color.bgSubtle)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
 
                     Text(repText(for: entry.set))
@@ -374,7 +374,7 @@ struct TemplateDetailView: View {
                 if warmups > 0 {
                     Text("\(warmups) warmup")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.gold)
+                        .foregroundColor(.warmup)
                     dot
                 }
 

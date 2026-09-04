@@ -1,8 +1,8 @@
 // WeightSuggestionCardView.swift
 // Per-set weight suggestion strips. Each pending suggestion is its own
-// visually distinct strip with an accent rail, icon tile, line 1
-// (set + weight + target reps), and line 2 (contextual prompt — one of four
-// variants chosen by the engine signal that most explains the prescription).
+// visually distinct strip with an accent rail, icon tile and a single line
+// (set + weight + target reps). The engine's contextual sentence is no longer
+// rendered here — `explanation.userSummary` is still produced, just not shown.
 // Admin mode keeps the existing dense format with a per-row Details toggle.
 
 import SwiftUI
@@ -106,34 +106,22 @@ struct WeightSuggestionCardView: View {
             HStack(spacing: 10) {
                 iconTile(systemName: "wand.and.stars", tint: primaryAccent)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    // Line 1 — "Set N · 54 kg for 7 reps".
-                    // Names the rep count the weight was priced for, not the
-                    // target range: at a range's lower bound the same weight
-                    // would read as a step backwards.
-                    HStack(spacing: 0) {
-                        Text("Set \(suggestion.setNumber) · ")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Color.textPrimary)
+                // The prescription is the whole row: "Set N · 54 kg for 7 reps".
+                // Names the rep count the weight was priced for, not the target
+                // range: at a range's lower bound the same weight would read as
+                // a step backwards.
+                HStack(spacing: 0) {
+                    Text("Set \(suggestion.setNumber) · ")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.textPrimary)
 
-                        Text(formatWeight(suggestion.suggestedWeight))
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(primaryAccent)
+                    Text(formatWeight(suggestion.suggestedWeight))
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(primaryAccent)
 
-                        Text(" for \(suggestion.prescribedDisplayLabel)")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(Color.textSecondary)
-                    }
-
-                    // Line 2 — generic contextual copy from the engine.
-                    // Suppressed in the stale state since the banner replaces it.
-                    // F1 (v1.1) will swap this for per-row contextual phrases.
-                    if !isStale, !suggestion.explanation.userSummary.isEmpty {
-                        Text(suggestion.explanation.userSummary)
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color.textTertiary)
-                            .lineLimit(2)
-                    }
+                    Text(" for \(suggestion.prescribedDisplayLabel)")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color.textSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }

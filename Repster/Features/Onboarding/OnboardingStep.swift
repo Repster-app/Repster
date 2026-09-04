@@ -10,24 +10,24 @@ enum OnboardingStep: Int, CaseIterable {
     /// Units and bodyweight share a screen. A bodyweight figure is meaningless without a
     /// unit, so separated, the second screen had to silently assume the first's answer.
     case unitsAndBodyweight = 1
-    /// Was index 3, behind an Apple Health step that 1.4 shipped here and 1.5 moved to
-    /// the first workout finish. `step_index` therefore drops by one across that release;
-    /// `step` is the stable dimension to funnel on.
-    case importPrompt       = 2
+    /// Pick a program, which writes its sessions as templates in a folder.
+    ///
+    /// Replaces the old `importPrompt` at this index. That screen was the last thing between the
+    /// user and the app, and five people stopped there for good without one recorded skip — see
+    /// ONBOARDING_REDESIGN_SCOPING.md.
+    case program            = 2
+
+    /// Completion screen offering the two optional extras: import, and the walkthrough.
+    /// Import moved here so nobody has to pass through it to reach the app.
+    case extras             = 3
 
     static var totalSteps: Int { allCases.count }
 
-    var isSkippable: Bool {
-        switch self {
-        case .welcome:
-            return false
-        case .unitsAndBodyweight:
-            // Units always holds a value, preselected from the device locale, and the
-            // bodyweight field is optional within the screen. There is nothing here that
-            // skipping would let you avoid answering.
-            return false
-        case .importPrompt:
-            return true
-        }
-    }
+    /// Nothing is skippable any more, and that is deliberate rather than incidental.
+    ///
+    /// `import_prompt` was marked skippable and recorded zero skips across the 53 people who saw
+    /// it, which left an unwired control and an unfindable one indistinguishable. Step 2 always
+    /// resolves to a choice (including "build my own") and step 3's way out is its primary
+    /// button, so there is no skip control left to under-report.
+    var isSkippable: Bool { false }
 }
