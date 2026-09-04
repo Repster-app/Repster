@@ -142,7 +142,25 @@ struct SetTableView: View {
             // Set rows — warmups get W1/W2, drop sets D1/D2, working sets start at 1.
             // `SetBadgeLabel.assign` is shared with both history renderers so the same set
             // shows the same number wherever it is drawn.
-            LazyVStack(spacing: 0) {
+            //
+            // Deliberately eager. As a `LazyVStack` these rows only materialise when the list
+            // thinks they are visible, and the keypad is a ~380pt bottom `safeAreaInset` — so
+            // opening it shrinks this scroll viewport to a fraction of its height and rows fall
+            // outside it. They kept their reserved height and drew nothing: blank gaps where sets
+            // should be, which filled in the moment the keypad was dismissed.
+            //
+            // Two changes had to land before that was reachable. Removing the row's `onDisappear`
+            // (so the keypad survives scrolling) meant the keypad could stay open over a shrunken
+            // table at all; before, it closed itself as soon as rows left. And scoping the
+            // keypad's redraws to the keypad meant nothing was incidentally repainting the table
+            // any more — the full-screen repaint per keystroke had been quietly rescuing those
+            // rows. Neither change was wrong. Laziness was.
+            //
+            // Nothing is lost by dropping it: an exercise carries a handful of sets, not
+            // hundreds, so there is no window to virtualise. The cost is that every row rebuilds
+            // on a table redraw rather than only the visible ones, which at this list size is
+            // noise.
+            VStack(spacing: 0) {
                 let numberedSets: [(set: WorkoutSet, number: Int)] = zip(
                     sets,
                     SetBadgeLabel.assign(for: sets.map(\.setType))
@@ -170,9 +188,10 @@ struct SetTableView: View {
         .cornerRadius(12)
         // The keypad outlives any single row, so its owner is checked against the exercise's own
         // set list rather than against a row's lifecycle. `onDisappear` on the row used to do this,
-        // but rows live in a LazyVStack, where disappearing also means "scrolled out of view" — so
-        // editing a set and scrolling down tore the keypad out mid-entry. This fires only when the
-        // owning set genuinely leaves, and sits above the LazyVStack where scrolling can't reach it.
+        // back when the rows were lazy and disappearing also meant "scrolled out of view" — so
+        // editing a set and scrolling down tore the keypad out mid-entry. Keyed on the set list it
+        // fires only when the owning set genuinely leaves, which stays correct now that the rows
+        // are eager and `onDisappear` would no longer fire on a scroll anyway.
         .onChange(of: sets.map(\.id)) { _, ids in
             if let ownerSetID = keyboardManager?.context?.ownerSetID, !ids.contains(ownerSetID) {
                 keyboardManager?.hide(ownerSetID: ownerSetID)
