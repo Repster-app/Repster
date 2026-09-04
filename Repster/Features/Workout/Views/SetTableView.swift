@@ -579,7 +579,10 @@ private struct SetRowWrapper: View {
         guard let context = keyboardManager.context, context.ownerSetID == set.id else { return }
         let canComplete = completionInput(for: exercise) != nil
         context.canCompleteSet = { canComplete }
-        keyboardManager.refresh()
+        // Per keystroke, so it publishes on the manager's nested revision rather than the manager
+        // itself: the fresh `canCompleteSet` is for the keypad, and nothing else on this screen
+        // reads it. `refresh()` here re-rendered the entire workout screen on every digit.
+        keyboardManager.noteKeypadValueChanged()
     }
 
     private func setNoteAlert(for content: AnyView) -> AnyView {
@@ -1228,11 +1231,64 @@ final class SetEntryKeyboardManager: ObservableObject {
         objectWillChange.send()
     }
 
+    /// A change the keypad must redraw for, but that the rest of the screen does not care about.
+    ///
+    /// `ActiveWorkoutView` owns this manager as a `@StateObject` and reads it through
+    /// `isSetKeyboardVisible`, so `refresh()` re-evaluates that whole screen — header, tab strip,
+    /// the set table with every row, the suggestion module. Fine when the keypad appears or moves
+    /// between sets. Not fine per digit, which is what the row's `refreshCustomKeyboardIfOwned`
+    /// was doing.
+    ///
+    /// Publishing from a nested object instead keeps the invalidation local: SwiftUI does not
+    /// forward a nested `ObservableObject`'s changes to observers of the object holding it, so
+    /// only `SetEntryKeyboardOverlay`, which observes this directly, redraws.
+    let revision = Revision()
+
+    /// Bumps `revision`. Use for anything the keypad reads that the workout screen does not.
+    func noteKeypadValueChanged() {
+        revision.tick &+= 1
+    }
+
+    final class Revision: ObservableObject {
+        @Published var tick = 0
+    }
+}
+
+/// Press feedback for every control on the set keypad.
+///
+/// `.buttonStyle(.plain)`, which these were, strips SwiftUI's pressed highlight along with the
+/// rest of the system styling — so a key showed nothing at all under a thumb, and the first
+/// feedback of a tap was the digit arriving in the field a render pass later. That reads as lag
+/// even when the render is on time.
+///
+/// This responds to the touch itself rather than to state propagating out to the row and back,
+/// so it lands on the frame the finger does, independent of what the edit costs to render.
+private struct KeypadPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .opacity(configuration.isPressed ? 0.7 : 1)
+            // Fast enough to feel like a response rather than an animation, and asymmetric on
+            // purpose: the press should read instantly, the release can settle.
+            .animation(
+                configuration.isPressed ? nil : .easeOut(duration: 0.12),
+                value: configuration.isPressed
+            )
+    }
 }
 
 /// Sketch-inspired keyboard surface rendered at screen bottom while editing set fields.
 struct SetEntryKeyboardOverlay: View {
     @ObservedObject var manager: SetEntryKeyboardManager
+
+    /// The manager's nested revision signal. Observed here so a value edit redraws this overlay
+    /// without invalidating `ActiveWorkoutView` — see `SetEntryKeyboardManager.revision`.
+    @ObservedObject private var revision: SetEntryKeyboardManager.Revision
+
+    init(manager: SetEntryKeyboardManager) {
+        self._manager = ObservedObject(wrappedValue: manager)
+        self._revision = ObservedObject(wrappedValue: manager.revision)
+    }
 
     /// Bumped to force this overlay's body to re-run.
     ///
@@ -1469,7 +1525,7 @@ struct SetEntryKeyboardOverlay: View {
                 .clipShape(Circle())
                 .overlay(Circle().stroke(Color.border, lineWidth: 1))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(KeypadPressStyle())
         .accessibilityLabel("Cancel rep range")
     }
 
@@ -1501,7 +1557,7 @@ struct SetEntryKeyboardOverlay: View {
                         .stroke(prominent ? Color.clear : Color.border, lineWidth: 1)
                 )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(KeypadPressStyle())
         .disabled(disabled)
     }
 
@@ -1609,7 +1665,7 @@ struct SetEntryKeyboardOverlay: View {
                     .stroke(isEditing || hasRange ? Color.clear : Color.accent.opacity(0.35), lineWidth: 1)
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(KeypadPressStyle())
     }
 
     private func rirChip(_ context: SetEntryKeyboardContext, label: String, value: Double?) -> some View {
@@ -1629,7 +1685,7 @@ struct SetEntryKeyboardOverlay: View {
                 )
                 .clipShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(KeypadPressStyle())
     }
 
     private func numberPad(for context: SetEntryKeyboardContext) -> some View {
@@ -1659,7 +1715,7 @@ struct SetEntryKeyboardOverlay: View {
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                         .opacity(keyDisabled ? 0.55 : 1)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(KeypadPressStyle())
                 .disabled(keyDisabled)
             }
         }
@@ -1697,7 +1753,7 @@ struct SetEntryKeyboardOverlay: View {
                             .stroke(Color.border, lineWidth: 1)
                     )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(KeypadPressStyle())
 
             // D2: Context-aware suggestion button — weight suggestion or rep range
             if onWeightField {
@@ -1718,7 +1774,7 @@ struct SetEntryKeyboardOverlay: View {
                     .background(suggestedWeight == nil ? Color.bgInput : Color.accent)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(KeypadPressStyle())
                 .disabled(suggestedWeight == nil)
             } else if onRepsField {
                 repRangeButton(for: context)
@@ -1776,7 +1832,7 @@ struct SetEntryKeyboardOverlay: View {
                     .background(Color.white.opacity(0.9))
                     .clipShape(RoundedRectangle(cornerRadius: 16))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(KeypadPressStyle())
             .disabled(!context.canCompleteSet())
         }
         .frame(width: 108)
@@ -1796,7 +1852,7 @@ struct SetEntryKeyboardOverlay: View {
                         .stroke(Color.border, lineWidth: 1)
                 )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(KeypadPressStyle())
         .disabled(disabled)
     }
 
@@ -1814,7 +1870,7 @@ struct SetEntryKeyboardOverlay: View {
                         .stroke(Color.border, lineWidth: selected ? 0 : 1)
                 )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(KeypadPressStyle())
         .disabled(disabled)
     }
 
@@ -1832,7 +1888,7 @@ struct SetEntryKeyboardOverlay: View {
                         .stroke(Color.border, lineWidth: 1)
                 )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(KeypadPressStyle())
         .disabled(disabled)
     }
 
