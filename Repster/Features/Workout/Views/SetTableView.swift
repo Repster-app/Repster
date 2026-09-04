@@ -1227,12 +1227,26 @@ final class SetEntryKeyboardManager: ObservableObject {
     func refresh() {
         objectWillChange.send()
     }
+
 }
 
 /// Sketch-inspired keyboard surface rendered at screen bottom while editing set fields.
 struct SetEntryKeyboardOverlay: View {
     @ObservedObject var manager: SetEntryKeyboardManager
 
+    /// Bumped to force this overlay's body to re-run.
+    ///
+    /// The keypad renders through `SetEntryKeyboardContext`, a class the manager owns, so its
+    /// values are read at body-evaluation time — they do not publish. Something has to tell
+    /// SwiftUI to look again after a key writes through one of the context's closures, and this
+    /// `@State` is it: changing it invalidates this view and nothing else.
+    ///
+    /// It was `.id(refreshTick)` on the card, the number grid and the rail. That is a teardown,
+    /// not a refresh — every digit destroyed and rebuilt 26 buttons, and the grid, being lazy,
+    /// re-materialised its cells over more than one frame while the outgoing copy was still on
+    /// screen. Keys visibly settled into place. Note the identity swap never fixed anything the
+    /// re-render does not: the context and its closures live on the manager and survive it
+    /// untouched, so a rebuilt view calls exactly the same closures.
     @State private var refreshTick = 0
     @State private var repRangeEditMode = false
     @State private var repRangeMinText = ""
@@ -1289,7 +1303,6 @@ struct SetEntryKeyboardOverlay: View {
                     }
                     .padding(10)
                 }
-                .id(refreshTick)
                 .background(Color.bgCard)
                 .overlay(
                     RoundedRectangle(cornerRadius: 18)
@@ -1301,7 +1314,6 @@ struct SetEntryKeyboardOverlay: View {
                 .background(Color.bgCard.ignoresSafeArea(.all, edges: .bottom))
                 .onChange(of: manager.context?.ownerSetID) { _, _ in
                     repRangeEditMode = false
-                    refreshTick = 0
                 }
                 .onChange(of: manager.context?.trackedField) { _, newField in
                     guard !supportsRepRangeEditing(for: newField) else { return }
@@ -1542,6 +1554,8 @@ struct SetEntryKeyboardOverlay: View {
         context.commitTargetRepRange(minVal, maxVal)
         repRangeEditMode = false
         refreshTick += 1
+        // The one write on this screen that does not go through a row's text `@State`, so the
+        // row's `onChange` will not publish it for us. Rare enough that a full pass is fine.
         manager.refresh()
     }
 
@@ -1650,7 +1664,6 @@ struct SetEntryKeyboardOverlay: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .id(refreshTick)
     }
 
     private func actionRail(for context: SetEntryKeyboardContext) -> some View {
@@ -1767,7 +1780,6 @@ struct SetEntryKeyboardOverlay: View {
             .disabled(!context.canCompleteSet())
         }
         .frame(width: 108)
-        .id(refreshTick)
     }
 
     private func capsuleRailButton(title: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
@@ -1824,6 +1836,14 @@ struct SetEntryKeyboardOverlay: View {
         .disabled(disabled)
     }
 
+    /// Applies one key to the focused field.
+    ///
+    /// Every branch writes through `context.setFieldValue` and then bumps `refreshTick` so this
+    /// overlay redraws. It does not also call `manager.refresh()`: that write lands in the owning
+    /// row's `@State`, whose `onChange` already runs `refreshCustomKeyboardIfOwned`, and that
+    /// refreshes the manager once the edit has settled. Publishing from here as well cost a second
+    /// pass over the whole workout screen — header, tab strip, set table and all — per digit,
+    /// because `ActiveWorkoutView` owns the manager and reads it through `isSetKeyboardVisible`.
     private func handleKey(_ key: String, context: SetEntryKeyboardContext) {
         // Route input to rep range mini-fields when in edit mode
         if repRangeEditMode {
@@ -1837,7 +1857,6 @@ struct SetEntryKeyboardOverlay: View {
             value = String(value.dropLast())
             context.setFieldValue(field, value)
             refreshTick += 1
-            manager.refresh()
             return
         }
 
@@ -1845,7 +1864,6 @@ struct SetEntryKeyboardOverlay: View {
             guard allowsDecimal(field), !value.contains(".") else { return }
             context.setFieldValue(field, value.isEmpty ? "0." : value + ".")
             refreshTick += 1
-            manager.refresh()
             return
         }
 
@@ -1853,7 +1871,6 @@ struct SetEntryKeyboardOverlay: View {
             guard field == .duration, !value.contains(":") else { return }
             context.setFieldValue(field, value.isEmpty ? "0:" : value + ":")
             refreshTick += 1
-            manager.refresh()
             return
         }
 
@@ -1862,7 +1879,6 @@ struct SetEntryKeyboardOverlay: View {
             guard field == .reps, !value.contains("-"), !value.isEmpty else { return }
             context.setFieldValue(field, value + "-")
             refreshTick += 1
-            manager.refresh()
             return
         }
 
@@ -1871,7 +1887,6 @@ struct SetEntryKeyboardOverlay: View {
         }
         context.setFieldValue(field, value + key)
         refreshTick += 1
-        manager.refresh()
     }
 
     private func handleRepRangeKey(_ key: String) {
@@ -1951,7 +1966,6 @@ struct SetEntryKeyboardOverlay: View {
             UnitConversion.formatDisplayedWeight(suggested, unitPreference: context.unitPreference)
         )
         refreshTick += 1
-        manager.refresh()
     }
 
     private func nudgeWeight(_ context: SetEntryKeyboardContext, delta: Double) {
@@ -1976,7 +1990,6 @@ struct SetEntryKeyboardOverlay: View {
         let formatted = UnitConversion.formatWeight(next)
         context.setFieldValue(.weight, formatted)
         refreshTick += 1
-        manager.refresh()
     }
 
     private func nudgeReps(_ context: SetEntryKeyboardContext, delta: Int) {
@@ -1990,7 +2003,6 @@ struct SetEntryKeyboardOverlay: View {
         let next = max(0, current + delta)
         context.setFieldValue(field, next == 0 ? "" : String(next))
         refreshTick += 1
-        manager.refresh()
     }
 
     private func weightHelperText(_ context: SetEntryKeyboardContext) -> String {
