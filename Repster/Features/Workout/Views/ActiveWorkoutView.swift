@@ -132,9 +132,20 @@ struct ActiveWorkoutView: View {
         }
         .background(Color.bg.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
+            // Scoped to the accessory, not to the screen. On the root `VStack` this sat *outside*
+            // the inset, so the transaction it opened covered the header, the exercise tab strip,
+            // the sub-tab picker and the whole scroll view — meaning the set table and the
+            // suggestion module re-ran layout on every frame of the keypad's 0.2s appearance.
+            // That is the per-frame cost that showed up as jank on open and close and nowhere
+            // else: typing re-laid-out the screen once per digit, opening did it a dozen times in
+            // a fifth of a second.
+            //
+            // The children's `.move(edge: .bottom)` transitions still animate — they only need an
+            // animation in scope, and this is in scope for them. What they no longer do is drag
+            // the rest of the screen through the transition with them.
             bottomAccessoryArea
+                .animation(.easeInOut(duration: 0.2), value: bottomAccessoryAnimationKey)
         }
-        .animation(.easeInOut(duration: 0.2), value: bottomAccessoryAnimationKey)
         .task {
             services.analyticsService.screen(.activeWorkout)
             await viewModel.loadActiveWorkout()

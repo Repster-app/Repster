@@ -1338,9 +1338,20 @@ struct SetEntryKeyboardOverlay: View {
                     guard !supportsRepRangeEditing(for: newField) else { return }
                     repRangeEditMode = false
                 }
+                // Inside the `if`, deliberately. On the enclosing `Group` this also covered the
+                // card's own insertion and removal, so opening the keypad fired it — nil to a
+                // UUID is a change — *at the same time* as `ActiveWorkoutView`'s accessory
+                // animation, which the same event triggers. Two easeInOut(0.2) curves driving one
+                // transition is what made open and close read as slightly doubled.
+                //
+                // In here it is part of the subtree being inserted, and `.animation(_:value:)`
+                // does not fire on a first appearance — so it stays out of the way of opening and
+                // closing while still doing the job it is actually for: moving between two sets
+                // with Prev/Next while the card is already up. That case is not covered by
+                // `bottomAccessoryAnimationKey`, which carries no set identity.
+                .animation(.easeInOut(duration: 0.2), value: manager.context?.ownerSetID)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: manager.context?.ownerSetID)
     }
 
     /// The band above the keys: one `slotHeight` row on a recessed ground, or nothing at all.
@@ -1651,38 +1662,65 @@ struct SetEntryKeyboardOverlay: View {
         .buttonStyle(.plain)
     }
 
+    /// The twelve keys, in three eager rows.
+    ///
+    /// This was a `LazyVGrid`, which is the same mistake the set list made one level up. The card
+    /// is removed and re-inserted whenever the keypad opens or closes, and it animates in through
+    /// a `.move` transition — so the incoming copy is mid-flight, and a lazy grid inside something
+    /// whose geometry has not settled does not materialise its cells. That left a hole where the
+    /// keys belong, and because the card's `bgCard` sizes itself to this `VStack`, a short grid
+    /// meant the background did not cover either: the scroll content behind showed straight
+    /// through the keypad.
+    ///
+    /// Rows are built explicitly rather than by a grid because twelve fixed keys in three columns
+    /// do not need a layout engine, and `maxWidth: .infinity` on each key already gives the equal
+    /// columns `GridItem(.flexible())` was providing.
     private func numberPad(for context: SetEntryKeyboardContext) -> some View {
         let keys: [String] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"]
-        let focusedField = context.trackedField
-        let decimalAllowed = allowsDecimal(focusedField)
-        let isRepsField = focusedField == .reps
-        let isDurationField = focusedField == .duration
-        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-            ForEach(keys, id: \.self) { key in
-                let isDecimalKey = key == "."
-                let showColon = isDecimalKey && isDurationField && !repRangeEditMode
-                // D6: Show dash key on reps field or rep range edit mode
-                let showDash = isDecimalKey && (isRepsField || repRangeEditMode)
-                let keyDisabled = isDecimalKey && !decimalAllowed && !isRepsField && !isDurationField && !repRangeEditMode
-                let keyLabel = showColon ? ":" : (showDash ? "-" : (keyDisabled ? "•" : key))
-                let effectiveKey = showColon ? ":" : (showDash ? "-" : key)
-                Button {
-                    handleKey(effectiveKey, context: context)
-                } label: {
-                    Text(keyLabel)
-                        .font(.system(size: key == "⌫" ? 20 : 22, weight: .semibold))
-                        .foregroundColor(keyDisabled ? .textTertiary : .textPrimary)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 54)
-                        .background(Color.bgSubtle)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .opacity(keyDisabled ? 0.55 : 1)
+        let rows: [[String]] = stride(from: 0, to: keys.count, by: 3).map {
+            Array(keys[$0 ..< min($0 + 3, keys.count)])
+        }
+        return VStack(spacing: 8) {
+            ForEach(rows, id: \.self) { row in
+                HStack(spacing: 8) {
+                    ForEach(row, id: \.self) { key in
+                        numberPadKey(key, for: context)
+                    }
                 }
-                .buttonStyle(.plain)
-                .disabled(keyDisabled)
             }
         }
         .frame(maxWidth: .infinity)
+    }
+
+    /// One key. The decimal slot doubles as `:` on duration and `-` on reps and in the rep-range
+    /// editor, and is a dead `•` where none of those apply.
+    @ViewBuilder
+    private func numberPadKey(_ key: String, for context: SetEntryKeyboardContext) -> some View {
+        let focusedField = context.trackedField
+        let isDecimalKey = key == "."
+        let isRepsField = focusedField == .reps
+        let isDurationField = focusedField == .duration
+        let showColon = isDecimalKey && isDurationField && !repRangeEditMode
+        // D6: Show dash key on reps field or rep range edit mode
+        let showDash = isDecimalKey && (isRepsField || repRangeEditMode)
+        let keyDisabled = isDecimalKey && !allowsDecimal(focusedField) && !isRepsField && !isDurationField && !repRangeEditMode
+        let keyLabel = showColon ? ":" : (showDash ? "-" : (keyDisabled ? "•" : key))
+        let effectiveKey = showColon ? ":" : (showDash ? "-" : key)
+
+        Button {
+            handleKey(effectiveKey, context: context)
+        } label: {
+            Text(keyLabel)
+                .font(.system(size: key == "⌫" ? 20 : 22, weight: .semibold))
+                .foregroundColor(keyDisabled ? .textTertiary : .textPrimary)
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+                .background(Color.bgSubtle)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .opacity(keyDisabled ? 0.55 : 1)
+        }
+        .buttonStyle(.plain)
+        .disabled(keyDisabled)
     }
 
     private func actionRail(for context: SetEntryKeyboardContext) -> some View {
