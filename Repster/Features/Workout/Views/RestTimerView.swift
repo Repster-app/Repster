@@ -157,17 +157,28 @@ struct RestTimerView: View {
     }
 
     /// The 2pt rule along the top edge: full-width separator, overpainted to show progress.
+    ///
+    /// The overpaint is a full-width rectangle scaled from its leading edge, not a rectangle given
+    /// a measured width. It used to be the latter, inside a `GeometryReader` — which broke the
+    /// moment this bar sat in an animated layout: the keypad opening animates the accessory area
+    /// this lives in, a `GeometryReader` mid-animation reports a stale origin, and the rule drew
+    /// itself against those stale numbers. It came off the bar entirely and painted across the set
+    /// table, roughly 57pt above where it belongs.
+    ///
+    /// `scaleEffect` needs no geometry, so there is nothing to go stale. It also animates better:
+    /// scaling is a transform the render server can interpolate, where an animated `width` is a
+    /// layout change re-resolved every frame.
     private func progressRule(progress: CGFloat, color: Color) -> some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                Rectangle()
-                    .fill(Color.border)
+        ZStack(alignment: .leading) {
+            Rectangle()
+                .fill(Color.border)
 
-                Rectangle()
-                    .fill(color)
-                    .frame(width: geometry.size.width * progress)
-                    .animation(.linear(duration: 1), value: progress)
-            }
+            Rectangle()
+                .fill(color)
+                // Clamped because `scaleEffect` will happily draw past the bar's own width, and a
+                // timer that has been given extra seconds can hand this a progress above 1.
+                .scaleEffect(x: max(0, min(1, progress)), anchor: .leading)
+                .animation(.linear(duration: 1), value: progress)
         }
         .frame(height: Self.ruleHeight)
     }
