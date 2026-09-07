@@ -113,7 +113,7 @@ struct ActiveWorkoutView: View {
             headerBar
 
             // Exercise tab strip (WP04)
-            ExerciseTabStripView(dataSource: viewModel, services: services)
+            ExerciseTabStripView(dataSource: viewModel, services: services, showsReorderSheet: true)
 
             if viewModel.currentExercise != nil {
                 // Sub-tab picker: [Sets | History | Charts] (T025)
@@ -280,6 +280,9 @@ struct ActiveWorkoutView: View {
                                 presentation: .preserveExisting
                             )
                         }
+                    },
+                    onExplainerOpened: {
+                        services.analyticsService.recordWorkoutInteraction(.suggestionExplainerOpens)
                     }
                 )
                 .padding(.horizontal, 20)

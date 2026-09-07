@@ -105,12 +105,21 @@ struct WorkoutShareCardData: Equatable {
     }
 
     /// Only offer a style the session can actually fill.
-    var availableStyles: [WorkoutShareCardStyle] {
+    ///
+    /// `.record` is always offered: it has a designed no-PR state that leads with the workout
+    /// itself. Gating it on `prLift` meant a session without a record could fall to a single
+    /// available style, and a picker with one option hides itself — which is why the styles
+    /// looked missing rather than merely limited.
+    ///
+    /// Volume is a weight, so it follows the hide-weights toggle. Offering a card that prints
+    /// the exact tonnage at 96 pt to someone who asked for weights to be hidden would undo the
+    /// one control B4 exists to provide.
+    func availableStyles(hidesWeights: Bool = false) -> [WorkoutShareCardStyle] {
         WorkoutShareCardStyle.allCases.filter { style in
             switch style {
-            case .record:  return prLift != nil
+            case .record:  return true
             case .muscles: return muscleSlices.count >= 2
-            case .volume:  return volumeLabel != nil
+            case .volume:  return volumeLabel != nil && !hidesWeights
             case .trace:   return traceBars.count >= 3
             }
         }
@@ -218,14 +227,16 @@ struct WorkoutShareCard: View {
                     .frame(width: 210, height: 210)
 
                 VStack(spacing: 2) {
-                    Text(data.volumeLabel ?? data.setCountLabel)
+                    let showsVolume = !hidesWeights && data.volumeLabel != nil
+
+                    Text(showsVolume ? (data.volumeLabel ?? "") : data.setCountLabel)
                         .font(.system(size: 26, weight: .bold))
                         .monospacedDigit()
                         .foregroundColor(.textPrimary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
 
-                    Text(data.volumeLabel == nil ? "SETS" : "TOTAL")
+                    Text(showsVolume ? "TOTAL" : "SETS")
                         .font(.system(size: 10, weight: .semibold))
                         .kerning(1.1)
                         .foregroundColor(.textTertiary)
@@ -275,7 +286,7 @@ struct WorkoutShareCard: View {
 
             Spacer(minLength: 0).frame(maxHeight: .infinity)
 
-            Text(data.volumeHeadline)
+            Text(hidesWeights ? data.setCountLabel : data.volumeHeadline)
                 .font(.system(size: 96, weight: .heavy, design: .rounded))
                 .monospacedDigit()
                 .foregroundColor(.textPrimary)
@@ -284,7 +295,7 @@ struct WorkoutShareCard: View {
 
             Spacer().frame(height: 14)
 
-            Text(data.volumeCaption)
+            Text(hidesWeights ? "SETS LOGGED" : data.volumeCaption)
                 .font(.system(size: 15, weight: .bold))
                 .kerning(3.2)
                 .foregroundColor(.accent)
@@ -338,7 +349,8 @@ struct WorkoutShareCard: View {
 
             Spacer(minLength: 0).frame(maxHeight: .infinity)
 
-            metaRow([data.durationLabel, "\(data.setCountLabel) sets", data.volumeLabel].compactMap { $0 })
+            metaRow([data.durationLabel, "\(data.setCountLabel) sets",
+                     hidesWeights ? nil : data.volumeLabel].compactMap { $0 })
 
             Spacer().frame(height: 16)
 
@@ -820,9 +832,133 @@ extension WorkoutShareCardData {
 ///
 /// The two toggles are B4's, and they persist — this is the audience that will notice their
 /// squat number is on the card and quietly not post it, and the choice should be made once.
+/// The share card's analytics, kept out of the view so the two rules that decide whether the
+/// numbers mean anything are testable without a view hierarchy:
+///
+/// 1. `opened` fires **once per presentation**. It is the denominator of the open rate that
+///    gates phase 2, and `paywall shown` is the cautionary tale for what a re-fire does to a
+///    headline metric.
+/// 2. `dismissed` fires **only if nothing was shared**, so `opened` splits cleanly into
+///    shared and abandoned instead of counting every close.
+@MainActor
+final class ShareCardInstrumentation {
+
+    private let analyticsService: any AnalyticsServiceProtocol
+    private let entryPoint: ShareCardEntryPoint
+    private let prsHit: Int
+    private let accessTier: String?
+
+    private var hasRecordedOpen = false
+    private var hasShared = false
+    /// Render runs again on every style swipe and toggle flip, so a broken renderer would
+    /// otherwise send one failure per swipe. The question is whether it ever breaks, not how
+    /// many times the user poked it.
+    private var reportedFailures: Set<ShareCardFailure> = []
+
+    init(
+        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService(),
+        entryPoint: ShareCardEntryPoint = .summary,
+        prsHit: Int = 0,
+        accessTier: String? = nil
+    ) {
+        self.analyticsService = analyticsService
+        self.entryPoint = entryPoint
+        self.prsHit = prsHit
+        self.accessTier = accessTier
+    }
+
+    func opened(variant: WorkoutShareCardStyle, exerciseListShown: Bool, weightsShown: Bool) {
+        guard !hasRecordedOpen else { return }
+        hasRecordedOpen = true
+        analyticsService.shareCardOpened(
+            entryPoint: entryPoint,
+            variant: variant.rawValue,
+            prsHit: prsHit,
+            accessTier: accessTier,
+            exerciseListShown: exerciseListShown,
+            weightsShown: weightsShown
+        )
+    }
+
+    /// Only ever called from a confirmed completion — `UIActivityViewController` saying the
+    /// share happened, or Photos saying the write landed.
+    func shared(variant: WorkoutShareCardStyle, destination: String) {
+        hasShared = true
+        analyticsService.shareCardShared(
+            entryPoint: entryPoint,
+            variant: variant.rawValue,
+            destination: destination,
+            prsHit: prsHit
+        )
+    }
+
+    func closed(variant: WorkoutShareCardStyle) {
+        guard !hasShared else { return }
+        analyticsService.shareCardDismissed(entryPoint: entryPoint, variant: variant.rawValue)
+    }
+
+    func failed(_ errorType: ShareCardFailure) {
+        guard reportedFailures.insert(errorType).inserted else { return }
+        analyticsService.shareCardFailed(entryPoint: entryPoint, errorType: errorType)
+    }
+}
+
+/// `UIActivityViewController` rather than `ShareLink`, for one reason: `ShareLink` has no
+/// completion handler. With it, "shared" could only ever mean "tapped Share" — which would
+/// make the design doc's >= 50% completion bar a comparison of taps against taps — and
+/// `destination`, the property that says whether this is an Instagram feature or an iMessage
+/// feature, could not be captured at all.
+///
+/// Deliberately its own type rather than a promotion of the private `ActivityShareSheet` in
+/// `ExportView`: that one and `TemplateShareSheet` need no completion handler, and
+/// [TemplateSharing.swift:6](Repster/Features/Templates/Views/TemplateSharing.swift:6) already
+/// records that consolidating the copies is a separate job. This is the one that would host
+/// it when someone does that job.
+private struct WorkoutShareCardActivitySheet: UIViewControllerRepresentable {
+
+    let activityItems: [Any]
+    /// Called only when the share completed. `activityType` is nil when the sheet reports
+    /// success without naming an activity.
+    let onComplete: (UIActivity.ActivityType?) -> Void
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(
+            activityItems: activityItems,
+            applicationActivities: nil
+        )
+        controller.completionWithItemsHandler = { activityType, completed, _, _ in
+            // A cancel is a user decision, not a share and not a failure. It stays silent:
+            // the card sheet is still open behind it and they may yet share or close.
+            guard completed else { return }
+            onComplete(activityType)
+        }
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
 struct WorkoutSharePreviewSheet: View {
 
     let data: WorkoutShareCardData
+
+    @State private var instrumentation: ShareCardInstrumentation
+
+    init(
+        data: WorkoutShareCardData,
+        entryPoint: ShareCardEntryPoint = .summary,
+        prsHit: Int = 0,
+        accessTier: String? = nil,
+        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService()
+    ) {
+        self.data = data
+        _instrumentation = State(initialValue: ShareCardInstrumentation(
+            analyticsService: analyticsService,
+            entryPoint: entryPoint,
+            prsHit: prsHit,
+            accessTier: accessTier
+        ))
+    }
 
     @Environment(\.dismiss) private var dismiss
     @State private var hidesExerciseList = WorkoutShareCardPreferences.hidesExerciseList
@@ -832,6 +968,7 @@ struct WorkoutSharePreviewSheet: View {
     @State private var style: WorkoutShareCardStyle = WorkoutShareCardPreferences.style
     @State private var saveState: SaveState = .idle
     @State private var showPhotosDeniedAlert = false
+    @State private var showActivitySheet = false
 
     private enum SaveState: Equatable {
         case idle, saving, saved
@@ -883,6 +1020,23 @@ struct WorkoutSharePreviewSheet: View {
         .onAppear {
             // A remembered style the session cannot fill would leave the picker on a blank card.
             if !styles.contains(style) { style = styles[0] }
+
+            // After the correction above, so `variant` is the card actually on screen.
+            instrumentation.opened(
+                variant: style,
+                exerciseListShown: !hidesExerciseList,
+                weightsShown: !hidesWeights
+            )
+        }
+        .onDisappear {
+            // Covers the X and a swipe down alike — the X routes through `dismiss()`, a swipe
+            // never does, and instrumenting only the button would undercount every dismissal
+            // by however many people swipe. Silent if a share already succeeded.
+            instrumentation.closed(variant: style)
+        }
+        .onChange(of: hidesWeights) { _, _ in
+            // Hiding weights withdraws the volume card, so the selection has to move off it.
+            if !styles.contains(style) { style = styles[0] }
         }
         .onChange(of: style) { _, value in
             WorkoutShareCardPreferences.style = value
@@ -928,7 +1082,7 @@ struct WorkoutSharePreviewSheet: View {
 
     /// Styles this session can actually fill, with the remembered one guaranteed present.
     private var styles: [WorkoutShareCardStyle] {
-        let available = data.availableStyles
+        let available = data.availableStyles(hidesWeights: hidesWeights)
         return available.isEmpty ? [.record] : available
     }
 
@@ -1060,13 +1214,11 @@ struct WorkoutSharePreviewSheet: View {
                 .disabled(rendered == nil || saveState != .idle)
 
                 Group {
-                    if let fileURL, let rendered {
-                        ShareLink(
-                            item: WorkoutShareCardFile(url: fileURL),
-                            preview: SharePreview(data.title, image: Image(uiImage: rendered))
-                        ) {
+                    if fileURL != nil {
+                        Button { showActivitySheet = true } label: {
                             shareLabel(enabled: true)
                         }
+                        .buttonStyle(.plain)
                     } else {
                         shareLabel(enabled: false)
                     }
@@ -1076,6 +1228,16 @@ struct WorkoutSharePreviewSheet: View {
             .padding(.vertical, 12)
         }
         .background(Color.bg)
+        .sheet(isPresented: $showActivitySheet) {
+            if let fileURL {
+                WorkoutShareCardActivitySheet(activityItems: [fileURL]) { activityType in
+                    instrumentation.shared(
+                        variant: style,
+                        destination: activityType?.rawValue ?? ShareCardDestination.unknown
+                    )
+                }
+            }
+        }
         .alert("Photos access is off", isPresented: $showPhotosDeniedAlert) {
             Button("Not now", role: .cancel) { }
             if let settings = URL(string: UIApplication.openSettingsURLString) {
@@ -1124,14 +1286,24 @@ struct WorkoutSharePreviewSheet: View {
         switch await WorkoutShareCardPhotoSaver.save(rendered) {
         case .saved:
             saveState = .saved
+            // A card in the camera roll has left the app as surely as one sent to Messages,
+            // so it counts as a share — with its own destination, since it never touches a
+            // `UIActivityViewController`.
+            instrumentation.shared(variant: style, destination: ShareCardDestination.saveToPhotos)
             // Settle back so a second save is possible without reopening the sheet.
             try? await Task.sleep(for: .seconds(2))
             if saveState == .saved { saveState = .idle }
         case .denied:
             saveState = .idle
             showPhotosDeniedAlert = true
+            // Not a share: nothing was written. Recorded as a failure because a permission
+            // wall is the one funnel leak card design cannot fix — `error_type` keeps it
+            // separable from a genuinely broken render.
+            instrumentation.failed(.photosPermissionDenied)
         case .failed:
             saveState = .idle
+            // The silent one: the button returns to idle and says nothing.
+            instrumentation.failed(.photoSaveFailed)
         }
     }
 
@@ -1162,6 +1334,9 @@ struct WorkoutSharePreviewSheet: View {
 
         guard let image else {
             fileURL = nil
+            // The Share button never enables and the sheet shows nothing. Without this event
+            // that is invisible — exactly the "the button does nothing" bug D1 calls out.
+            instrumentation.failed(.renderFailed)
             return
         }
 

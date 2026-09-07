@@ -64,24 +64,43 @@ struct WhatsNewRelease {
             version: "1.5",
             items: [
                 WhatsNewItem(
-                    id: "smarter_suggestions",
-                    systemImage: "wand.and.stars",
+                    id: "supersets",
+                    systemImage: "link",
                     tint: .accent,
-                    // Written from the lifter's side of the screen. "Capacity baseline now reads
-                    // reps in reserve" is what changed; "it stops going down when you're holding
-                    // back" is what they noticed and complained about.
-                    title: "Smarter suggestions",
-                    body: "Telling the app you had reps left no longer makes it suggest less. It won't drop below a weight you just lifted with something in the tank, and drop sets no longer drag the rest of the exercise down."
+                    // First because it is the only genuinely new capability in the release, and
+                    // the only one nobody finds by accident — templates and the summary screen
+                    // announce themselves by looking different.
+                    title: "Supersets",
+                    body: "Repster now supports supersets — find them in templates, during the workout, and in your history."
                 ),
                 WhatsNewItem(
-                    id: "suggestions_recalibrating",
-                    systemImage: "arrow.triangle.2.circlepath",
+                    id: "smarter_suggestions",
+                    systemImage: "wand.and.stars",
+                    // Gold rather than accent because of the second sentence. This tile carries
+                    // the warning that used to be its own "Give it a week" row, folded in when
+                    // the third slot went elsewhere. It must not be trimmed to the good news:
+                    // the epoch-2 engine resets every existing user's learned rates on upgrade,
+                    // so suggestions move for everybody on the same day, and this sheet is the
+                    // only place that is explained. See PRE_1.5_CHECKLIST.md §2.2.
                     tint: .gold,
-                    // The honest half. Suggestions shift for everyone on the same day and the
-                    // per-exercise tuning restarts; saying so costs one tile and buys back the
-                    // trust that a week of unexplained numbers would spend.
-                    title: "Give it a week",
-                    body: "Because the maths changed, per-exercise tuning starts fresh. Your numbers may look a little different until it has seen a few sessions."
+                    // Written from the lifter's side of the screen, and deliberately with no
+                    // before-and-after: the row says what the engine does now rather than
+                    // confessing what it used to do. The recalibration still has to be said —
+                    // it just arrives as the engine starting fresh, not as an apology.
+                    title: "Smarter suggestions",
+                    body: "Suggestions now factor in how hard each set actually felt, and handle drop sets properly. They're learning your numbers from today, so give them a few sessions to settle."
+                ),
+                WhatsNewItem(
+                    id: "fresh_look",
+                    systemImage: "sparkles",
+                    tint: .green,
+                    // Broad on purpose, and the one row where the ten-second test is met by the
+                    // release rather than by the copy: everything named here is met unprompted
+                    // after the next workout. What it must not soften into is "various
+                    // improvements" — a row with nothing to go and look at is what teaches
+                    // people to dismiss the sheet unread.
+                    title: "A fresh look",
+                    body: "A rebuilt workout summary you can share, redesigned templates, and a cleaner look throughout."
                 )
             ]
         ),

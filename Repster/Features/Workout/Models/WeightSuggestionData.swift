@@ -124,6 +124,12 @@ struct SetSuggestion: Identifiable, Sendable {
     let explanation: SuggestionExplanation
     /// Structured diagnostics shown in the expanded details panel.
     let diagnostics: SetSuggestionDiagnostics
+    /// The logged set the baseline estimate was drawn from, when there is one.
+    /// The explainer names it directly — a real set the lifter performed is something
+    /// they can check and correct, where a derived estimate is not.
+    let baselineTopSet: HistoricalSetSnapshot?
+    /// The same target taken to failure, when that is a different set from this one.
+    let pushOption: SuggestionPushOption?
 
     var contextLabel: String { explanation.userSummary }
 }
@@ -209,6 +215,11 @@ struct WeightSuggestionData: Sendable {
     let completedInSessionSets: [CompletedSetSnapshot]
     /// Whether the module is available or unavailable for a typed reason.
     let availability: SuggestionAvailability
+    /// Working sets logged this session that were too far from failure to count as
+    /// evidence of capacity, and so raised nothing — while still adding fatigue.
+    /// Drives the explainer's "today hasn't counted" state; see
+    /// `SuggestionEngine.capabilityEvidenceMaxRIR`.
+    let sessionSetsIgnoredForCapability: Int
 
     var unavailableReason: SuggestionUnavailableReason? {
         guard case let .unavailable(reason) = availability else { return nil }
@@ -738,7 +749,11 @@ enum SuggestionExplainer {
             e1RMSourceWorkoutDate: evaluation.decisions.first?.e1RMSourceWorkoutDate
                 ?? evaluation.input?.baseSourceWorkoutDate,
             completedInSessionSets: completedInSessionSets,
-            availability: availability
+            availability: availability,
+            sessionSetsIgnoredForCapability: completedInSessionSets.filter { snapshot in
+                guard let rir = snapshot.rir else { return false }
+                return rir >= SuggestionEngine.capabilityEvidenceMaxRIR
+            }.count
         )
     }
 
@@ -815,7 +830,9 @@ enum SuggestionExplainer {
                 formula: formula,
                 setType: setType,
                 configuredRestSeconds: configuredRestSeconds
-            )
+            ),
+            baselineTopSet: decision.e1RMSourceTopSet,
+            pushOption: decision.pushOption
         )
     }
 

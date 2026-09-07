@@ -53,6 +53,11 @@ Shipped in 1.3 — these can contain real user data:
 >
 > Plus PostHog's `Application Installed` / `Updated` / `Opened`
 
+The four `share card` events and the `Share Card` screen are newer still — added
+2026-09-05, so **1.5 and later only**. The share card itself shipped on `NewMain` on
+2026-09-02 with no instrumentation at all, which means cards shared between those two dates
+are not counted anywhere and cannot be recovered.
+
 All `workout completed` properties listed below — including `access_tier` and
 `remaining_free_workouts` — are already in 1.3. The **exception** is the thirteen
 in-workout interaction counters (`history_views`, `sets_uncompleted`, …), added
@@ -144,6 +149,35 @@ Three things to know before building insights on these:
 | `template created` | `exercise_count_bucket`, `source` | Strong retention predictor — worth watching. |
 | `empty state shown` | `screen_name`, `has_data` | A screen rendered with nothing in it. Only fires for Home, Charts and Insights. |
 
+### Share card
+Added 2026-09-05, so **1.5 and later only** — there is no backfill and no share data
+before that build. Every property here is app-derived: no workout title, exercise name or
+note reaches any of them.
+
+`entry_point` is `summary` on every event today; it exists because the design doc's phase 2
+adds `history`, `pr_card` and `insight`, and a breakdown added later cannot re-segment data
+already collected.
+
+| Event | Key properties | Meaning |
+|---|---|---|
+| `share card opened` | `entry_point`, `variant`, `prs_hit`, `access_tier`, `exercise_list_shown`, `weights_shown` | The preview sheet reached the screen. **The headline number** — this over `workout completed` is the open rate the phase-2 gate reads. Fires once per presentation. Also sends `$screen` = `Share Card`. |
+| `share card shared` | `entry_point`, `variant`, `destination`, `prs_hit` | A card that actually left the app. Fired from `UIActivityViewController`'s completion handler or a landed Photos save — **never on the tap that raises the share sheet**, so `shared ÷ opened` is a real completion rate and not taps over taps. Cancelling the iOS share sheet sends nothing. |
+| `share card dismissed` | `entry_point`, `variant` | Closed **without sharing** — the X or a swipe down, which are one event here. Silent after a successful share, so `opened` splits cleanly into shared and abandoned. |
+| `share card failed` | `entry_point`, `error_type` | Three different things, and they must be read apart. `render_failed` is a broken card (the Share button never enables). `photos_permission_denied` is a refused Photos prompt — a user decision, not a bug. `photo_save_failed` is the silent one: Photos said yes and nothing landed. Deduped per kind per presentation. |
+
+`variant` is the card design on screen: `record`, `muscles`, `volume` or `trace`. On
+`opened` it is the remembered style; on `shared` it is the one actually sent.
+
+`destination` is Apple's `UIActivity.ActivityType` raw value passed through untouched
+(`com.apple.UIKit.activity.Message`, an extension's bundle id, …), plus two of Repster's
+own: `save_to_photos` for the dedicated save button, and `unknown` when the share sheet
+reports success without naming an activity. It is an open set on purpose — the question it
+answers is whether this is an iMessage feature or an Instagram feature.
+
+`prs_hit` is a **raw integer**, matching `workout completed`. That is deliberate: the funnel
+below splits both steps on the same property, which a bucketed string on one side would
+break.
+
 ### Monetization
 | Event | Key properties | Meaning |
 |---|---|---|
@@ -233,6 +267,23 @@ The question: *do people keep training in the app?*
 7. **Session shape** (Trends, breakdown `duration_bucket`, then a second tile for `set_count_bucket`) — `workout completed`
 8. **When people train** (Trends, breakdown `day_of_week`; second tile `time_of_day`) — `workout completed`
 9. **Templates created** (Trends, unique users) — `template created`
+10. **Share funnel** (Funnel, 1-day window) — `workout completed` → `share card opened` →
+    `share card shared`. **Add a breakdown on `prs_hit`**, or two saved copies filtered
+    `prs_hit > 0` and `prs_hit = 0`. That split is the whole point: it tests the
+    achievement-framing hypothesis (`SHARE_CARD_FEATURE_DESIGN.md` A3) and feeds every
+    phase-2 decision. Step 1 → 2 is the open rate; the gate is **≥ 8%**, read after 4 weeks
+    or 200 completed workouts, whichever is later. Step 2 → 3 is the completion rate, bar
+    **≥ 50%**
+11. **Where cards go** (Trends, breakdown `destination`) — `share card shared`. Informational
+    at this volume, but it decides whether a square variant is worth building
+12. **Card abandonment** (Trends, breakdown `variant`) — `share card dismissed` against
+    `share card opened`. A variant that is opened and never shared is a card problem, not a
+    placement problem
+13. **Broken cards** (Trends, breakdown `error_type`) — `share card failed`. Worth an alert
+    on `render_failed`: it means the Share button is doing nothing and no one will report it
+
+**Reading caveat, same as §4 of `PRE_1.4_CHECKLIST.md`:** give it 1–2 weeks, and remember a
+PostHog identity is an install, not a person. Nothing before 1.5 is in this funnel.
 
 ### Dashboard 3 — Monetization
 The question: *does hitting the wall convert, and from where?*

@@ -16,7 +16,8 @@ import SwiftUI
 /// - Inactive tab: bgCard background, textTertiary text
 /// - Auto-scrolls to keep the active tab visible
 /// - Long-press shows "Delete Exercise" with confirmation
-/// - Context menu includes "Move Left" / "Move Right" for reordering
+/// - Context menu includes "Move Left" / "Move Right" for reordering, and "Reorder
+///   Exercises…" for the whole workout at once when `showsReorderSheet` is on
 struct ExerciseTabStripView: View {
 
     // MARK: - Dependencies
@@ -26,6 +27,14 @@ struct ExerciseTabStripView: View {
 
     /// Needed only to build the replacement picker, which reuses `ExerciseListView` in browse mode.
     var services: ServiceContainer
+
+    /// Whether the long-press menu offers "Reorder Exercises…".
+    ///
+    /// Off by default so `EditWorkoutView`, which shares this strip, is unchanged. Reordering a
+    /// past workout works — `EditWorkoutViewModel.reorderExercises` persists as of 2026-08-29 —
+    /// but shipping the sheet there was not part of what was scoped, and turning it on later is
+    /// this one argument.
+    var showsReorderSheet: Bool = false
 
     // MARK: - State
 
@@ -46,6 +55,9 @@ struct ExerciseTabStripView: View {
 
     /// Whether the "this will remove logged sets" confirmation is showing.
     @State private var showReplaceConfirmation = false
+
+    /// Whether the reorder sheet is showing.
+    @State private var showReorderSheet = false
 
     /// The exercise a superset is being built around, or nil when no picker is in flight.
     ///
@@ -108,6 +120,13 @@ struct ExerciseTabStripView: View {
                 )
             }
         }
+        .sheet(isPresented: $showReorderSheet) {
+            NavigationStack {
+                ReorderExercisesSheet(dataSource: dataSource) {
+                    showReorderSheet = false
+                }
+            }
+        }
         .sheet(item: $supersetAnchor) { anchor in
             let anchorId = anchor.id
             NavigationStack {
@@ -147,14 +166,6 @@ struct ExerciseTabStripView: View {
 
     // MARK: - Supersets
 
-    /// Colours for the groups currently on screen, assigned by order of appearance.
-    ///
-    /// The strip carries no letters — a group is identified by its container and where it sits —
-    /// so the palette only has to separate two groups that are both visible, and it cycles rather
-    /// than capping. Green, red, gold and orange are deliberately absent: they mean completed,
-    /// delete, PR and "has a note" everywhere else in the app.
-    private static let groupPalette: [Color] = [.accent, .chart5, .chart7, .chart8]
-
     private var supersetRuns: [SupersetGrouping.Run] {
         SupersetGrouping.runs(
             exercises: dataSource.exercises,
@@ -163,11 +174,11 @@ struct ExerciseTabStripView: View {
     }
 
     /// The container colour for a run, or nil when it must not be drawn as a group.
+    ///
+    /// Shared with `ReorderExercisesSheet` — the sheet is opened from this strip and draws the
+    /// same groups, so the two have to agree on which group is which colour.
     private func markColor(for run: SupersetGrouping.Run) -> Color? {
-        guard run.isMarked, let groupId = run.groupId else { return nil }
-        let onScreen = supersetRuns.compactMap { $0.isMarked ? $0.groupId : nil }
-        guard let position = onScreen.firstIndex(of: groupId) else { return nil }
-        return Self.groupPalette[position % Self.groupPalette.count]
+        SupersetPalette.color(for: run, in: supersetRuns)
     }
 
     /// Two-plus adjacent members of one group, drawn as a single segmented control.
@@ -247,6 +258,22 @@ struct ExerciseTabStripView: View {
                 } label: {
                     Label("Move Right", systemImage: "arrow.right")
                 }
+            }
+
+            // Same job as the two above at a different scale, so it belongs with them. Pointless
+            // with one exercise, which is the rule Delete already follows.
+            if showsReorderSheet && dataSource.exercises.count > 1 {
+                Button {
+                    showReorderSheet = true
+                } label: {
+                    Label("Reorder Exercises…", systemImage: "arrow.up.arrow.down")
+                }
+            }
+
+            // Only when there is a movement group above it to separate. With one exercise every
+            // item above is hidden, and this would otherwise open the menu.
+            if dataSource.exercises.count > 1 {
+                Divider()
             }
 
             if dataSource.supportsSupersetAuthoring {

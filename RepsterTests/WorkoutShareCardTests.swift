@@ -287,13 +287,41 @@ final class WorkoutShareCardTests: XCTestCase {
         var full = data()
         full.muscleSlices = [slice("chest", 0.6), slice("triceps", 0.4)]
         full.traceBars = [bar(1), bar(0.8), bar(0.6)]
-        XCTAssertEqual(full.availableStyles, [.record, .muscles, .volume, .trace])
+        XCTAssertEqual(full.availableStyles(), [.record, .muscles, .volume, .trace])
 
         // One muscle is not a breakdown, and two bars are not a session.
         var thin = data()
         thin.muscleSlices = [slice("chest", 1.0)]
         thin.traceBars = [bar(1), bar(0.5)]
-        XCTAssertEqual(thin.availableStyles, [.record, .volume])
+        XCTAssertEqual(thin.availableStyles(), [.record, .volume])
+    }
+
+    /// The card falls back to the workout itself when there is no record, so the style has to
+    /// stay on offer — otherwise a plain session can drop to one style and the picker, which
+    /// hides itself below two, disappears entirely.
+    func testRecordStaysAvailableWithoutAPersonalRecord() {
+        var noPR = data(prLift: nil)
+        noPR = WorkoutShareCardData(
+            title: noPR.title, dateLabel: noPR.dateLabel, durationLabel: noPR.durationLabel,
+            setCountLabel: noPR.setCountLabel, volumeLabel: noPR.volumeLabel,
+            liftCountLabel: noPR.liftCountLabel, prLift: nil, lifts: noPR.lifts,
+            extraLiftCount: noPR.extraLiftCount
+        )
+        XCTAssertTrue(noPR.availableStyles().contains(.record))
+        XCTAssertGreaterThan(noPR.availableStyles().count, 1, "The picker hides itself below two styles")
+    }
+
+    /// Volume is a weight. Offering a card that prints the exact tonnage at 96 pt to someone who
+    /// asked for weights to be hidden would undo the only control B4 provides.
+    func testHidingWeightsWithdrawsTheVolumeCard() {
+        var full = data()
+        full.muscleSlices = [slice("chest", 0.6), slice("triceps", 0.4)]
+        full.traceBars = [bar(1), bar(0.8), bar(0.6)]
+
+        XCTAssertTrue(full.availableStyles(hidesWeights: false).contains(.volume))
+        XCTAssertFalse(full.availableStyles(hidesWeights: true).contains(.volume))
+        // The others survive — they can all be drawn without a weight on them.
+        XCTAssertEqual(full.availableStyles(hidesWeights: true), [.record, .muscles, .trace])
     }
 
     func testAStyleIsAlwaysAvailableEvenForAnEmptySession() {
@@ -303,7 +331,8 @@ final class WorkoutShareCardTests: XCTestCase {
             prLift: nil, lifts: [], extraLiftCount: 0
         )
         // No record, no volume, no muscles, no trace — the picker must still have something.
-        XCTAssertTrue(bare.availableStyles.isEmpty)
+        // .record is always on offer, so there is always something to show.
+        XCTAssertEqual(bare.availableStyles(), [.record])
     }
 
     func testEveryStyleRenders() {
@@ -347,17 +376,22 @@ final class WorkoutShareCardTests: XCTestCase {
 
     // MARK: - Coach teaser flag
 
-    /// The teaser is drawn as unbuilt, so it has to be removable without a release.
-    func testCoachTeaserDefaultsOnAndCanBePulled() {
+    /// The teaser advertises a feature that is not built, so it stays off until one exists.
+    ///
+    /// This assertion was inverted for 1.5. It previously pinned the default **on**, on the
+    /// reasoning that the flag made the teaser removable without a release — but the key is
+    /// local `UserDefaults` with no remote config behind it, so that only ever reached one
+    /// device. Coach did not land, and a permanent "Soon" is a broken promise.
+    func testCoachTeaserDefaultsOffAndCanBeTurnedOn() {
         let defaults = UserDefaults.standard
         let key = CoachPreferences.summaryTeaserKey
         let original = defaults.object(forKey: key)
         defer { defaults.set(original, forKey: key) }
 
         defaults.removeObject(forKey: key)
-        XCTAssertTrue(CoachPreferences.showsSummaryTeaser)
+        XCTAssertFalse(CoachPreferences.showsSummaryTeaser, "Coach is unbuilt — the teaser must not ship on by default")
 
-        defaults.set(false, forKey: key)
-        XCTAssertFalse(CoachPreferences.showsSummaryTeaser)
+        defaults.set(true, forKey: key)
+        XCTAssertTrue(CoachPreferences.showsSummaryTeaser, "The flag must still turn it on for the release Coach lands in")
     }
 }

@@ -426,6 +426,8 @@ struct SuggestionDecision: Sendable {
     /// proved it. Surfaced in the explanation — a suggestion the floor pushed *up* must never still
     /// claim it eased off to manage fatigue.
     let appliedFloor: SuggestionEngine.SuggestionFloor?
+    /// The same target taken to failure, when that is a different set from the one prescribed.
+    let pushOption: SuggestionPushOption?
 
     var targetReps: Int { target.reps }
     var displayTargetReps: Int { target.displayReps }
@@ -438,6 +440,22 @@ struct SuggestionDecision: Sendable {
     var targetDefaultUsageLabel: String? { target.defaultUsageLabel }
     var targetDisplayLabel: String { target.displayTargetLabel }
     var normalizedTargetLabel: String? { target.normalizedTargetLabel }
+}
+
+/// The harder reading of a target: the same set taken to failure rather than
+/// leaving reps in reserve.
+///
+/// Deliberately never leaves the user's own rep range — on a range target it takes
+/// the top of the range, on a fixed target it keeps the reps and adds load. The
+/// engine reports whether one exists; whether it is a good idea to *offer* is a
+/// presentation decision, because a push on a low-confidence baseline is bad advice.
+struct SuggestionPushOption: Sendable, Equatable {
+    /// Reps the push is priced for (normalized, matching `SuggestionTarget.reps`).
+    let reps: Int
+    /// User-facing reps for display (matching `SuggestionTarget.displayReps`).
+    let displayReps: Int
+    /// Prescribed weight in kg, rounded to the configured increment.
+    let weight: Double
 }
 
 /// Expected-vs-actual set outcome payload for future calibration work.
@@ -884,6 +902,18 @@ enum SuggestionEngine {
                 appliedFloor = floor
             }
 
+            // The push is priced off the same effective e1RM as the prescription, so the two
+            // always agree about how strong the lifter is today — they differ only in how much
+            // of that is spent. Computed after the floor so a floored suggestion cannot end up
+            // heavier than its own push.
+            let pushOption = pushOption(
+                target: setSpec.target,
+                effectiveE1RM: effectiveE1RM,
+                prescribedWeight: prescribedWeight,
+                prescribedReps: bestReps ?? setSpec.targetReps,
+                settings: input.settings
+            )
+
             decisions.append(SuggestionDecision(
                 setId: setSpec.setId,
                 setIndex: setSpec.setIndex,
@@ -908,11 +938,46 @@ enum SuggestionEngine {
                 selectionReferenceE1RM: selectionReferenceE1RM,
                 calibrationAdjustment: input.calibrationAdjustment,
                 projectedSessionFatigue: projectedFatigue,
-                appliedFloor: appliedFloor
+                appliedFloor: appliedFloor,
+                pushOption: pushOption
             ))
         }
 
         return decisions
+    }
+
+    /// The push for a target: the same reps taken to RIR 0.
+    ///
+    /// Takes the top of the rep range when the target carries one, so the push stays inside
+    /// the range the user set rather than reaching past it. Returns nil when the target already
+    /// goes to failure, or when the push would name the set that was already prescribed.
+    static func pushOption(
+        target: SuggestionTarget,
+        effectiveE1RM: Double,
+        prescribedWeight: Double,
+        prescribedReps: Int,
+        settings: SuggestionSettingsSnapshot
+    ) -> SuggestionPushOption? {
+        guard target.rir > 0, effectiveE1RM > 0 else { return nil }
+
+        let pushReps = max(1, target.repRange?.upperBound ?? target.reps)
+        let intensity = max(0.3, settings.formula.reverseCalculate(e1RM: 1.0, reps: pushReps))
+        let weight = roundToIncrement(effectiveE1RM * intensity, increment: settings.weightIncrement)
+        guard weight > 0 else { return nil }
+
+        // Nothing to offer when the push lands on the set already prescribed.
+        let sameSet = pushReps == prescribedReps && abs(weight - prescribedWeight) < 0.0001
+        guard !sameSet else { return nil }
+
+        // A push must never be *lighter* than what was prescribed; that happens when the floor
+        // raised the suggestion above the model, and calling the lighter set a push would be a lie.
+        guard weight >= prescribedWeight else { return nil }
+
+        return SuggestionPushOption(
+            reps: pushReps,
+            displayReps: max(1, target.displayRepRange?.upperBound ?? target.displayReps),
+            weight: weight
+        )
     }
 
     private static func repRangeCandidates(
@@ -1101,6 +1166,12 @@ enum SuggestionEngine {
         )
     }
 
+    /// Sets logged at or above this RIR are not read as evidence of capacity.
+    ///
+    /// Shared with the UI so the explainer can tell a lifter *why* an easy session did not move
+    /// their numbers, rather than restating the threshold in a view and letting the two drift.
+    static let capabilityEvidenceMaxRIR: Double = 3
+
     private static func normalizedObservedCapability(
         for set: SessionSetContext,
         readiness: ReadinessState,
@@ -1115,7 +1186,7 @@ enum SuggestionEngine {
               set.reps > 0,
               let actualRIR = set.rir,
               actualRIR >= 0,
-              actualRIR < 3 else { return nil }
+              actualRIR < capabilityEvidenceMaxRIR else { return nil }
         // RIR ≥ 3 sets are weak evidence of true capacity (RIR self-report is unreliable
         // far from failure and e1RM formulas degrade past ~10 reps to failure), so they
         // don't move sessionCapabilityE1RM. They still contribute to session fatigue.

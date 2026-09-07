@@ -1,0 +1,62 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html",     "x": 0,    "y": 0,    "w": 390, "h": 844, "title": "A · The debrief" },
+    { "file": "Diff.dc.html",     "x": 470,  "y": 0,    "w": 390, "h": 844, "title": "B · The diff" },
+    { "file": "TileFeed.dc.html", "x": 940,  "y": 0,    "w": 390, "h": 844, "title": "C · Tile feed" },
+    { "file": "Replay.dc.html",   "x": 0,    "y": 1120, "w": 390, "h": 844, "title": "D · Session replay" },
+    { "file": "Ledger.dc.html",   "x": 470,  "y": 1120, "w": 390, "h": 844, "title": "E · The model's account" },
+    { "file": "ColdStart.dc.html","x": 940,  "y": 1120, "w": 390, "h": 844, "title": "F · First session" }
+  ],
+  "annotations": [
+    {
+      "id": "brief",
+      "x": 0,
+      "y": -230,
+      "w": 860,
+      "text": "Analyse with Coach — what sits behind the tap.\n\nSix screens against one session: Push A, Wed 3 Sep, 18 sets, 58 minutes. Same data every time, so the difference you are looking at is the SHAPE, not the numbers.\n\nA–C are the three viable shapes for v1. D is the bet. E is a section, not a screen — it is blank for anyone not using suggestions. F is the state that decides whether any of this survives contact with a new user.\n\nColours, radii, type and card geometry are lifted from DesignTokens.swift and WorkoutSummarySheet's own sectionCard — not approximated."
+    },
+    {
+      "id": "note-a",
+      "x": 0,
+      "y": 880,
+      "w": 390,
+      "text": "A · THE DEBRIEF — the leading candidate\n\nOne headline, four findings, a forward line, the rest folded away. Keeps both halves of the teaser's promise on one screen and reads like a person talking.\n\nTradeoff: the headline has to be right 200 different ways, and it is hardest exactly when the session was ordinary. Needs the novelty rule (§8.7) or it becomes wallpaper by session 40."
+    },
+    {
+      "id": "note-b",
+      "x": 470,
+      "y": 880,
+      "w": 390,
+      "text": "B · THE DIFF — the most literal reading\n\nEverything against the last comparable session. Answers \"what changed\" with no interpretation at all, so it is the safest thing the app could ship.\n\nTradeoff: it needs the comparability rule (§4, B1) and it is silent on session one and after any freestyle session. Note the down-delta is grey, not red — red here would turn the screen into a report card."
+    },
+    {
+      "id": "note-c",
+      "x": 940,
+      "y": 880,
+      "w": 390,
+      "text": "C · TILE FEED — the prototype's instinct\n\nReuses InsightCardView, the rules engine, curation, snoozing — nearly free, and it is what COACHING_TILES already sketched.\n\nTradeoff: look at it next to A. Four cards about one session read as four unrelated facts, and nothing on the screen is about what happens next. This is the shape most likely to be built by accident."
+    },
+    {
+      "id": "note-d",
+      "x": 0,
+      "y": 2000,
+      "w": 390,
+      "text": "D · SESSION REPLAY — the bet\n\nNothing in Repster is temporal within a session. This is the only screen here that could not be a tile, and it is the one people would screenshot.\n\nBuilt entirely on completedAt deltas — the unread seam. Which is also the risk: the gaps are rest+work, not rest, retroactive edits corrupt the timestamps, and untickeded rows have none. Fix those and this is a real feature; ship it on top of them and it quietly lies."
+    },
+    {
+      "id": "note-e",
+      "x": 470,
+      "y": 2000,
+      "w": 390,
+      "text": "E · THE MODEL'S ACCOUNT — a section, not a screen\n\nThe most honest thing the app can show: what it expected, what happened, what it changed. Most of it is already computed by FatigueLearningService.\n\nTradeoff: wand-only. Blank for the users with the least data, which is why REPSTER_COACH §6 forbids it as a headline. Note the subject of every sentence is the app, never the lifter — and the missing-sets line at the bottom is deliberate."
+    },
+    {
+      "id": "note-f",
+      "x": 940,
+      "y": 2000,
+      "w": 390,
+      "text": "F · FIRST SESSION — the state that decides the rest\n\nEvery finding here computes from one workout: heaviest set, session shape, where the work went, pace, first-time exercises.\n\nDeliberately NO list of what unlocks later. Insights v2 §8 says state what you are showing, never what you can't — a locked list is a screen advertising its own emptiness. The one closing line is the whole concession. Worth arguing with."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

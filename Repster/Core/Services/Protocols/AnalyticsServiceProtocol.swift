@@ -238,6 +238,9 @@ enum WorkoutInteraction: String, CaseIterable {
     case prViews = "pr_views"
     case chartViews = "chart_views"
     case suggestionRefreshes = "suggestion_refreshes"
+    /// Opening "Why this weight" on a suggestion strip. The one honest read on whether the
+    /// explainer earns its place — a trust surface nobody opens is not a trust surface.
+    case suggestionExplainerOpens = "suggestion_explainer_opens"
 
     // Navigation churn: how much hunting the screen costs.
 
@@ -795,6 +798,122 @@ extension AnalyticsServiceProtocol {
             .stepIndex: .int(lastPage.index)
         ])
     }
+
+    // MARK: - Share card
+    //
+    // `opened` over `workout completed` is the open rate that decides whether phase 2 gets
+    // built (SHARE_CARD_FEATURE_DESIGN.md A6), so it is the one number here that must not
+    // drift: it fires once per presentation, never on a re-render.
+    //
+    // No property carries a workout title, an exercise name or a note. `variant` and
+    // `destination` are enums the app controls, `prs_hit` is a derived count, and the two
+    // toggles are booleans — nothing here is user-authored text.
+
+    /// The preview sheet reached the screen. Also a screen view, matching `paywallShown`:
+    /// the funnel wants the event, `$screen` breakdowns want the screen.
+    ///
+    /// `prsHit` is a raw `Int` rather than a bucket, deliberately — `workout completed`
+    /// already sends `prs_hit` that way, and the D2 funnel splits both steps on the same
+    /// property. One key with two types across sibling events would break that split.
+    func shareCardOpened(
+        entryPoint: ShareCardEntryPoint,
+        variant: String,
+        prsHit: Int,
+        accessTier: String?,
+        exerciseListShown: Bool,
+        weightsShown: Bool
+    ) {
+        var properties: [AnalyticsPropertyKey: AnalyticsPropertyValue] = [
+            .entryPoint: .string(entryPoint.rawValue),
+            .variant: .string(variant),
+            .prsHit: .int(prsHit),
+            .exerciseListShown: .bool(exerciseListShown),
+            .weightsShown: .bool(weightsShown)
+        ]
+        // Absent rather than guessed: an unresolved entitlement is not the same claim as
+        // "free", and this event is read against `workout completed`, which knows.
+        if let accessTier {
+            properties[.accessTier] = .string(accessTier)
+        }
+        screen(.shareCard, properties: properties)
+        track(.shareCardOpened, properties: properties)
+    }
+
+    /// A card that actually left the app. Never fired on the tap that raises the share
+    /// sheet: `UIActivityViewController` reports completion, and a tap-fired event would
+    /// make the >= 50% completion bar measure taps against taps.
+    func shareCardShared(
+        entryPoint: ShareCardEntryPoint,
+        variant: String,
+        destination: String,
+        prsHit: Int
+    ) {
+        track(.shareCardShared, properties: [
+            .entryPoint: .string(entryPoint.rawValue),
+            .variant: .string(variant),
+            .destination: .string(destination),
+            .prsHit: .int(prsHit)
+        ])
+    }
+
+    /// Closed without sharing anything — the X or a swipe down, which are the same event to a
+    /// user and must be the same event here. Deliberately silent after a successful share, so
+    /// `opened` partitions cleanly into shared and abandoned rather than counting the close
+    /// twice.
+    func shareCardDismissed(entryPoint: ShareCardEntryPoint, variant: String) {
+        track(.shareCardDismissed, properties: [
+            .entryPoint: .string(entryPoint.rawValue),
+            .variant: .string(variant)
+        ])
+    }
+
+    /// The three ways the card can fail to leave, separated by `error_type`. Only
+    /// `render_failed` is a broken card; the two Photos cases are a refused permission and a
+    /// write that silently did nothing. Read them apart, not as one error rate.
+    func shareCardFailed(entryPoint: ShareCardEntryPoint, errorType: ShareCardFailure) {
+        track(.shareCardFailed, properties: [
+            .entryPoint: .string(entryPoint.rawValue),
+            .errorType: .string(errorType.rawValue)
+        ])
+    }
+}
+
+/// Where the share card was raised from. Only `summary` exists today — the design doc's
+/// `history`, `pr_card` and `insight` entry points all belong to phase 2, which this
+/// instrumentation is what gates. They get their case when they get their button.
+enum ShareCardEntryPoint: String {
+    /// The "Share workout" pill in the summary sheet header.
+    case summary
+}
+
+/// Where a shared card actually went.
+///
+/// Everything but `saveToPhotos` is Apple's `UIActivity.ActivityType` raw value passed
+/// through untouched (`com.apple.UIKit.activity.PostToFacebook`, an extension's bundle id,
+/// and so on) — an open set, which is the point: the question this answers is whether the
+/// card is an Instagram feature or an iMessage feature, and guessing the list in advance
+/// would prejudge it.
+enum ShareCardDestination {
+    /// Save to Photos, which never reaches a `UIActivityViewController` — it is Repster's
+    /// own button. Named here so it sits in the same breakdown as everything else.
+    static let saveToPhotos = "save_to_photos"
+    /// The activity sheet reported completion without naming an activity. Rare, and worth
+    /// keeping distinct from a cancel rather than silently dropping a real share.
+    static let unknown = "unknown"
+}
+
+/// Why a card never made it. Distinct from a cancelled share, which is a user decision and
+/// not an error.
+enum ShareCardFailure: String {
+    /// `WorkoutShareCardRenderer.render` returned nil, so the sheet is showing nothing and
+    /// the Share button never enables. Invisible without this event.
+    case renderFailed = "render_failed"
+    /// Photos add-only access was refused. Recoverable only in Settings, and the one leak in
+    /// the funnel that no amount of card design fixes.
+    case photosPermissionDenied = "photos_permission_denied"
+    /// Photos authorised the write and it still did not land. Silent in the UI — the button
+    /// simply returns to idle — which is exactly the "does nothing" bug this event exists for.
+    case photoSaveFailed = "photo_save_failed"
 }
 
 /// Where Repster offered the Apple Health integration. Keep the raw values
@@ -866,6 +985,7 @@ enum AnalyticsScreen: String, CaseIterable {
     case exerciseList = "Exercise List"
     case templates = "Templates"
     case history = "History"
+    case shareCard = "Share Card"
 }
 
 enum AnalyticsEvent: String, CaseIterable {
@@ -918,6 +1038,13 @@ enum AnalyticsEvent: String, CaseIterable {
     /// job is verification: if this event stops arriving, attribution is broken
     /// and every paid-vs-organic breakdown has silently gone unsegmented.
     case attributionResolved = "attribution resolved"
+    // Share card. `opened` is the headline number the phase-2 gate reads (open rate =
+    // opened / workout completed); `shared` only ever fires on a confirmed completion, so
+    // completion rate means what the design doc's >= 50% bar assumes it means.
+    case shareCardOpened = "share card opened"
+    case shareCardShared = "share card shared"
+    case shareCardDismissed = "share card dismissed"
+    case shareCardFailed = "share card failed"
 }
 
 enum AnalyticsPropertyKey: String, CaseIterable {
@@ -983,6 +1110,7 @@ enum AnalyticsPropertyKey: String, CaseIterable {
     case prViews = "pr_views"
     case chartViews = "chart_views"
     case suggestionRefreshes = "suggestion_refreshes"
+    case suggestionExplainerOpens = "suggestion_explainer_opens"
     case exercisePickerOpens = "exercise_picker_opens"
     case exerciseSwitches = "exercise_switches"
     case exerciseSettingsOpens = "exercise_settings_opens"
@@ -994,6 +1122,17 @@ enum AnalyticsPropertyKey: String, CaseIterable {
     case workoutPauses = "workout_pauses"
     case supersetPromptTaps = "superset_prompt_taps"
     case supersetCreates = "superset_creates"
+    // Share card.
+    case entryPoint = "entry_point"
+    /// Which of the four card designs was on screen: `record` / `muscles` / `volume` / `trace`.
+    case variant
+    /// Apple's activity type, or `save_to_photos`. See `ShareCardDestination`.
+    case destination
+    /// The two privacy toggles, recorded as shown rather than hidden so the property reads the
+    /// same way round as the card does. Both are remembered across sessions, so the value at
+    /// open time is the user's standing preference rather than a per-card whim.
+    case exerciseListShown = "exercise_list_shown"
+    case weightsShown = "weights_shown"
     // Attribution. Set as person properties (see `AnalyticsAttributionReporter`),
     // which is why they can be filtered on events that predate resolution.
     case acquisitionChannel = "acquisition_channel"

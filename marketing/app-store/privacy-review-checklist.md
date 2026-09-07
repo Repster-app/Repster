@@ -1,6 +1,22 @@
 # App Privacy and Review Checklist
 
-Last checked: August 29, 2026
+Last checked: September 6, 2026
+
+> **Changed for 1.5 (September 6, 2026):** two corrections to the App Review Notes
+> below. The free-tier limit was stated as 5 completed workouts; the code has said
+> **10** (`RevenueCatConfiguration.freeWorkoutLimit`), and so do the website and the
+> support page — this note was the only thing saying 5. And 1.5 adds
+> `NSPhotoLibraryAddUsageDescription` for Save to Photos on the workout share card,
+> which needed its own paragraph so a reviewer meeting a new permission string has an
+> explanation. Neither is an App Privacy change: add-only access to write an image the
+> user asked to save collects nothing and sends nothing off device.
+>
+> **Also removed 2026-09-06:** every reference to the **AI template helper**. It was
+> deleted from the app in the 1.5 templates rebuild (`3cf55ed`) and no paste box
+> exists any more, so the privacy policy's "AI Template Feature" section, the terms'
+> "AI Template Helper" section, the feature guide bullet and the support FAQ entry
+> all described a feature that is gone. The replay masking list drops from four items
+> to three for the same reason.
 
 > **Changed in the analytics expansion (August 2026):** PostHog person profiles,
 > application lifecycle events, session replay, and multiple-choice surveys
@@ -141,17 +157,23 @@ multiple-choice surveys, the anonymous per-install identifier behind person
 profiles, Apple Health, crash and error diagnostics, and Apple Search Ads
 attribution. Do not paraphrase it here — read the file.
 
-⚠️ **Until the Pages source is switched, the file and the live page still differ.**
-Pages must be repointed to branch `NewMain`, folder `/docs` (it currently serves
-the root of `main`). Until that happens the live page is dated May 16, 2026 and
-actively states that replay and surveys are disabled. See `PRE_1.4_CHECKLIST.md`
-§1.1.
+✅ **Resolved 2026-08-18.** Pages now serves branch `NewMain`, folder `/docs`, so
+this file *is* the live page once it is pushed. `main` is a stale rollback copy and
+touching it deploys nothing.
+
+⚠️ **As of 2026-09-06 the rewrite is committed and unpushed.** `NewMain` is 47
+commits ahead of `origin/NewMain`, so the live page is still the pre-1.5 text saying
+everything typed in your own words is masked. **Pushing `NewMain` is the deploy**,
+and it has to happen before the 1.5 build reaches users. See
+`PRE_1.5_CHECKLIST.md` §1.1.
 
 The three commitments that must stay literally true in the app:
 
-1. Notes (workout, set and template), bodyweight wherever it is shown, the import
-   preview of the user's own training file, and text pasted into the AI template box
-   are hidden on device before a recording is uploaded. As of 1.5 the recording is
+1. Notes (workout, set and template), bodyweight wherever it is shown, and the import
+   preview of the user's own training file are hidden on device before a recording is
+   uploaded. (**The AI template box was deleted in the 1.5 templates rebuild**,
+   `3cf55ed`, so the fourth item on this list is gone — along with the AI sections of
+   the privacy policy and terms, removed 2026-09-06.) As of 1.5 the recording is
    legible by default (`maskAllTextInputs = false` in
    `AnalyticsService.configureSessionReplay`) and those values are masked at the field
    via `replayMasked()`; the three text fields that live inside a `.alert` cannot be
@@ -188,7 +210,7 @@ Use this in the App Review Notes field:
 >
 > The app uses anonymous PostHog EU product analytics for aggregate usage statistics only. It does not use IDFA, advertising, tracking, autocapture, or heatmaps. Users can turn all analytics off in Settings -> Data & Backups -> Share Anonymous Analytics, which disables events, session recordings, surveys, crash and error diagnostics, and Apple Search Ads attribution together.
 >
-> The app captures anonymous session recordings to diagnose usability problems, and users can turn them off with everything else under Settings -> Data & Backups -> Share Anonymous Analytics. Recordings show the app's own interface text and the training content on screen — exercise names, workout and template names, and the sets, reps and weights of a workout — which is what makes them useful for finding where people get stuck. The app has no photo picker and no user-supplied imagery, so every image in a recording is one the app ships. Four things are masked on device before any recording is uploaded and are never received: workout, set and template notes; the user's bodyweight wherever it is displayed, including the bodyweight log; the preview of a training file being imported; and text pasted into the AI template box. Text typed inside a pop-up dialogue cannot be masked that way, so recording stops entirely while such a dialogue is open. Recordings are not linked to any account, name or email address, because the app has no accounts. Analytics events themselves carry only bucketed counts and never exact figures, notes, CSV contents, bodyweight values, or raw workout logs.
+> The app captures anonymous session recordings to diagnose usability problems, and users can turn them off with everything else under Settings -> Data & Backups -> Share Anonymous Analytics. Recordings show the app's own interface text and the training content on screen — exercise names, workout and template names, and the sets, reps and weights of a workout — which is what makes them useful for finding where people get stuck. The app has no photo picker and no user-supplied imagery, so every image in a recording is one the app ships. Three things are masked on device before any recording is uploaded and are never received: workout, set and template notes; the user's bodyweight wherever it is displayed, including the bodyweight log; and the preview of a training file being imported. Text typed inside a pop-up dialogue cannot be masked that way, so recording stops entirely while such a dialogue is open. Recordings are not linked to any account, name or email address, because the app has no accounts. Analytics events themselves carry only bucketed counts and never exact figures, notes, CSV contents, bodyweight values, or raw workout logs.
 >
 > The app sends crash and error diagnostics (exception type, stack trace, device model, OS and app version) so crashes can be found and fixed. These contain no workout data and are covered by the same Share Anonymous Analytics toggle.
 >
@@ -198,7 +220,9 @@ Use this in the App Review Notes field:
 >
 > ATTRIBUTION: Repster uses Apple's own AdServices framework (`AAAttribution`) for first-party Apple Search Ads attribution only, once per install. No App Tracking Transparency prompt is shown because no IDFA is requested, no advertising profile is built, and no data is shared with third parties for tracking or ad targeting. The corresponding App Privacy answer is Identifiers -> Advertising Data, with purpose Analytics, not linked to the user, and not used for tracking. It is covered by the same Share Anonymous Analytics toggle: with analytics off, no request to Apple's attribution endpoint is made at all.
 >
-> The free tier allows up to 5 completed workouts. After that limit, the app presents the RevenueCat/App Store paywall to unlock unlimited workout logging. Restore Purchases and Manage Subscription are available in Settings -> Membership. Privacy Policy and Terms of Use are available in Settings -> About.
+> PHOTOS: After finishing a workout, the user can open a shareable summary card and tap Save to Photos. That is the only thing that writes to the photo library, and it writes only the card image the user just asked to save. Repster requests add-only access (`NSPhotoLibraryAddUsageDescription`); it never requests read access, has no photo picker, and never reads or imports the user's photos. If the user declines, the card can still be shared through the standard share sheet.
+>
+> The free tier allows up to 10 completed workouts. After that limit, the app presents the RevenueCat/App Store paywall to unlock unlimited workout logging. Restore Purchases and Manage Subscription are available in Settings -> Membership. Privacy Policy and Terms of Use are available in Settings -> About.
 >
 > Local notifications are used for rest timer alerts. Live Activities are used to show the active workout/rest timer state while a workout is in progress.
 
@@ -210,7 +234,9 @@ Use this in the App Review Notes field:
 - `Repster/Core/Services/HealthKitService.swift` and `Repster/Info.plist`
 - `docs/privacy.html` (repo source of truth)
 - Live GitHub Pages privacy policy at `https://repster-app.github.io/Repster/privacy.html`
-  — served from the **root of `main`**, not from the file above
+  — served from **`NewMain:/docs`** since 2026-08-18, so it *is* `docs/privacy.html`
+  above, one push behind. `main` is a stale rollback copy; pushing it deploys nothing
+- `Repster/Info.plist` — also carries `NSPhotoLibraryAddUsageDescription` as of 1.5
 
 ## References
 

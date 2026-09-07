@@ -11,6 +11,11 @@ struct WeightSuggestionCardView: View {
     let data: WeightSuggestionData
     let unitPreference: UnitPreference
     let isAdminModeEnabled: Bool
+    /// Called when the explainer is opened, so the caller can record the tally.
+    var onExplainerOpened: (() -> Void)? = nil
+
+    /// Suggestion whose explainer sheet is open, if any.
+    @State private var explainedSuggestion: SetSuggestion?
 
     /// Per-row Details toggle state (admin mode only). Indexed by `setId`.
     /// Replaces the previous global toggle.
@@ -44,6 +49,13 @@ struct WeightSuggestionCardView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .sheet(item: $explainedSuggestion) { suggestion in
+            SuggestionExplainerSheet(
+                suggestion: suggestion,
+                data: data,
+                unitPreference: unitPreference
+            )
+        }
     }
 
     // MARK: - Stale banner
@@ -102,6 +114,21 @@ struct WeightSuggestionCardView: View {
     // MARK: - User pending strip (Take B)
 
     private func userPendingStrip(_ suggestion: SetSuggestion) -> some View {
+        Button {
+            onExplainerOpened?()
+            explainedSuggestion = suggestion
+        } label: {
+            userPendingStripBody(suggestion)
+        }
+        .buttonStyle(SuggestionStripButtonStyle())
+        .accessibilityLabel(
+            "Set \(suggestion.setNumber), \(formatWeight(suggestion.suggestedWeight)) "
+            + "for \(suggestion.prescribedDisplayLabel)"
+        )
+        .accessibilityHint("Shows why this weight was suggested")
+    }
+
+    private func userPendingStripBody(_ suggestion: SetSuggestion) -> some View {
         stripContainer(railColor: primaryAccent) {
             HStack(spacing: 10) {
                 iconTile(systemName: "wand.and.stars", tint: primaryAccent)
@@ -124,6 +151,10 @@ struct WeightSuggestionCardView: View {
                         .foregroundStyle(Color.textSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.textTertiary)
             }
         }
     }
@@ -512,5 +543,21 @@ struct WeightSuggestionCardView: View {
 
     private func formatWeight(_ kg: Double) -> String {
         UnitConversion.formatWeightLabel(kg, unitPreference: unitPreference)
+    }
+}
+
+/// Press feedback for a suggestion strip.
+///
+/// The strip paints its own `bgCard` background, so the press reads as a light overlay
+/// rather than a background swap — swapping it would fight the rail and the icon tile.
+private struct SuggestionStripButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.05 : 0))
+                    .allowsHitTesting(false)
+            )
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }

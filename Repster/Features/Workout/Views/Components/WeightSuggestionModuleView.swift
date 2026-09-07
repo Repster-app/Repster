@@ -15,6 +15,7 @@ struct WeightSuggestionModuleView: View {
     let isLoading: Bool
     let isRefreshing: Bool
     let onRefresh: () -> Void
+    var onExplainerOpened: (() -> Void)? = nil
 
     var body: some View {
         if let data, !isLoading {
@@ -28,7 +29,8 @@ struct WeightSuggestionModuleView: View {
                     WeightSuggestionCardView(
                         data: data,
                         unitPreference: unitPreference,
-                        isAdminModeEnabled: isAdminModeEnabled
+                        isAdminModeEnabled: isAdminModeEnabled,
+                        onExplainerOpened: onExplainerOpened
                     )
                 }
             } else if let reason = data.unavailableReason, reason != .featureDisabled {

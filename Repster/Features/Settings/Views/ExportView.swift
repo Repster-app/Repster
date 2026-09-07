@@ -27,7 +27,7 @@ struct ExportView: View {
                 .font(.title2.bold())
                 .foregroundStyle(Color.textPrimary)
 
-            Text("Create a Repster backup file that preserves your workout history, workout metadata, and set details for full restore later.")
+            Text("Create a Repster backup file with your full workout history, set details, and templates. Bodyweight logs, programs, and settings are not included.")
                 .font(.body)
                 .foregroundStyle(Color.textSecondary)
                 .multilineTextAlignment(.center)
@@ -126,7 +126,7 @@ struct RestoreBackupView: View {
                 viewModel.performRestore()
             }
         } message: {
-            Text("This deletes current workouts and sets before restoring the selected backup. Bodyweight logs, settings, templates, and programs are left untouched.")
+            Text("This deletes your current workouts, sets, and templates, then restores the ones in the backup. Bodyweight logs, programs, and settings are left untouched.")
         }
     }
 
@@ -142,7 +142,7 @@ struct RestoreBackupView: View {
                 .font(.title2.bold())
                 .foregroundStyle(Color.textPrimary)
 
-            Text("Select a Repster backup file to replace the current workout history with the archived workouts, exercises, and sets.")
+            Text("Select a Repster backup file. Restoring replaces your current workout history and templates with the ones in the backup; anything added since is deleted.")
                 .font(.body)
                 .foregroundStyle(Color.textSecondary)
                 .multilineTextAlignment(.center)
@@ -184,7 +184,7 @@ struct RestoreBackupView: View {
                     .cornerRadius(12)
                 }
 
-                Text("Restoring will replace the current workout history only. Templates, programs, bodyweight logs, and settings stay as they are.")
+                Text("Restoring replaces your current workout history and templates with the ones in this backup. Programs, bodyweight logs, and settings stay as they are.")
                     .font(.subheadline)
                     .foregroundStyle(Color.textSecondary)
 

@@ -85,6 +85,8 @@
 		AC0007 /* SetRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0007 /* SetRowView.swift */; };
 		AC0008 /* SetTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0008 /* SetTableView.swift */; };
 		AC0009 /* ExerciseTabStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0009 /* ExerciseTabStripView.swift */; };
+		AC0090 /* ReorderExercisesSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0090 /* ReorderExercisesSheet.swift */; };
+		AC0091 /* SupersetPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0091 /* SupersetPalette.swift */; };
 		AC0902 /* SupersetPartnerPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0902 /* SupersetPartnerPicker.swift */; };
 		AC0010 /* ActiveWorkoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0010 /* ActiveWorkoutView.swift */; };
 		AC0011 /* ElapsedTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0011 /* ElapsedTimerView.swift */; };
@@ -206,6 +208,7 @@
 		AW0004 /* PrescriptionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0004 /* PrescriptionSettingsView.swift */; };
 		AW0005 /* WeightSuggestionData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0005 /* WeightSuggestionData.swift */; };
 		AW0006 /* WeightSuggestionCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0006 /* WeightSuggestionCardView.swift */; };
+		AW0090 /* SuggestionExplainerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0090 /* SuggestionExplainerSheet.swift */; };
 		AW0007 /* WeightSuggestionModuleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0007 /* WeightSuggestionModuleView.swift */; };
 		AW0008 /* WorkoutExclusionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0008 /* WorkoutExclusionSheet.swift */; };
 		AW0009 /* ProgressionExclusionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0009 /* ProgressionExclusionViews.swift */; };
@@ -257,6 +260,8 @@
 		RTA0002 /* RestAlarmPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = RTA1002 /* RestAlarmPromptView.swift */; };
 		RV0001 /* ReviewPromptService.swift in Sources */ = {isa = PBXBuildFile; fileRef = RV1001 /* ReviewPromptService.swift */; };
 		SB0001 /* SmartSuggestionBehaviorScenarioTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SB1001 /* SmartSuggestionBehaviorScenarioTests.swift */; };
+		SB0002 /* SuggestionExplainerPushTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SB1002 /* SuggestionExplainerPushTests.swift */; };
+		SB0003 /* ReorderExercisesSheetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SB1003 /* ReorderExercisesSheetTests.swift */; };
 		TT0001 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */; };
 		TT9201 /* WorkoutShareCardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT9202 /* WorkoutShareCardTests.swift */; };
 		TT0002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = TT2003 /* XCTest.framework */; };
@@ -421,6 +426,8 @@
 		BC0007 /* SetRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetRowView.swift; sourceTree = "<group>"; };
 		BC0008 /* SetTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetTableView.swift; sourceTree = "<group>"; };
 		BC0009 /* ExerciseTabStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseTabStripView.swift; sourceTree = "<group>"; };
+		BC0090 /* ReorderExercisesSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReorderExercisesSheet.swift; sourceTree = "<group>"; };
+		BC0091 /* SupersetPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupersetPalette.swift; sourceTree = "<group>"; };
 		BC0902 /* SupersetPartnerPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupersetPartnerPicker.swift; sourceTree = "<group>"; };
 		BC0010 /* ActiveWorkoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutView.swift; sourceTree = "<group>"; };
 		BC0011 /* ElapsedTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElapsedTimerView.swift; sourceTree = "<group>"; };
@@ -538,6 +545,7 @@
 		BW0004 /* PrescriptionSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrescriptionSettingsView.swift; sourceTree = "<group>"; };
 		BW0005 /* WeightSuggestionData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightSuggestionData.swift; sourceTree = "<group>"; };
 		BW0006 /* WeightSuggestionCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightSuggestionCardView.swift; sourceTree = "<group>"; };
+		BW0090 /* SuggestionExplainerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestionExplainerSheet.swift; sourceTree = "<group>"; };
 		BW0007 /* WeightSuggestionModuleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightSuggestionModuleView.swift; sourceTree = "<group>"; };
 		BW0008 /* WorkoutExclusionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutExclusionSheet.swift; sourceTree = "<group>"; };
 		BW0009 /* ProgressionExclusionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressionExclusionViews.swift; sourceTree = "<group>"; };
@@ -586,6 +594,8 @@
 		RTA1002 /* RestAlarmPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestAlarmPromptView.swift; sourceTree = "<group>"; };
 		RV1001 /* ReviewPromptService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewPromptService.swift; sourceTree = "<group>"; };
 		SB1001 /* SmartSuggestionBehaviorScenarioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSuggestionBehaviorScenarioTests.swift; sourceTree = "<group>"; };
+		SB1002 /* SuggestionExplainerPushTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestionExplainerPushTests.swift; sourceTree = "<group>"; };
+		SB1003 /* ReorderExercisesSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReorderExercisesSheetTests.swift; sourceTree = "<group>"; };
 		TT2001 /* RepsterTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RepsterTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutViewModelSuggestionRefreshTests.swift; sourceTree = "<group>"; };
 		TT9202 /* WorkoutShareCardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutShareCardTests.swift; sourceTree = "<group>"; };
@@ -874,6 +884,8 @@
 				BC0007 /* SetRowView.swift */,
 				BC0008 /* SetTableView.swift */,
 				BC0009 /* ExerciseTabStripView.swift */,
+				BC0090 /* ReorderExercisesSheet.swift */,
+				BC0091 /* SupersetPalette.swift */,
 				BC0902 /* SupersetPartnerPicker.swift */,
 				BC0010 /* ActiveWorkoutView.swift */,
 				BC0011 /* ElapsedTimerView.swift */,
@@ -1320,6 +1332,7 @@
 				BW0008 /* WorkoutExclusionSheet.swift */,
 				BW0009 /* ProgressionExclusionViews.swift */,
 				BW0006 /* WeightSuggestionCardView.swift */,
+				BW0090 /* SuggestionExplainerSheet.swift */,
 				BW0007 /* WeightSuggestionModuleView.swift */,
 			);
 			path = Components;
@@ -1502,6 +1515,8 @@
 				ATRB2001 /* AttributionServiceTests.swift */,
 				FL1005 /* FatigueLearningServiceTests.swift */,
 				SB1001 /* SmartSuggestionBehaviorScenarioTests.swift */,
+				SB1002 /* SuggestionExplainerPushTests.swift */,
+				SB1003 /* ReorderExercisesSheetTests.swift */,
 				IN1009 /* InsightsServiceTests.swift */,
 				IN1031 /* ExerciseWorkoutCountTests.swift */,
 				IN1033 /* BaselineMeterGeometryTests.swift */,
@@ -1776,6 +1791,8 @@
 				AC0007 /* SetRowView.swift in Sources */,
 				AC0008 /* SetTableView.swift in Sources */,
 				AC0009 /* ExerciseTabStripView.swift in Sources */,
+				AC0090 /* ReorderExercisesSheet.swift in Sources */,
+				AC0091 /* SupersetPalette.swift in Sources */,
 				AC0902 /* SupersetPartnerPicker.swift in Sources */,
 				AC0010 /* ActiveWorkoutView.swift in Sources */,
 				AC0011 /* ElapsedTimerView.swift in Sources */,
@@ -1861,6 +1878,7 @@
 				AW0004 /* PrescriptionSettingsView.swift in Sources */,
 				AW0005 /* WeightSuggestionData.swift in Sources */,
 				AW0006 /* WeightSuggestionCardView.swift in Sources */,
+				AW0090 /* SuggestionExplainerSheet.swift in Sources */,
 				AW0007 /* WeightSuggestionModuleView.swift in Sources */,
 				AW0008 /* WorkoutExclusionSheet.swift in Sources */,
 				AW0009 /* ProgressionExclusionViews.swift in Sources */,
@@ -1993,6 +2011,8 @@
 				ATRB0003 /* AttributionServiceTests.swift in Sources */,
 				FL0005 /* FatigueLearningServiceTests.swift in Sources */,
 				SB0001 /* SmartSuggestionBehaviorScenarioTests.swift in Sources */,
+				SB0002 /* SuggestionExplainerPushTests.swift in Sources */,
+				SB0003 /* ReorderExercisesSheetTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2031,7 +2051,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.Repster.WorkoutLiveActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -2064,7 +2084,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.Repster.WorkoutLiveActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -2212,7 +2232,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.5;
 				POSTHOG_HOST = "https://eu.i.posthog.com";
 				POSTHOG_PROJECT_TOKEN = phc_sJysoQ23BBpPBsHpsoym4isYSah9xsc9Z2ndgXgqTfiy;
 				PRODUCT_BUNDLE_IDENTIFIER = com.magnusespensen.Repster;
@@ -2244,7 +2264,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.5;
 				POSTHOG_HOST = "https://eu.i.posthog.com";
 				POSTHOG_PROJECT_TOKEN = "$(POSTHOG_PROJECT_TOKEN_VALUE)";
 				POSTHOG_PROJECT_TOKEN_VALUE = phc_sJysoQ23BBpPBsHpsoym4isYSah9xsc9Z2ndgXgqTfiy;

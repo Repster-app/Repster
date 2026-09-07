@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/PostHog/posthog-ios.git",
       "state" : {
-        "revision" : "f271e65b58ad5286df38ce4d759ceb6f8db13c5b",
-        "version" : "3.69.3"
+        "revision" : "8551035fe72d8d6605cb077dd853867dc04283ec",
+        "version" : "3.71.4"
       }
     },
     {
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RevenueCat/purchases-ios-spm.git",
       "state" : {
-        "revision" : "3d036d836a93872895f84065fabe580c3f2e2a23",
-        "version" : "5.83.1"
+        "revision" : "b5c4652249754d6d8ec415a6bc79a611ea38c839",
+        "version" : "5.88.0"
       }
     }
   ],

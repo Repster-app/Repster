@@ -1041,7 +1041,7 @@ private struct DataBackupsView: View {
                     )
                 }
             } footer: {
-                Text("Import training data from a CSV file, create a Repster backup archive, or restore workout history. Restoring replaces workout history only. Templates, programs, bodyweight logs, and settings stay untouched.")
+                Text("Import training data from a CSV file, create a Repster backup archive, or restore workout history. Restoring replaces your workout history and templates with the ones in the backup. Bodyweight logs, programs, and settings stay untouched.")
                     .foregroundStyle(Color.textTertiary)
             }
 

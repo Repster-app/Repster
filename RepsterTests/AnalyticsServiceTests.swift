@@ -8,6 +8,11 @@ final class AnalyticsServiceTests: XCTestCase {
         XCTAssertEqual(AnalyticsEvent.paywallShown.rawValue, "paywall shown")
         XCTAssertEqual(AnalyticsScreen.activeWorkout.rawValue, "Active Workout")
         XCTAssertEqual(AnalyticsScreen.workoutSummary.rawValue, "Workout Summary")
+        XCTAssertEqual(AnalyticsEvent.shareCardOpened.rawValue, "share card opened")
+        XCTAssertEqual(AnalyticsEvent.shareCardShared.rawValue, "share card shared")
+        XCTAssertEqual(AnalyticsEvent.shareCardDismissed.rawValue, "share card dismissed")
+        XCTAssertEqual(AnalyticsEvent.shareCardFailed.rawValue, "share card failed")
+        XCTAssertEqual(AnalyticsScreen.shareCard.rawValue, "Share Card")
     }
 
     func testDurationBucketsCoverFinerRanges() {
@@ -613,6 +618,113 @@ final class AnalyticsServiceTests: XCTestCase {
         "AnalyticsServiceTests.\(name)"
     }
 
+    // MARK: - Share card
+
+    func testShareCardOpenedSendsTheFullPropertySetAndAScreenView() {
+        let (service, client, _) = makeService()
+
+        service.shareCardOpened(
+            entryPoint: .summary,
+            variant: "record",
+            prsHit: 2,
+            accessTier: "subscribed",
+            exerciseListShown: true,
+            weightsShown: false
+        )
+
+        XCTAssertEqual(client.captures.last?.event, "share card opened")
+        XCTAssertEqual(client.captures.last?.properties["entry_point"] as? String, "summary")
+        XCTAssertEqual(client.captures.last?.properties["variant"] as? String, "record")
+        XCTAssertEqual(client.captures.last?.properties["access_tier"] as? String, "subscribed")
+        XCTAssertEqual(client.captures.last?.properties["exercise_list_shown"] as? Bool, true)
+        XCTAssertEqual(client.captures.last?.properties["weights_shown"] as? Bool, false)
+        // Raw int, matching `workout completed` — the D2 funnel splits both steps on this one
+        // key, and a bucket string on one side of it would break that split.
+        XCTAssertEqual(client.captures.last?.properties["prs_hit"] as? Int, 2)
+        // Screen view too, the way `paywallShown` does it.
+        XCTAssertEqual(client.screens.last?.screen, "Share Card")
+    }
+
+    /// An unresolved entitlement is not the same claim as "free".
+    func testShareCardOpenedOmitsAccessTierWhenItIsUnknown() {
+        let (service, client, _) = makeService()
+
+        service.shareCardOpened(
+            entryPoint: .summary,
+            variant: "muscles",
+            prsHit: 0,
+            accessTier: nil,
+            exerciseListShown: false,
+            weightsShown: true
+        )
+
+        XCTAssertNil(client.captures.last?.properties["access_tier"])
+        XCTAssertEqual(client.captures.last?.properties["variant"] as? String, "muscles")
+    }
+
+    func testShareCardSharedCarriesTheDestination() {
+        let (service, client, _) = makeService()
+
+        service.shareCardShared(
+            entryPoint: .summary,
+            variant: "volume",
+            destination: "com.apple.UIKit.activity.Message",
+            prsHit: 1
+        )
+
+        XCTAssertEqual(client.captures.last?.event, "share card shared")
+        XCTAssertEqual(
+            client.captures.last?.properties["destination"] as? String,
+            "com.apple.UIKit.activity.Message"
+        )
+        XCTAssertEqual(client.captures.last?.properties["prs_hit"] as? Int, 1)
+    }
+
+    func testShareCardDismissedAndFailedCarryTheirProperties() {
+        let (service, client, _) = makeService()
+
+        service.shareCardDismissed(entryPoint: .summary, variant: "trace")
+        XCTAssertEqual(client.captures.last?.event, "share card dismissed")
+        XCTAssertEqual(client.captures.last?.properties["variant"] as? String, "trace")
+
+        service.shareCardFailed(entryPoint: .summary, errorType: .renderFailed)
+        XCTAssertEqual(client.captures.last?.event, "share card failed")
+        XCTAssertEqual(client.captures.last?.properties["error_type"] as? String, "render_failed")
+    }
+
+    /// Nothing a user typed may ride along: no workout title, exercise name or note is in
+    /// reach of any of these calls, and this pins the whole property surface so a later
+    /// addition has to be deliberate.
+    func testShareCardEventsCarryNoUserAuthoredText() {
+        let (service, client, _) = makeService()
+
+        service.shareCardOpened(
+            entryPoint: .summary,
+            variant: "record",
+            prsHit: 3,
+            accessTier: "free",
+            exerciseListShown: true,
+            weightsShown: true
+        )
+        service.shareCardShared(
+            entryPoint: .summary,
+            variant: "record",
+            destination: "save_to_photos",
+            prsHit: 3
+        )
+
+        let allowed: Set<String> = [
+            "entry_point", "variant", "prs_hit", "access_tier",
+            "exercise_list_shown", "weights_shown", "destination"
+        ]
+        for capture in client.captures where capture.event.hasPrefix("share card") {
+            XCTAssertTrue(
+                Set(capture.properties.keys).isSubset(of: allowed),
+                "unexpected property on \(capture.event): \(Set(capture.properties.keys).subtracting(allowed))"
+            )
+        }
+    }
+
     private func makeService() -> (
         service: AnalyticsService,
         client: SpyAnalyticsClient,
@@ -737,6 +849,126 @@ final class ReviewPromptServiceTests: XCTestCase {
 
 private enum SampleError: Error {
     case healthWriteFailed
+}
+
+/// The two rules that decide whether the share-card funnel means anything, tested away from
+/// any view: `opened` must not double-count, and `dismissed` must not fire on top of a share.
+@MainActor
+final class ShareCardInstrumentationTests: XCTestCase {
+
+    private let suiteName = "ShareCardInstrumentationTests"
+
+    private func makeInstrumentation(
+        prsHit: Int = 0,
+        accessTier: String? = "free"
+    ) -> (ShareCardInstrumentation, SpyAnalyticsClient) {
+        let client = SpyAnalyticsClient()
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        let service = AnalyticsService(
+            client: client,
+            configuration: AnalyticsConfiguration(
+                projectToken: "phc_test",
+                host: "https://eu.i.posthog.com"
+            )!,
+            userDefaults: defaults
+        )
+        return (
+            ShareCardInstrumentation(
+                analyticsService: service,
+                entryPoint: .summary,
+                prsHit: prsHit,
+                accessTier: accessTier
+            ),
+            client
+        )
+    }
+
+    private func shareCardEvents(_ client: SpyAnalyticsClient) -> [String] {
+        client.captures.map(\.event).filter { $0.hasPrefix("share card") }
+    }
+
+    /// The open rate is the number the phase-2 gate is read against, and `paywall shown`
+    /// already demonstrated what a re-fire does to one.
+    func testOpenedFiresOncePerPresentation() {
+        let (instrumentation, client) = makeInstrumentation()
+
+        instrumentation.opened(variant: .record, exerciseListShown: true, weightsShown: true)
+        instrumentation.opened(variant: .record, exerciseListShown: true, weightsShown: true)
+        instrumentation.opened(variant: .volume, exerciseListShown: false, weightsShown: false)
+
+        XCTAssertEqual(shareCardEvents(client), ["share card opened"])
+    }
+
+    func testClosingWithoutSharingIsADismissal() {
+        let (instrumentation, client) = makeInstrumentation()
+
+        instrumentation.opened(variant: .record, exerciseListShown: true, weightsShown: true)
+        instrumentation.closed(variant: .record)
+
+        XCTAssertEqual(shareCardEvents(client), ["share card opened", "share card dismissed"])
+    }
+
+    /// Otherwise every successful share is followed by a dismissal and `opened` no longer
+    /// splits into "shared" and "abandoned".
+    func testClosingAfterASuccessfulShareIsNotADismissal() {
+        let (instrumentation, client) = makeInstrumentation()
+
+        instrumentation.opened(variant: .record, exerciseListShown: true, weightsShown: true)
+        instrumentation.shared(variant: .record, destination: "com.apple.UIKit.activity.Message")
+        instrumentation.closed(variant: .record)
+
+        XCTAssertEqual(shareCardEvents(client), ["share card opened", "share card shared"])
+    }
+
+    /// A save that lands is a share, with its own destination.
+    func testASavedPhotoIsAShareAndSuppressesTheDismissal() {
+        let (instrumentation, client) = makeInstrumentation(prsHit: 2)
+
+        instrumentation.opened(variant: .trace, exerciseListShown: true, weightsShown: false)
+        instrumentation.shared(variant: .trace, destination: ShareCardDestination.saveToPhotos)
+        instrumentation.closed(variant: .trace)
+
+        XCTAssertEqual(shareCardEvents(client), ["share card opened", "share card shared"])
+        XCTAssertEqual(
+            client.captures.last?.properties["destination"] as? String,
+            "save_to_photos"
+        )
+        XCTAssertEqual(client.captures.last?.properties["variant"] as? String, "trace")
+        XCTAssertEqual(client.captures.last?.properties["prs_hit"] as? Int, 2)
+    }
+
+    /// A refused permission and a failed write are not shares, so the sheet closing after one
+    /// is still an abandonment.
+    func testAFailedSaveIsNotAShare() {
+        let (instrumentation, client) = makeInstrumentation()
+
+        instrumentation.opened(variant: .record, exerciseListShown: true, weightsShown: true)
+        instrumentation.failed(.photosPermissionDenied)
+        instrumentation.closed(variant: .record)
+
+        XCTAssertEqual(
+            shareCardEvents(client),
+            ["share card opened", "share card failed", "share card dismissed"]
+        )
+    }
+
+    /// Render re-runs on every style swipe and toggle flip. The question is whether it ever
+    /// breaks, not how many times the user swiped past the break.
+    func testEachFailureKindIsReportedOncePerPresentation() {
+        let (instrumentation, client) = makeInstrumentation()
+
+        instrumentation.failed(.renderFailed)
+        instrumentation.failed(.renderFailed)
+        instrumentation.failed(.renderFailed)
+        instrumentation.failed(.photoSaveFailed)
+
+        XCTAssertEqual(shareCardEvents(client), ["share card failed", "share card failed"])
+        let types = client.captures
+            .filter { $0.event == "share card failed" }
+            .compactMap { $0.properties["error_type"] as? String }
+        XCTAssertEqual(types, ["render_failed", "photo_save_failed"])
+    }
 }
 
 private final class SpyAnalyticsClient: AnalyticsClientProtocol {

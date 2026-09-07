@@ -14,12 +14,18 @@ enum CoachPreferences {
 
     /// Whether the unbuilt "Analyse with Coach" teaser is shown on the summary sheet.
     ///
-    /// Defaults to `true` but is readable from `UserDefaults`, so the teaser can be pulled
-    /// without a release if Coach slips. A permanent "Soon" is a broken promise, and per
-    /// REPSTER_COACH_SCOPING §2.5 the coach cannot initiate — this is one of the few moments
-    /// it has the user's attention, so it has to be credible or absent.
+    /// **Defaults to `false` as of 1.5.** It defaulted to `true`, on the reasoning that the
+    /// teaser could be pulled without a release if Coach slipped — but the key is read from
+    /// local `UserDefaults` with no remote config behind it, so that lever only ever reached
+    /// one device at a time. Coach slipped: COACH_ANALYSIS_SCOPING.md is still choosing what
+    /// sits behind the tap, and nothing is scheduled.
+    ///
+    /// The rule that decided it is the one already written down here — a permanent "Soon" is
+    /// a broken promise, and per REPSTER_COACH_SCOPING §2.5 the coach cannot initiate, so the
+    /// end of a workout is one of the few moments it has the user's attention. It has to be
+    /// credible or absent. Flip this back the release Coach can actually answer the tap.
     static var showsSummaryTeaser: Bool {
-        UserDefaults.standard.object(forKey: summaryTeaserKey) as? Bool ?? true
+        UserDefaults.standard.object(forKey: summaryTeaserKey) as? Bool ?? false
     }
 }
 
@@ -51,6 +57,12 @@ struct WorkoutSummarySheet: View {
     @FocusState private var focusedField: FocusField?
 
     // MARK: - State
+
+    /// `subscribed` / `free` for the share card's `access_tier`, resolved once when the sheet
+    /// appears. Read-only — `currentAccessSnapshot()` rather than
+    /// `recordCompletedWorkoutIfNeeded()`, which would consume a free workout just to label an
+    /// event. Stays nil until it resolves, and the property is then omitted rather than guessed.
+    @State private var shareAccessTier: String?
 
     /// User-editable workout title. Empty means "use the automatic title".
     @State private var workoutTitle: String = ""
@@ -163,9 +175,21 @@ struct WorkoutSummarySheet: View {
         .task {
             await loadCalorieEstimate()
         }
+        .task {
+            // Resolved here rather than in the share sheet so the card stays a value-driven
+            // view: by the time anyone taps Share, this has long since settled.
+            let snapshot = await services.accessControlService.currentAccessSnapshot()
+            shareAccessTier = snapshot.hasFullAccess ? "subscribed" : "free"
+        }
         .sheet(isPresented: $showSharePreview) {
             if let summary = displaySummary {
-                WorkoutSharePreviewSheet(data: shareCardData(summary: summary))
+                WorkoutSharePreviewSheet(
+                    data: shareCardData(summary: summary),
+                    entryPoint: .summary,
+                    prsHit: summary.prsHit,
+                    accessTier: shareAccessTier,
+                    analyticsService: services.analyticsService
+                )
             }
         }
         .alert("Discard Workout?", isPresented: $showDiscardAlert) {
