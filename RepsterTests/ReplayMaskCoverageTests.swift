@@ -178,6 +178,94 @@ final class ReplayMaskCoverageTests: XCTestCase {
         )
     }
 
+    // MARK: - Displayed notes
+
+    /// Every place note text is *drawn*, as opposed to typed, outside `SetNoteStrip`.
+    ///
+    /// `testEveryTextInputIsClassified` only sees fields, so without this a
+    /// `Text(set.notes ?? "")` added to some screen would put a note into recordings with
+    /// nothing failing — and the privacy policy promises notes are hidden there. Set notes are
+    /// drawn through `SetNoteStrip`, which masks itself and is checked by
+    /// `testSetNoteStripStillMasks`, so it never needs an entry here.
+    ///
+    /// Keyed like `inventory`, by the source line as written. Each file listed must still call
+    /// `replayMasked()`.
+    private static let displayedNoteInventory: [String: Set<String>] = [
+        "Features/Templates/Views/TemplateDetailView.swift": [
+            #"Text(notes)"#
+        ],
+        "Features/Templates/Views/TemplateImportReviewSheet.swift": [
+            #"Text(notes)"#,
+            #"Text("Notes: \(notes)")"#
+        ]
+    ]
+
+    /// Note text is never drawn without a decision behind it, and the files that draw it
+    /// still mask.
+    func testDisplayedNoteTextIsMasked() throws {
+        let found = try Self.displayedNoteSites()
+
+        var unlisted: [String] = []
+        for (file, lines) in found {
+            let known = Self.displayedNoteInventory[file] ?? []
+            for line in lines where !known.contains(line) {
+                unlisted.append("\(file)\n      \(line)")
+            }
+        }
+
+        XCTAssertTrue(
+            unlisted.isEmpty,
+            """
+            Note text drawn with no session-replay decision behind it:
+
+              \(unlisted.joined(separator: "\n\n  "))
+
+            Show a set note through SetNoteStrip, which masks itself. For any other note, apply
+            replayMasked() to the Text and list the line in displayedNoteInventory.
+            """
+        )
+
+        var vanished: [String] = []
+        for (file, lines) in Self.displayedNoteInventory {
+            let present = found[file] ?? []
+            for line in lines where !present.contains(line) {
+                vanished.append("\(file)\n      \(line)")
+            }
+        }
+
+        XCTAssertTrue(
+            vanished.isEmpty,
+            """
+            Listed note display that is no longer in the source — deleted, moved or reformatted:
+
+              \(vanished.joined(separator: "\n\n  "))
+
+            Update ReplayMaskCoverageTests.displayedNoteInventory to match.
+            """
+        )
+
+        for file in Self.displayedNoteInventory.keys {
+            let contents = try String(contentsOf: Self.sourceRoot.appendingPathComponent(file), encoding: .utf8)
+            XCTAssertTrue(
+                contents.contains("replayMasked()"),
+                "\(file) draws note text but no longer calls replayMasked()."
+            )
+        }
+    }
+
+    /// The component every set note is drawn through still masks what it draws.
+    func testSetNoteStripStillMasks() throws {
+        let contents = try String(
+            contentsOf: Self.sourceRoot.appendingPathComponent("Features/Workout/Views/Components/SetNoteStrip.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(
+            contents.contains("replayMasked()"),
+            "SetNoteStrip no longer masks the note. The privacy policy promises set notes are hidden from recordings."
+        )
+    }
+
     // MARK: - Source scanning
 
     /// `<repo>/Repster`, derived from this file rather than from the build environment so
@@ -219,5 +307,100 @@ final class ReplayMaskCoverageTests: XCTestCase {
         }
 
         return sites
+    }
+
+    /// Every line that passes code mentioning "note" to `Text(`, keyed by path relative to
+    /// `Repster/`. String-literal text is ignored, so `Text("Add a note")` is not a match, but
+    /// an interpolation inside a literal is code, so `Text("Notes: \(notes)")` is.
+    private static func displayedNoteSites() throws -> [String: Set<String>] {
+        let root = sourceRoot
+
+        guard let walker = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isRegularFileKey]
+        ) else {
+            throw XCTSkip("Source tree not readable at \(root.path)")
+        }
+
+        var sites: [String: Set<String>] = [:]
+
+        for case let url as URL in walker where url.pathExtension == "swift" {
+            let contents = try String(contentsOf: url, encoding: .utf8)
+            let relative = url.path.replacingOccurrences(of: root.path + "/", with: "")
+
+            for rawLine in contents.components(separatedBy: .newlines) {
+                let line = rawLine.trimmingCharacters(in: .whitespaces)
+
+                guard !line.hasPrefix("//"), !line.hasPrefix("///"), !line.hasPrefix("*") else { continue }
+                guard textArgumentMentionsNote(in: line) else { continue }
+
+                sites[relative, default: []].insert(line)
+            }
+        }
+
+        return sites
+    }
+
+    /// Whether any `Text(` call on this line has "note" in its code — not in the text of a
+    /// string literal. `SomethingText(` does not count.
+    private static func textArgumentMentionsNote(in line: String) -> Bool {
+        let chars = Array(line)
+        let marker = Array("Text(")
+        var i = 0
+
+        while i + marker.count <= chars.count {
+            let isCall = Array(chars[i..<(i + marker.count)]) == marker
+            let startsWord = i == 0 || !(chars[i - 1].isLetter || chars[i - 1].isNumber || chars[i - 1] == "_")
+
+            if isCall, startsWord,
+               codeOutsideStringLiterals(chars[(i + marker.count)...]).lowercased().contains("note") {
+                return true
+            }
+            i += 1
+        }
+
+        return false
+    }
+
+    /// `chars` with the text of string literals removed and `\( … )` interpolations kept.
+    private static func codeOutsideStringLiterals(_ chars: ArraySlice<Character>) -> String {
+        var code = ""
+        var inLiteral = false
+        var i = chars.startIndex
+
+        while i < chars.endIndex {
+            let c = chars[i]
+
+            if !inLiteral {
+                if c == "\"" {
+                    inLiteral = true
+                } else {
+                    code.append(c)
+                }
+                i += 1
+            } else if c == "\\", i + 1 < chars.endIndex, chars[i + 1] == "(" {
+                var j = i + 2
+                var depth = 1
+                while j < chars.endIndex, depth > 0 {
+                    if chars[j] == "(" {
+                        depth += 1
+                    } else if chars[j] == ")" {
+                        depth -= 1
+                    }
+                    if depth > 0 {
+                        code.append(chars[j])
+                    }
+                    j += 1
+                }
+                i = j
+            } else {
+                if c == "\"" {
+                    inLiteral = false
+                }
+                i += 1
+            }
+        }
+
+        return code
     }
 }

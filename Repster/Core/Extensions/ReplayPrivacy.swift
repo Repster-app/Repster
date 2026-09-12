@@ -27,8 +27,9 @@
 //
 // `grep -rE "replayMasked|replayPaused"` is the complete inventory of what recordings
 // hide, and `RepsterTests/ReplayMaskCoverageTests.swift` fails the build when any new
-// `TextField` or `TextEditor` appears without a decision recorded against it. The
-// inverted default fails open, so that test is the thing standing between a new text
+// `TextField` or `TextEditor` appears without a decision recorded against it, or when
+// note text is drawn without a mask (set notes go through `SetNoteStrip`, which masks
+// itself). The inverted default fails open, so that test is the thing standing between a new text
 // field and a recording of what gets typed into it.
 //
 // KEEP IN SYNC when the masked set changes:

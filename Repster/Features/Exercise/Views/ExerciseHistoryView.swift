@@ -12,6 +12,15 @@ struct ExerciseHistoryView: View {
     let exercise: ChartExerciseData?
     let unitPreference: UnitPreference
 
+    /// Sets whose note is open.
+    ///
+    /// Held here rather than on a session card: the cards sit in a `LazyVStack`, and state on
+    /// the parent survives them scrolling out and back. Set ids are stable across a reload, so
+    /// a note stays open if history refreshes underneath it. Several can be open at once —
+    /// closing one above the row you tapped would shift that row under your finger.
+    /// See SET_NOTES_IN_HISTORY_SCOPING.md §2.3.
+    @State private var expandedSetIds: Set<UUID> = []
+
     // MARK: - Body
 
     var body: some View {
@@ -33,7 +42,11 @@ struct ExerciseHistoryView: View {
     // MARK: - Session Card
 
     private func workoutSessionCard(_ group: WorkoutHistoryGroup) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        // A card with any note reserves the chevron slot on every row, so PR badges stay in one
+        // column. A card with none is drawn exactly as it was before notes could open.
+        let reservesChevronSlot = group.sets.contains(where: \.hasNote)
+
+        return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Text(formatDate(group.date))
                     .font(.system(size: 13, weight: .semibold))
@@ -56,7 +69,12 @@ struct ExerciseHistoryView: View {
             VStack(spacing: 0) {
                 let labels = SetBadgeLabel.assign(for: group.sets.map(\.setType))
                 ForEach(Array(group.sets.enumerated()), id: \.element.id) { index, set in
-                    setRow(set, label: labels[index], siblings: group.sets)
+                    setRow(
+                        set,
+                        label: labels[index],
+                        siblings: group.sets,
+                        reservesChevronSlot: reservesChevronSlot
+                    )
                     if index < group.sets.count - 1 {
                         Divider()
                             .background(Color.border)
@@ -71,7 +89,62 @@ struct ExerciseHistoryView: View {
 
     // MARK: - Set Row
 
-    private func setRow(_ set: ChartSetData, label: SetBadgeLabel, siblings: [ChartSetData]) -> some View {
+    /// A row with a note opens it on tap, in a strip directly beneath, and closes it on a second
+    /// tap. Rows without a note are not tappable. See SET_NOTES_IN_HISTORY_SCOPING.md §2.
+    @ViewBuilder
+    private func setRow(
+        _ set: ChartSetData,
+        label: SetBadgeLabel,
+        siblings: [ChartSetData],
+        reservesChevronSlot: Bool
+    ) -> some View {
+        if let note = set.notes, set.hasNote {
+            let isExpanded = expandedSetIds.contains(set.id)
+
+            Button {
+                toggleNote(for: set.id)
+            } label: {
+                VStack(alignment: .leading, spacing: 0) {
+                    setRowContent(
+                        set,
+                        label: label,
+                        siblings: siblings,
+                        reservesChevronSlot: reservesChevronSlot,
+                        isExpanded: isExpanded
+                    )
+
+                    if isExpanded {
+                        // Indented past the 24pt badge column and the 8pt gap, so the note
+                        // lines up with the numbers. It sits outside the row's warm-up dimming.
+                        SetNoteStrip(text: note)
+                            .padding(.leading, 32)
+                            .padding(.bottom, 6)
+                            .transition(.opacity)
+                    }
+                }
+                // Rows are ~30pt tall, so the whole width is the target. Only noted rows are
+                // tappable, which means a near miss lands on nothing rather than the wrong row.
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        } else {
+            setRowContent(
+                set,
+                label: label,
+                siblings: siblings,
+                reservesChevronSlot: reservesChevronSlot,
+                isExpanded: false
+            )
+        }
+    }
+
+    private func setRowContent(
+        _ set: ChartSetData,
+        label: SetBadgeLabel,
+        siblings: [ChartSetData],
+        reservesChevronSlot: Bool,
+        isExpanded: Bool
+    ) -> some View {
         let hasNote = set.hasNote
         let isWarmup = set.setType == .warmup
         let display = WorkoutSetPerformanceFormatter.display(
@@ -133,9 +206,32 @@ struct ExerciseHistoryView: View {
             Spacer()
 
             PRBadgeView(status: CachedPRStatus.effectiveStatus(for: set, among: siblings))
+
+            if reservesChevronSlot {
+                // Present but invisible on a plain row in a noted card, so the PR column
+                // doesn't shift between rows. Decorative either way: the row is the button.
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.textTertiary)
+                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                    .frame(width: 14)
+                    .opacity(hasNote ? 1 : 0)
+                    .accessibilityHidden(true)
+            }
         }
         .padding(.vertical, 6)
         .opacity(isWarmup ? 0.6 : 1.0)
+    }
+
+    /// Same timing as the admin drawer in `WeightSuggestionCardView`.
+    private func toggleNote(for setId: UUID) {
+        withAnimation(.easeInOut(duration: 0.18)) {
+            if expandedSetIds.contains(setId) {
+                expandedSetIds.remove(setId)
+            } else {
+                expandedSetIds.insert(setId)
+            }
+        }
     }
 
     // MARK: - Empty State

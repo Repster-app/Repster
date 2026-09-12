@@ -19,6 +19,10 @@ struct CalendarExerciseCard: View {
     /// directly above or below. See SUPERSETS_SCOPING.md §5.2.
     var insideSupersetCard: Bool = false
 
+    /// Sets whose note is open. Safe to hold on the card: `CalendarWorkoutDetailView` lays
+    /// cards out in a plain `VStack`, not a lazy one. See SET_NOTES_IN_HISTORY_SCOPING.md §2.
+    @State private var expandedSetIds: Set<UUID> = []
+
     private var displaySets: [ChartSetData] {
         sets.filter { $0.hasData }
             .sorted { $0.orderInExercise < $1.orderInExercise }
@@ -26,6 +30,12 @@ struct CalendarExerciseCard: View {
 
     private var readOnlyFields: [WorkoutSetReadOnlyField] {
         WorkoutSetPerformanceFormatter.readOnlyFields(for: exercise.trackingType)
+    }
+
+    /// A card with any note reserves the chevron column on every row and in the header, so
+    /// the PR column stays put. A card with none is drawn exactly as before.
+    private var reservesChevronSlot: Bool {
+        displaySets.contains(where: \.hasNote)
     }
 
     var body: some View {
@@ -75,6 +85,10 @@ struct CalendarExerciseCard: View {
                 }
                 Color.clear
                     .frame(width: 44)
+                if reservesChevronSlot {
+                    Color.clear
+                        .frame(width: 14)
+                }
             }
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(Color.textTertiary)
@@ -97,10 +111,41 @@ struct CalendarExerciseCard: View {
         }
     }
 
+    /// A row with a note opens it on tap, in a strip directly beneath, and closes it on a second
+    /// tap. The card itself is a button that opens the exercise; this inner button takes the tap
+    /// on a noted row, and a tap anywhere else on the card still opens the exercise.
+    @ViewBuilder
+    private func setRow(label: SetBadgeLabel, workoutSet: ChartSetData) -> some View {
+        if let note = workoutSet.notes, workoutSet.hasNote {
+            let isExpanded = expandedSetIds.contains(workoutSet.id)
+
+            Button {
+                toggleNote(for: workoutSet.id)
+            } label: {
+                VStack(alignment: .leading, spacing: 0) {
+                    setRowContent(label: label, workoutSet: workoutSet, isExpanded: isExpanded)
+
+                    if isExpanded {
+                        // Indented past the 32pt set column and the row's default spacing, so the
+                        // note lines up with the numbers. It sits outside the warm-up dimming.
+                        SetNoteStrip(text: note)
+                            .padding(.leading, 40)
+                            .padding(.vertical, 4)
+                            .transition(.opacity)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        } else {
+            setRowContent(label: label, workoutSet: workoutSet, isExpanded: false)
+        }
+    }
+
     // The `workoutSet.modelContext == nil` guard that used to wrap this row is gone: it
     // existed to swallow crashes from live models detaching mid-render, and a snapshot
     // has no context to detach from.
-    private func setRow(label: SetBadgeLabel, workoutSet: ChartSetData) -> some View {
+    private func setRowContent(label: SetBadgeLabel, workoutSet: ChartSetData, isExpanded: Bool) -> some View {
         let isWarmup = workoutSet.setType == .warmup
 
         return HStack {
@@ -139,9 +184,32 @@ struct CalendarExerciseCard: View {
                 .overlay(alignment: .trailing) {
                     PRBadgeView(status: CachedPRStatus.effectiveStatus(for: workoutSet, among: displaySets))
                 }
+
+            if reservesChevronSlot {
+                // Present but invisible on a plain row in a noted card, so the PR column
+                // doesn't shift between rows. Decorative either way: the row is the button.
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.textTertiary)
+                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                    .frame(width: 14)
+                    .opacity(workoutSet.hasNote ? 1 : 0)
+                    .accessibilityHidden(true)
+            }
         }
         .padding(.vertical, 4)
         .opacity(isWarmup ? 0.45 : 1.0)
+    }
+
+    /// Same timing as `ExerciseHistoryView` and the admin drawer in `WeightSuggestionCardView`.
+    private func toggleNote(for setId: UUID) {
+        withAnimation(.easeInOut(duration: 0.18)) {
+            if expandedSetIds.contains(setId) {
+                expandedSetIds.remove(setId)
+            } else {
+                expandedSetIds.insert(setId)
+            }
+        }
     }
 
     private func headerCell(for field: WorkoutSetReadOnlyField) -> some View {
