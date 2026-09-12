@@ -3,6 +3,14 @@ import SwiftData
 import UserNotifications
 @testable import Repster
 
+private extension Workout {
+    var testSnapshot: WorkoutSnapshot { WorkoutSnapshot(from: self) }
+}
+
+private extension HealthProfile {
+    var testSnapshot: HealthProfileSnapshot { HealthProfileSnapshot(from: self) }
+}
+
 @MainActor
 final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
 
@@ -116,7 +124,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
     ) -> (viewModel: ActiveWorkoutViewModel, bench: UUID, incline: UUID, fly: UUID, group: UUID) {
         let viewModel = makeOrderingViewModel(setService: setService)
         let workoutId = UUID()
-        viewModel.workout = Workout(id: workoutId, date: Date(), status: .inProgress)
+        viewModel.workout = Workout(id: workoutId, date: Date(), status: .inProgress).testSnapshot
 
         let bench = makeExercise(name: "Bench Press")
         let incline = makeExercise(name: "Incline DB Press")
@@ -544,7 +552,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
 
         let exercise = makeExercise(name: "Back Squat")
         let workoutId = UUID()
-        viewModel.workout = Workout(id: workoutId, date: Date(), status: .inProgress)
+        viewModel.workout = Workout(id: workoutId, date: Date(), status: .inProgress).testSnapshot
         viewModel.exercises = [ChartExerciseData(from: exercise)]
 
         let working1 = makeSet(exerciseId: exercise.id, order: 1, reps: 5)
@@ -593,7 +601,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         let viewModel = makeOrderingViewModel(setService: setService)
 
         let exercise = makeExercise(name: "Bench Press")
-        viewModel.workout = Workout(id: UUID(), date: Date(), status: .inProgress)
+        viewModel.workout = Workout(id: UUID(), date: Date(), status: .inProgress).testSnapshot
         viewModel.exercises = [ChartExerciseData(from: exercise)]
 
         let holder = makeSet(exerciseId: exercise.id, order: 1, reps: 5)
@@ -622,7 +630,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         let viewModel = makeOrderingViewModel(setService: setService)
 
         let exercise = makeExercise(name: "Bench Press")
-        viewModel.workout = Workout(id: UUID(), date: Date(), status: .inProgress)
+        viewModel.workout = Workout(id: UUID(), date: Date(), status: .inProgress).testSnapshot
         viewModel.exercises = [ChartExerciseData(from: exercise)]
 
         let set1 = makeSet(exerciseId: exercise.id, order: 1, reps: 5)
@@ -681,7 +689,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             analyticsService: AnalyticsServiceSpy(),
             fatigueLearningService: makeStubFatigueLearningService()
         )
-        viewModel.workout = Workout(id: UUID(), date: Date(), status: .inProgress)
+        viewModel.workout = Workout(id: UUID(), date: Date(), status: .inProgress).testSnapshot
         viewModel.exercises = [ChartExerciseData(from: exercise)]
         viewModel.setsByExercise = [exercise.id: []]
 
@@ -865,7 +873,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             date: Date(),
             startTime: Date().addingTimeInterval(-30),
             status: .inProgress
-        )
+        ).testSnapshot
 
         XCTAssertFalse(viewModel.willAlertRestTimerInApp, "idle")
 
@@ -904,7 +912,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             date: Date(),
             startTime: Date().addingTimeInterval(-30),
             status: .inProgress
-        )
+        ).testSnapshot
 
         viewModel.startRestTimer(duration: 5)
         viewModel.subtractTime(15)
@@ -970,7 +978,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             date: Date(),
             startTime: Date().addingTimeInterval(-30),
             status: .inProgress
-        )
+        ).testSnapshot
         return viewModel
     }
 
@@ -1148,7 +1156,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             date: Date(),
             startTime: Date().addingTimeInterval(-900),
             status: .inProgress
-        )
+        ).testSnapshot
         viewModel.exercises = [ChartExerciseData(from: makeExercise(name: "Back Squat"))]
         let completedSet = makeSet(exerciseId: viewModel.exercises[0].id, order: 1, reps: 5)
         completedSet.completed = true
@@ -1480,7 +1488,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             date: Date(),
             startTime: Date().addingTimeInterval(-30),
             status: .inProgress
-        )
+        ).testSnapshot
 
         viewModel.startRestTimer(duration: 4)
         try await Task.sleep(for: .milliseconds(1100))
@@ -1542,7 +1550,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             date: Date(),
             startTime: Date().addingTimeInterval(-30),
             status: .inProgress
-        )
+        ).testSnapshot
 
         viewModel.startRestTimer(duration: 4)
         try await Task.sleep(for: .milliseconds(1100))
@@ -1714,7 +1722,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             date: Date(),
             startTime: Date().addingTimeInterval(-30),
             status: .inProgress
-        )
+        ).testSnapshot
 
         viewModel.startRestTimer(duration: 5)
         try await Task.sleep(for: .milliseconds(1100))
@@ -2016,7 +2024,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             fatigueLearningService: makeStubFatigueLearningService()
         )
 
-        viewModel.workout = workout
+        viewModel.workout = workout.testSnapshot
         viewModel.exercises = [ChartExerciseData(from: existingExercise)]
         viewModel.selectedExerciseIndex = 0
         viewModel.setsByExercise = [
@@ -2183,7 +2191,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         }
 
         let workoutId = UUID()
-        viewModel.workout = Workout(id: workoutId, date: Date(), status: .inProgress)
+        viewModel.workout = Workout(id: workoutId, date: Date(), status: .inProgress).testSnapshot
         viewModel.exercises = exercises.map { ChartExerciseData(from: $0) }
 
         var sets: [UUID: [WorkoutSet]] = [:]
@@ -2374,7 +2382,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             setService: setService
         )
 
-        context.viewModel.workout = Workout(startTime: Date())
+        context.viewModel.workout = Workout(startTime: Date()).testSnapshot
         await context.viewModel.loadWeightSuggestions()
         XCTAssertEqual(loadPrescriptionService.evaluationCount, 1)
 
@@ -2530,7 +2538,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             setService: setService
         )
 
-        context.viewModel.workout = Workout(startTime: Date())
+        context.viewModel.workout = Workout(startTime: Date()).testSnapshot
         await context.viewModel.loadWeightSuggestions()
         await context.viewModel.loadExerciseInfo()
 
@@ -2638,7 +2646,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             loadPrescriptionService: LoadPrescriptionServiceSpy(),
             fatigueLearningService: makeStubFatigueLearningService()
         )
-        viewModel.workout = workout
+        viewModel.workout = workout.testSnapshot
         viewModel.exercises = [ChartExerciseData(from: exercise)]
         viewModel.setsByExercise = [exercise.id: [uncompletedSet, deletedSet, typeChangedSet]]
         // The stub models the store, and `changeSetType` now applies its field writes there
@@ -2883,7 +2891,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         let preparation = SuggestionCoordinator.prepare(
             exercise: ChartExerciseData(from: exercise),
             sets: [set],
-            profile: profile
+            profile: profile.testSnapshot
         )
 
         XCTAssertEqual(preparation.pendingSets.count, 1)
@@ -3067,7 +3075,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         let preparation = SuggestionCoordinator.prepare(
             exercise: ChartExerciseData(from: exercise),
             sets: [set],
-            profile: profile
+            profile: profile.testSnapshot
         )
 
         let target = try XCTUnwrap(preparation.pendingSets.first?.target)
@@ -3097,7 +3105,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         let preparation = SuggestionCoordinator.prepare(
             exercise: ChartExerciseData(from: exercise),
             sets: [set],
-            profile: profile
+            profile: profile.testSnapshot
         )
 
         let target = try XCTUnwrap(preparation.pendingSets.first?.target)
@@ -3129,7 +3137,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         let preparation = SuggestionCoordinator.prepare(
             exercise: ChartExerciseData(from: exercise),
             sets: [set],
-            profile: profile
+            profile: profile.testSnapshot
         )
 
         let target = try XCTUnwrap(preparation.pendingSets.first?.target)
@@ -3161,7 +3169,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         let preparation = SuggestionCoordinator.prepare(
             exercise: ChartExerciseData(from: exercise),
             sets: [set],
-            profile: profile
+            profile: profile.testSnapshot
         )
 
         let target = try XCTUnwrap(preparation.pendingSets.first?.target)
@@ -3276,7 +3284,7 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
         let preparation = SuggestionCoordinator.prepare(
             exercise: ChartExerciseData(from: exercise),
             sets: [set],
-            profile: profile
+            profile: profile.testSnapshot
         )
 
         XCTAssertTrue(preparation.pendingSets.isEmpty)
@@ -3312,15 +3320,15 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
 
         let included = SuggestionCoordinator.prepare(
             exercise: ChartExerciseData(from: exercise),
-            workout: includedWorkout,
+            workout: includedWorkout.testSnapshot,
             sets: [set],
-            profile: profile
+            profile: profile.testSnapshot
         )
         let excluded = SuggestionCoordinator.prepare(
             exercise: ChartExerciseData(from: exercise),
-            workout: excludedWorkout,
+            workout: excludedWorkout.testSnapshot,
             sets: [set],
-            profile: profile
+            profile: profile.testSnapshot
         )
 
         XCTAssertNil(included.unavailableReason)
@@ -3366,15 +3374,15 @@ final class WeightSuggestionDataRowStateTests: XCTestCase {
 
         let excluded = SuggestionCoordinator.prepare(
             exercise: ChartExerciseData(from: excludedExercise),
-            workout: workout,
+            workout: workout.testSnapshot,
             sets: [excludedSet],
-            profile: profile
+            profile: profile.testSnapshot
         )
         let allowed = SuggestionCoordinator.prepare(
             exercise: ChartExerciseData(from: allowedExercise),
-            workout: workout,
+            workout: workout.testSnapshot,
             sets: [allowedSet],
-            profile: profile
+            profile: profile.testSnapshot
         )
 
         XCTAssertNil(excluded.unavailableReason)
@@ -4774,7 +4782,7 @@ final class DeleteOrderingTests: XCTestCase {
         harness.exerciseService.fetchedExercises[first.id] = first
         harness.exerciseService.fetchedExercises[second.id] = second
 
-        harness.viewModel.workout = workout
+        harness.viewModel.workout = workout.testSnapshot
         harness.viewModel.exercises = [ChartExerciseData(from: first), ChartExerciseData(from: second)]
         harness.viewModel.setsByExercise = [first.id: firstSets, second.id: secondSets]
         harness.viewModel.selectedExerciseIndex = 0
@@ -5044,8 +5052,18 @@ private final class HealthProfileRepositoryStub: @unchecked Sendable, HealthProf
     }
 
     func save(_ profile: HealthProfile) async throws { let _ = profile }
+    func update(
+        _ mutation: @Sendable (HealthProfile) -> Void
+    ) async throws -> HealthProfileSnapshot {
+        mutation(profile)
+        profile.updatedAt = Date()
+        return HealthProfileSnapshot(from: profile)
+    }
     func fetch() async throws -> HealthProfile? { profile }
     func fetchOrCreate() async throws -> HealthProfile { profile }
+    func fetchSnapshotOrCreate() async throws -> HealthProfileSnapshot {
+        HealthProfileSnapshot(from: profile)
+    }
 }
 
 private final class SetServiceStub: @unchecked Sendable, SetServiceProtocol {
@@ -5974,6 +5992,10 @@ private final class ImportWorkoutRepositoryStub: @unchecked Sendable, WorkoutRep
     func fetchWorkoutSummary(byId id: UUID) async throws -> WorkoutSnapshot? {
         let _ = id
         return nil
+    }
+    func fetchWorkoutSummaries(byIds ids: Set<UUID>) async throws -> [WorkoutSnapshot] {
+        let _ = ids
+        return []
     }
     func fetchInProgressSummary() async throws -> WorkoutSnapshot? { nil }
     func fetchWorkoutSummaries(for dateRange: ClosedRange<Date>) async throws -> [WorkoutSnapshot] {

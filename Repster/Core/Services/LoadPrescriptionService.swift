@@ -53,7 +53,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         exerciseId: UUID,
         completedSessionSets _: [SessionSetContext]
     ) async throws -> BaseE1RMEstimate {
-        let profile = try await healthProfileRepo.fetchOrCreate()
+        let profile = try await healthProfileRepo.fetchSnapshotOrCreate()
         let formula = E1RMFormula(rawValue: profile.e1RMFormula) ?? .epley
 
         return try await estimateCapacityBaseE1RM(
@@ -68,13 +68,13 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         pendingSets: [SuggestionPendingSetInput],
         completedSessionSets: [SessionSetContext]
     ) async throws -> SuggestionEvaluation {
-        let profile = try await healthProfileRepo.fetchOrCreate()
+        let profile = try await healthProfileRepo.fetchSnapshotOrCreate()
 
         guard profile.prescriptionEnabled ?? true else {
             return .unavailable(.featureDisabled)
         }
 
-        guard let exercise = try await exerciseRepo.fetch(byId: exerciseId) else {
+        guard let exercise = try await exerciseRepo.fetchChartExercise(byId: exerciseId) else {
             return .unavailable(.missingExercise)
         }
 
@@ -222,7 +222,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         let windowStart = Calendar.current.date(byAdding: .weekOfYear, value: -recencyWeeks, to: now)!
 
         // --- Tier 1: in-window recent sets ---
-        let recentSets = try await setRepo.fetchSets(
+        let recentSets = try await setRepo.fetchChartSets(
             exerciseId: exerciseId,
             from: windowStart,
             to: now
@@ -247,7 +247,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         }
 
         // --- Tier 2: most recent eligible workout of any age ---
-        let allSets = try await setRepo.fetchSets(
+        let allSets = try await setRepo.fetchChartSets(
             exerciseId: exerciseId,
             from: nil,
             to: now
@@ -306,7 +306,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
     /// Whether a set is eligible to contribute to the capacity baseline:
     /// completed, non-warmup, non-partial, has a stored e1RM, and not part of an
     /// excluded workout.
-    private func isEligibleForCapacity(set: WorkoutSet, excludedWorkoutIds: Set<UUID>) -> Bool {
+    private func isEligibleForCapacity(set: ChartSetData, excludedWorkoutIds: Set<UUID>) -> Bool {
         return set.completed &&
             !excludedWorkoutIds.contains(set.workoutId) &&
             set.setType.countsAsPerformedWork &&
@@ -317,7 +317,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
     /// most-recent-first, and return the highest peak across the first `limit`
     /// workouts along with the date of the workout that produced that peak.
     private func peakAcrossRecentWorkouts(
-        _ eligibleSets: [WorkoutSet],
+        _ eligibleSets: [ChartSetData],
         limit: Int,
         formula: E1RMFormula
     ) -> (value: Double, workoutDate: Date, topSet: HistoricalSetSnapshot)? {
@@ -363,7 +363,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
     ///
     /// Falls back to the stored value when no RIR was recorded, which is the same number as before
     /// — so histories with no RIR are unaffected.
-    private func capacityE1RM(for set: WorkoutSet, formula: E1RMFormula) -> Double {
+    private func capacityE1RM(for set: ChartSetData, formula: E1RMFormula) -> Double {
         guard let rir = set.performanceRIR, rir >= 0 else { return set.e1RM ?? 0 }
         let weight = set.effectiveWeight ?? set.weight ?? 0
         let reps = set.prReps
@@ -375,7 +375,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         for exerciseId: UUID,
         workoutIds: Set<UUID>
     ) async throws -> Set<UUID> {
-        let workouts = try await workoutRepo.fetch(byIds: workoutIds)
+        let workouts = try await workoutRepo.fetchWorkoutSummaries(byIds: workoutIds)
         return Set(
             workouts.compactMap { workout in
                 workout.excludesFromProgressionHistory(exerciseId: exerciseId) ? workout.id : nil

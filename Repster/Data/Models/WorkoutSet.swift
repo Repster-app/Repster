@@ -141,18 +141,13 @@ final class WorkoutSet {
     }
 
     var performanceRIR: Double? {
-        switch (leftReps, rightReps, leftRIR, rightRIR) {
-        case let (.some(left), .some(right), .some(leftRIR), .some(rightRIR)):
-            if left > right { return leftRIR }
-            if right > left { return rightRIR }
-            return min(leftRIR, rightRIR)
-        case (_, _, let leftRIR?, nil):
-            return leftRIR
-        case (_, _, nil, let rightRIR?):
-            return rightRIR
-        default:
-            return rir
-        }
+        resolvedPerformanceRIR(
+            leftReps: leftReps,
+            rightReps: rightReps,
+            leftRIR: leftRIR,
+            rightRIR: rightRIR,
+            fallbackRIR: rir
+        )
     }
 
     func syncDerivedPerformanceFields(for exercise: Exercise?) {
@@ -275,6 +270,28 @@ final class WorkoutSet {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.restDurationSeconds = restDurationSeconds
+    }
+}
+
+/// Shared by the live SwiftData model and its value snapshot so suggestion math cannot drift.
+func resolvedPerformanceRIR(
+    leftReps: Int?,
+    rightReps: Int?,
+    leftRIR: Double?,
+    rightRIR: Double?,
+    fallbackRIR: Double?
+) -> Double? {
+    switch (leftReps, rightReps, leftRIR, rightRIR) {
+    case let (.some(left), .some(right), .some(leftRIR), .some(rightRIR)):
+        if left > right { return leftRIR }
+        if right > left { return rightRIR }
+        return min(leftRIR, rightRIR)
+    case (_, _, let leftRIR?, nil):
+        return leftRIR
+    case (_, _, nil, let rightRIR?):
+        return rightRIR
+    default:
+        return fallbackRIR
     }
 }
 

@@ -38,6 +38,7 @@ protocol WorkoutRepositoryProtocol: Sendable {
     /// Snapshot equivalents of the fetches above. Used by every read-only workout screen
     /// so live `Workout` handles never cross onto the main actor.
     func fetchWorkoutSummary(byId id: UUID) async throws -> WorkoutSnapshot?
+    func fetchWorkoutSummaries(byIds ids: Set<UUID>) async throws -> [WorkoutSnapshot]
     func fetchInProgressSummary() async throws -> WorkoutSnapshot?
     func fetchWorkoutSummaries(for dateRange: ClosedRange<Date>) async throws -> [WorkoutSnapshot]
     func fetchAllWorkoutSummaries(limit: Int?, offset: Int?) async throws -> [WorkoutSnapshot]

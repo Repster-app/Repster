@@ -47,127 +47,92 @@ actor SettingsService: SettingsServiceProtocol {
     // MARK: - Write
 
     func updateUnitPreference(_ preference: UnitPreference) async throws {
-        let profile = try await healthProfileRepository.fetchOrCreate()
-        profile.unitPreference = preference
-        profile.updatedAt = Date()
-        try await healthProfileRepository.save(profile)
+        _ = try await healthProfileRepository.update { $0.unitPreference = preference }
     }
 
     func updateE1RMFormula(_ formula: E1RMFormula) async throws {
-        let profile = try await healthProfileRepository.fetchOrCreate()
-        profile.e1RMFormula = formula.rawValue
-        profile.updatedAt = Date()
-        try await healthProfileRepository.save(profile)
+        _ = try await healthProfileRepository.update { $0.e1RMFormula = formula.rawValue }
     }
 
     func updateIncludeWarmupsInVolume(_ include: Bool) async throws {
-        let profile = try await healthProfileRepository.fetchOrCreate()
-        profile.includeWarmupsInVolume = include
-        profile.updatedAt = Date()
-        try await healthProfileRepository.save(profile)
+        _ = try await healthProfileRepository.update { $0.includeWarmupsInVolume = include }
         try await statsService.rebuildAll()
     }
 
     func updateIncludeWarmupsInPRs(_ include: Bool) async throws {
-        let profile = try await healthProfileRepository.fetchOrCreate()
-        profile.includeWarmupsInPRs = include
-        profile.updatedAt = Date()
-        try await healthProfileRepository.save(profile)
+        _ = try await healthProfileRepository.update { $0.includeWarmupsInPRs = include }
         try await prService.rebuildAll()
     }
 
     func updateDefaultRestTime(_ seconds: Int?) async throws {
-        let profile = try await healthProfileRepository.fetchOrCreate()
-        profile.defaultRestTimeSeconds = seconds
-        profile.updatedAt = Date()
-        try await healthProfileRepository.save(profile)
+        _ = try await healthProfileRepository.update { $0.defaultRestTimeSeconds = seconds }
     }
 
     func updateDefaultWarmupRestTime(_ seconds: Int?) async throws {
-        let profile = try await healthProfileRepository.fetchOrCreate()
-        profile.defaultWarmupRestTimeSeconds = seconds
-        profile.updatedAt = Date()
-        try await healthProfileRepository.save(profile)
+        _ = try await healthProfileRepository.update { $0.defaultWarmupRestTimeSeconds = seconds }
     }
 
     func updateRestTimerAlert(_ value: String) async throws {
-        let profile = try await healthProfileRepository.fetchOrCreate()
-        profile.restTimerAlert = value
-        profile.updatedAt = Date()
-        try await healthProfileRepository.save(profile)
+        _ = try await healthProfileRepository.update { $0.restTimerAlert = value }
     }
 
     // MARK: - Smart Suggestions Settings
 
     func updatePrescriptionEnabled(_ enabled: Bool) async throws {
-        let profile = try await healthProfileRepository.fetchOrCreate()
-        profile.prescriptionEnabled = enabled
-        profile.updatedAt = Date()
-        try await healthProfileRepository.save(profile)
+        _ = try await healthProfileRepository.update { $0.prescriptionEnabled = enabled }
     }
 
     func updatePrescriptionRecencyWeeks(_ weeks: Int) async throws {
-        let profile = try await healthProfileRepository.fetchOrCreate()
-        profile.prescriptionRecencyWeeks = max(2, min(12, weeks))
-        profile.updatedAt = Date()
-        try await healthProfileRepository.save(profile)
+        _ = try await healthProfileRepository.update {
+            $0.prescriptionRecencyWeeks = max(2, min(12, weeks))
+        }
     }
 
     func updatePrescriptionDefaultIncrement(_ increment: Double) async throws {
-        let profile = try await healthProfileRepository.fetchOrCreate()
-        profile.prescriptionDefaultIncrement = increment
-        profile.updatedAt = Date()
-        try await healthProfileRepository.save(profile)
+        _ = try await healthProfileRepository.update { $0.prescriptionDefaultIncrement = increment }
     }
 
     func updatePrescriptionDefaultTargetReps(_ reps: Int) async throws {
-        let profile = try await healthProfileRepository.fetchOrCreate()
-        profile.prescriptionDefaultTargetReps = max(1, min(30, reps))
-        profile.updatedAt = Date()
-        try await healthProfileRepository.save(profile)
+        _ = try await healthProfileRepository.update {
+            $0.prescriptionDefaultTargetReps = max(1, min(30, reps))
+        }
     }
 
     func updatePrescriptionDefaultTargetRIR(_ rir: Int) async throws {
-        let profile = try await healthProfileRepository.fetchOrCreate()
-        profile.prescriptionDefaultTargetRIR = max(0, min(5, rir))
-        profile.updatedAt = Date()
-        try await healthProfileRepository.save(profile)
+        _ = try await healthProfileRepository.update {
+            $0.prescriptionDefaultTargetRIR = max(0, min(5, rir))
+        }
     }
 
     func updatePrescriptionFreshnessBonus(enabled: Bool, percent: Double) async throws {
-        let profile = try await healthProfileRepository.fetchOrCreate()
-        profile.prescriptionFreshnessBonus = enabled
-        profile.prescriptionFreshnessBonusPercent = max(0.0, min(0.10, percent))
-        profile.updatedAt = Date()
-        try await healthProfileRepository.save(profile)
+        _ = try await healthProfileRepository.update {
+            $0.prescriptionFreshnessBonus = enabled
+            $0.prescriptionFreshnessBonusPercent = max(0.0, min(0.10, percent))
+        }
     }
 
     func updatePrescriptionFatigueModelingEnabled(_ enabled: Bool) async throws {
-        let profile = try await healthProfileRepository.fetchOrCreate()
-        profile.prescriptionFatigueModelingEnabled = enabled
-        profile.updatedAt = Date()
-        try await healthProfileRepository.save(profile)
+        _ = try await healthProfileRepository.update {
+            $0.prescriptionFatigueModelingEnabled = enabled
+        }
     }
 
     func updatePrescriptionCapacityGuardsEnabled(_ enabled: Bool) async throws {
-        let profile = try await healthProfileRepository.fetchOrCreate()
-        profile.prescriptionCapacityGuardsEnabled = enabled
-        profile.updatedAt = Date()
-        try await healthProfileRepository.save(profile)
+        _ = try await healthProfileRepository.update {
+            $0.prescriptionCapacityGuardsEnabled = enabled
+        }
     }
 
     func updatePrescriptionDefaultRecoveryConstant(_ seconds: Double) async throws {
-        let profile = try await healthProfileRepository.fetchOrCreate()
-        profile.prescriptionDefaultRecoveryConstant = max(60, min(600, seconds))
-        profile.updatedAt = Date()
-        try await healthProfileRepository.save(profile)
+        _ = try await healthProfileRepository.update {
+            $0.prescriptionDefaultRecoveryConstant = max(60, min(600, seconds))
+        }
     }
 
     func updatePrescriptionAdminModeEnabled(_ enabled: Bool) async throws {
-        let profile = try await healthProfileRepository.fetchOrCreate()
-        profile.prescriptionAdminModeEnabled = enabled
-        profile.updatedAt = Date()
-        try await healthProfileRepository.save(profile)
+        _ = try await healthProfileRepository.update {
+            $0.prescriptionAdminModeEnabled = enabled
+        }
     }
 
     // MARK: - Data Reset

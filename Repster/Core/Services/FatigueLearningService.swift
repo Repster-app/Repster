@@ -405,7 +405,7 @@ actor FatigueLearningService {
             let usedAudits = audits.filter { $0.status == .used }
             guard !usedAudits.isEmpty else { return }
 
-            let profile = try await healthProfileRepo.fetchOrCreate()
+            var profile = try await healthProfileRepo.fetchSnapshotOrCreate()
             let byExercise = Dictionary(grouping: usedAudits, by: \.exerciseId)
 
             if usedAudits.count >= Self.minimumUsedSetsForGlobalLearning {
@@ -416,8 +416,10 @@ actor FatigueLearningService {
                 }
 
                 if !exerciseMedians.isEmpty {
-                    updateGlobalLearning(profile: profile, sessionError: Self.medianError(exerciseMedians))
-                    try await healthProfileRepo.save(profile)
+                    let sessionError = Self.medianError(exerciseMedians)
+                    profile = try await healthProfileRepo.update { profile in
+                        Self.updateGlobalLearning(profile: profile, sessionError: sessionError)
+                    }
                 }
             }
 
@@ -482,12 +484,11 @@ actor FatigueLearningService {
             try await exerciseRepo.save(exercise)
         }
 
-        let profile = try await healthProfileRepo.fetchOrCreate()
-        profile.prescriptionLearnedFatigueRate = nil
-        profile.prescriptionFatigueLearningSessionCount = nil
-        profile.prescriptionFatigueLearningCumulativeError = nil
-        profile.updatedAt = Date()
-        try await healthProfileRepo.save(profile)
+        _ = try await healthProfileRepo.update { profile in
+            profile.prescriptionLearnedFatigueRate = nil
+            profile.prescriptionFatigueLearningSessionCount = nil
+            profile.prescriptionFatigueLearningCumulativeError = nil
+        }
     }
 
     /// Reset learning state for all exercises, **including** the prediction record.
@@ -513,12 +514,11 @@ actor FatigueLearningService {
         }
         try await auditRepo.deleteAll()
 
-        let profile = try await healthProfileRepo.fetchOrCreate()
-        profile.prescriptionLearnedFatigueRate = nil
-        profile.prescriptionFatigueLearningSessionCount = nil
-        profile.prescriptionFatigueLearningCumulativeError = nil
-        profile.updatedAt = Date()
-        try await healthProfileRepo.save(profile)
+        _ = try await healthProfileRepo.update { profile in
+            profile.prescriptionLearnedFatigueRate = nil
+            profile.prescriptionFatigueLearningSessionCount = nil
+            profile.prescriptionFatigueLearningCumulativeError = nil
+        }
     }
 
     /// Fetch exercises that have any learning data, sorted by session count descending.
@@ -696,28 +696,71 @@ actor FatigueLearningService {
     }
 
     static func appliedFatigueRateInfo(for exercise: Exercise, profile: HealthProfile) -> AppliedFatigueRateInfo {
-        let globalRate = profile.prescriptionLearnedFatigueRate ?? Self.defaultGlobalFatigueRate
-        let globalSource: AppliedFatigueRateSource = profile.prescriptionLearnedFatigueRate == nil ? .defaultRate : .globalLearned
+        appliedFatigueRateInfo(
+            globalLearnedRate: profile.prescriptionLearnedFatigueRate,
+            localRate: exercise.fatigueRate,
+            localSource: exercise.resolvedFatigueRateSource,
+            localSessionCount: exercise.fatigueLearningSessionCount
+        )
+    }
 
-        if exercise.resolvedFatigueRateSource == .manualOverride, let rate = exercise.fatigueRate {
-            return AppliedFatigueRateInfo(rate: rate, source: .manualOverride, localInfluence: 1.0)
+    static func appliedFatigueRateInfo(
+        for exercise: Exercise,
+        profile: HealthProfileSnapshot
+    ) -> AppliedFatigueRateInfo {
+        appliedFatigueRateInfo(
+            globalLearnedRate: profile.prescriptionLearnedFatigueRate,
+            localRate: exercise.fatigueRate,
+            localSource: exercise.resolvedFatigueRateSource,
+            localSessionCount: exercise.fatigueLearningSessionCount
+        )
+    }
+
+    /// Value-only overload used by Smart Suggestions outside repository actors.
+    static func appliedFatigueRateInfo(
+        for exercise: ChartExerciseData,
+        profile: HealthProfileSnapshot
+    ) -> AppliedFatigueRateInfo {
+        appliedFatigueRateInfo(
+            globalLearnedRate: profile.prescriptionLearnedFatigueRate,
+            localRate: exercise.fatigueRate,
+            localSource: exercise.resolvedFatigueRateSource,
+            localSessionCount: exercise.fatigueLearningSessionCount
+        )
+    }
+
+    private static func appliedFatigueRateInfo(
+        globalLearnedRate: Double?,
+        localRate: Double?,
+        localSource: ExerciseFatigueRateSource?,
+        localSessionCount: Int?
+    ) -> AppliedFatigueRateInfo {
+        let globalRate = globalLearnedRate ?? Self.defaultGlobalFatigueRate
+        let globalSource: AppliedFatigueRateSource = globalLearnedRate == nil ? .defaultRate : .globalLearned
+
+        if localSource == .manualOverride, let localRate {
+            return AppliedFatigueRateInfo(rate: localRate, source: .manualOverride, localInfluence: 1.0)
         }
 
-        if let localRate = exercise.fatigueRate, exercise.resolvedFatigueRateSource == .learned {
-            let localInfluence = Self.localInfluence(for: exercise.fatigueLearningSessionCount ?? 0)
+        if let localRate, localSource == .learned {
+            let localInfluence = Self.localInfluence(for: localSessionCount ?? 0)
             if localInfluence >= 1.0 {
                 return AppliedFatigueRateInfo(rate: localRate, source: .localLearned, localInfluence: 1.0)
             }
             if localInfluence > 0 {
                 let blendedRate = (localRate * localInfluence) + (globalRate * (1.0 - localInfluence))
-                return AppliedFatigueRateInfo(rate: blendedRate, source: .blendedLocal, localInfluence: localInfluence)
+                return AppliedFatigueRateInfo(
+                    rate: blendedRate,
+                    source: .blendedLocal,
+                    localInfluence: localInfluence
+                )
             }
         }
 
         return AppliedFatigueRateInfo(rate: globalRate, source: globalSource, localInfluence: 0.0)
     }
 
-    private func updateGlobalLearning(profile: HealthProfile, sessionError: Double) {
+    private static func updateGlobalLearning(profile: HealthProfile, sessionError: Double) {
         let oldCount = profile.prescriptionFatigueLearningSessionCount ?? 0
         let newCount = oldCount + 1
         profile.prescriptionFatigueLearningSessionCount = newCount
@@ -732,7 +775,11 @@ actor FatigueLearningService {
         profile.updatedAt = Date()
     }
 
-    private func updateExerciseLearning(exercise: Exercise, profile: HealthProfile, sessionError: Double) async throws {
+    private func updateExerciseLearning(
+        exercise: Exercise,
+        profile: HealthProfileSnapshot,
+        sessionError: Double
+    ) async throws {
         let oldCount = exercise.fatigueLearningSessionCount ?? 0
         let newCount = oldCount + 1
         exercise.fatigueLearningSessionCount = newCount

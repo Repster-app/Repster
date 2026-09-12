@@ -262,6 +262,7 @@
 		SB0001 /* SmartSuggestionBehaviorScenarioTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SB1001 /* SmartSuggestionBehaviorScenarioTests.swift */; };
 		SB0002 /* SuggestionExplainerPushTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SB1002 /* SuggestionExplainerPushTests.swift */; };
 		SB0003 /* ReorderExercisesSheetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SB1003 /* ReorderExercisesSheetTests.swift */; };
+		LR0001 /* LiveModelRaceReproTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = LR1001 /* LiveModelRaceReproTests.swift */; };
 		TT0001 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */; };
 		TT9201 /* WorkoutShareCardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT9202 /* WorkoutShareCardTests.swift */; };
 		TT0002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = TT2003 /* XCTest.framework */; };
@@ -596,6 +597,7 @@
 		SB1001 /* SmartSuggestionBehaviorScenarioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSuggestionBehaviorScenarioTests.swift; sourceTree = "<group>"; };
 		SB1002 /* SuggestionExplainerPushTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestionExplainerPushTests.swift; sourceTree = "<group>"; };
 		SB1003 /* ReorderExercisesSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReorderExercisesSheetTests.swift; sourceTree = "<group>"; };
+		LR1001 /* LiveModelRaceReproTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveModelRaceReproTests.swift; sourceTree = "<group>"; };
 		TT2001 /* RepsterTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RepsterTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutViewModelSuggestionRefreshTests.swift; sourceTree = "<group>"; };
 		TT9202 /* WorkoutShareCardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutShareCardTests.swift; sourceTree = "<group>"; };
@@ -1517,6 +1519,7 @@
 				SB1001 /* SmartSuggestionBehaviorScenarioTests.swift */,
 				SB1002 /* SuggestionExplainerPushTests.swift */,
 				SB1003 /* ReorderExercisesSheetTests.swift */,
+				LR1001 /* LiveModelRaceReproTests.swift */,
 				IN1009 /* InsightsServiceTests.swift */,
 				IN1031 /* ExerciseWorkoutCountTests.swift */,
 				IN1033 /* BaselineMeterGeometryTests.swift */,
@@ -1984,6 +1987,7 @@
 				HK0003 /* HealthKitEnergyEstimateTests.swift in Sources */,
 				TT0001 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift in Sources */,
 				TT9201 /* WorkoutShareCardTests.swift in Sources */,
+				LR0001 /* LiveModelRaceReproTests.swift in Sources */,
 				IN0009 /* InsightsServiceTests.swift in Sources */,
 				IN0031 /* ExerciseWorkoutCountTests.swift in Sources */,
 				IN0033 /* BaselineMeterGeometryTests.swift in Sources */,

@@ -11,6 +11,16 @@ actor HealthProfileRepository: HealthProfileRepositoryProtocol {
         try modelContext.save()
     }
 
+    func update(
+        _ mutation: @Sendable (HealthProfile) -> Void
+    ) throws -> HealthProfileSnapshot {
+        let profile = try fetchOrCreate()
+        mutation(profile)
+        profile.updatedAt = Date()
+        try modelContext.save()
+        return HealthProfileSnapshot(from: profile)
+    }
+
     // MARK: - Queries
 
     func fetch() throws -> HealthProfile? {
@@ -50,5 +60,9 @@ actor HealthProfileRepository: HealthProfileRepositoryProtocol {
         modelContext.insert(profile)
         try modelContext.save()
         return profile
+    }
+
+    func fetchSnapshotOrCreate() throws -> HealthProfileSnapshot {
+        HealthProfileSnapshot(from: try fetchOrCreate())
     }
 }

@@ -231,7 +231,7 @@ actor WorkoutService: WorkoutServiceProtocol {
     ) async throws -> Set<UUID> {
         guard !workoutIds.isEmpty else { return [] }
 
-        let workouts = try await workoutRepo.fetch(byIds: workoutIds)
+        let workouts = try await workoutRepo.fetchWorkoutSummaries(byIds: workoutIds)
         return Set(
             workouts.compactMap { workout in
                 workout.excludesFromProgressionHistory(exerciseId: exerciseId) ? workout.id : nil

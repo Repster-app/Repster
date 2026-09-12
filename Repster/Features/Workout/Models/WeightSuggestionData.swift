@@ -277,9 +277,9 @@ struct SuggestionPreparation: Sendable {
 enum SuggestionCoordinator {
     static func prepare(
         exercise: ChartExerciseData?,
-        workout: Workout? = nil,
+        workout: WorkoutSnapshot? = nil,
         sets: [WorkoutSet],
-        profile: HealthProfile?
+        profile: HealthProfileSnapshot?
     ) -> SuggestionPreparation {
         let completedSessionSets = completedSessionSets(from: sets, exercise: exercise, profile: profile)
         let resolved = resolveWorkingSets(from: sets, exercise: exercise, profile: profile)
@@ -329,7 +329,7 @@ enum SuggestionCoordinator {
     static func completedSessionSets(
         from sets: [WorkoutSet],
         exercise: ChartExerciseData? = nil,
-        profile: HealthProfile? = nil
+        profile: HealthProfileSnapshot? = nil
     ) -> [SessionSetContext] {
         sets
             .filter { $0.completed && $0.setType != .warmup }
@@ -354,7 +354,7 @@ enum SuggestionCoordinator {
     private static func resolvedTargetRIR(
         for set: WorkoutSet,
         exercise: ChartExerciseData?,
-        profile: HealthProfile?
+        profile: HealthProfileSnapshot?
     ) -> Double? {
         guard set.performanceRIR == nil else { return nil }
         guard case let .eligible(target) = resolveTarget(for: set, exercise: exercise, profile: profile) else {
@@ -377,7 +377,7 @@ enum SuggestionCoordinator {
     private static func resolveWorkingSets(
         from sets: [WorkoutSet],
         exercise: ChartExerciseData?,
-        profile: HealthProfile?
+        profile: HealthProfileSnapshot?
     ) -> (pending: [SuggestionSetResolution], completed: [CompletedSetSnapshot]) {
         var pending: [SuggestionSetResolution] = []
         var completed: [CompletedSetSnapshot] = []
@@ -418,7 +418,7 @@ enum SuggestionCoordinator {
     private static func resolveTarget(
         for set: WorkoutSet,
         exercise: ChartExerciseData?,
-        profile: HealthProfile?
+        profile: HealthProfileSnapshot?
     ) -> SuggestionEligibility {
         let repTargetMode = repTargetMode(for: exercise)
         let templateRepRange = makeRepRange(min: set.targetRepMin, max: set.targetRepMax)
@@ -515,10 +515,10 @@ enum SuggestionCoordinator {
 
     private static func cacheKey(
         exercise: ChartExerciseData?,
-        workout: Workout?,
+        workout: WorkoutSnapshot?,
         completedWorking: [WorkoutSet],
         setResolutions: [SuggestionSetResolution],
-        profile: HealthProfile?,
+        profile: HealthProfileSnapshot?,
         unavailableReason: SuggestionUnavailableReason?
     ) -> String {
         let completedSignature = completedWorking
@@ -627,11 +627,11 @@ enum SuggestionCoordinator {
     }
 
     private static func workoutProgressionHistorySignature(
-        workout: Workout?,
+        workout: WorkoutSnapshot?,
         exercise: ChartExerciseData?
     ) -> String {
         guard let workout else { return "workout:none" }
-        let excludedIds = (workout.excludedExerciseIdsFromProgressionHistory ?? [])
+        let excludedIds = workout.excludedExerciseIdsForProgressionHistory
             .map(\.uuidString)
             .sorted()
             .joined(separator: ",")
@@ -649,12 +649,12 @@ enum SuggestionCoordinator {
         ].joined(separator: ":")
     }
 
-    private static func normalizedDefaultTargetReps(from profile: HealthProfile?) -> Int? {
+    private static func normalizedDefaultTargetReps(from profile: HealthProfileSnapshot?) -> Int? {
         guard let reps = profile?.prescriptionDefaultTargetReps, (1...30).contains(reps) else { return nil }
         return reps
     }
 
-    private static func normalizedDefaultTargetRIR(from profile: HealthProfile?) -> Int? {
+    private static func normalizedDefaultTargetRIR(from profile: HealthProfileSnapshot?) -> Int? {
         guard let rir = profile?.prescriptionDefaultTargetRIR, (0...5).contains(rir) else { return nil }
         return rir
     }

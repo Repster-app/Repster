@@ -1099,12 +1099,24 @@ private final class InMemoryHealthProfileRepo: @unchecked Sendable, HealthProfil
         self.profile = profile
     }
 
+    func update(
+        _ mutation: @Sendable (HealthProfile) -> Void
+    ) async throws -> HealthProfileSnapshot {
+        mutation(profile)
+        profile.updatedAt = Date()
+        return HealthProfileSnapshot(from: profile)
+    }
+
     func fetch() async throws -> HealthProfile? {
         profile
     }
 
     func fetchOrCreate() async throws -> HealthProfile {
         profile
+    }
+
+    func fetchSnapshotOrCreate() async throws -> HealthProfileSnapshot {
+        HealthProfileSnapshot(from: profile)
     }
 }
 

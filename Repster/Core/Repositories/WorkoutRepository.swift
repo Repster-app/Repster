@@ -75,6 +75,10 @@ actor WorkoutRepository: WorkoutRepositoryProtocol {
         try fetch(byId: id).map(WorkoutSnapshot.init(from:))
     }
 
+    func fetchWorkoutSummaries(byIds ids: Set<UUID>) throws -> [WorkoutSnapshot] {
+        try fetch(byIds: ids).map(WorkoutSnapshot.init(from:))
+    }
+
     func fetchInProgressSummary() throws -> WorkoutSnapshot? {
         try fetchInProgress().map(WorkoutSnapshot.init(from:))
     }

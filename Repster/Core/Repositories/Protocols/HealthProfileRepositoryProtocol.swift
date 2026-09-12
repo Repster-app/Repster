@@ -14,6 +14,12 @@ protocol HealthProfileRepositoryProtocol: Sendable {
 
     func save(_ profile: HealthProfile) async throws
 
+    /// Fetch, mutate and save the singleton inside the actor that owns its context.
+    /// Returns the committed value without sending the live SwiftData model back out.
+    func update(
+        _ mutation: @Sendable (HealthProfile) -> Void
+    ) async throws -> HealthProfileSnapshot
+
     // MARK: - Queries
 
     /// Fetch the single HealthProfile, or nil if none exists yet.
@@ -23,4 +29,7 @@ protocol HealthProfileRepositoryProtocol: Sendable {
     /// Defaults: unitPreference = .metric, includeWarmupsInVolume = false,
     /// includeWarmupsInPRs = false, e1RMFormula = "epley".
     func fetchOrCreate() async throws -> HealthProfile
+
+    /// Snapshot equivalent of `fetchOrCreate()` for callers outside the repository actor.
+    func fetchSnapshotOrCreate() async throws -> HealthProfileSnapshot
 }

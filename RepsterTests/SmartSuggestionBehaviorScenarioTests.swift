@@ -885,7 +885,7 @@ final class CompletedSetTargetResolutionTests: XCTestCase {
         return SuggestionCoordinator.completedSessionSets(
             from: sets,
             exercise: ChartExerciseData(from: exercise),
-            profile: profile
+            profile: HealthProfileSnapshot(from: profile)
         )
     }
 
@@ -935,7 +935,7 @@ final class CompletedSetTargetResolutionTests: XCTestCase {
         let resolved = SuggestionCoordinator.completedSessionSets(
             from: [set],
             exercise: ChartExerciseData(from: exercise),
-            profile: profile
+            profile: HealthProfileSnapshot(from: profile)
         )
 
         XCTAssertNil(resolved[0].targetRIR)
@@ -1628,7 +1628,7 @@ final class UnilateralSuggestionTests: XCTestCase {
         let contexts = SuggestionCoordinator.completedSessionSets(
             from: [set],
             exercise: ChartExerciseData(from: exercise),
-            profile: HealthProfile()
+            profile: HealthProfileSnapshot(from: HealthProfile())
         )
 
         XCTAssertEqual(contexts[0].rir, 1, "the harder side governs")
@@ -1647,7 +1647,7 @@ final class UnilateralSuggestionTests: XCTestCase {
         let contexts = SuggestionCoordinator.completedSessionSets(
             from: [set],
             exercise: ChartExerciseData(from: exercise),
-            profile: HealthProfile()
+            profile: HealthProfileSnapshot(from: HealthProfile())
         )
 
         XCTAssertNil(contexts[0].rir)
@@ -1665,7 +1665,7 @@ final class UnilateralSuggestionTests: XCTestCase {
         let contexts = SuggestionCoordinator.completedSessionSets(
             from: [set],
             exercise: ChartExerciseData(from: exercise),
-            profile: HealthProfile()
+            profile: HealthProfileSnapshot(from: HealthProfile())
         )
 
         XCTAssertEqual(contexts[0].reps, 9)

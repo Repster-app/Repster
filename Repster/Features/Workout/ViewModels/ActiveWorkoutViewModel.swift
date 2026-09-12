@@ -126,8 +126,8 @@ final class ActiveWorkoutViewModel {
 
     // MARK: - Workout State
 
-    /// The current active workout (nil if none).
-    var workout: Workout?
+    /// Value snapshot of the current active workout (nil if none).
+    var workout: WorkoutSnapshot?
 
     /// Ordered list of exercises in this workout.
     var exercises: [ChartExerciseData] = []
@@ -347,7 +347,7 @@ final class ActiveWorkoutViewModel {
 
         do {
             // 1. Check for existing active workout
-            guard let active = try await workoutService.getActiveWorkout() else {
+            guard let active = try await workoutService.getActiveWorkoutSummary() else {
                 clearPersistedWorkoutClockState()
                 clearPersistedSelectedExerciseState()
                 clearPersistedRestTimerState()
@@ -420,7 +420,7 @@ final class ActiveWorkoutViewModel {
             }
 
             // 7. Fetch global default rest time for fallback
-            if let profile = try? await settingsService.fetchSettings() {
+            if let profile = try? await healthProfileRepo.fetchSnapshotOrCreate() {
                 self.unitPreference = profile.unitPreference
                 self.defaultWeightIncrement = UnitConversion.resolvedStoredWeightIncrement(
                     exerciseIncrement: nil,
@@ -457,7 +457,7 @@ final class ActiveWorkoutViewModel {
             let suggestionState = weightSuggestionData?.rowState(for: set.id)
             let predictionSnapshot: PredictionSnapshot?
             if let suggestion = suggestionState?.suggestion {
-                let formulaRawValue = (try? await healthProfileRepo.fetchOrCreate().e1RMFormula) ?? "epley"
+                let formulaRawValue = (try? await healthProfileRepo.fetchSnapshotOrCreate().e1RMFormula) ?? "epley"
                 predictionSnapshot = PredictionSnapshot(
                     effectiveE1RM: suggestion.diagnostics.effectiveE1RM,
                     baseE1RM: suggestion.diagnostics.baseE1RM,
@@ -1225,7 +1225,7 @@ final class ActiveWorkoutViewModel {
         return max(0, accumulatedElapsedSeconds + runningSegment)
     }
 
-    private func restoreWorkoutClockState(for workout: Workout, referenceDate: Date = Date()) {
+    private func restoreWorkoutClockState(for workout: WorkoutSnapshot, referenceDate: Date = Date()) {
         let defaults = UserDefaults.standard
         let workoutId = workout.id.uuidString
         let persistedWorkoutId = defaults.string(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockWorkoutId)
@@ -1345,7 +1345,7 @@ final class ActiveWorkoutViewModel {
         defaults.removeObject(forKey: ActiveWorkoutSessionDefaultsKeys.workoutClockIsPaused)
     }
 
-    private func restoreSelectedExerciseState(for workout: Workout) {
+    private func restoreSelectedExerciseState(for workout: WorkoutSnapshot) {
         guard !exercises.isEmpty else {
             selectedExerciseIndex = 0
             clearPersistedSelectedExerciseState()
@@ -1700,7 +1700,7 @@ final class ActiveWorkoutViewModel {
         startRestTimer(remaining: remaining, total: total, referenceDate: referenceDate)
     }
 
-    private func restoreRestTimerState(for workout: Workout, referenceDate: Date = Date()) {
+    private func restoreRestTimerState(for workout: WorkoutSnapshot, referenceDate: Date = Date()) {
         let defaults = UserDefaults.standard
         let persistedWorkoutId = defaults.string(forKey: ActiveWorkoutSessionDefaultsKeys.restTimerWorkoutId)
 
@@ -2028,7 +2028,7 @@ final class ActiveWorkoutViewModel {
 
         do {
             // Fetch unit preference and prescription toggle for display
-            let profile = try await settingsService.fetchSettings()
+            let profile = try await healthProfileRepo.fetchSnapshotOrCreate()
             unitPreference = profile.unitPreference
             defaultWeightIncrement = UnitConversion.resolvedStoredWeightIncrement(
                 exerciseIncrement: nil,
@@ -2075,7 +2075,7 @@ final class ActiveWorkoutViewModel {
     }
 
     func refreshDisplaySettings() async {
-        guard let profile = try? await settingsService.fetchSettings() else { return }
+        guard let profile = try? await healthProfileRepo.fetchSnapshotOrCreate() else { return }
         unitPreference = profile.unitPreference
         defaultWeightIncrement = UnitConversion.resolvedStoredWeightIncrement(
             exerciseIncrement: nil,
@@ -2282,12 +2282,8 @@ final class ActiveWorkoutViewModel {
         }
     }
 
-    private func resolveSuggestionProfile() async -> HealthProfile? {
-        var resolvedProfile: HealthProfile? = try? await settingsService.fetchSettings()
-        if resolvedProfile == nil {
-            resolvedProfile = try? await healthProfileRepo.fetchOrCreate()
-        }
-        return resolvedProfile
+    private func resolveSuggestionProfile() async -> HealthProfileSnapshot? {
+        try? await healthProfileRepo.fetchSnapshotOrCreate()
     }
 
     private func isCurrentSuggestionRefresh(

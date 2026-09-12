@@ -1,5 +1,68 @@
 import Foundation
 
+/// Complete value-type mirror of `HealthProfile`.
+///
+/// Repository actors return this snapshot whenever settings are read outside the owning
+/// `ModelContext`. SwiftData models are reference-backed and must not cross actor boundaries;
+/// this plain value carries the same stored state without retaining that backing data.
+struct HealthProfileSnapshot: Sendable, Equatable {
+    let id: UUID
+    let unitPreferenceRawValue: String
+    let includeWarmupsInVolume: Bool
+    let includeWarmupsInPRs: Bool
+    let e1RMFormula: String
+    let defaultRestTimeSeconds: Int?
+    let defaultWarmupRestTimeSeconds: Int?
+    let restTimerAlert: String?
+    let prescriptionEnabled: Bool?
+    let prescriptionRecencyWeeks: Int?
+    let prescriptionDefaultIncrement: Double?
+    let prescriptionDefaultTargetReps: Int?
+    let prescriptionDefaultTargetRIR: Int?
+    let prescriptionFreshnessBonus: Bool?
+    let prescriptionFreshnessBonusPercent: Double?
+    let prescriptionFatigueModelingEnabled: Bool?
+    let prescriptionDefaultRecoveryConstant: Double?
+    let prescriptionAdminModeEnabled: Bool?
+    let prescriptionCapacityGuardsEnabled: Bool?
+    let prescriptionLearnedFatigueRate: Double?
+    let prescriptionFatigueLearningSessionCount: Int?
+    let prescriptionFatigueLearningCumulativeError: Double?
+    let createdAt: Date
+    let updatedAt: Date
+
+    init(from profile: HealthProfile) {
+        id = profile.id
+        unitPreferenceRawValue = profile.unitPreferenceRawValue
+        includeWarmupsInVolume = profile.includeWarmupsInVolume
+        includeWarmupsInPRs = profile.includeWarmupsInPRs
+        e1RMFormula = profile.e1RMFormula
+        defaultRestTimeSeconds = profile.defaultRestTimeSeconds
+        defaultWarmupRestTimeSeconds = profile.defaultWarmupRestTimeSeconds
+        restTimerAlert = profile.restTimerAlert
+        prescriptionEnabled = profile.prescriptionEnabled
+        prescriptionRecencyWeeks = profile.prescriptionRecencyWeeks
+        prescriptionDefaultIncrement = profile.prescriptionDefaultIncrement
+        prescriptionDefaultTargetReps = profile.prescriptionDefaultTargetReps
+        prescriptionDefaultTargetRIR = profile.prescriptionDefaultTargetRIR
+        prescriptionFreshnessBonus = profile.prescriptionFreshnessBonus
+        prescriptionFreshnessBonusPercent = profile.prescriptionFreshnessBonusPercent
+        prescriptionFatigueModelingEnabled = profile.prescriptionFatigueModelingEnabled
+        prescriptionDefaultRecoveryConstant = profile.prescriptionDefaultRecoveryConstant
+        prescriptionAdminModeEnabled = profile.prescriptionAdminModeEnabled
+        prescriptionCapacityGuardsEnabled = profile.prescriptionCapacityGuardsEnabled
+        prescriptionLearnedFatigueRate = profile.prescriptionLearnedFatigueRate
+        prescriptionFatigueLearningSessionCount = profile.prescriptionFatigueLearningSessionCount
+        prescriptionFatigueLearningCumulativeError = profile.prescriptionFatigueLearningCumulativeError
+        createdAt = profile.createdAt
+        updatedAt = profile.updatedAt
+    }
+
+    var unitPreference: UnitPreference {
+        UnitPreference(rawValue: unitPreferenceRawValue) ?? .metric
+    }
+}
+
 /// Complete value-type mirror of `WorkoutSet`.
 ///
 /// Carries *every* stored property rather than only the fields today's callers happen to read —
@@ -69,6 +132,17 @@ struct ChartSetData: Sendable, Equatable {
     var volume: Double? {
         guard let ew = effectiveWeight, totalReps > 0 else { return nil }
         return ew * Double(totalReps)
+    }
+
+    /// Mirrors `WorkoutSet.performanceRIR` through the same shared resolver.
+    var performanceRIR: Double? {
+        resolvedPerformanceRIR(
+            leftReps: leftReps,
+            rightReps: rightReps,
+            leftRIR: leftRIR,
+            rightRIR: rightRIR,
+            fallbackRIR: rir
+        )
     }
 
     init(from set: WorkoutSet) {
@@ -255,8 +329,13 @@ struct WorkoutSnapshot: Sendable, Equatable, Identifiable {
     let startTime: Date?
     let endTime: Date?
     let duration: Int?
+    let perceivedEffort: Double?
+    let notes: String?
+    let programId: UUID?
     let status: WorkoutStatus
+    let healthKitWorkoutUUID: UUID?
     let createdAt: Date
+    let updatedAt: Date
     /// Mirrors `Workout.excludesEntireWorkoutFromProgressionHistory`.
     /// Read-only UI needs this to say a session is not counted; without it the flag is
     /// invisible everywhere outside the Progression sheet that sets it.
@@ -272,8 +351,13 @@ struct WorkoutSnapshot: Sendable, Equatable, Identifiable {
         self.startTime = workout.startTime
         self.endTime = workout.endTime
         self.duration = workout.duration
+        self.perceivedEffort = workout.perceivedEffort
+        self.notes = workout.notes
+        self.programId = workout.programId
         self.status = workout.status
+        self.healthKitWorkoutUUID = workout.healthKitWorkoutUUID
         self.createdAt = workout.createdAt
+        self.updatedAt = workout.updatedAt
         self.excludesEntireWorkoutFromProgressionHistory =
             workout.excludesEntireWorkoutFromProgressionHistory
         self.excludedExerciseIdsForProgressionHistory =
