@@ -1882,18 +1882,11 @@ final class SetServiceTests: XCTestCase {
     }
 
     private func makeContext() throws -> SetServiceTestContext {
-        let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+        // The app's full schema: backup export and restore fetch templates, so a hand-picked list
+        // without them aborts the process on iOS 17.
         let container = try ModelContainer(
-            for: Exercise.self,
-            Workout.self,
-            WorkoutSet.self,
-            ExerciseStats.self,
-            PerformanceRecord.self,
-            BodyweightEntry.self,
-            HealthProfile.self,
-            FatigueObservation.self,
-            FatigueLearningSetAudit.self,
-            configurations: configuration
+            for: Schema(ModelContainerSetup.modelTypes),
+            configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
         )
 
         let exerciseRepo = ExerciseRepository(modelContainer: container)

@@ -51,11 +51,11 @@ final class CrossContextRaceTests: XCTestCase {
     private static let pairedLoad = 2_000
 
     private func makeContainer() throws -> ModelContainer {
+        // The app's full schema: `testExportBackupUnderConcurrentSaves` exports, which fetches
+        // templates.
         try ModelContainer(
-            for: Exercise.self, Workout.self, WorkoutSet.self, ExerciseStats.self,
-            PerformanceRecord.self, BodyweightEntry.self, HealthProfile.self,
-            FatigueObservation.self, FatigueLearningSetAudit.self,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+            for: Schema(ModelContainerSetup.modelTypes),
+            configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
         )
     }
 

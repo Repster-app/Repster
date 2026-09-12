@@ -2,8 +2,12 @@ import Foundation
 import SwiftData
 
 enum ModelContainerSetup {
-    static func createContainer() throws -> ModelContainer {
-        let schema = Schema([
+    /// Every model the app stores. Test containers are built from this list too, so a model added
+    /// here reaches them without anyone having to remember. Hand-written lists in two backup test
+    /// helpers missed the template models when templates joined the archive, and on iOS 17 the
+    /// export's template fetch then aborted the test process.
+    static var modelTypes: [any PersistentModel.Type] {
+        [
             WorkoutSet.self,
             Workout.self,
             Exercise.self,
@@ -21,7 +25,11 @@ enum ModelContainerSetup {
             FatigueObservation.self,
             FatigueLearningSetAudit.self,
             InsightRecord.self
-        ])
+        ]
+    }
+
+    static func createContainer() throws -> ModelContainer {
+        let schema = Schema(modelTypes)
 
         let configuration = ModelConfiguration(
             schema: schema,

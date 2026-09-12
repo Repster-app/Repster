@@ -55,11 +55,10 @@ final class RealDataDifferentialTests: XCTestCase {
     }
 
     private func makeStack() throws -> Stack {
+        // The app's full schema: restoring a backup fetches templates.
         let container = try ModelContainer(
-            for: Exercise.self, Workout.self, WorkoutSet.self, ExerciseStats.self,
-            PerformanceRecord.self, BodyweightEntry.self, HealthProfile.self,
-            FatigueObservation.self, FatigueLearningSetAudit.self,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+            for: Schema(ModelContainerSetup.modelTypes),
+            configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
         )
         let exerciseRepo = ExerciseRepository(modelContainer: container)
         let workoutRepo = WorkoutRepository(modelContainer: container)
