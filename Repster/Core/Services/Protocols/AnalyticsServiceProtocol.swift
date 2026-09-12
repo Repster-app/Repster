@@ -677,12 +677,17 @@ extension AnalyticsServiceProtocol {
     /// Opening Insights *is* the screen view, so the finding properties ride on
     /// the `$screen` event rather than a second `insights opened` alongside it.
     /// `finding_count == 0` is the empty feed, which is why no `has_data` is sent.
-    func insightsViewed(findingCount: Int, hasNew: Bool, hasBaseline: Bool) {
-        screen(.insights, properties: [
+    func insightsViewed(findingCount: Int, hasNew: Bool, hasBaseline: Bool, sidesState: String? = nil) {
+        var properties: [AnalyticsPropertyKey: AnalyticsPropertyValue] = [
             .findingCount: .int(findingCount),
             .hasNew: .bool(hasNew),
             .hasBaseline: .bool(hasBaseline)
-        ])
+        ]
+        // Reach for the Sides card: `hidden` is everyone it has nothing to show.
+        if let sidesState {
+            properties[.sidesState] = .string(sidesState)
+        }
+        screen(.insights, properties: properties)
         if findingCount == 0 {
             emptyStateShown(screen: .insights)
         }
@@ -723,6 +728,22 @@ extension AnalyticsServiceProtocol {
 
     func musclePanelExpanded(groupCount: Int) {
         track(.musclePanelExpanded, properties: [.groupCount: .int(groupCount)])
+    }
+
+    /// A muscle group opened from the Sides card. `muscle_group` is only ever a
+    /// catalog value: a custom group is text the user typed, so it's sent as
+    /// "custom" rather than as itself.
+    func sidesGroupOpened(group: String, status: SideGroupStatus, exerciseCount: Int) {
+        let isCatalogGroup = ExerciseMuscleGroupCatalog.supportedEntries.contains { $0.value == group }
+        track(.sidesGroupOpened, properties: [
+            .muscleGroup: .string(isCatalogGroup ? group : "custom"),
+            .sideStatus: .string(status.analyticsValue),
+            .exerciseCountBucket: .string(AnalyticsBuckets.count(exerciseCount))
+        ])
+    }
+
+    func sidesExerciseOpened(status: SideStatus) {
+        track(.sidesExerciseOpened, properties: [.sideStatus: .string(status.analyticsValue)])
     }
 
     func reviewPromptRequested(trigger: String, completedWorkoutCount: Int) {
@@ -1049,6 +1070,8 @@ enum AnalyticsEvent: String, CaseIterable {
     case insightRatingReason = "insight rating reason"
     case insightSnoozed = "insight snoozed"
     case musclePanelExpanded = "muscle panel expanded"
+    case sidesGroupOpened = "sides group opened"
+    case sidesExerciseOpened = "sides exercise opened"
     case appleHealthPromptShown = "apple health prompt shown"
     case appleHealthPromptAnswered = "apple health prompt answered"
     case appleHealthDisabled = "apple health disabled"
@@ -1093,6 +1116,9 @@ enum AnalyticsPropertyKey: String, CaseIterable {
     case hasNew = "has_new"
     case hasBaseline = "has_baseline"
     case groupCount = "group_count"
+    case sidesState = "sides_state"
+    case sideStatus = "side_status"
+    case muscleGroup = "muscle_group"
     case notesEntered = "notes_entered"
     case excludedFromProgression = "excluded_from_progression"
     case prsHit = "prs_hit"

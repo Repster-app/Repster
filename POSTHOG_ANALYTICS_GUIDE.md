@@ -217,6 +217,9 @@ Every event carries `rule_id`, one of: `strengthTrend`, `consistency`,
 | `insight rated` | `rule_id`, `rating` (`useful`/`not_useful`), `insight_age_days` | Explicit verdict, only reachable from an expanded card. |
 | `insight snoozed` | `rule_id`, `insight_age_days` | **The strongest kill signal** — hiding a finding for three weeks beats any thumbs-down and has no response-rate bias. |
 | `muscle panel expanded` | `group_count` | |
+| `$screen` (Insights) → `sides_state` | `hidden` / `building` / `even` / `possible` / `imbalanced` | Reach of the Sides card: the share of Insights views where it appears at all. `hidden` means nothing had both sides logged in the last 12 weeks. |
+| `sides group opened` | `muscle_group` (catalog value, or `custom`), `side_status` (`imbalance` / `possible` / `even` / `collecting`), `exercise_count_bucket` | A muscle group opened from the Sides card. |
+| `sides exercise opened` | `side_status` (`stronger` / `possible` / `even` / `collecting`) | An exercise opened from a Sides deep dive. |
 
 ### Data & settings
 | Event | Key properties | Meaning |

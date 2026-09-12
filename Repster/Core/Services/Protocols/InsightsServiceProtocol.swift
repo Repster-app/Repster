@@ -301,6 +301,10 @@ protocol InsightsServiceProtocol: Sendable {
     /// for a user who hasn't logged anything yet.
     func fetchTrainingStatus() async throws -> TrainingStatus
 
+    /// Left against right on unilateral exercises, from each exercise's recent sessions. `.hidden`
+    /// when nothing has both sides logged, which the screen treats as "draw nothing".
+    func fetchSidesStatus() async throws -> SidesStatus
+
     /// Active (non-snoozed) insights, new first, then by score.
     func fetchActiveInsights() async throws -> [InsightItem]
 

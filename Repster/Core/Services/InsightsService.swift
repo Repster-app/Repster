@@ -215,6 +215,21 @@ actor InsightsService: InsightsServiceProtocol {
         try trainingStatus(referenceDate: Date())
     }
 
+    func fetchSidesStatus() async throws -> SidesStatus {
+        try sidesStatus(referenceDate: Date())
+    }
+
+    /// Internal so tests can drive it with a fixed reference date. Reads the same windowed
+    /// context as the status layer — completed sets only — over 12 weeks; each exercise then
+    /// uses its last 6 sessions in that window.
+    func sidesStatus(referenceDate: Date) throws -> SidesStatus {
+        guard let windowStart = Calendar.current.date(
+            byAdding: .day, value: -SidesAnalysis.lookbackDays, to: referenceDate
+        ) else { return .empty }
+        let context = try buildStatusContext(referenceDate: referenceDate, windowStart: windowStart)
+        return SidesAnalysis.status(from: context)
+    }
+
     func newInsightCount() async throws -> Int {
         try activeRecords().filter { $0.state == .new }.count
     }

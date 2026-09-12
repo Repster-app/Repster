@@ -30,6 +30,19 @@ struct InsightsView: View {
                 if let status = viewModel.status {
                     TrainingStatusCardView(status: status)
 
+                    // Left against right on unilateral lifts. Absent, not empty,
+                    // when nothing has both sides logged (D10).
+                    if let sides = viewModel.sides, sides.state != .hidden {
+                        SidesCardView(status: sides) { group in
+                            services.analyticsService.sidesGroupOpened(
+                                group: group.id,
+                                status: group.status,
+                                exerciseCount: group.exercises.count
+                            )
+                            viewModel.selectedSideGroup = group
+                        }
+                    }
+
                     if !status.muscles.isEmpty {
                         MuscleVolumePanelView(
                             rows: status.muscles,
@@ -56,6 +69,11 @@ struct InsightsView: View {
         .background(Color.bg)
         .navigationTitle("Training Insights")
         .navigationBarTitleDisplayMode(.large)
+        .sheet(item: $viewModel.selectedSideGroup) { group in
+            SideGroupDetailSheet(group: group, unitPreference: services.unitPreference) { exercise in
+                services.analyticsService.sidesExerciseOpened(status: exercise.status)
+            }
+        }
         .task {
             await viewModel.load()
             // Reported after load so the empty state reflects "no findings yet"
@@ -64,7 +82,8 @@ struct InsightsView: View {
             services.analyticsService.insightsViewed(
                 findingCount: viewModel.insights.count,
                 hasNew: !viewModel.newInsights.isEmpty,
-                hasBaseline: viewModel.status?.baselineSets != nil
+                hasBaseline: viewModel.status?.baselineSets != nil,
+                sidesState: viewModel.sides?.state.rawValue
             )
         }
     }

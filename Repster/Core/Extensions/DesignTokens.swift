@@ -152,6 +152,29 @@ extension Color {
     /// Standard 8-color palette for charts: accent, success, gold, danger, purple, orange, teal, pink
     static let chartPalette: [Color] = [.accent, .success, .gold, .danger, .chart5, .chart6, .chart7, .chart8]
 
+    // MARK: - Sides body map (left vs right)
+
+    /// A muscle group where at least one exercise shows a stronger side — the accent itself.
+    static let sidesImbalance = accent
+
+    /// The strength mark and the session chart's columns: how much one side leads.
+    static let sidesStronger = accent
+
+    /// #456AB5 — A group checked and found even.
+    static let sidesEven = Color(red: 0.271, green: 0.416, blue: 0.710)
+
+    /// #353D53 — A group still collecting sessions.
+    static let sidesCollecting = Color(red: 0.208, green: 0.239, blue: 0.325)
+
+    /// #2A2B33 — Regions nothing tracks, and the parts of the body that aren't muscles.
+    static let bodyBase = Color(red: 0.165, green: 0.169, blue: 0.200)
+
+    /// #202127 — Hair, a shade under the base so the head reads as a head.
+    static let bodyHair = Color(red: 0.125, green: 0.129, blue: 0.153)
+
+    /// #3A3C46 — The figure's outline.
+    static let bodyOutline = Color(red: 0.227, green: 0.235, blue: 0.275)
+
     // MARK: - Border
 
     /// White at 6% opacity — Input borders, dividers

@@ -14,6 +14,10 @@ final class InsightsViewModel {
     var isLoading = false
     var hasLoaded = false
     var musclePanelExpanded = false
+    /// Left against right on unilateral lifts. Nil until loaded; `.hidden` draws nothing.
+    var sides: SidesStatus?
+    /// The group whose deep dive is open.
+    var selectedSideGroup: SideGroupSummary?
 
     private let insightsService: any InsightsServiceProtocol
 
@@ -59,6 +63,14 @@ final class InsightsViewModel {
             status = resolvedStatus
             insights = persisted
             hasLoaded = true
+
+            // After the first paint: eight weeks of sets is cheap, but not free,
+            // and the card isn't the first thing on screen.
+            if let freshSides = try? await insightsService.fetchSidesStatus() {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    sides = freshSides
+                }
+            }
 
             // Only re-read what a re-analysis could actually have changed.
             if try await insightsService.refreshIfNeeded() {
