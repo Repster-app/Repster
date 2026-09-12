@@ -18,6 +18,7 @@ struct CalendarView: View {
     @State private var isDeletingWorkout = false
     @State private var saveAsTemplateController = SaveWorkoutAsTemplateController()
     @State private var templateFeedback: TemplateSaveFeedback? = nil
+    @State private var detailToShare: WorkoutDetail?
     @Binding var initialDate: Date?
 
     init(
@@ -194,6 +195,7 @@ struct CalendarView: View {
                 guard oldValue != nil, newValue == nil, let selectedDate = viewModel.selectedDate else { return }
                 Task { await viewModel.selectDate(selectedDate) }
             }
+            .shareWorkoutCard(item: $detailToShare, entryPoint: .calendar)
             .confirmationDialog(
                 "Delete Workout",
                 isPresented: Binding(
@@ -326,6 +328,9 @@ struct CalendarView: View {
                     },
                     onDeleteWorkout: { workout in
                         workoutToDelete = workout
+                    },
+                    onShare: { workout in
+                        detailToShare = viewModel.workoutDetails[workout.id]
                     },
                     onEditProgression: { workout in
                         workoutToEditProgression = workout

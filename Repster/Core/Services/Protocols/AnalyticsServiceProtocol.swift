@@ -819,13 +819,17 @@ extension AnalyticsServiceProtocol {
     /// `prsHit` is a raw `Int` rather than a bucket, deliberately — `workout completed`
     /// already sends `prs_hit` that way, and the D2 funnel splits both steps on the same
     /// property. One key with two types across sibling events would break that split.
+    ///
+    /// From a saved workout, `prsHit` counts only the records that still stand, and
+    /// `daysSinceWorkout` is sent; from the summary it is omitted, since it would always be 0.
     func shareCardOpened(
         entryPoint: ShareCardEntryPoint,
         variant: String,
         prsHit: Int,
         accessTier: String?,
         exerciseListShown: Bool,
-        weightsShown: Bool
+        weightsShown: Bool,
+        daysSinceWorkout: Int? = nil
     ) {
         var properties: [AnalyticsPropertyKey: AnalyticsPropertyValue] = [
             .entryPoint: .string(entryPoint.rawValue),
@@ -839,6 +843,9 @@ extension AnalyticsServiceProtocol {
         if let accessTier {
             properties[.accessTier] = .string(accessTier)
         }
+        if let daysSinceWorkout {
+            properties[.daysSinceWorkout] = .int(daysSinceWorkout)
+        }
         screen(.shareCard, properties: properties)
         track(.shareCardOpened, properties: properties)
     }
@@ -850,14 +857,19 @@ extension AnalyticsServiceProtocol {
         entryPoint: ShareCardEntryPoint,
         variant: String,
         destination: String,
-        prsHit: Int
+        prsHit: Int,
+        daysSinceWorkout: Int? = nil
     ) {
-        track(.shareCardShared, properties: [
+        var properties: [AnalyticsPropertyKey: AnalyticsPropertyValue] = [
             .entryPoint: .string(entryPoint.rawValue),
             .variant: .string(variant),
             .destination: .string(destination),
             .prsHit: .int(prsHit)
-        ])
+        ]
+        if let daysSinceWorkout {
+            properties[.daysSinceWorkout] = .int(daysSinceWorkout)
+        }
+        track(.shareCardShared, properties: properties)
     }
 
     /// Closed without sharing anything — the X or a swipe down, which are the same event to a
@@ -882,12 +894,20 @@ extension AnalyticsServiceProtocol {
     }
 }
 
-/// Where the share card was raised from. Only `summary` exists today — the design doc's
-/// `history`, `pr_card` and `insight` entry points all belong to phase 2, which this
-/// instrumentation is what gates. They get their case when they get their button.
+/// Where the share card was raised from. The design doc's `pr_card` and `insight` entry
+/// points get their case when they get their button.
+///
+/// Saved workouts are two values rather than the doc's single `history`: which of the two
+/// placements people actually find is the open question that change was built to answer
+/// (SHARE_FROM_HISTORY_SCOPING.md D4). Group them in PostHog for a "history" total.
 enum ShareCardEntryPoint: String {
     /// The "Share workout" pill in the summary sheet header.
     case summary
+    /// The share icon in a workout's header row in the Calendar day pane.
+    case calendar
+    /// The share icon in the workout detail screen's toolbar — reached from Home, the
+    /// Workouts tab and the Exercises tab.
+    case workoutDetail = "workout_detail"
 }
 
 /// Where a shared card actually went.
@@ -1138,6 +1158,9 @@ enum AnalyticsPropertyKey: String, CaseIterable {
     /// open time is the user's standing preference rather than a per-card whim.
     case exerciseListShown = "exercise_list_shown"
     case weightsShown = "weights_shown"
+    /// Whole calendar days between the workout and the share, on cards raised from a saved
+    /// workout only. 0 means "closed the summary and came straight back for the card".
+    case daysSinceWorkout = "days_since_workout"
     // Attribution. Set as person properties (see `AnalyticsAttributionReporter`),
     // which is why they can be filtered on events that predate resolution.
     case acquisitionChannel = "acquisition_channel"

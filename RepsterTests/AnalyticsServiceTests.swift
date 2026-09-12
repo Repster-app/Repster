@@ -643,6 +643,8 @@ final class AnalyticsServiceTests: XCTestCase {
         XCTAssertEqual(client.captures.last?.properties["prs_hit"] as? Int, 2)
         // Screen view too, the way `paywallShown` does it.
         XCTAssertEqual(client.screens.last?.screen, "Share Card")
+        // Always 0 from the summary, so it is only sent from saved workouts.
+        XCTAssertNil(client.captures.last?.properties["days_since_workout"])
     }
 
     /// An unresolved entitlement is not the same claim as "free".
@@ -692,6 +694,34 @@ final class AnalyticsServiceTests: XCTestCase {
         XCTAssertEqual(client.captures.last?.properties["error_type"] as? String, "render_failed")
     }
 
+    /// Saved workouts are two entry points, so the dashboards can tell which placement people
+    /// find, and they carry the workout's age.
+    func testSavedWorkoutSharesCarryTheirEntryPointAndAge() {
+        let (service, client, _) = makeService()
+
+        service.shareCardOpened(
+            entryPoint: .calendar,
+            variant: "record",
+            prsHit: 0,
+            accessTier: "free",
+            exerciseListShown: true,
+            weightsShown: true,
+            daysSinceWorkout: 12
+        )
+        XCTAssertEqual(client.captures.last?.properties["entry_point"] as? String, "calendar")
+        XCTAssertEqual(client.captures.last?.properties["days_since_workout"] as? Int, 12)
+
+        service.shareCardShared(
+            entryPoint: .workoutDetail,
+            variant: "record",
+            destination: "save_to_photos",
+            prsHit: 1,
+            daysSinceWorkout: 0
+        )
+        XCTAssertEqual(client.captures.last?.properties["entry_point"] as? String, "workout_detail")
+        XCTAssertEqual(client.captures.last?.properties["days_since_workout"] as? Int, 0)
+    }
+
     /// Nothing a user typed may ride along: no workout title, exercise name or note is in
     /// reach of any of these calls, and this pins the whole property surface so a later
     /// addition has to be deliberate.
@@ -704,18 +734,20 @@ final class AnalyticsServiceTests: XCTestCase {
             prsHit: 3,
             accessTier: "free",
             exerciseListShown: true,
-            weightsShown: true
+            weightsShown: true,
+            daysSinceWorkout: 4
         )
         service.shareCardShared(
             entryPoint: .summary,
             variant: "record",
             destination: "save_to_photos",
-            prsHit: 3
+            prsHit: 3,
+            daysSinceWorkout: 4
         )
 
         let allowed: Set<String> = [
             "entry_point", "variant", "prs_hit", "access_tier",
-            "exercise_list_shown", "weights_shown", "destination"
+            "exercise_list_shown", "weights_shown", "destination", "days_since_workout"
         ]
         for capture in client.captures where capture.event.hasPrefix("share card") {
             XCTAssertTrue(
@@ -968,6 +1000,35 @@ final class ShareCardInstrumentationTests: XCTestCase {
             .filter { $0.event == "share card failed" }
             .compactMap { $0.properties["error_type"] as? String }
         XCTAssertEqual(types, ["render_failed", "photo_save_failed"])
+    }
+
+    /// The workout's age reaches both events the funnel reads, from whichever surface raised it.
+    func testASavedWorkoutsAgeRidesOnOpenedAndShared() {
+        let client = SpyAnalyticsClient()
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        let service = AnalyticsService(
+            client: client,
+            configuration: AnalyticsConfiguration(projectToken: "phc_test", host: "https://eu.i.posthog.com")!,
+            userDefaults: defaults
+        )
+        let instrumentation = ShareCardInstrumentation(
+            analyticsService: service,
+            entryPoint: .workoutDetail,
+            prsHit: 1,
+            accessTier: "subscribed",
+            daysSinceWorkout: 30
+        )
+
+        instrumentation.opened(variant: .record, exerciseListShown: true, weightsShown: true)
+        instrumentation.shared(variant: .record, destination: "com.apple.UIKit.activity.Message")
+
+        let shareEvents = client.captures.filter { $0.event.hasPrefix("share card") }
+        XCTAssertEqual(shareEvents.map(\.event), ["share card opened", "share card shared"])
+        for event in shareEvents {
+            XCTAssertEqual(event.properties["days_since_workout"] as? Int, 30)
+            XCTAssertEqual(event.properties["entry_point"] as? String, "workout_detail")
+        }
     }
 }
 

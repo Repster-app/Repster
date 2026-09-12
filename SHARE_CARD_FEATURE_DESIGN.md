@@ -221,6 +221,9 @@ Visual weight follows the achievement:
   (`WorkoutSummarySheet.swift:203–211`).
 - Otherwise → a third button in `secondaryActionsSection` alongside Save as Template.
 
+**Built for 1.6 (2026-09-11), as share icons rather than menu items, with C5 option 2** —
+see [SHARE_FROM_HISTORY_SCOPING.md](SHARE_FROM_HISTORY_SCOPING.md).
+
 **Secondary (phase 2):** the toolbar menu on `WorkoutDetailFromHomeView.swift:66` and the
 workout header menu in `CalendarWorkoutDetailView`. Gated on solving C5.
 

@@ -94,6 +94,7 @@
 		AC0013 /* RestTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0013 /* RestTimerView.swift */; };
 		AC0014 /* WorkoutSummarySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0014 /* WorkoutSummarySheet.swift */; };
 		AC9001 /* WorkoutShareCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC9001 /* WorkoutShareCard.swift */; };
+		AC9002 /* WorkoutShareCardBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC9002 /* WorkoutShareCardBuilder.swift */; };
 		AC0015 /* ExerciseInfoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0015 /* ExerciseInfoData.swift */; };
 		AC0016 /* ExerciseInfoProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0016 /* ExerciseInfoProvider.swift */; };
 		AC0017 /* E1RMCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0017 /* E1RMCardView.swift */; };
@@ -437,6 +438,7 @@
 		BC0013 /* RestTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerView.swift; sourceTree = "<group>"; };
 		BC0014 /* WorkoutSummarySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSummarySheet.swift; sourceTree = "<group>"; };
 		BC9001 /* WorkoutShareCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutShareCard.swift; sourceTree = "<group>"; };
+		BC9002 /* WorkoutShareCardBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutShareCardBuilder.swift; sourceTree = "<group>"; };
 		BC0015 /* ExerciseInfoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseInfoData.swift; sourceTree = "<group>"; };
 		BC0016 /* ExerciseInfoProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseInfoProvider.swift; sourceTree = "<group>"; };
 		BC0017 /* E1RMCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E1RMCardView.swift; sourceTree = "<group>"; };
@@ -898,6 +900,7 @@
 				RTA1002 /* RestAlarmPromptView.swift */,
 				BC0014 /* WorkoutSummarySheet.swift */,
 				BC9001 /* WorkoutShareCard.swift */,
+				BC9002 /* WorkoutShareCardBuilder.swift */,
 				BC0023 /* EditWorkoutView.swift */,
 			);
 			path = Views;
@@ -1807,6 +1810,7 @@
 				RTA0002 /* RestAlarmPromptView.swift in Sources */,
 				AC0014 /* WorkoutSummarySheet.swift in Sources */,
 				AC9001 /* WorkoutShareCard.swift in Sources */,
+				AC9002 /* WorkoutShareCardBuilder.swift in Sources */,
 				AC0023 /* EditWorkoutView.swift in Sources */,
 				AC0021 /* SetTableDataSource.swift in Sources */,
 				AC0022 /* EditWorkoutViewModel.swift in Sources */,

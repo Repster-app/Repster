@@ -395,3 +395,322 @@ final class WorkoutShareCardTests: XCTestCase {
         XCTAssertTrue(CoachPreferences.showsSummaryTeaser, "The flag must still turn it on for the release Coach lands in")
     }
 }
+
+// MARK: - Builder
+
+/// `WorkoutShareCardBuilder` is the one place the card's numbers come from, for the summary and
+/// for saved workouts alike. SHARE_FROM_HISTORY_SCOPING.md §5.
+@MainActor
+final class WorkoutShareCardBuilderTests: XCTestCase {
+
+    private let workoutId = UUID()
+    /// Pinned so the year rule and `daysSince` are deterministic.
+    private let now = Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 11, hour: 12))!
+    private let workoutDate = Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 10, hour: 18))!
+
+    // MARK: Fixtures
+
+    private func exercise(_ name: String, muscle: String) -> ChartExerciseData {
+        let exercise = Exercise(name: name, equipmentType: .barbell, trackingType: .weightReps)
+        exercise.primaryMuscle = muscle
+        return ChartExerciseData(from: exercise)
+    }
+
+    private func set(
+        _ exercise: ChartExerciseData,
+        order: Int,
+        _ weight: Double,
+        _ reps: Int,
+        completed: Bool = true,
+        type: SetType = .working,
+        pr: CachedPRStatus? = nil
+    ) -> ChartSetData {
+        let set = WorkoutSet(
+            workoutId: workoutId,
+            exerciseId: exercise.id,
+            weight: weight,
+            effectiveWeight: weight,
+            reps: reps,
+            setType: type,
+            orderInWorkout: order,
+            orderInExercise: order,
+            completed: completed
+        )
+        set.prStatus = pr
+        return ChartSetData(from: set)
+    }
+
+    private struct Session {
+        let bench: ChartExerciseData
+        let press: ChartExerciseData
+        let pushdown: ChartExerciseData
+        let entries: [WorkoutShareCardBuilder.Entry]
+
+        var exercisesById: [UUID: ChartExerciseData] {
+            Dictionary(uniqueKeysWithValues: entries.map { ($0.exercise.id, $0.exercise) })
+        }
+    }
+
+    /// Bench with a warm-up and a record on its first working set; a press with one row nobody
+    /// ticked; three pushdowns; and a lateral raise that was added and never done.
+    private func session(benchRecord: CachedPRStatus? = .current) -> Session {
+        let bench = exercise("Barbell Bench Press", muscle: "chest")
+        let press = exercise("Overhead Press", muscle: "shoulders")
+        let pushdown = exercise("Triceps Pushdown", muscle: "triceps")
+        let raise = exercise("Lateral Raise", muscle: "shoulders")
+
+        return Session(bench: bench, press: press, pushdown: pushdown, entries: [
+            .init(exercise: bench, sets: [
+                set(bench, order: 1, 60, 5, type: .warmup),
+                set(bench, order: 2, 100, 5, pr: benchRecord),
+                set(bench, order: 3, 100, 5),
+                set(bench, order: 4, 90, 5)
+            ]),
+            .init(exercise: press, sets: [
+                set(press, order: 5, 50, 8),
+                set(press, order: 6, 50, 8),
+                set(press, order: 7, 50, 7, completed: false)
+            ]),
+            .init(exercise: pushdown, sets: [
+                set(pushdown, order: 8, 30, 12),
+                set(pushdown, order: 9, 30, 12),
+                set(pushdown, order: 10, 30, 12)
+            ]),
+            .init(exercise: raise, sets: [
+                set(raise, order: 11, 10, 15, completed: false)
+            ])
+        ])
+    }
+
+    private func summaryCard(
+        _ session: Session,
+        duration: TimeInterval? = 3840,
+        context: WorkoutShareCardContext = .summary
+    ) -> WorkoutShareCardData {
+        WorkoutShareCardBuilder.make(
+            title: "Push Day A",
+            date: workoutDate,
+            duration: duration,
+            entries: session.entries,
+            unitPreference: .metric,
+            context: context,
+            now: now
+        )
+    }
+
+    /// A saved workout as the history screens load it: every set in one pile, grouped and
+    /// ordered by `ExerciseGroup.build`.
+    private func detail(
+        sets: [ChartSetData],
+        exercisesById: [UUID: ChartExerciseData],
+        status: WorkoutStatus = .completed,
+        duration: Int? = 3840
+    ) -> WorkoutDetail {
+        let workout = Workout(
+            date: workoutDate,
+            title: "Push Day A",
+            startTime: workoutDate,
+            duration: duration,
+            status: status
+        )
+        return WorkoutDetail(
+            workout: WorkoutSnapshot(from: workout),
+            exerciseGroups: ExerciseGroup.build(sets: sets, exercisesById: exercisesById, statsById: [:]),
+            primaryMetric: nil,
+            exerciseCount: 0,
+            setCount: 0
+        )
+    }
+
+    private func group(_ raw: String) -> String {
+        ExercisePrimaryGroup.normalizedValue(raw) ?? raw
+    }
+
+    // MARK: Golden
+
+    /// The card this session produced from the summary before the builder existed, worked by
+    /// hand from that code, with the two differences the builder makes on purpose:
+    ///
+    /// - "Lateral Raise" has no ticked set, so it is no longer a fourth "0 sets" lift
+    ///   (`liftCountLabel` was "4", `extraLiftCount` 1).
+    /// - The record's trace bar is marked. The summary read `WorkoutSet.cachedPRStatus`, a
+    ///   legacy field the initialiser always sets to nil, so the diamond was never drawn.
+    func testGoldenSessionProducesTheSummaryCard() {
+        let s = session()
+        func kg(_ value: Double) -> String { UnitConversion.formatWeightLabel(value, unitPreference: .metric) }
+
+        let benchLift = WorkoutShareCardData.Lift(id: s.bench.id, name: "Barbell Bench Press", detail: "\(kg(100)) × 5", setCountLabel: "4 sets")
+        let pushdownLift = WorkoutShareCardData.Lift(id: s.pushdown.id, name: "Triceps Pushdown", detail: "\(kg(30)) × 12", setCountLabel: "3 sets")
+        let pressLift = WorkoutShareCardData.Lift(id: s.press.id, name: "Overhead Press", detail: "\(kg(50)) × 8", setCountLabel: "2 sets")
+
+        // Working sets only, raw weight × reps.
+        let chest = 500.0 + 500 + 450, triceps = 360.0 * 3, shoulders = 400.0 * 2
+        let muscleTotal = chest + triceps + shoulders
+
+        let benchSets = s.entries[0].sets, pressSets = s.entries[1].sets, pushdownSets = s.entries[2].sets
+        func bar(_ set: ChartSetData, _ magnitude: Double, _ muscle: String, pr: Bool = false, new: Bool = false) -> WorkoutShareCardData.TraceBar {
+            .init(id: set.id, magnitude: magnitude, group: group(muscle), isPR: pr, startsNewExercise: new)
+        }
+
+        let expected = WorkoutShareCardData(
+            title: "Push Day A",
+            dateLabel: workoutDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()),
+            durationLabel: "1h 4m",
+            // Warm-up included; the unticked press row is not.
+            setCountLabel: "9",
+            // Effective weight × reps over every ticked set, warm-up included.
+            volumeLabel: WorkoutPrimaryMetric.volume(1750 + 800 + 1080)
+                .formattedValue(style: .detailed, unitPreference: .metric),
+            liftCountLabel: "3",
+            prLift: benchLift,
+            lifts: [benchLift, pushdownLift, pressLift],
+            extraLiftCount: 0,
+            muscleSlices: [
+                .init(group: group("chest"), displayName: ExercisePrimaryGroup.displayName(for: group("chest")), fraction: chest / muscleTotal),
+                .init(group: group("triceps"), displayName: ExercisePrimaryGroup.displayName(for: group("triceps")), fraction: triceps / muscleTotal),
+                .init(group: group("shoulders"), displayName: ExercisePrimaryGroup.displayName(for: group("shoulders")), fraction: shoulders / muscleTotal)
+            ],
+            traceBars: [
+                bar(benchSets[1], 1, "chest", pr: true, new: true),
+                bar(benchSets[2], 1, "chest"),
+                bar(benchSets[3], 0.9, "chest"),
+                bar(pressSets[0], 0.8, "shoulders", new: true),
+                bar(pressSets[1], 0.8, "shoulders"),
+                bar(pushdownSets[0], 0.72, "triceps", new: true),
+                bar(pushdownSets[1], 0.72, "triceps"),
+                bar(pushdownSets[2], 0.72, "triceps")
+            ],
+            prLabel: "NEW PR"
+        )
+
+        XCTAssertEqual(summaryCard(s), expected)
+    }
+
+    // MARK: What counts
+
+    /// The Copy Previous row nobody ticked is not a set, not volume and not a bar — a card is a
+    /// public claim about what was done.
+    func testUntickedRowsCountForNothing() {
+        var s = session()
+        let card = summaryCard(s)
+
+        let ticked = s.entries[1]
+        s = Session(bench: s.bench, press: s.press, pushdown: s.pushdown, entries: [
+            s.entries[0],
+            .init(exercise: ticked.exercise, sets: ticked.sets.filter(\.completed)),
+            s.entries[2],
+            s.entries[3]
+        ])
+
+        XCTAssertEqual(card, summaryCard(s), "Dropping the unticked row must change nothing")
+        XCTAssertEqual(card.setCountLabel, "9")
+        XCTAssertFalse(card.traceBars.contains { $0.id == ticked.sets[2].id })
+    }
+
+    /// It used to show as a "0 sets" row and count toward "N lifts".
+    func testAnExerciseNeverDoneIsNotALift() {
+        let card = summaryCard(session())
+
+        XCTAssertFalse(card.lifts.contains { $0.name == "Lateral Raise" })
+        XCTAssertEqual(card.liftCountLabel, "3")
+        XCTAssertEqual(card.extraLiftCount, 0)
+    }
+
+    // MARK: Records (option A)
+
+    /// `prStatus` decays once a record is beaten, and a beaten record is not on the card —
+    /// neither as the headline nor as a marked bar. Equalling one is not a record either.
+    func testOnlyAStandingRecordIsAPR() {
+        XCTAssertNotNil(summaryCard(session(benchRecord: .current)).prLift)
+        XCTAssertEqual(summaryCard(session(benchRecord: .current)).traceBars.filter(\.isPR).count, 1)
+
+        for status: CachedPRStatus? in [.previous, .matched, .dominated, nil] {
+            let card = summaryCard(session(benchRecord: status))
+            XCTAssertNil(card.prLift, "\(String(describing: status)) must not headline the card")
+            XCTAssertFalse(card.traceBars.contains(where: \.isPR), "\(String(describing: status)) must not mark a bar")
+        }
+    }
+
+    func testHistoryCardsSayPersonalBestRatherThanNew() {
+        XCTAssertEqual(summaryCard(session(), context: .summary).prLabel, "NEW PR")
+        XCTAssertEqual(summaryCard(session(), context: .history).prLabel, "PERSONAL BEST")
+    }
+
+    func testStandingPRCountIsTickedCurrentRecordsOnly() {
+        let bench = exercise("Barbell Bench Press", muscle: "chest")
+        let saved = detail(
+            sets: [
+                set(bench, order: 1, 100, 5, pr: .current),
+                set(bench, order: 2, 100, 6, completed: false, pr: .current),
+                set(bench, order: 3, 95, 5, pr: .previous)
+            ],
+            exercisesById: [bench.id: bench]
+        )
+        XCTAssertEqual(WorkoutShareCardBuilder.standingPRCount(in: saved), 1)
+    }
+
+    // MARK: Labels
+
+    /// Some imported workouts have no duration. "0m" would read as a claim.
+    func testMissingDurationIsLeftOffRatherThanZero() {
+        let s = session()
+        XCTAssertNil(summaryCard(s, duration: nil).durationLabel)
+
+        let sets = s.entries.flatMap(\.sets)
+        for missing: Int? in [nil, 0] {
+            let saved = detail(sets: sets, exercisesById: s.exercisesById, duration: missing)
+            XCTAssertNil(WorkoutShareCardBuilder.make(detail: saved, unitPreference: .metric, now: now).durationLabel)
+        }
+        let timed = detail(sets: sets, exercisesById: s.exercisesById, duration: 3840)
+        XCTAssertEqual(WorkoutShareCardBuilder.make(detail: timed, unitPreference: .metric, now: now).durationLabel, "1h 4m")
+    }
+
+    /// A card from last year without its year would pass itself off as recent.
+    func testDateCarriesTheYearOnlyWhenItIsNotThisOne() {
+        let lastYear = Calendar.current.date(from: DateComponents(year: 2025, month: 8, day: 30, hour: 9))!
+        XCTAssertTrue(WorkoutShareCardBuilder.dateLabel(lastYear, now: now).contains("2025"))
+        XCTAssertFalse(WorkoutShareCardBuilder.dateLabel(workoutDate, now: now).contains("2026"))
+    }
+
+    func testDaysSinceCountsCalendarDaysAndNeverGoesNegative() {
+        XCTAssertEqual(WorkoutShareCardBuilder.daysSince(now, now: now), 0)
+        // 18:00 yesterday to noon today is under 24 hours and still one calendar day.
+        XCTAssertEqual(WorkoutShareCardBuilder.daysSince(workoutDate, now: now), 1)
+        let later = Calendar.current.date(byAdding: .day, value: 3, to: now)!
+        XCTAssertEqual(WorkoutShareCardBuilder.daysSince(later, now: now), 0)
+    }
+
+    // MARK: Summary and history agree
+
+    /// The point of one builder: a workout shared from the summary and again from history is
+    /// the same card, even though history hands the sets over in one unordered pile and lets
+    /// `ExerciseGroup.build` put them back together. Only the PR wording differs.
+    func testASavedWorkoutSharesTheSameCardAsItsSummary() {
+        let s = session()
+        let saved = detail(sets: s.entries.flatMap(\.sets).reversed(), exercisesById: s.exercisesById)
+
+        var expected = summaryCard(s)
+        expected.prLabel = "PERSONAL BEST"
+
+        XCTAssertEqual(WorkoutShareCardBuilder.make(detail: saved, unitPreference: .metric, now: now), expected)
+    }
+
+    // MARK: Who gets a button
+
+    func testOnlyAFinishedWorkoutWithSomethingTickedCanBeShared() {
+        let s = session()
+        let sets = s.entries.flatMap(\.sets)
+
+        XCTAssertTrue(WorkoutShareCardBuilder.canShare(detail(sets: sets, exercisesById: s.exercisesById)))
+        XCTAssertFalse(
+            WorkoutShareCardBuilder.canShare(detail(sets: sets, exercisesById: s.exercisesById, status: .inProgress)),
+            "Calendar lists today's in-progress workout; it is not a card yet"
+        )
+
+        let nothingTicked = sets.filter { !$0.completed }
+        XCTAssertFalse(
+            WorkoutShareCardBuilder.canShare(detail(sets: nothingTicked, exercisesById: s.exercisesById)),
+            "A workout with nothing ticked would share as an empty card"
+        )
+    }
+}

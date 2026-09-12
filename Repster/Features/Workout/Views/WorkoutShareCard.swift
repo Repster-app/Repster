@@ -49,7 +49,8 @@ struct WorkoutShareCardData: Equatable {
 
     let title: String
     let dateLabel: String
-    let durationLabel: String
+    /// Nil when the workout has no recorded duration, which some imported ones don't.
+    let durationLabel: String?
     let setCountLabel: String
     /// Total volume, already unit-converted. Nil for distance/duration-style sessions.
     let volumeLabel: String?
@@ -67,6 +68,10 @@ struct WorkoutShareCardData: Equatable {
 
     /// Every working set in the order it was performed.
     var traceBars: [TraceBar] = []
+
+    /// The eyebrow over a record. "NEW PR" moments after the workout; "PERSONAL BEST" from
+    /// history, where "new" would be wrong on a card from March.
+    var prLabel: String = "NEW PR"
 
     /// A slice of the session's volume.
     struct MuscleSlice: Equatable, Identifiable {
@@ -270,7 +275,7 @@ struct WorkoutShareCard: View {
 
             Spacer(minLength: 0).frame(maxHeight: .infinity)
 
-            metaRow([data.durationLabel, "\(data.setCountLabel) sets", "\(data.liftCountLabel) lifts"])
+            metaRow([data.durationLabel, "\(data.setCountLabel) sets", "\(data.liftCountLabel) lifts"].compactMap { $0 })
 
             Spacer().frame(height: 16)
 
@@ -308,7 +313,7 @@ struct WorkoutShareCard: View {
 
             Spacer(minLength: 0).frame(maxHeight: .infinity)
 
-            metaRow([data.durationLabel, "\(data.setCountLabel) sets", "\(data.liftCountLabel) lifts"])
+            metaRow([data.durationLabel, "\(data.setCountLabel) sets", "\(data.liftCountLabel) lifts"].compactMap { $0 })
 
             Spacer().frame(height: 16)
 
@@ -394,7 +399,7 @@ struct WorkoutShareCard: View {
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.gold)
 
-                    Text("NEW PR")
+                    Text(data.prLabel)
                         .font(.system(size: 12, weight: .bold))
                         .kerning(2.2)
                         .foregroundColor(.gold)
@@ -453,7 +458,7 @@ struct WorkoutShareCard: View {
 
     private var statRow: some View {
         HStack(spacing: 10) {
-            statCell(value: data.durationLabel, label: "TIME")
+            statCell(value: data.durationLabel ?? "—", label: "TIME")
             statCell(value: data.setCountLabel, label: "SETS")
 
             // Volume is a weight, so it goes with the weights. A lift count keeps the row at
@@ -847,6 +852,8 @@ final class ShareCardInstrumentation {
     private let entryPoint: ShareCardEntryPoint
     private let prsHit: Int
     private let accessTier: String?
+    /// Nil from the summary, where the answer is always zero and would only add noise.
+    private let daysSinceWorkout: Int?
 
     private var hasRecordedOpen = false
     private var hasShared = false
@@ -859,12 +866,14 @@ final class ShareCardInstrumentation {
         analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService(),
         entryPoint: ShareCardEntryPoint = .summary,
         prsHit: Int = 0,
-        accessTier: String? = nil
+        accessTier: String? = nil,
+        daysSinceWorkout: Int? = nil
     ) {
         self.analyticsService = analyticsService
         self.entryPoint = entryPoint
         self.prsHit = prsHit
         self.accessTier = accessTier
+        self.daysSinceWorkout = daysSinceWorkout
     }
 
     func opened(variant: WorkoutShareCardStyle, exerciseListShown: Bool, weightsShown: Bool) {
@@ -876,7 +885,8 @@ final class ShareCardInstrumentation {
             prsHit: prsHit,
             accessTier: accessTier,
             exerciseListShown: exerciseListShown,
-            weightsShown: weightsShown
+            weightsShown: weightsShown,
+            daysSinceWorkout: daysSinceWorkout
         )
     }
 
@@ -888,7 +898,8 @@ final class ShareCardInstrumentation {
             entryPoint: entryPoint,
             variant: variant.rawValue,
             destination: destination,
-            prsHit: prsHit
+            prsHit: prsHit,
+            daysSinceWorkout: daysSinceWorkout
         )
     }
 
@@ -949,14 +960,16 @@ struct WorkoutSharePreviewSheet: View {
         entryPoint: ShareCardEntryPoint = .summary,
         prsHit: Int = 0,
         accessTier: String? = nil,
-        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService()
+        analyticsService: any AnalyticsServiceProtocol = NoopAnalyticsService(),
+        daysSinceWorkout: Int? = nil
     ) {
         self.data = data
         _instrumentation = State(initialValue: ShareCardInstrumentation(
             analyticsService: analyticsService,
             entryPoint: entryPoint,
             prsHit: prsHit,
-            accessTier: accessTier
+            accessTier: accessTier,
+            daysSinceWorkout: daysSinceWorkout
         ))
     }
 

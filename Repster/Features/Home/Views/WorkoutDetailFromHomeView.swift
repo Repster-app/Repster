@@ -23,6 +23,7 @@ struct WorkoutDetailFromHomeView: View {
     @State private var selectedExerciseId: UUID?
     @State private var saveAsTemplateController = SaveWorkoutAsTemplateController()
     @State private var templateFeedback: TemplateSaveFeedback? = nil
+    @State private var detailToShare: WorkoutDetail?
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceContainer.self) private var services
 
@@ -68,6 +69,20 @@ struct WorkoutDetailFromHomeView: View {
         .navigationTitle(workoutDetails.first?.workout.displayTitle ?? "Workout Detail")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // A visible button, not a menu item: the report that started this was that sharing
+            // could not be found once the summary had closed.
+            if let detail = workoutDetails.first, WorkoutShareCardBuilder.canShare(detail) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        detailToShare = detail
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 16))
+                    }
+                    .accessibilityLabel("Share workout")
+                }
+            }
+
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     // Edit Workout
@@ -129,6 +144,7 @@ struct WorkoutDetailFromHomeView: View {
         .task {
             await loadDetail()
         }
+        .shareWorkoutCard(item: $detailToShare, entryPoint: .workoutDetail)
         .saveWorkoutAsTemplatePrompt(
             controller: saveAsTemplateController,
             workoutId: workoutDetails.first?.workout.id,
