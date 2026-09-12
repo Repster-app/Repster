@@ -1,6 +1,7 @@
 # Bugs 2 and 3: full fix scoping
 
-**Written:** 2026-09-11. **Implementation update:** 2026-09-12 — Phases 0, 1 and 4 are built and verified; Phases 2, 3, 5 and 6 remain.
+**Written:** 2026-09-11. **Implementation update:** 2026-09-12 — Phases 0, 1 and 4, plus the
+Settings slice of Tier C, are built; Phases 2, 3, 5 and the remainder of 6 remain.
 **Source investigation:** [TEST_SUITE_FAILURES_INVESTIGATION.md](TEST_SUITE_FAILURES_INVESTIGATION.md) (§4 bug 2, §10.2 bug 3).
 **Builds on:** [SWIFTDATA_CRASH_WORK_RECORD.md](SWIFTDATA_CRASH_WORK_RECORD.md) and
 [STAGE2_WRITE_PATH_DESIGN.md](STAGE2_WRITE_PATH_DESIGN.md), the August work this finishes.
@@ -10,7 +11,8 @@
 - **Bugs 2 and 3 come from one problem.** A live database record leaves the part of the app that
   owns it and gets used somewhere else, on another thread.
   - **Bug 2** (iOS 17): the other code *changes* the record.
-  - **Bug 3** (iOS 18): the other code *reads* the record while the owner reloads it.
+  - **Bug 3** (iOS 18): the other code *reads* the record while its owner saves it, or while the
+    owner first re-fetches a new record it just saved.
 - **The full fix is one rule, finished everywhere:** records never leave their owner.
   - Code that wants to **read** gets a frozen copy.
   - Code that wants to **change** something sends the owner an instruction ("set target RIR to 2"),
@@ -29,8 +31,11 @@
   - **Phase 1:** all 20 `HealthProfile` write sites run inside `HealthProfileRepository`.
   - **Phase 4:** the suggestion engine reads set, exercise, workout and profile snapshots;
     `ActiveWorkoutViewModel.workout` is also a snapshot.
+  - **Tier C / Settings:** `SettingsService` exposes only profile snapshots; its setters return
+    the saved snapshot, and `SettingsViewModel` renders that value instead of a live model.
 - **Still needed:** Phase 5 converts the workout screens' held `[WorkoutSet]` values. Until then,
-  the minimal held-live-set positive control still represents a real remaining risk.
+  those screens still have the risk represented by the held-live-set positive control. The
+  control itself is intentionally unsafe and must keep crashing after Phase 5.
 - **Recommended next order:** Phase 5 → Phases 2–3 → Phase 6. See the short operator checklist in
   [SWIFTDATA_LIVE_MODEL_TEST_CHECKLIST.md](SWIFTDATA_LIVE_MODEL_TEST_CHECKLIST.md).
 
@@ -174,25 +179,27 @@ objects:
 
 ## 4. Bug 3 scope
 
-Bug 3 needs a live record read outside its owner *at the moment* the owner re-fetches that row.
-The fix is to read copies. Tiers are in risk order.
+Bug 3 needs a live record read outside its owner when the owner saves that record, or when the
+owner first fetches a new record it just saved. A save in another context and a plain re-fetch
+keep the held instance's backing data. The fix is to read copies. Tiers are in risk order.
 
 ### 4.1 Tier A: the suggestion engine (both observed crashes) — **done 2026-09-12**
 
-**Crash B's reader:** `LoadPrescriptionService` (a plain actor) fetches and reads live records:
+**Crash B's reader:** `LoadPrescriptionService` (a plain actor) previously fetched and read live
+records. Phase 4 built these replacements:
 
-| Line | Today | Change to |
+| Line | Former live read | Built replacement |
 |---|---|---|
-| `:225`, `:250` | `setRepo.fetchSets(exerciseId:from:to:)` → `[WorkoutSet]` | `fetchChartSets(exerciseId:from:to:)` (**exists**) |
-| `:378` | `workoutRepo.fetch(byIds:)` → `[Workout]` | New `fetchWorkoutSummaries(byIds:)` → `[WorkoutSnapshot]`. The snapshot already has the exclusion fields |
-| `:56`, `:71` | `healthProfileRepo.fetchOrCreate()` | A profile snapshot. New `HealthProfileSnapshot`, also needed in Tier C |
-| `:77` | `exerciseRepo.fetch(byId:)` | `fetchChartExercise(byId:)` (**exists**) |
+| `:225`, `:250` | `setRepo.fetchSets(exerciseId:from:to:)` → `[WorkoutSet]` | `fetchChartSets(exerciseId:from:to:)` → `[ChartSetData]` |
+| `:378` | `workoutRepo.fetch(byIds:)` → `[Workout]` | `fetchWorkoutSummaries(byIds:)` → `[WorkoutSnapshot]` |
+| `:56`, `:71` | `healthProfileRepo.fetchOrCreate()` | `fetchSnapshotOrCreate()` → `HealthProfileSnapshot` |
+| `:77` | `exerciseRepo.fetch(byId:)` | `fetchChartExercise(byId:)` → `ChartExerciseData` |
 
 Also:
 - `isEligibleForCapacity`, `peakAcrossRecentWorkouts` and `capacityE1RM(for:)` take `ChartSetData`.
-- `performanceRIR` exists only on `WorkoutSet` (`WorkoutSet.swift:143`). Give `ChartSetData` the
-  same property through one shared implementation, the August pattern for `statsReps`.
-- `FatigueLearningService.appliedFatigueRateInfo(for:profile:)` needs snapshot inputs.
+- `ChartSetData.performanceRIR` now shares the model's calculation, following the August pattern
+  for `statsReps`.
+- `FatigueLearningService.appliedFatigueRateInfo(for:profile:)` now accepts snapshot inputs.
 - `WorkoutService.excludedWorkoutIdsForProgressionHistory` (`:228-240`), which is the History
   tab's re-fetch, moves to the same `fetchWorkoutSummaries(byIds:)`.
 
@@ -234,10 +241,11 @@ layer and no `updatedAt` plumbing. The one delicate function is `applyAffectedSe
 ### 4.3 Tier C: the long tail
 
 - **`WorkoutSummarySheet`** is now covered by `ActiveWorkoutViewModel.workout: WorkoutSnapshot`.
-- **Live `HealthProfile`** is still handed to feature files outside the completed suggestion path:
-  `EditWorkoutViewModel`, `ExerciseInfoProvider`, `SettingsViewModel`,
-  `BodyweightLogViewModel`, `CreateEditExerciseViewModel`, `ExerciseSettingsSheet`. They should
-  get `HealthProfileSnapshot`.
+- **Settings screen and SettingsService profile reads — done 2026-09-12.** `SettingsViewModel`
+  and the advanced Settings sections hold `HealthProfileSnapshot`. The service's snapshot fetch
+  is also used by `ServiceContainer`, `BodyweightLogViewModel`, `CreateEditExerciseViewModel`,
+  `EditWorkoutViewModel` and `ExerciseSettingsSheet`; all six callers only read it. Settings
+  writes remain routed through service setters, which now return the saved snapshot directly.
 - **August's unaudited screens:** `ExerciseDetailViewModel`, `ExerciseListViewModel`,
   `BodyweightLogViewModel`, `AssignMuscleGroupsView`, `TemplateListSheet`, `ExercisePickerSheet`.
 - **Reads inside services.** A grep finds about 145 live-record fetches in plain-actor services:
@@ -301,23 +309,19 @@ Each phase ships on its own and leaves the app better than before.
 | **3. The rest of bug 2** | 12 sites (Fatigue exercise 5, Workout 3, Template 2, Bodyweight 1, plus the `:471` batch), then `save` → `insert` + assertion | **Bug 2 closed**, with a guard | ½–1 session |
 | **4. Bug 3, Tier A** | Suggestion engine on snapshots; `ActiveWorkoutViewModel.workout` → `WorkoutSnapshot`. **Done 2026-09-12** | **Both observed bug-3 readers** | Done |
 | **5. Bug 3, Tier B** | Both workout screens, `SetTableDataSource`, `SetService` signatures | **Bug 3 on the workout screens**; removes the badge identity dependency | 2–3 sessions + device pass |
-| **6. Tier C + guard** | Summary sheet, profile snapshot, unaudited screens, service reads, `@unchecked Sendable` removal | The rule everywhere; the compiler enforces it | 2+ sessions, can be spread out |
+| **6. Tier C + guard** | Remaining unaudited screens and service reads, then `@unchecked Sendable` removal. Settings/profile slice **done 2026-09-12** | The rule everywhere; the compiler enforces it | 2+ sessions, can be spread out |
 
 Sizes are estimates. For scale: August's comparable Stage 1 + 2 touched 52 files
 (+2,897 / −492).
 
 **Why this order:**
-- Phase 1 first because it's the only crash a user has actually hit, and it's the smallest.
-- Phase 2 before 3 because it's the hot path and every test crash.
-- Phase 4 before 5 because it closes both observed bug-3 readers without touching the set table.
-- Phase 5 is the riskiest change in the program: the highest-traffic screen, and August showed
-  the suite is weak evidence there.
-
-**Alternative for Phase 1 if you want a hotfix instead:** change `actor SettingsService` to
-`@MainActor final class`. That's one line. On iOS 17 the repositories run on main (investigation
-§9.1 P0), so a main-thread writer can't race them. It's untested and needs one probe on 17.5.
-`resetAllAppData` would then run on main. It doesn't fit the full fix's rule, so treat it only
-as a stopgap.
+- Completed first: Phase 1 closed the only known real-user crash; Phase 4 closed both observed
+  bug-3 readers without changing the set table.
+- Next, Phase 5 closes the remaining high-traffic workout-screen reads. It is the riskiest change,
+  so it stays isolated behind its own real-path regression and device pass.
+- Then Phase 2 before Phase 3: PR/stats is the hotter bug-2 path, followed by the remaining writes
+  and the insert-only guard.
+- Phase 6 comes last because it is the long-tail audit and compile-time enforcement step.
 
 ---
 
@@ -326,14 +330,14 @@ as a stopgap.
 The August rule applies: **a green suite is close to no evidence on these paths.** Every fix
 needs a control that still detects the bug.
 
-| Phase | Control (must crash before the fix) | Pass condition |
+| Phase | Harness | Pass condition |
 |---|---|---|
 | 0 | Bug 2: the real `OnboardingViewModel.finish()` with main-built repositories, iOS 17.5, plus two discriminators. **Built**, marker-gated like `CrossContextRaceTests` | Crashes on 17.5 today, 5/5; clean on 18.6 |
 | 0 | Bug 3: a live record held by other code while its repository saves it (in-memory, iOS 18.6). **Built** | Crashes on 18.6 today, 10/10 |
 | 1 | Real onboarding regression, 2,000 rounds | **Clean on iOS 17.5 (2026-09-12)** |
 | 2–3 | `AffectedSetsPreconditionTests` (crashes every run on 17.5 today); `SetServiceTests` with repositories built on main (crashes today, investigation §9.3) | Clean ×20 on 17.5; badge identity measurements unchanged |
 | 4 | Real suggestion-engine regression plus set/workout snapshot stress | **Clean on iOS 18.6 (2026-09-12)** |
-| 5 | Held-live-set control switched to the converted workout-screen path | Must become clean on 18.6 and 26.3 |
+| 5 | Keep `testBug3Control_HeldSetsReadWhileOwnerSaves` as the synthetic positive control. Add a separate real-path regression that drives the converted active/edit workout view-model set flows while repository saves overlap their reads | The synthetic held-live-set control must still crash; the new snapshot-based real-path regression must be clean on 18.6 and 26.3 |
 | All | Full suite on **17.5, 18.6 and 26**, one `xcodebuild` at a time, totals from `.xcresult`; golden masters unchanged; mutation checks on the changed surface (August §16) | — |
 | 5 | Device pass: log sets, PR badges appear and demote, edit a finished workout, finish a workout, suggestions refresh on exercise switch | — |
 
