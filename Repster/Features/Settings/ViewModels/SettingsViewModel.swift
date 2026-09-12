@@ -72,7 +72,7 @@ enum SupportEmailComposer {
 final class SettingsViewModel {
     // MARK: - State
 
-    var profile: HealthProfile?
+    var profile: HealthProfileSnapshot?
     var isLoading = true
     var isRebuilding = false
     var showError = false
@@ -328,10 +328,9 @@ final class SettingsViewModel {
     }
 
     @discardableResult
-    private func performUpdate(_ update: () async throws -> Void) async -> Bool {
+    private func performUpdate(_ update: () async throws -> HealthProfileSnapshot) async -> Bool {
         do {
-            try await update()
-            try await reloadProfile()
+            profile = try await update()
             return true
         } catch {
             present(error)
@@ -340,7 +339,7 @@ final class SettingsViewModel {
     }
 
     private func reloadProfile() async throws {
-        profile = try await settingsService.fetchSettings()
+        profile = try await settingsService.fetchSettingsSnapshot()
     }
 
     private func present(_ error: Error) {

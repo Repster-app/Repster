@@ -50,7 +50,7 @@ final class BodyweightLogViewModel {
 
     func loadEntries() async {
         do {
-            let profile = try await settingsService.fetchSettings()
+            let profile = try await settingsService.fetchSettingsSnapshot()
             unitPreference = profile.unitPreference
             entries = try await bodyweightService.fetchAllEntries()
         } catch {

@@ -21,6 +21,7 @@ import Foundation
 /// | `testBug3Mechanism_WhenIsBackingDataReplaced` | `RUN_BUG3_MECHANISM` | any | Prints a table |
 /// | `testBug3Control_HeldSetsReadWhileOwnerSaves` | `RUN_BUG3_HELD_SETS` | iOS 18.6 | **Crash** |
 /// | `testBug3Regression_EngineUsesSnapshotsWhileOwnerSaves` | `RUN_BUG3_ENGINE` | iOS 18.6 | Clean |
+/// | `testBug3Regression_SettingsViewModelUsesSnapshotWhileTogglesSave` | `RUN_BUG3_SETTINGS` | iOS 18.6 | Clean after migration |
 /// | `testBug3Control_HeldWorkoutReadOnMainWhileOwnerSaves` | `RUN_BUG3_HELD_WORKOUT` | iOS 18.6 | **Crash** |
 /// | `testBug3Discriminator_SnapshotsReadWhileOwnerSaves` | `RUN_BUG3_SNAPSHOTS` | iOS 18.6 | Clean |
 ///
@@ -134,9 +135,9 @@ final class LiveModelRaceReproTests: XCTestCase {
         )
     }
 
-    /// The real onboarding screen over the real `SettingsService`, wired as `ServiceContainer` does.
+    /// The real settings service, wired as `ServiceContainer` does.
     @MainActor
-    private func makeOnboarding(_ repos: SettingsRepositories) -> OnboardingViewModel {
+    private func makeSettingsService(_ repos: SettingsRepositories) -> SettingsService {
         let statsService = StatsService(
             exerciseStatsRepository: repos.exerciseStats,
             setRepository: repos.set,
@@ -151,7 +152,7 @@ final class LiveModelRaceReproTests: XCTestCase {
             healthProfileRepository: repos.healthProfile,
             exerciseRepository: repos.exercise
         )
-        let settingsService = SettingsService(
+        return SettingsService(
             healthProfileRepository: repos.healthProfile,
             prService: prService,
             statsService: statsService,
@@ -159,8 +160,13 @@ final class LiveModelRaceReproTests: XCTestCase {
             userDefaults: UserDefaults(suiteName: "live-model-repro-\(UUID().uuidString)")!,
             seedExercises: { _ in }
         )
+    }
+
+    /// The real onboarding screen over the real `SettingsService`, wired as `ServiceContainer` does.
+    @MainActor
+    private func makeOnboarding(_ repos: SettingsRepositories) -> OnboardingViewModel {
         return OnboardingViewModel(
-            settingsService: settingsService,
+            settingsService: makeSettingsService(repos),
             bodyweightService: BodyweightService(
                 bodyweightEntryRepository: repos.bodyweight,
                 healthProfileRepository: repos.healthProfile
@@ -241,8 +247,8 @@ final class LiveModelRaceReproTests: XCTestCase {
     /// actor that owns the context, which is built on main as in the control. If the crash needs a
     /// write from a *different* actor (investigation §9.1 P2), this stays clean on iOS 17.5.
     ///
-    /// The owner is a probe, because the app has no "change it inside the owner" method for the
-    /// profile yet. Adding one is Phase 1 of the fix.
+    /// The owner is the historical probe for the shape Phase 1 added to the app as
+    /// `HealthProfileRepository.update`.
     @MainActor
     func testBug2Discriminator_OwnerActorWrites() async throws {
         try requireMarker(
@@ -269,8 +275,8 @@ final class LiveModelRaceReproTests: XCTestCase {
     // Both bug-3 reports died in `persistentBackingData.setter`: the swapping thread in Swift's
     // "deallocated with non-zero retain count" fatal error, the reader at `0x10`. The mechanism
     // probe below measured when SwiftData replaces a model's backing data on iOS 18.6: on every
-    // save of a changed model, on the first fetch after a new model is saved, and when another
-    // context saves the row. A plain re-fetch replaces nothing.
+    // save of a changed model, and on the first fetch after that owner saved a new model. Another
+    // context saving the row keeps the held instance's backing data, as does a plain re-fetch.
     //
     // So the reader must already be *holding* the record when the replacement happens, as the
     // workout screen holds `workout` and `setsByExercise`. Three earlier harnesses, whose readers
@@ -386,6 +392,57 @@ final class LiveModelRaceReproTests: XCTestCase {
         stop.set()
         log("engine made \(await reads.value) estimateBaseE1RM calls")
         log("Bug 3 regression (LoadPrescriptionService snapshots) survived \(Self.rounds) saves")
+    }
+
+    /// **Regression, real path.** The settings screen continuously reads its view-model profile
+    /// while real toggle actions save that same profile through `SettingsService`. Before the
+    /// snapshot migration this deliberately holds the live model that the repository updates;
+    /// afterwards it exercises the same UI path with an immutable value.
+    @MainActor
+    func testBug3Regression_SettingsViewModelUsesSnapshotWhileTogglesSave() async throws {
+        try requireMarker(
+            "RUN_BUG3_SETTINGS",
+            "Bug 3 regression: SettingsViewModel must stay clean while its toggles save."
+        )
+        let repos = try Self.buildSettingsRepositories()
+        XCTAssertTrue(repos.builtOnMainThread, "must be built where the app builds its repositories")
+        let viewModel = SettingsViewModel(settingsService: makeSettingsService(repos))
+        await viewModel.loadProfile()
+        XCTAssertNotNil(viewModel.profile)
+        XCTAssertFalse(viewModel.showError, viewModel.errorMessage)
+
+        let stop = LiveModelReproStopFlag()
+        let reads = Task { @MainActor () -> Int in
+            var passes = 0
+            var checksum = 0
+            while !stop.isSet {
+                if let profile = viewModel.profile {
+                    checksum ^= profile.unitPreferenceRawValue.hashValue
+                    checksum ^= profile.e1RMFormula.hashValue
+                    checksum ^= profile.defaultRestTimeSeconds ?? 0
+                    checksum ^= profile.prescriptionEnabled == true ? 1 : 0
+                    checksum ^= profile.prescriptionDefaultTargetReps ?? 0
+                    checksum ^= profile.includeWarmupsInVolume ? 1 : 0
+                    checksum ^= profile.includeWarmupsInPRs ? 1 : 0
+                }
+                passes += 1
+                if passes.isMultiple(of: 50) { await Task.yield() }
+            }
+            return checksum == Int.min ? -passes : passes
+        }
+
+        for round in 0..<Self.rounds {
+            await viewModel.updateUnitPreference(round.isMultiple(of: 2) ? .metric : .imperial)
+            await viewModel.updateDefaultRestTime(120 + round % 2)
+            await viewModel.updatePrescriptionEnabled(round.isMultiple(of: 2))
+        }
+        stop.set()
+        let readPasses = await reads.value
+
+        XCTAssertFalse(viewModel.showError, viewModel.errorMessage)
+        XCTAssertGreaterThan(readPasses, 0)
+        log("SettingsViewModel reader made \(readPasses) passes")
+        log("Bug 3 regression (SettingsViewModel profile reads during saves) survived \(Self.rounds) rounds")
     }
 
     /// **Control, crash A's shape.** The screen holds the workout `WorkoutService.startWorkout`
@@ -544,8 +601,8 @@ private final class LiveModelReproStopFlag: @unchecked Sendable {
     func set() { lock.withLock { stopped = true } }
 }
 
-/// Owns its context and changes the profile inside it: the shape Phase 1 would give
-/// `HealthProfileRepository`. Test-only.
+/// Owns its context and changes the profile inside it: the historical probe for the shape Phase 1
+/// added to `HealthProfileRepository.update`. Test-only.
 @ModelActor
 private actor LiveModelReproProfileOwner {
     private func profile() throws -> HealthProfile {

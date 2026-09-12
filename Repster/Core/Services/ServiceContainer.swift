@@ -202,7 +202,7 @@ final class ServiceContainer {
 
     @MainActor
     func refreshUnitPreference() async {
-        guard let profile = try? await settingsService.fetchSettings() else { return }
+        guard let profile = try? await settingsService.fetchSettingsSnapshot() else { return }
         unitPreference = profile.unitPreference
     }
 

@@ -65,7 +65,7 @@ final class EditWorkoutViewModel {
     func loadWorkout() async {
         isLoading = true
         do {
-            if let profile = try? await settingsService.fetchSettings() {
+            if let profile = try? await settingsService.fetchSettingsSnapshot() {
                 unitPreference = profile.unitPreference
                 defaultWeightIncrement = UnitConversion.resolvedStoredWeightIncrement(
                     exerciseIncrement: nil,

@@ -136,9 +136,9 @@ final class OnboardingViewModel {
     func finish() async {
         isSaving = true
         do {
-            try await settingsService.updateUnitPreference(selectedUnit)
-            try await settingsService.updatePrescriptionDefaultTargetReps(defaultTargetReps)
-            try await settingsService.updatePrescriptionDefaultTargetRIR(defaultTargetRIR)
+            _ = try await settingsService.updateUnitPreference(selectedUnit)
+            _ = try await settingsService.updatePrescriptionDefaultTargetReps(defaultTargetReps)
+            _ = try await settingsService.updatePrescriptionDefaultTargetRIR(defaultTargetRIR)
 
             if let weight = Double(bodyweightInput), weight > 0 {
                 let weightKg = selectedUnit == .imperial

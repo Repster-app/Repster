@@ -40,97 +40,99 @@ actor SettingsService: SettingsServiceProtocol {
 
     // MARK: - Read
 
-    func fetchSettings() async throws -> HealthProfile {
-        try await healthProfileRepository.fetchOrCreate()
+    func fetchSettingsSnapshot() async throws -> HealthProfileSnapshot {
+        try await healthProfileRepository.fetchSnapshotOrCreate()
     }
 
     // MARK: - Write
 
-    func updateUnitPreference(_ preference: UnitPreference) async throws {
-        _ = try await healthProfileRepository.update { $0.unitPreference = preference }
+    func updateUnitPreference(_ preference: UnitPreference) async throws -> HealthProfileSnapshot {
+        try await healthProfileRepository.update { $0.unitPreference = preference }
     }
 
-    func updateE1RMFormula(_ formula: E1RMFormula) async throws {
-        _ = try await healthProfileRepository.update { $0.e1RMFormula = formula.rawValue }
+    func updateE1RMFormula(_ formula: E1RMFormula) async throws -> HealthProfileSnapshot {
+        try await healthProfileRepository.update { $0.e1RMFormula = formula.rawValue }
     }
 
-    func updateIncludeWarmupsInVolume(_ include: Bool) async throws {
-        _ = try await healthProfileRepository.update { $0.includeWarmupsInVolume = include }
+    func updateIncludeWarmupsInVolume(_ include: Bool) async throws -> HealthProfileSnapshot {
+        let snapshot = try await healthProfileRepository.update { $0.includeWarmupsInVolume = include }
         try await statsService.rebuildAll()
+        return snapshot
     }
 
-    func updateIncludeWarmupsInPRs(_ include: Bool) async throws {
-        _ = try await healthProfileRepository.update { $0.includeWarmupsInPRs = include }
+    func updateIncludeWarmupsInPRs(_ include: Bool) async throws -> HealthProfileSnapshot {
+        let snapshot = try await healthProfileRepository.update { $0.includeWarmupsInPRs = include }
         try await prService.rebuildAll()
+        return snapshot
     }
 
-    func updateDefaultRestTime(_ seconds: Int?) async throws {
-        _ = try await healthProfileRepository.update { $0.defaultRestTimeSeconds = seconds }
+    func updateDefaultRestTime(_ seconds: Int?) async throws -> HealthProfileSnapshot {
+        try await healthProfileRepository.update { $0.defaultRestTimeSeconds = seconds }
     }
 
-    func updateDefaultWarmupRestTime(_ seconds: Int?) async throws {
-        _ = try await healthProfileRepository.update { $0.defaultWarmupRestTimeSeconds = seconds }
+    func updateDefaultWarmupRestTime(_ seconds: Int?) async throws -> HealthProfileSnapshot {
+        try await healthProfileRepository.update { $0.defaultWarmupRestTimeSeconds = seconds }
     }
 
-    func updateRestTimerAlert(_ value: String) async throws {
-        _ = try await healthProfileRepository.update { $0.restTimerAlert = value }
+    func updateRestTimerAlert(_ value: String) async throws -> HealthProfileSnapshot {
+        try await healthProfileRepository.update { $0.restTimerAlert = value }
     }
 
     // MARK: - Smart Suggestions Settings
 
-    func updatePrescriptionEnabled(_ enabled: Bool) async throws {
-        _ = try await healthProfileRepository.update { $0.prescriptionEnabled = enabled }
+    func updatePrescriptionEnabled(_ enabled: Bool) async throws -> HealthProfileSnapshot {
+        try await healthProfileRepository.update { $0.prescriptionEnabled = enabled }
     }
 
-    func updatePrescriptionRecencyWeeks(_ weeks: Int) async throws {
-        _ = try await healthProfileRepository.update {
+    func updatePrescriptionRecencyWeeks(_ weeks: Int) async throws -> HealthProfileSnapshot {
+        try await healthProfileRepository.update {
             $0.prescriptionRecencyWeeks = max(2, min(12, weeks))
         }
     }
 
-    func updatePrescriptionDefaultIncrement(_ increment: Double) async throws {
-        _ = try await healthProfileRepository.update { $0.prescriptionDefaultIncrement = increment }
+    func updatePrescriptionDefaultIncrement(_ increment: Double) async throws -> HealthProfileSnapshot {
+        try await healthProfileRepository.update { $0.prescriptionDefaultIncrement = increment }
     }
 
-    func updatePrescriptionDefaultTargetReps(_ reps: Int) async throws {
-        _ = try await healthProfileRepository.update {
+    func updatePrescriptionDefaultTargetReps(_ reps: Int) async throws -> HealthProfileSnapshot {
+        try await healthProfileRepository.update {
             $0.prescriptionDefaultTargetReps = max(1, min(30, reps))
         }
     }
 
-    func updatePrescriptionDefaultTargetRIR(_ rir: Int) async throws {
-        _ = try await healthProfileRepository.update {
+    func updatePrescriptionDefaultTargetRIR(_ rir: Int) async throws -> HealthProfileSnapshot {
+        try await healthProfileRepository.update {
             $0.prescriptionDefaultTargetRIR = max(0, min(5, rir))
         }
     }
 
-    func updatePrescriptionFreshnessBonus(enabled: Bool, percent: Double) async throws {
-        _ = try await healthProfileRepository.update {
+    func updatePrescriptionFreshnessBonus(enabled: Bool, percent: Double) async throws -> HealthProfileSnapshot {
+        try await healthProfileRepository.update {
             $0.prescriptionFreshnessBonus = enabled
             $0.prescriptionFreshnessBonusPercent = max(0.0, min(0.10, percent))
         }
     }
 
-    func updatePrescriptionFatigueModelingEnabled(_ enabled: Bool) async throws {
-        _ = try await healthProfileRepository.update {
+    func updatePrescriptionFatigueModelingEnabled(_ enabled: Bool) async throws -> HealthProfileSnapshot {
+        try await healthProfileRepository.update {
             $0.prescriptionFatigueModelingEnabled = enabled
         }
     }
 
-    func updatePrescriptionCapacityGuardsEnabled(_ enabled: Bool) async throws {
-        _ = try await healthProfileRepository.update {
+    func updatePrescriptionCapacityGuardsEnabled(_ enabled: Bool) async throws -> HealthProfileSnapshot {
+        try await healthProfileRepository.update {
             $0.prescriptionCapacityGuardsEnabled = enabled
         }
     }
 
-    func updatePrescriptionDefaultRecoveryConstant(_ seconds: Double) async throws {
-        _ = try await healthProfileRepository.update {
+    func updatePrescriptionDefaultRecoveryConstant(_ seconds: Double) async throws -> HealthProfileSnapshot {
+        try await healthProfileRepository.update {
             $0.prescriptionDefaultRecoveryConstant = max(60, min(600, seconds))
         }
     }
 
-    func updatePrescriptionAdminModeEnabled(_ enabled: Bool) async throws {
-        _ = try await healthProfileRepository.update {
+    func updatePrescriptionAdminModeEnabled(_ enabled: Bool) async throws -> HealthProfileSnapshot {
+        try await healthProfileRepository.update {
             $0.prescriptionAdminModeEnabled = enabled
         }
     }
@@ -166,7 +168,7 @@ actor SettingsService: SettingsServiceProtocol {
             throw SettingsResetError.seedLibraryUnavailable
         }
 
-        _ = try await healthProfileRepository.fetchOrCreate()
+        _ = try await healthProfileRepository.fetchSnapshotOrCreate()
     }
 
     // MARK: - Rebuild Operations

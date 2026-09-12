@@ -2145,6 +2145,7 @@ private struct SeededTrackedSet {
 private actor StartupPRRebuildSettingsServiceStub: SettingsServiceProtocol {
     private var rebuildPRsCallCount = 0
     private var rebuildPRsError: Error?
+    private let settingsSnapshot = HealthProfileSnapshot(from: HealthProfile())
 
     func setRebuildPRsError(_ error: Error?) {
         rebuildPRsError = error
@@ -2154,24 +2155,24 @@ private actor StartupPRRebuildSettingsServiceStub: SettingsServiceProtocol {
         rebuildPRsCallCount
     }
 
-    func fetchSettings() async throws -> HealthProfile { HealthProfile() }
-    func updateUnitPreference(_ preference: UnitPreference) async throws {}
-    func updateE1RMFormula(_ formula: E1RMFormula) async throws {}
-    func updateIncludeWarmupsInVolume(_ include: Bool) async throws {}
-    func updateIncludeWarmupsInPRs(_ include: Bool) async throws {}
-    func updateDefaultRestTime(_ seconds: Int?) async throws {}
-    func updateDefaultWarmupRestTime(_ seconds: Int?) async throws {}
-    func updateRestTimerAlert(_ value: String) async throws {}
-    func updatePrescriptionEnabled(_ enabled: Bool) async throws {}
-    func updatePrescriptionRecencyWeeks(_ weeks: Int) async throws {}
-    func updatePrescriptionDefaultIncrement(_ increment: Double) async throws {}
-    func updatePrescriptionDefaultTargetReps(_ reps: Int) async throws {}
-    func updatePrescriptionDefaultTargetRIR(_ rir: Int) async throws {}
-    func updatePrescriptionFreshnessBonus(enabled: Bool, percent: Double) async throws {}
-    func updatePrescriptionFatigueModelingEnabled(_ enabled: Bool) async throws {}
-    func updatePrescriptionCapacityGuardsEnabled(_ enabled: Bool) async throws {}
-    func updatePrescriptionDefaultRecoveryConstant(_ seconds: Double) async throws {}
-    func updatePrescriptionAdminModeEnabled(_ enabled: Bool) async throws {}
+    func fetchSettingsSnapshot() async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updateUnitPreference(_ preference: UnitPreference) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updateE1RMFormula(_ formula: E1RMFormula) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updateIncludeWarmupsInVolume(_ include: Bool) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updateIncludeWarmupsInPRs(_ include: Bool) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updateDefaultRestTime(_ seconds: Int?) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updateDefaultWarmupRestTime(_ seconds: Int?) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updateRestTimerAlert(_ value: String) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionEnabled(_ enabled: Bool) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionRecencyWeeks(_ weeks: Int) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionDefaultIncrement(_ increment: Double) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionDefaultTargetReps(_ reps: Int) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionDefaultTargetRIR(_ rir: Int) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionFreshnessBonus(enabled: Bool, percent: Double) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionFatigueModelingEnabled(_ enabled: Bool) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionCapacityGuardsEnabled(_ enabled: Bool) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionDefaultRecoveryConstant(_ seconds: Double) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionAdminModeEnabled(_ enabled: Bool) async throws -> HealthProfileSnapshot { settingsSnapshot }
     func resetAllAppData() async throws {}
 
     func rebuildPRs() async throws {

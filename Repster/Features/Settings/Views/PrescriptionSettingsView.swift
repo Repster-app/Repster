@@ -5,11 +5,11 @@
 import SwiftUI
 
 struct SmartSuggestionsAdvancedSettingsView: View {
-    let profile: HealthProfile
+    let profile: HealthProfileSnapshot
     private let settingsService: any SettingsServiceProtocol
     let fatigueLearningService: FatigueLearningService
 
-    init(profile: HealthProfile, settingsService: any SettingsServiceProtocol, fatigueLearningService: FatigueLearningService) {
+    init(profile: HealthProfileSnapshot, settingsService: any SettingsServiceProtocol, fatigueLearningService: FatigueLearningService) {
         self.profile = profile
         self.settingsService = settingsService
         self.fatigueLearningService = fatigueLearningService
@@ -53,7 +53,7 @@ struct SmartSuggestionsAdvancedSections: View {
 
     // MARK: - Init
 
-    init(profile: HealthProfile,
+    init(profile: HealthProfileSnapshot,
          settingsService: any SettingsServiceProtocol,
          fatigueLearningService: FatigueLearningService,
          isAdminModeEnabled: Bool = false,
@@ -112,7 +112,7 @@ struct SmartSuggestionsAdvancedSections: View {
                 }
             }
             .onChange(of: defaultTargetReps) { _, newValue in
-                Task { try? await settingsService.updatePrescriptionDefaultTargetReps(newValue) }
+                Task { _ = try? await settingsService.updatePrescriptionDefaultTargetReps(newValue) }
             }
 
             Picker("Default RIR", selection: $defaultTargetRIR) {
@@ -123,7 +123,7 @@ struct SmartSuggestionsAdvancedSections: View {
             .foregroundColor(.textPrimary)
             .pickerStyle(.menu)
             .onChange(of: defaultTargetRIR) { _, newValue in
-                Task { try? await settingsService.updatePrescriptionDefaultTargetRIR(newValue) }
+                Task { _ = try? await settingsService.updatePrescriptionDefaultTargetRIR(newValue) }
             }
         }
     }
@@ -137,7 +137,7 @@ struct SmartSuggestionsAdvancedSections: View {
             }
             .foregroundColor(.textPrimary)
             .onChange(of: recencyWeeks) { _, newValue in
-                Task { try? await settingsService.updatePrescriptionRecencyWeeks(newValue) }
+                Task { _ = try? await settingsService.updatePrescriptionRecencyWeeks(newValue) }
             }
         } footer: {
             Text("How far back to look for performance data. Shorter windows adapt faster to strength changes.")
@@ -150,14 +150,14 @@ struct SmartSuggestionsAdvancedSections: View {
             Toggle("Fatigue", isOn: $fatigueEnabled)
                 .foregroundColor(.textPrimary)
                 .onChange(of: fatigueEnabled) { _, newValue in
-                    Task { try? await settingsService.updatePrescriptionFatigueModelingEnabled(newValue) }
+                    Task { _ = try? await settingsService.updatePrescriptionFatigueModelingEnabled(newValue) }
                 }
 
             if isAdminModeEnabled {
                 Toggle("Capacity Guards", isOn: $capacityGuardsEnabled)
                     .foregroundColor(.textPrimary)
                     .onChange(of: capacityGuardsEnabled) { _, newValue in
-                        Task { try? await settingsService.updatePrescriptionCapacityGuardsEnabled(newValue) }
+                        Task { _ = try? await settingsService.updatePrescriptionCapacityGuardsEnabled(newValue) }
                     }
             }
 

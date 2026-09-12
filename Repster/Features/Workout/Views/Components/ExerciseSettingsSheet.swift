@@ -177,7 +177,7 @@ struct ExerciseSettingsSheet: View {
     }
 
     private func loadDefaults() async {
-        guard let profile = try? await services.settingsService.fetchSettings() else { return }
+        guard let profile = try? await services.settingsService.fetchSettingsSnapshot() else { return }
         appDefaultRestTime = profile.defaultRestTimeSeconds
         appDefaultIncrement = profile.prescriptionDefaultIncrement
             ?? UnitConversion.defaultStoredWeightIncrement(for: profile.unitPreference)
