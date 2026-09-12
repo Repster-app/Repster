@@ -124,6 +124,7 @@ phantom skip to the end of every single workout. The count belongs on
 | `chart_views` | Sub-tab → Charts |
 | `suggestion_refreshes` | Weight-suggestion refresh tap |
 | `exercise_picker_opens` | `+` in the header, or the empty-state button |
+| `duplicate_exercise_adds` | Each picked exercise `addExercises` skips because it is already in the workout (added 2026-09-10, 1.6; see DUPLICATE_EXERCISE_ADD_SCOPING.md) |
 | `exercise_switches` | Exercise tab tap (D7) |
 | `exercise_settings_opens` | Gear icon beside the sub-tab bar |
 | `sets_uncompleted` | `uncompleteSet` |

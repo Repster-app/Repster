@@ -322,17 +322,33 @@ final class EditWorkoutViewModel {
     // MARK: - Exercise Actions
 
     /// Add exercises to the workout via the exercise picker.
+    ///
+    /// Skips an exercise already in the workout, and moves to it when nothing new was picked —
+    /// same rule, and the same reason, as `ActiveWorkoutViewModel.addExercises`.
     func addExercises(_ exerciseIds: [UUID]) async {
-        for exerciseId in exerciseIds {
+        var addedExerciseCount = 0
+        var firstAlreadyPresentId: UUID?
+        var seen = Set<UUID>()
+
+        for exerciseId in exerciseIds where seen.insert(exerciseId).inserted {
+            guard !exercises.contains(where: { $0.id == exerciseId }) else {
+                firstAlreadyPresentId = firstAlreadyPresentId ?? exerciseId
+                continue
+            }
+
             do {
                 guard let exercise = try await exerciseService.fetchExerciseSnapshot(exerciseId) else {
                     continue
                 }
+                // The fetch suspended — re-check rather than trust the guard above.
+                guard !exercises.contains(where: { $0.id == exerciseId }) else { continue }
+
                 exercises.append(exercise)
                 setsByExercise[exerciseId] = []
 
                 // Create initial empty working set
                 await addSet(for: exerciseId)
+                addedExerciseCount += 1
             } catch {
                 #if DEBUG
                 dbg("[EditWorkoutViewModel] addExercise failed: \(error)")
@@ -340,9 +356,11 @@ final class EditWorkoutViewModel {
             }
         }
 
-        // Switch to the last added exercise
-        if !exercises.isEmpty {
+        // Switch to the last added exercise, or to the one already here that was picked
+        if addedExerciseCount > 0 {
             selectedExerciseIndex = exercises.count - 1
+        } else if let firstAlreadyPresentId {
+            setSelectedExercise(id: firstAlreadyPresentId)
         }
     }
 

@@ -245,6 +245,10 @@ enum WorkoutInteraction: String, CaseIterable {
     // Navigation churn: how much hunting the screen costs.
 
     case exercisePickerOpens = "exercise_picker_opens"
+    /// Exercises picked in that sheet that were already in the workout, and so skipped. A
+    /// workout holds one block per exercise; this is the only demand signal for allowing two.
+    /// See DUPLICATE_EXERCISE_ADD_SCOPING.md D2.
+    case duplicateExerciseAdds = "duplicate_exercise_adds"
     /// User taps on the exercise tab strip only — never the nine programmatic
     /// writes to `selectedExerciseIndex`. See `SetTableDataSource
     /// .recordExerciseTabSelected()`.
@@ -1112,6 +1116,7 @@ enum AnalyticsPropertyKey: String, CaseIterable {
     case suggestionRefreshes = "suggestion_refreshes"
     case suggestionExplainerOpens = "suggestion_explainer_opens"
     case exercisePickerOpens = "exercise_picker_opens"
+    case duplicateExerciseAdds = "duplicate_exercise_adds"
     case exerciseSwitches = "exercise_switches"
     case exerciseSettingsOpens = "exercise_settings_opens"
     case setsUncompleted = "sets_uncompleted"

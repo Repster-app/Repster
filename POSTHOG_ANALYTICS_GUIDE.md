@@ -122,6 +122,7 @@ end — there is deliberately no per-tap event. Added 2026-08-17, so **not in 1.
 | `history_views` / `pr_views` / `chart_views` | Opening that per-exercise sub-tab mid-workout |
 | `suggestion_refreshes` | Refreshing the weight suggestion |
 | `exercise_picker_opens` | Opening the add-exercise sheet |
+| `duplicate_exercise_adds` | Exercises picked in that sheet that were already in the workout, so skipped. The demand signal for allowing one exercise twice. **1.6+ only.** |
 | `exercise_switches` | Tapping a different exercise tab (taps only, never programmatic jumps) |
 | `exercise_settings_opens` | The gear beside the sub-tab bar |
 | `sets_added` / `sets_deleted` / `sets_uncompleted` | Set edits during the session |

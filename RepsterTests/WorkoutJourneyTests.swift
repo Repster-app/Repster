@@ -1336,6 +1336,128 @@ extension WorkoutJourneyTests {
         XCTAssertEqual(reopened.currentSets.first?.weight, 120)
     }
 
+    // MARK: - Journey: adding an exercise that is already in the workout
+    //
+    // Reported 2026-09-10: picking an exercise the workout already held appended a second tab
+    // and reset that exercise's sets to one blank row. The logged rows stayed in the store, so
+    // history still showed them, but the screen had forgotten them. See
+    // DUPLICATE_EXERCISE_ADD_SCOPING.md. On the unfixed code the Active journeys trip
+    // `assertOrderingInvariant` (two tabs share a MIN) and crash the runner rather than fail.
+
+    /// The reported case: a finished workout, re-opened for editing, and its own exercise re-added.
+    func testAddingAnExerciseAlreadyInAFinishedWorkoutKeepsItsLoggedSets() async throws {
+        let stack = try Stack()
+        let bench = Fixture.barbell()
+        let active = try await startWorkout(stack, with: [bench])
+        let workoutId = try XCTUnwrap(active.workout?.id)
+
+        try await completeNextSet(active, weight: 100, reps: 5)
+        await active.addSet(for: bench.id)
+        try await completeNextSet(active, weight: 100, reps: 4)
+        await active.finishWorkout(title: nil, notes: nil, perceivedEffort: nil)
+
+        let edit = stack.makeEditViewModel(workoutId: workoutId)
+        await edit.loadWorkout()
+        let loggedIds = edit.currentSets.map(\.id)
+        XCTAssertEqual(loggedIds.count, 2)
+
+        await edit.addExercises([bench.id])
+
+        XCTAssertEqual(edit.exercises.map(\.id), [bench.id], "no second tab for the same exercise")
+        XCTAssertEqual(edit.currentSets.map(\.id), loggedIds, "the logged sets stay on screen")
+        XCTAssertEqual(edit.selectedExerciseId, bench.id)
+        XCTAssertEqual(try stack.committedSets(for: workoutId).count, 2, "no blank set is written")
+    }
+
+    /// A mixed pick on the edit screen: the new exercise is added once, the existing one is left alone.
+    func testEditScreenAddsOnlyTheExercisesNotAlreadyInTheWorkout() async throws {
+        let stack = try Stack()
+        let bench = Fixture.barbell()
+        let pullUp = Fixture.bodyweightStyle()
+        let active = try await startWorkout(stack, with: [bench])
+        let workoutId = try XCTUnwrap(active.workout?.id)
+        try await stack.exerciseRepo.save(pullUp)
+
+        try await completeNextSet(active, weight: 100, reps: 5)
+        await active.finishWorkout(title: nil, notes: nil, perceivedEffort: nil)
+
+        let edit = stack.makeEditViewModel(workoutId: workoutId)
+        await edit.loadWorkout()
+        let benchSetIds = edit.currentSets.map(\.id)
+
+        // Pull Up twice as well: the view model must not rely on the picker to dedupe.
+        await edit.addExercises([bench.id, pullUp.id, pullUp.id])
+
+        XCTAssertEqual(edit.exercises.map(\.id), [bench.id, pullUp.id])
+        XCTAssertEqual(edit.setsByExercise[bench.id]?.map(\.id), benchSetIds, "bench keeps its logged set")
+        XCTAssertEqual(edit.setsByExercise[pullUp.id]?.count, 1, "one seeded set for the new exercise")
+        XCTAssertEqual(edit.selectedExerciseId, pullUp.id, "the edit screen lands on the last exercise added")
+        XCTAssertEqual(try stack.committedSets(for: workoutId).count, 2)
+    }
+
+    /// The same thing mid-workout, then a relaunch: the store must not have gained a stray row.
+    func testAddingAnExerciseAlreadyInTheLiveWorkoutKeepsItsSetsAcrossARelaunch() async throws {
+        let stack = try Stack()
+        let bench = Fixture.barbell()
+        let active = try await startWorkout(stack, with: [bench])
+        try await completeNextSet(active, weight: 100, reps: 5)
+        let loggedIds = active.currentSets.map(\.id)
+
+        await active.addExercises([bench.id])
+
+        XCTAssertEqual(active.exercises.map(\.id), [bench.id], "no second tab for the same exercise")
+        XCTAssertEqual(active.currentSets.map(\.id), loggedIds, "the logged set stays on screen")
+        XCTAssertEqual(active.selectedExerciseId, bench.id)
+        try assertScreenMatchesStore(active, stack)
+
+        let reopened = stack.makeViewModel()
+        await reopened.loadActiveWorkout()
+        XCTAssertEqual(reopened.exercises.map(\.id), [bench.id])
+        XCTAssertEqual(reopened.setsByExercise[bench.id]?.map(\.id), loggedIds, "no blank row after a relaunch")
+    }
+
+    /// Selection: a mixed pick keeps the old rule (first new exercise); a pick of only an
+    /// existing exercise moves to it.
+    func testLiveWorkoutJumpsToAnExistingExerciseWhenNothingNewIsPicked() async throws {
+        let stack = try Stack()
+        let bench = Fixture.barbell()
+        let pullUp = Fixture.bodyweightStyle()
+        let lunge = Fixture.unilateral()
+        let active = try await startWorkout(stack, with: [bench, pullUp])
+        try await stack.exerciseRepo.save(lunge)
+        let benchSetIds = try XCTUnwrap(active.setsByExercise[bench.id]).map(\.id)
+
+        active.selectedExerciseIndex = 1
+        XCTAssertEqual(active.selectedExerciseId, pullUp.id)
+
+        await active.addExercises([bench.id, lunge.id])
+
+        XCTAssertEqual(active.exercises.map(\.id), [bench.id, pullUp.id, lunge.id])
+        XCTAssertEqual(active.selectedExerciseId, lunge.id, "a new exercise is still what gets selected")
+        XCTAssertEqual(active.setsByExercise[bench.id]?.map(\.id), benchSetIds, "bench keeps its rows")
+
+        await active.addExercises([bench.id])
+
+        XCTAssertEqual(active.exercises.count, 3)
+        XCTAssertEqual(active.selectedExerciseId, bench.id, "picking only an existing exercise moves to it")
+        try assertScreenMatchesStore(active, stack)
+    }
+
+    /// The same id twice in one pick adds it once.
+    func testLiveWorkoutAddsARepeatedPickOnce() async throws {
+        let stack = try Stack()
+        let bench = Fixture.barbell()
+        let pullUp = Fixture.bodyweightStyle()
+        let active = try await startWorkout(stack, with: [bench])
+        try await stack.exerciseRepo.save(pullUp)
+
+        await active.addExercises([pullUp.id, pullUp.id])
+
+        XCTAssertEqual(active.exercises.map(\.id), [bench.id, pullUp.id])
+        XCTAssertEqual(active.setsByExercise[pullUp.id]?.count, 1)
+        try assertScreenMatchesStore(active, stack)
+    }
+
     // MARK: - Baseline selection across a switch to bodyweight
 
     /// A 0 kg set can never satisfy the capacity filter — every e1RM formula is

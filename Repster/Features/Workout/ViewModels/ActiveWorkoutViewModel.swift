@@ -978,15 +978,32 @@ final class ActiveWorkoutViewModel {
     ///
     /// For each exercise, fetches the Exercise object, creates an initial empty set,
     /// and switches to the first newly added exercise tab.
+    ///
+    /// An exercise already in the workout is skipped, not added again. Sets are grouped by
+    /// `exerciseId`, so a second entry shares the first one's rows: resetting them below dropped
+    /// the logged sets off the screen while they stayed in the store, and gave the strip's
+    /// `ForEach` two tabs with one id. When the pick was only exercises already here, the
+    /// selection moves to the first of them instead. See DUPLICATE_EXERCISE_ADD_SCOPING.md.
     func addExercises(_ exerciseIds: [UUID]) async {
         let firstAddedIndex = exercises.count
         var addedExerciseCount = 0
+        var firstAlreadyPresentId: UUID?
+        var seen = Set<UUID>()
 
-        for exerciseId in exerciseIds {
+        for exerciseId in exerciseIds where seen.insert(exerciseId).inserted {
+            guard !exercises.contains(where: { $0.id == exerciseId }) else {
+                firstAlreadyPresentId = firstAlreadyPresentId ?? exerciseId
+                analyticsService.recordWorkoutInteraction(.duplicateExerciseAdds)
+                continue
+            }
+
             do {
                 guard let exercise = try await exerciseService.fetchExerciseSnapshot(exerciseId) else {
                     continue
                 }
+
+                // The fetch suspended — re-check rather than trust the guard above.
+                guard !exercises.contains(where: { $0.id == exerciseId }) else { continue }
 
                 // Add to exercises list
                 exercises.append(exercise)
@@ -1006,6 +1023,9 @@ final class ActiveWorkoutViewModel {
         // Switch to the first newly added exercise so the user starts at the front of the new block.
         if addedExerciseCount > 0 {
             selectedExerciseIndex = firstAddedIndex
+        } else if let firstAlreadyPresentId {
+            // Nothing new was picked — take the user to the exercise they chose, where its sets are.
+            setSelectedExercise(id: firstAlreadyPresentId)
         }
 
         assertOrderingInvariant("addExercises")
