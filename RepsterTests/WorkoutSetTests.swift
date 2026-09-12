@@ -1202,8 +1202,8 @@ final class WorkoutSetTests: XCTestCase {
     func testExerciseSettingsMetricWeightIncrementOptionsRestoreSheetSpecificList() {
         let options = ExerciseSettingsSheet.weightIncrementOptions(for: .metric)
 
-        XCTAssertEqual(options.map(\.display), [1.0, 1.25, 2.0, 2.5, 5.0, 10.0, 20.0])
-        XCTAssertEqual(options.map(\.storedKg), [1.0, 1.25, 2.0, 2.5, 5.0, 10.0, 20.0])
+        XCTAssertEqual(options.map(\.display), [1.0, 1.25, 2.0, 2.5, 4.0, 5.0, 10.0, 20.0])
+        XCTAssertEqual(options.map(\.storedKg), [1.0, 1.25, 2.0, 2.5, 4.0, 5.0, 10.0, 20.0])
     }
 
     func testExerciseSettingsImperialWeightIncrementOptionsStayNativePounds() {
