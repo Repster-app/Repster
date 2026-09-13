@@ -1,7 +1,8 @@
 # Test suite failures — investigation record
 
-**Written:** 2026-09-11. Revised after verification and reproduction. §12 (2026-09-12) records
-the Phase 1 and Phase 4 implementation and supersedes the earlier “not built” status notes.
+**Written:** 2026-09-11. **Revised:** 2026-09-13 after verification, reproduction and the
+Xcode 26.3 guard audit. §12 records the Phase 1 and Phase 4 implementation; corrected historical
+claims in the body are marked and point to §11/§12.
 
 ## Plain summary (read this first)
 
@@ -14,7 +15,7 @@ the Phase 1 and Phase 4 implementation and supersedes the earlier “not built�
 |---|---|---|---|
 | **Bug 1** | Two test helpers built their test database without the template tables | Tests only, never the app | **Fixed 2026-09-11** (uncommitted). Suite green on iOS 17.5 and 26 (§3.6) |
 | **Bug 2** | A crash on iOS 17 when a service changes a saved record it doesn't own | iOS 17 only: **1 active user**, and it **has crashed a real phone** (1.3, iOS 17.5.1, onboarding) | **Real onboarding path fixed (Phase 1)**; other services remain for Phases 2–3 (§12) |
-| **Bug 3** | A crash when code is holding a record at the moment its repository saves it, or first re-loads it after creating it | iOS 18: 10 active users. The same pattern also crashes the harness on iOS 26 (§11.3) | **Both observed readers fixed (Phase 4)**; held workout sets remain for Phase 5 (§12) |
+| **Bug 3** | A crash when code is holding a record at the moment its repository saves it, or first fetches a record it just saved | iOS 18: 10 active users. The same pattern also crashes the harness on iOS 26 (§11.3) | **Both observed readers fixed (Phase 4)**; held workout sets remain for Phase 5 (§12) |
 
 - **"47 places" is not 47 bugs.** It is one unsafe write shape repeated across seven services.
   Phase 1 removes the 20 profile writes; the remaining 27 are staged as Phases 2–3.
@@ -36,15 +37,18 @@ classes pass. On **iPhone 16 Pro / iOS 18.6**, bug 2 is absent but a third, rare
 ([SHARE_FROM_HISTORY_SCOPING.md](SHARE_FROM_HISTORY_SCOPING.md)), the full suite came back red.
 Every failure turned out to predate that work (§2).
 
-| | Bug 1: template models missing | Bug 2: cross-actor write race | Bug 3: read during re-fetch |
+| | Bug 1: template models missing | Bug 2: cross-actor write race | Bug 3: held-model read during owner save / first post-create fetch |
 |---|---|---|---|
-| Runtime | iOS 17.5 (passes on 26; 18.6 was only tested after the fix) | iOS 17.5 only. Clean on 18.6 (§10.1) and 26 (§9) | Observed on iOS 18.6; the isolated pattern also crashes the harness on iOS 26 (§11.3) |
+| Runtime | iOS 17.5 (passes on 26; 18.6 was only tested after the fix) | iOS 17.5 only. Clean on 18.6 (§10.1) and 26 (§9) | Backing replacement observed on iOS 18.6; the broader held-read/owner-save pattern also crashes the harness on iOS 26.3.1 (§11.2–11.3) |
 | Tests affected | 5, the same five every run | ~7, **different ones every run** | 2 crashes seen, in `WorkoutJourneyTests` |
 | How it fails | Uncaught ObjC exception → XCTest aborts the process (`SIGABRT`) | `EXC_BAD_ACCESS` at `0x8000000000000010`, main thread, inside a SwiftData run-loop observer | `EXC_BAD_ACCESS` at `0x10` while reading a `@Model` property |
-| Cause | Two test helpers never registered the template models after the 2026-09-01 templates redesign made backup touch templates | A plain-actor service (`PRService`, `StatsService`, …) writes to a `@Model` owned by a repository whose context was created on the main thread (§4.2) | A live `@Model` is read while its repository re-fetches the same row and frees its old backing data (§10.2) |
+| Cause | Two test helpers never registered the template models after the 2026-09-01 templates redesign made backup touch templates | A plain-actor service (`PRService`, `StatsService`, …) writes to a `@Model` owned by a repository whose context was created on the main thread (§4.2) | Other code holds and reads a live `@Model` while its owner saves it, or first fetches a model it just saved; iOS 18 may replace and free the held backing data (§11.2) |
 | Since | Commit `3cf55ed`, 2026-09-01 | Unknown | Unknown |
-| Affects the app? | No | Plausibly, on iOS 17 (1 user) (§4.5) | Plausibly, on iOS 18 (10 users); unverified |
-| Status | **Fixed** (§3.6) | Onboarding/profile path fixed; other write owners remain (§12) | Observed suggestion/workout readers fixed; live sets remain (§12) |
+| Affects the app? | No | **Yes:** one real-device crash in 1.3 on iOS 17.5.1, during onboarding (§11.1) | The risky pattern is present; no real-device bug-3 crash has been seen (§11.2–11.3) |
+| Status | **Fixed** (§3.6) | Real onboarding/profile path fixed in Phase 1; other write owners remain for Phases 2–3 (§12) | Both observed suggestion/workout readers fixed in Phase 4; held workout sets remain for Phase 5 (§12) |
+
+The Bug 2 and Bug 3 cells above were corrected 2026-09-12 after the dedicated harness and device
+crash review; §11/§12 preserve the evidence that superseded the original claims.
 
 **The side effect of all three:** each crash kills the test process. XCTest restarts it at the next
 test, and a runner that crashed still prints green per-class tallies. **Read totals from the
@@ -335,9 +339,11 @@ The reports are incomplete for bug 2: run A had 8 bug-2 crashes but only 1 repor
 
 ### 4.5 Does it affect the app?
 
-Probably yes, **on iOS 17 devices**, which today is one active user. It has not been observed.
-The synthetic race ran 20,000 cross-actor writes without a crash on both iOS 18.6 (§10.1) and
-iOS 26.3.1 (§9), so newer iOS looks safe.
+Yes, **on iOS 17 devices**, which today is one active user. It was observed once: version 1.3
+crashed on that user's iOS 17.5.1 device during the final onboarding write (§11.1). *(Corrected
+2026-09-12, see §11/§12.)* The synthetic bug-2 race ran 20,000 cross-actor writes without a crash
+on both iOS 18.6 (§10.1) and iOS 26.3.1 (§9), so that specific write mechanism looks confined to
+iOS 17.
 - `RepsterApp.init()` builds every repository on the main thread
   ([RepsterApp.swift:38](Repster/App/RepsterApp.swift:38) → `RepositoryContainer`). That is the
   same construction as the crashing test classes.
@@ -363,16 +369,16 @@ iOS 26.3.1 (§9), so newer iOS looks safe.
 
 ### 4.6 Scope of a fix, and the decision
 
-**Decision (2026-09-11): not fixing now.** Bug 2 affects one active user (iOS 17.5.1). It does not
-reproduce on iOS 18.6 or 26. The full clean-up below touches the highest-traffic code in the
-app (PR badges and stats on every set save), so the risk outweighs the benefit today. Revisit if
-Xcode Organizer shows 1.5 crashes at `0x8000000000000010` on iOS 17.
+**Decision (2026-09-11, superseded 2026-09-12):** the original decision was not to fix bug 2
+without device evidence. Organizer then showed the onboarding crash, so Phase 1 moved all 20
+profile writes into `HealthProfileRepository` and is built and verified. Phases 2–3 retain the
+remaining 27 sites. *(Corrected 2026-09-12, see §11/§12.)*
 
 **The rule a fix would complete.** From the August work: pass ids and `Sendable` values across
 the actor boundary, and let the `@ModelActor` fetch and change its own models. Reads were
 converted in August. These writes were not.
 
-#### What is in scope: 46 write sites in 7 services (audited from the code)
+#### What is in scope: 47 write sites in 7 services (audited from the code)
 
 Each site does this: a plain `actor` service fetches a saved model from a repository, changes
 it, and passes it back to `repo.save(model)`.
@@ -381,33 +387,35 @@ it, and passes it back to `repo.save(model)`.
 |---|---|---|---|
 | `PRService` | 13: 7 × `WorkoutSet.prStatus` (`:113, :348, :470, :539, :557, :627, :701`), 6 × `PerformanceRecord` (`:119, :250, :287, :309, :333, :686`) | WorkoutSet, PerformanceRecord | Every set save, edit or delete |
 | `StatsService` | 3 blocks, about 25 field writes: `handleSave` (`:259-311`), `handleEdit` (`:322-378`), `handleDelete` (`:388-419`) | ExerciseStats | Every set save, edit or delete |
-| `SettingsService` | 16: `fetchOrCreate()` → set one field → `save(profile)` (`:50-170`) | HealthProfile | Settings toggles |
+| `SettingsService` | 17: `fetchOrCreate()` → set one field → `save(profile)` (`:50-170`) | HealthProfile | Settings toggles; all moved owner-side in Phase 1 |
 | `FatigueLearningService` | 8: `processSessionEnd` (`:420`, `:752`), `resetLearning` (`:448`), `resetLearnedRatesPreservingHistory` (`:477`, `:486`), `resetAllLearning` (`:505`, `:517`), `applyManualNudge` (`:650`) | Exercise, HealthProfile | Workout finish, settings |
 | `WorkoutService` | 3: `finishWorkout` (`:75-91`), `updateWorkoutMetadata` (`:186-189`), `updateProgressionHistoryExclusions` (`:207-212`) | Workout | Finish workout |
 | `TemplateService` | 2: `updateTemplate` (`:212-217`), `lastUsedAt` in `startWorkoutFromTemplate` (`:317-319`) | WorkoutTemplate | Template edit and start |
 | `BodyweightService` | 1: `updateEntry` changes a model passed in by the caller (`:37`) | BodyweightEntry | Bodyweight edit |
 
-Every observed crash writer (§4.2) is in `PRService` or `StatsService`.
+The test crash reports in §4.2 have writers in `PRService` or `StatsService`, but the real-device
+writer was `SettingsService`. Therefore the original options B and C below would not have covered
+the observed device crash. *(Corrected 2026-09-12, see §11/§12.)*
 
 #### What is out of scope, and why
 
 | Pattern | Why it's excluded | Evidence |
 |---|---|---|
-| Services **reading** repository-owned models | Reads do not reproduce the race | §9.4b R1/R2: 20,000 reads, alone and during owner writes, no crash |
+| Services **reading** repository-owned models | They do not reproduce bug 2's iOS 17 observer race, but held reads can trigger bug 3 and belong to Phases 4–6 | §9.4b R1/R2 were clean because each read fetched after the swap; corrected by §11.2 |
 | `@MainActor` writes (ViewModels, `SetRowWrapper` keystrokes, `SetService`) | Repositories run on the main thread (P0), so these writes share the owner's thread and cannot race the main-thread observer | P0; no crash report ever showed a main-thread writer |
 | Inserting brand-new models (about 10 sites) | A new model has no context until it is inserted, so there is nothing to race | By construction |
 | Deletes via `repo.delete(model)`; services with their own context (`InsightsService` is a `@ModelActor`; `ImportService`, `WorkoutHistoryBackupService`, `SettingsService.resetAllAppData` create their own `ModelContext`) | The work runs on the context's owner | Code review |
 | Turning autosave off | Tested; still crashes | §9.4b R3 |
-| Building repositories off the main thread | Only helps on 17.5; on 18.6 and 26 repositories run on main anyway | P0 on all three runtimes |
+| Building repositories off the main thread | It only avoided the measured bug-2 race on 17.5 and is not an architectural fix | P0 probe calls plus the context-queue crash reports in §11.2–11.3 |
 
 #### Options
 
 | Option | Change | Covers | Risk |
 |---|---|---|---|
-| **A. Do nothing (chosen for now)** | None. iOS 17.5 stays a known-flaky test runtime | Nothing | The 1 iOS 17 user stays exposed |
-| **B. Move two services to the main thread** | `PRService` and `StatsService` become `@MainActor final class` instead of `actor`: about 2 lines | Every observed crash writer | **Untested.** Needs one probe (main-actor writer, iOS 17.5) and a check that the PR/stats rebuild at startup and after restore doesn't hitch the UI |
-| **C. Targeted rewrite** | The 16 sites in `PRService` and `StatsService` | Every observed crash writer | Moderate: the hottest path, and the identity dependency below |
-| **D. Full fix** | All 46 sites plus a compile-time guard | The whole pattern | Most work; the extra 30 sites are mechanical and low-traffic |
+| **A. Do nothing (original choice; superseded)** | None. iOS 17.5 stays a known-flaky test runtime | Nothing | The 1 iOS 17 user stays exposed |
+| **B. Move two services to the main thread** | `PRService` and `StatsService` become `@MainActor final class` instead of `actor`: about 2 lines | The test writers in §4.2, but not the observed Settings writer | **Untested.** Needs one probe (main-actor writer, iOS 17.5) and a check that the PR/stats rebuild at startup and after restore doesn't hitch the UI |
+| **C. Targeted rewrite** | The 16 sites in `PRService` and `StatsService` | The test writers in §4.2, but not the observed Settings writer | Moderate: the hottest path, and the identity dependency below |
+| **D. Full fix** | All 47 sites plus source and insert-only guards | The whole pattern | Most work; the lower-traffic sites are largely mechanical |
 
 #### How C or D would be built, if chosen
 
@@ -425,9 +433,12 @@ Every observed crash writer (§4.2) is in `PRService` or `StatsService`.
    `WorkoutSet` instance the ViewModel holds. Writing inside `SetRepository` keeps the same
    context and instance. `AffectedSetsPreconditionTests` guards this; keep it green on every
    runtime.
-5. **Guard against regression:** split `repo.save(_:)` into `insert(_:)` (new models) and
-   `update(_:)` (existing ones), so fetch-change-save stops compiling. Strict concurrency will
-   not catch it, because `@Model` types already conform to `Sendable`.
+5. **Guard against regression (corrected 2026-09-12, see §11/§12):** Xcode 26.3's `@Model`
+   macro itself adds `Sendable`, so the original statement that these types already conform is
+   correct on the current toolchain. Removing the project's redundant explicit
+   `@unchecked Sendable` conformances will not make actor crossings fail compilation. The
+   replacement is `SwiftDataLiveModelBoundaryRatchetTests`, plus the Phase 3 rename from
+   `save(_:)` to insert-only APIs with DEBUG `assert(model.modelContext == nil)` checks.
 
 **Verification:** `AffectedSetsPreconditionTests` × 20 on iOS 17.5 (crashes every run today);
 `SetServiceTests` with its database built on main (crashes today, §9.3); full suite on 17.5,
@@ -582,10 +593,11 @@ Each hammer test does 2,000 writes from a `@MainActor` test, as the crashing cla
   so don't read it as a green light.
 - On iOS 26 the race does not reproduce.
 
-**A side finding, not investigated further:** on iOS 26 even an off-main-built `@ModelActor` runs
-on the main thread. On 17.5 the app's repositories run on main because they are built there. On
-both runtimes, then, the app's repository work likely runs on the main thread. That is a possible
-UI-jank source worth measuring separately.
+**P0 qualification:** the probe reported that an off-main-built `@ModelActor` ran on main on
+iOS 26, and that the app's main-built repositories ran on main on iOS 17.5. Later bug-3 crash
+reports show repository work on `NSManagedObjectContext` queue threads while main was reading,
+on both iOS 18.6 and 26.3.1. P0 therefore describes those probe calls, not a guarantee about every
+repository operation. *(Corrected 2026-09-12, see §11.2–11.3.)*
 
 ### 9.2 Real code: `AffectedSetsPreconditionTests` (iOS 17.5)
 
@@ -656,7 +668,7 @@ worktree of the current tree.
 
 | Run | Result |
 |---|---|
-| P0: where code runs | Like iOS 26: repositories run on main wherever they were built. Plain actors run off main |
+| P0: where code runs | The probe calls ran on main wherever the repositories were built; later crash reports show repository operations can run on context queues while main reads (§11.2–11.3) |
 | P1: plain-actor writes into a main-built repo | 10 iterations, 20,000 writes, **no crash** (17.5: crashes on iteration 1) |
 | R0: the same write shape through `repo.save` | 10 iterations, **no crash** |
 | R1 / R2: cross-actor reads, alone and during owner writes | 10 iterations each, no crash |
@@ -664,7 +676,7 @@ worktree of the current tree.
 
 **Bug 2 is effectively iOS 17 only: one active user (on 17.5.1).**
 
-### 10.2 A different crash found on 18.6 ("bug 3"): reading a live model while its repository re-fetches it
+### 10.2 A different crash found on 18.6 ("bug 3"): reading a held live model while its owner saves it
 
 The 18.6 full suite: 870 tests (866 plus 4 probe tests), 863 passed, 5 skipped, 2 failed. One is
 the `/private/tmp` ReplayMask artifact (§9.4). The other is a segfault with a **different
@@ -675,12 +687,15 @@ signature** from bug 2:
 | Fault | `EXC_BAD_ACCESS` at **`0x10`** | same |
 | Victim test | `WorkoutJourneyTests.testHistorySubTabShowsPastSessionsNewestFirst` (full suite) | `WorkoutJourneyTests.testBothHistoryLoadersMarkTheSameExcludedSession` (journey class ×5) |
 | **Reader** | Main thread, reading the live `Workout.excludedExerciseIdsFromProgressionHistory` in `SuggestionCoordinator.workoutProgressionHistorySignature` (`WeightSuggestionData.swift:634`) ← `cacheKey` ← `prepare` ← `ActiveWorkoutViewModel.performWeightSuggestionRefresh` (`:2260`) | Cooperative thread: `LoadPrescriptionService.peakAcrossRecentWorkouts` (`:327-339`) reading `WorkoutSet.reps` via `prReps` ← `evaluateSuggestions` ← `performWeightSuggestionRefresh` (`:2273`) |
-| **Concurrent re-fetch** | `WorkoutRepository.fetch(byIds:)` on its context queue, running `Workout.persistentBackingData.setter`, which frees the old backing data (`swift_deallocClassInstance` fatal on that thread) | Main thread: `SetRepository.fetchChartSets(for:)` ← `SetService.supersetPartnerNames` ← `ActiveWorkoutViewModel.loadHistoryForCurrentExercise` (`:1972`), running `WorkoutSet.persistentBackingData.setter` |
+| **Concurrent owner action observed** | The first `WorkoutRepository.fetch(byIds:)` after creation, on its context queue, runs `Workout.persistentBackingData.setter` and frees the old backing data (`swift_deallocClassInstance` fatal on that thread) | Main thread: the first `SetRepository.fetchChartSets(for:)` after the sets were saved, via `SetService.supersetPartnerNames` ← `ActiveWorkoutViewModel.loadHistoryForCurrentExercise` (`:1972`), runs `WorkoutSet.persistentBackingData.setter` |
 
-**Mechanism, as far as the reports show:**
+**Mechanism, corrected by the probes in §11.2:**
 - One piece of code holds a *live* `@Model` instance and reads it.
-- Meanwhile the owning repository fetches the same row again. SwiftData 18 swaps that
-  instance's backing data and frees the old one under the reader.
+- The owning repository saves that record, or performs the first fetch after saving a newly
+  created record. SwiftData 18 can swap the held instance's backing data and free the old one
+  under the reader. A different context's save and later ordinary re-fetches keep it.
+- Both reports above happened on the first post-create fetch case. *(Corrected 2026-09-12, see
+  §11.2.)*
 - Both reports are in the **weight-suggestion refresh**, which runs during a workout. That is
   the "live models held across actors" class from August (`SWIFTDATA_CRASH_WORK_RECORD.md`),
   seen from a new angle.
@@ -690,9 +705,10 @@ signature** from bug 2:
   (360 test executions).
 - **iOS 26.3.1:** 0 crashes in 2 × 5 iterations of the same class, plus 3 clean full suites.
 
-**Not reproduced synthetically.** R2 (in-memory reads while the owner re-fetches and writes) is
-clean on 18.6. The August notes found this class needs an **on-disk** store, and the journey
-tests use one. A faithful probe needs an on-disk container.
+**Reproduced synthetically with in-memory stores.** The 2026-09-12 held-model controls reproduce
+both the backing replacement and the crashes on iOS 18.6; the older R2 probe was clean because
+its reader fetched the row itself after the swap instead of holding it beforehand. The journey
+tests and every dedicated control use in-memory containers. *(Corrected 2026-09-12, see §11.2.)*
 
 **Possible mis-attribution on 17.5:** runs A–C had bug-2 crashes with no `.ips` (rate-limited),
 and `testHistorySubTabShowsPastSessionsNewestFirst` was among them in run A. Some of those may
@@ -700,7 +716,9 @@ have been this bug, not bug 2.
 
 **Exposure:** iOS 18 is 10 active users (about 7%), and crash A's reader is on the main thread
 during a live workout. PostHog records no `$exception` events, so only Xcode Organizer can say
-whether it happens on devices. **Not investigated further, not fixed.**
+whether it happens on devices. No device bug-3 crash has been seen. Both observed readers were
+converted to snapshots in Phase 4; live sets held by the workout screens remain for Phase 5.
+*(Corrected 2026-09-12, see §11/§12.)*
 
 ---
 
@@ -1080,6 +1098,7 @@ later clean runs cannot pass merely because the race stopped reproducing.
 
 This does **not** close the entire architectural issue. Phase 5 still converts live sets held by
 the active/edit workout screens; Phases 2–3 move the remaining non-profile writes into their
-repository owners; Phase 6 removes the long tail and enables the compiler guard. The concise
+repository owners and finish the insert-only DEBUG guard; Phase 6 removes the long tail and
+closes the source-ratchet allowlist. The concise
 manual and automated gates are in
 [SWIFTDATA_LIVE_MODEL_TEST_CHECKLIST.md](SWIFTDATA_LIVE_MODEL_TEST_CHECKLIST.md).

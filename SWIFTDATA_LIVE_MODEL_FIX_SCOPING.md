@@ -1,7 +1,9 @@
 # Bugs 2 and 3: full fix scoping
 
 **Written:** 2026-09-11. **Implementation update:** 2026-09-12 — Phases 0, 1 and 4, plus the
-Settings slice of Tier C, are built; Phases 2, 3, 5 and the remainder of 6 remain.
+Settings slice of Tier C, are built and verified; Phases 2, 3, 5 and the remainder of 6 remain.
+**Cleanup verification:** 2026-09-13 — Settings error recovery, the source ratchet and the
+documentation corrections below are complete and verified.
 **Source investigation:** [TEST_SUITE_FAILURES_INVESTIGATION.md](TEST_SUITE_FAILURES_INVESTIGATION.md) (§4 bug 2, §10.2 bug 3).
 **Builds on:** [SWIFTDATA_CRASH_WORK_RECORD.md](SWIFTDATA_CRASH_WORK_RECORD.md) and
 [STAGE2_WRITE_PATH_DESIGN.md](STAGE2_WRITE_PATH_DESIGN.md), the August work this finishes.
@@ -23,7 +25,7 @@ Settings slice of Tier C, are built; Phases 2, 3, 5 and the remainder of 6 remai
 - **Phase 0 is done (2026-09-12).** `RepsterTests/LiveModelRaceReproTests.swift` crashes both
   bugs on demand, and the paired discriminators stay clean (investigation §11). It changed two
   things:
-  - Bug 3's trigger is a repository **saving** a record, or first re-loading one it just
+  - Bug 3's trigger is a repository **saving** a record, or first re-fetching one it just
     created, while other code holds it. That's the workout screen's normal state.
   - iOS 26 isn't immune to the pattern. The same harness crashes there with August's older
     signature, so bug 3's exposure may be 139 users, not 10 (§8).
@@ -87,10 +89,12 @@ What this corrects in the investigation doc:
    crash is in `SettingsService`. Options B and C in its §4.6 would not have prevented it.
 3. It counts `SettingsService` at 16 sites. It is **17** (saves at `:53` through `:170`), so bug 2
    is **47** sites, not 46.
-4. It says strict concurrency can't catch this because "`@Model` types already conform to
-   `Sendable`". They conform only because 12 models carry an explicit `@unchecked Sendable`.
-   August verified the macro does not add it (work record §4). Removing those annotations is the
-   compile-time guard (§4.5).
+4. Its claim that `@Model` types already conform to `Sendable` is correct on the **current**
+   toolchain. A clean Xcode 26.3 (17C529) build shows the macro itself emitting
+   `extension <Model>: Sendable` for all 13 model types in this audit; the explicit
+   `@unchecked Sendable` conformances are redundant. Removing them is optional cleanup and does
+   not restore compiler checking. The replacement guards are the source ratchet (§4.5) and the
+   Phase 3 insert-only repository assertion (§3).
 
 The other crashes in the Organizer cache on iOS 26 are the August getter race, which is already
 fixed. The two on iOS 18.6.2 are the 1.4 (17) `RepsterApp.init` fatalError. Neither is bug 2 or 3.
@@ -127,7 +131,9 @@ fixed. The two on iOS 18.6.2 are the 1.4 (17) `RepsterApp.init` fatalError. Neit
 
 **Test infrastructure:**
 - `ScreenDataGoldenMasterTests`
-- the snapshot/model parity guard
+- `RepsterTests/LiveModelRaceReproTests.swift`: marker-gated real-path regressions,
+  mechanism discriminators and deliberately crashing positive controls
+- `SwiftDataSnapshotBoundaryTests` in that file: snapshot/model parity guards
 - `AffectedSetsPreconditionTests`, which guards PR-badge identity
 - the opt-in race tests in `CrossContextRaceTests`
 
@@ -141,8 +147,8 @@ records are excluded (nothing to race): `PRService:86/515`, `StatsService:113/27
 
 | Service | Sites (save line) | Model | Replacement | Difficulty |
 |---|---|---|---|---|
-| `SettingsService` | **17**: `:53 60 67 75 83 90 97 106 113 120 127 134 142 149 156 163 170` | HealthProfile | New `HealthProfileRepository.update(_ body:)` (fetch-or-create, apply, stamp `updatedAt`, save, all inside the owner). Each setter becomes one line | Mechanical |
-| `FatigueLearningService` | **3** profile: `:420` (fields set `:723-732`), `:490`, `:521` | HealthProfile | Same `update(_ body:)` | Mechanical |
+| `SettingsService` | **17**: `:53 60 67 75 83 90 97 106 113 120 127 134 142 149 156 163 170` | HealthProfile | **Built:** `HealthProfileRepository.update(_ body:)` fetches/creates, applies, stamps and saves inside the owner | Done |
+| `FatigueLearningService` | **3** profile: `:420` (fields set `:723-732`), `:490`, `:521` | HealthProfile | **Built:** same `HealthProfileRepository.update(_ body:)` | Done |
 | `FatigueLearningService` | **5** exercise: `:453 482 510 653 752` | Exercise | New `ExerciseRepository.applyFatigueLearning(id:_:)`. These four fields (`fatigueRate`, `fatigueRateSourceRawValue`, `fatigueLearningSessionCount`, `fatigueLearningCumulativeError`) are **not** in `ExerciseEditableFields`, so `applyEdit` can't be reused | Mechanical; `:752` computes from the old values, so compute first, then apply |
 | `PRService` | **7** `prStatus`: `:114 349 471 540 558 628 702` | WorkoutSet | **Existing** `SetRepository.applyPRStatus(setId:status:)`. `:471` clears every set of an exercise in a loop, so add a batch `clearPRStatuses(exerciseId:)` | Hot path |
 | `PRService` | **6** record: `:123 253 290 312 337 690` | PerformanceRecord | New `PerformanceRecordRepository.applyUpdate(recordId:_:)` taking a value type with the fields `PRService` changes | Hot path; `evaluateAfterEdit` has four branches |
@@ -254,7 +260,7 @@ layer and no `updatedAt` plumbing. The one delicate function is `applyAffectedSe
   |---|---|
   | `PRService` | 24 |
   | `FatigueLearningService` | 23 |
-  | `SettingsService` | 19 |
+  | `SettingsService` | 19 in the original scan; now 0 live-profile reads through its public API |
   | `StatsService` | 15 |
   | `TemplateService` | 15 |
   | `WorkoutService` | 10 |
@@ -277,23 +283,29 @@ iOS 18 through the swap, on iOS 26 through August's older failure. Tier C paths 
 than the workout screen, so their risk is lower, not absent. (The earlier note that this class
 needs an on-disk store was wrong: every control is in-memory.)
 
-### 4.5 The compile-time guard for both bugs
+### 4.5 The source ratchet for both bugs
 
-Finish August's §12: remove `@unchecked Sendable` from the 12 models that still carry it:
-BodyweightEntry, Workout, WorkoutSet, FatigueObservation, TemplateExercise, WorkoutTemplate,
-Exercise, PerformanceRecord, ExerciseStats, Program, TemplateSet, HealthProfile.
+The old compile-time plan no longer works. A clean build with Xcode 26.3 (17C529) shows the
+`@Model` macro itself generating `extension <Model>: Sendable`. It reports 13 expected
+"redundant conformance" warnings where this project also declares `@unchecked Sendable`, but
+removing those declarations leaves the macro conformance in place. Swift therefore cannot flag
+these actor-boundary crossings on this toolchain.
 
-- **What it does:** under `SWIFT_VERSION = 5.0` each remaining crossing becomes a **warning**
-  (errors only in Swift 6 mode).
-- **Policy (August's):** remove a model's annotation only once its crossings reach zero, so
-  every removal is a guarantee and the build stays warning-clean.
-- **August's crossing counts (re-measure; they predate today's code):**
-  - FatigueObservation, TemplateSet, TemplateExercise: 3 each
-  - HealthProfile, Program, WorkoutTemplate: 4 each
-  - ExerciseStats, PerformanceRecord: 6 each
-  - BodyweightEntry: 9
-  - Exercise: 18
-- `Workout` and `WorkoutSet` hit zero with Tier B.
+`SwiftDataLiveModelBoundaryRatchetTests` is the replacement guard. It scans source for:
+
+- repository protocol methods returning any of the 13 audited `@Model` types; and
+- views or view models under `Repster/Features` that store any of those types.
+
+Every current crossing is in an explicit allowlist grouped by the phase expected to remove it:
+Phases 2–3 service writes, Phase 5 workout-screen sets and Phase 6 long-tail reads. The test fails
+both when a new crossing appears and when a listed crossing vanishes without its stale entry
+being removed, so the inventory can only shrink deliberately. A planted `HealthProfile`
+property was verified to fail with its file and declaration named, then removed.
+
+The write-side guard remains the end of Phase 3 (§3): rename repository `save(_:)` methods to
+insert-only APIs and add `#if DEBUG` assertions that `model.modelContext == nil`. Removing the
+now-redundant explicit `@unchecked Sendable` conformances is optional warning cleanup, not a
+safety guard.
 
 ---
 
@@ -309,7 +321,7 @@ Each phase ships on its own and leaves the app better than before.
 | **3. The rest of bug 2** | 12 sites (Fatigue exercise 5, Workout 3, Template 2, Bodyweight 1, plus the `:471` batch), then `save` → `insert` + assertion | **Bug 2 closed**, with a guard | ½–1 session |
 | **4. Bug 3, Tier A** | Suggestion engine on snapshots; `ActiveWorkoutViewModel.workout` → `WorkoutSnapshot`. **Done 2026-09-12** | **Both observed bug-3 readers** | Done |
 | **5. Bug 3, Tier B** | Both workout screens, `SetTableDataSource`, `SetService` signatures | **Bug 3 on the workout screens**; removes the badge identity dependency | 2–3 sessions + device pass |
-| **6. Tier C + guard** | Remaining unaudited screens and service reads, then `@unchecked Sendable` removal. Settings/profile slice **done 2026-09-12** | The rule everywhere; the compiler enforces it | 2+ sessions, can be spread out |
+| **6. Tier C + ratchet closure** | Remaining unaudited screens and service reads; shrink the source-ratchet allowlist to zero. Settings/profile slice **done 2026-09-12**. Redundant explicit `@unchecked Sendable` removal is optional cleanup | The rule everywhere; the ratchet prevents new crossings | 2+ sessions, can be spread out |
 
 Sizes are estimates. For scale: August's comparable Stage 1 + 2 touched 52 files
 (+2,897 / −492).
@@ -321,7 +333,7 @@ Sizes are estimates. For scale: August's comparable Stage 1 + 2 touched 52 files
   so it stays isolated behind its own real-path regression and device pass.
 - Then Phase 2 before Phase 3: PR/stats is the hotter bug-2 path, followed by the remaining writes
   and the insert-only guard.
-- Phase 6 comes last because it is the long-tail audit and compile-time enforcement step.
+- Phase 6 comes last because it is the long-tail audit and closes the source-ratchet allowlist.
 
 ---
 
@@ -332,11 +344,12 @@ needs a control that still detects the bug.
 
 | Phase | Harness | Pass condition |
 |---|---|---|
-| 0 | Bug 2: the real `OnboardingViewModel.finish()` with main-built repositories, iOS 17.5, plus two discriminators. **Built**, marker-gated like `CrossContextRaceTests` | Crashes on 17.5 today, 5/5; clean on 18.6 |
+| 0 | Bug 2: the real `OnboardingViewModel.finish()` with main-built repositories, iOS 17.5, plus two discriminators. **Built**, marker-gated like `CrossContextRaceTests` | Pre-fix crashed on 17.5, 5/5; clean after Phase 1 |
 | 0 | Bug 3: a live record held by other code while its repository saves it (in-memory, iOS 18.6). **Built** | Crashes on 18.6 today, 10/10 |
 | 1 | Real onboarding regression, 2,000 rounds | **Clean on iOS 17.5 (2026-09-12)** |
 | 2–3 | `AffectedSetsPreconditionTests` (crashes every run on 17.5 today); `SetServiceTests` with repositories built on main (crashes today, investigation §9.3) | Clean ×20 on 17.5; badge identity measurements unchanged |
-| 4 | Real suggestion-engine regression plus set/workout snapshot stress | **Clean on iOS 18.6 (2026-09-12)** |
+| 4 | Real suggestion-engine regression plus set/workout snapshot stress | **Clean on iOS 18.6 and 26.3.1 (2026-09-12)** |
+| Tier C / Settings | Real `SettingsViewModel` toggles save in a loop while a main-actor loop reads its profile fields | **Pre-fix crash on iOS 18.6; clean on 18.6 and 26.3.1 (2026-09-12)** |
 | 5 | Keep `testBug3Control_HeldSetsReadWhileOwnerSaves` as the synthetic positive control. Add a separate real-path regression that drives the converted active/edit workout view-model set flows while repository saves overlap their reads | The synthetic held-live-set control must still crash; the new snapshot-based real-path regression must be clean on 18.6 and 26.3 |
 | All | Full suite on **17.5, 18.6 and 26**, one `xcodebuild` at a time, totals from `.xcresult`; golden masters unchanged; mutation checks on the changed surface (August §16) | — |
 | 5 | Device pass: log sets, PR badges appear and demote, edit a finished workout, finish a workout, suggestions refresh on exercise switch | — |
@@ -378,13 +391,83 @@ bug present. The bug-3 controls crash every run on 18.6.
 
 ## 8. Implementation record and next decision
 
-**2026-09-12 verification:** test target builds; focused active-workout, suggestion and fatigue
-suites pass on iOS 18.6; the 2,000-round real onboarding regression passes on iOS 17.5; the real
-suggestion-engine and set/workout snapshot stress regressions pass on iOS 18.6.
+### 8.1 Settings snapshot follow-up — done 2026-09-12
+
+**Test first.** Added
+`testBug3Regression_SettingsViewModelUsesSnapshotWhileTogglesSave`, gated by
+`RUN_BUG3_SETTINGS`. It uses the real `SettingsViewModel` and `SettingsService`: one loop changes
+units, rest time and Smart Suggestions while a main-actor loop reads the held profile fields.
+Before changing app code, the test crashed on iOS 18.6 with
+`KnownKeysDictionary deallocated with non-zero retain count` and the `.xcresult` reported a signal
+trap. This proves the test exercised the same bug-3 mechanism as the Settings screen risk.
+
+**Implementation:**
+
+- Replaced `SettingsServiceProtocol.fetchSettings() -> HealthProfile` with
+  `fetchSettingsSnapshot() -> HealthProfileSnapshot`; the live service read no longer exists.
+- Every Settings setter now returns the `HealthProfileSnapshot` produced by
+  `HealthProfileRepository.update`, including setters that subsequently rebuild PRs or stats.
+- `SettingsViewModel.profile` and the advanced Smart Suggestions views now hold
+  `HealthProfileSnapshot`. After a change, the view model assigns the setter's returned snapshot
+  directly instead of saving and then re-fetching the profile.
+- Onboarding and advanced-settings callers that do not own profile state explicitly discard the
+  returned snapshot. Protocol test doubles and Settings summary fixtures were migrated too.
+- Corrected the race-harness comments: Phase 1 now has an owner-side update method, and bug 3's
+  backing replacement is caused by an owning-context save or the first fetch after it saved a new
+  model—not by another context saving the row.
+- If a warmup setting is saved but its follow-up stats/PR rebuild throws, `SettingsViewModel`
+  now presents the rebuild error and reloads the committed snapshot. Paired unit tests cover the
+  volume and PR toggles so the UI cannot silently show the old value.
+
+**Settings snapshot caller audit:**
+
+| Caller | Profile data used | Writes through the fetched value? |
+|---|---|---|
+| `ServiceContainer` | Unit preference cache | No |
+| `BodyweightLogViewModel` | Display unit | No |
+| `SettingsViewModel` | Rendered Settings state | No; changes use SettingsService setters |
+| `CreateEditExerciseViewModel` | Default rest and weight increment | No |
+| `EditWorkoutViewModel` | Unit and default weight increment | No |
+| `ExerciseSettingsSheet` | Default rest and weight increment | No |
+
+**Verification:**
+
+| Gate | Runtime | Result from `.xcresult` |
+|---|---|---|
+| Settings regression, before migration | iOS 18.6 | Crashed: 1 failed, signal trap; non-zero-retain-count log signature |
+| Settings regression, after migration | iOS 18.6 | Passed: 1/1; 2,000 toggle rounds, 6,363,100 profile-read passes |
+| Settings regression, after migration | iOS 26.3.1 | Passed: 1/1; 2,000 toggle rounds, 4,979,150 profile-read passes |
+| `RUN_BUG2_UNSAFE_WRITES` positive control | iOS 17.5 | Still crashed: 1 failed, SIGSEGV |
+| `RUN_BUG3_HELD_SETS` synthetic positive control | iOS 18.6 | Still crashed: 1 failed, SIGSEGV; non-zero-retain-count log signature |
+| Full suite | iOS 26.3.1 | Passed: 910 total, 896 passed, 14 gated skips, 0 failures |
+
+The test target builds with no new warnings from this work. Earlier verification in the same work
+record covers the onboarding regression on iOS 17.5 and the suggestion-engine regression on iOS
+18.6 and 26.3.1.
 
 **Next decision:** schedule Phase 5 separately. It is still recommended because the active and
 edit screens retain live `WorkoutSet` objects, but it is intentionally not bundled into this
-lower-risk change. After its device pass, complete Phases 2–3 and then the long-tail/compile guard.
+lower-risk change. After its device pass, complete Phases 2–3 and then close the long-tail
+ratchet allowlist.
+
+### 8.2 Guard and documentation cleanup — done 2026-09-12
+
+- Replaced the invalid compiler-guard plan with
+  `SwiftDataLiveModelBoundaryRatchetTests`, enrolled in the test target with an explicit phased
+  allowlist. Its baseline passes and a temporary unlisted `HealthProfile` property produced the
+  intended clear failure before being removed.
+- Recorded the Xcode 26.3 macro behavior, the built Fatigue profile writes and the existing race
+  and parity harnesses throughout this plan.
+- Removed the unused `SmartSuggestionsAdvancedSettingsView` wrapper after a project-wide caller
+  search; `SmartSuggestionsAdvancedSections`, which `SettingsView` uses, remains.
+- Kept the Phase 3 insert-only `save` rename and DEBUG detached-model assertion as the write-side
+  guard. Explicit `@unchecked Sendable` removal is now documented only as optional cleanup.
+
+**Verification (2026-09-13, from `.xcresult`):** the focused Settings/ratchet run passed 6/6;
+the planted-offender proof failed 1/1 with the added declaration named; the iOS 17.5 unsafe-write
+control crashed with `SIGSEGV`; and the iOS 18.6 held-set control crashed with `SIGABRT` plus the
+expected non-zero-retain-count log signature. The full iOS 26.3.1 suite passed: 913 total, 899
+passed, 14 marker-gated skips and 0 failures. Both race markers were consumed.
 
 ---
 

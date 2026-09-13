@@ -1919,6 +1919,34 @@ final class SettingsViewModelSummaryTests: XCTestCase {
         viewModel.profile = HealthProfileSnapshot(from: enabledProfile)
         XCTAssertEqual(viewModel.smartSuggestionsSummary, "Off")
     }
+
+    func testWarmupVolumeReloadsSavedValueWhenRebuildThrows() async {
+        let settingsService = RebuildFailingSettingsService()
+        let viewModel = SettingsViewModel(settingsService: settingsService)
+        await viewModel.loadProfile()
+
+        XCTAssertEqual(viewModel.profile?.includeWarmupsInVolume, false)
+
+        await viewModel.toggleWarmupVolume()
+
+        XCTAssertEqual(viewModel.profile?.includeWarmupsInVolume, true)
+        XCTAssertTrue(viewModel.showError)
+        XCTAssertEqual(viewModel.errorMessage, "Rebuild failed.")
+    }
+
+    func testWarmupPRsReloadsSavedValueWhenRebuildThrows() async {
+        let settingsService = RebuildFailingSettingsService()
+        let viewModel = SettingsViewModel(settingsService: settingsService)
+        await viewModel.loadProfile()
+
+        XCTAssertEqual(viewModel.profile?.includeWarmupsInPRs, false)
+
+        await viewModel.toggleWarmupPRs()
+
+        XCTAssertEqual(viewModel.profile?.includeWarmupsInPRs, true)
+        XCTAssertTrue(viewModel.showError)
+        XCTAssertEqual(viewModel.errorMessage, "Rebuild failed.")
+    }
 }
 
 final class SettingsResetServiceTests: XCTestCase {
@@ -2297,6 +2325,54 @@ private struct NoOpSettingsService: SettingsServiceProtocol {
     func rebuildPRs() async throws {}
     func rebuildStats() async throws {}
     func rebuildAll() async throws {}
+}
+
+@MainActor
+private final class RebuildFailingSettingsService: SettingsServiceProtocol {
+    private let profile = HealthProfile(
+        includeWarmupsInVolume: false,
+        includeWarmupsInPRs: false
+    )
+
+    private var settingsSnapshot: HealthProfileSnapshot { HealthProfileSnapshot(from: profile) }
+
+    func fetchSettingsSnapshot() async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updateUnitPreference(_ preference: UnitPreference) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updateE1RMFormula(_ formula: E1RMFormula) async throws -> HealthProfileSnapshot { settingsSnapshot }
+
+    func updateIncludeWarmupsInVolume(_ include: Bool) async throws -> HealthProfileSnapshot {
+        profile.includeWarmupsInVolume = include
+        throw RebuildFailure.failed
+    }
+
+    func updateIncludeWarmupsInPRs(_ include: Bool) async throws -> HealthProfileSnapshot {
+        profile.includeWarmupsInPRs = include
+        throw RebuildFailure.failed
+    }
+
+    func updateDefaultRestTime(_ seconds: Int?) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updateDefaultWarmupRestTime(_ seconds: Int?) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updateRestTimerAlert(_ value: String) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionEnabled(_ enabled: Bool) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionRecencyWeeks(_ weeks: Int) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionDefaultIncrement(_ increment: Double) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionDefaultTargetReps(_ reps: Int) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionDefaultTargetRIR(_ rir: Int) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionFreshnessBonus(enabled: Bool, percent: Double) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionFatigueModelingEnabled(_ enabled: Bool) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionCapacityGuardsEnabled(_ enabled: Bool) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionDefaultRecoveryConstant(_ seconds: Double) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func updatePrescriptionAdminModeEnabled(_ enabled: Bool) async throws -> HealthProfileSnapshot { settingsSnapshot }
+    func resetAllAppData() async throws {}
+    func rebuildPRs() async throws {}
+    func rebuildStats() async throws {}
+    func rebuildAll() async throws {}
+
+    private enum RebuildFailure: LocalizedError {
+        case failed
+
+        var errorDescription: String? { "Rebuild failed." }
+    }
 }
 
 private func makeResetContext() throws -> SettingsResetTestContext {

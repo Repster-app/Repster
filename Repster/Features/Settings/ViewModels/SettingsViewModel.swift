@@ -260,9 +260,12 @@ final class SettingsViewModel {
     func toggleWarmupVolume() async {
         guard let current = profile?.includeWarmupsInVolume else { return }
         isRebuilding = true
-        await performUpdate({
+        let didUpdate = await performUpdate({
             try await settingsService.updateIncludeWarmupsInVolume(!current)
         })
+        if !didUpdate {
+            try? await reloadProfile()
+        }
         isRebuilding = false
     }
 
@@ -273,9 +276,12 @@ final class SettingsViewModel {
     func toggleWarmupPRs() async {
         guard let current = profile?.includeWarmupsInPRs else { return }
         isRebuilding = true
-        await performUpdate({
+        let didUpdate = await performUpdate({
             try await settingsService.updateIncludeWarmupsInPRs(!current)
         })
+        if !didUpdate {
+            try? await reloadProfile()
+        }
         isRebuilding = false
     }
 

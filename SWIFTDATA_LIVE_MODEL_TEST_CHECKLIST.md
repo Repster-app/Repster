@@ -13,6 +13,19 @@ Automated:
   iOS 18.6 run crashed with the bug-3 signature.
 - iOS 18.6: active-workout, suggestion and fatigue-learning suites pass.
 - Test target builds with no new warnings from this change.
+- `SwiftDataLiveModelBoundaryRatchetTests` passes with the current phased allowlist; its planted
+  unlisted `HealthProfile` proof fails with a clear source location.
+- Warmup volume/PR error-path tests show the saved snapshot after a rebuild throws.
+
+Recorded 2026-09-12; cleanup gates rerun 2026-09-13:
+
+- Settings regression: pre-fix crash on iOS 18.6; post-fix pass on iOS 18.6 and 26.3.1, 2,000
+  rounds each.
+- Positive controls on the cleanup rerun: unsafe profile writes still SIGSEGV on iOS 17.5;
+  synthetic held live sets still crash (SIGABRT this run) with the non-zero-retain-count signature
+  on iOS 18.6.
+- Full iOS 26.3.1 cleanup suite: 913 total, 899 passed, 14 gated skips, 0 failures, read from
+  `.xcresult`.
 
 Manual (one short workout):
 
@@ -53,5 +66,9 @@ Manual:
 ## Final — Phase 6 / release gate
 
 - Full suite on iOS 17.5, 18.6 and 26.3, one run at a time; read totals from `.xcresult`.
-- No remaining `@unchecked Sendable` on models whose crossings are closed.
+- The source-ratchet allowlist is empty: repository protocols return no audited live model, and
+  views/view models store none. Any new or stale entry fails the test.
+- Phase 3 repository writes use insert-only APIs with DEBUG assertions that inserted models have
+  no `modelContext`. Removing redundant explicit `@unchecked Sendable` conformances is optional
+  warning cleanup; Xcode 26.3's `@Model` macro adds `Sendable` itself.
 - Repeat the Phase 5 device workout once on the oldest supported real device available.

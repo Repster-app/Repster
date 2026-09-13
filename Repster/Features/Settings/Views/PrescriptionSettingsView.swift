@@ -4,33 +4,6 @@
 
 import SwiftUI
 
-struct SmartSuggestionsAdvancedSettingsView: View {
-    let profile: HealthProfileSnapshot
-    private let settingsService: any SettingsServiceProtocol
-    let fatigueLearningService: FatigueLearningService
-
-    init(profile: HealthProfileSnapshot, settingsService: any SettingsServiceProtocol, fatigueLearningService: FatigueLearningService) {
-        self.profile = profile
-        self.settingsService = settingsService
-        self.fatigueLearningService = fatigueLearningService
-    }
-
-    var body: some View {
-        Form {
-            SmartSuggestionsAdvancedSections(
-                profile: profile,
-                settingsService: settingsService,
-                fatigueLearningService: fatigueLearningService,
-                isAdminModeEnabled: profile.prescriptionAdminModeEnabled ?? false
-            )
-        }
-        .scrollContentBackground(.hidden)
-        .background(Color.bg)
-        .navigationTitle("Smart Suggestions")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
 /// Reusable advanced Smart Suggestions sections.
 struct SmartSuggestionsAdvancedSections: View {
 
