@@ -1,0 +1,941 @@
+<title>Repster Code Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --ground: #f2f2f6;
+  --panel: #ffffff;
+  --sunken: #e9e9ef;
+  --line: #dcdce4;
+  --line-strong: #c3c3cf;
+  --ink: #15151a;
+  --ink-2: #51515f;
+  --ink-3: #72728a;
+  --accent: #3a6fe0;
+  --accent-soft: rgba(58, 111, 224, 0.11);
+  --gold: #d4a23a;
+  --l-shell: #9c9cab;
+  --l-features: #2a78d6;
+  --l-core: #eb6834;
+  --l-data: #1baf7a;
+  --neutral-cell: #e1e1e8;
+  --seq-lo: #cde2fb;
+  --seq-hi: #104281;
+  --warn: #fab219;
+  --warn-ink: #7a5200;
+  --upward-zone: rgba(250, 178, 25, 0.08);
+  --shadow: 0 1px 2px rgba(20, 20, 40, 0.06), 0 10px 28px rgba(20, 20, 40, 0.08);
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
+  --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #111113;
+    --panel: #1b1b1f;
+    --sunken: #16161a;
+    --line: #2b2b33;
+    --line-strong: #3b3b46;
+    --ink: #eaeaef;
+    --ink-2: #a0a0ae;
+    --ink-3: #74748b;
+    --accent: #5b8def;
+    --accent-soft: rgba(91, 141, 239, 0.15);
+    --gold: #d4a23a;
+    --l-shell: #5c5c6e;
+    --l-features: #3987e5;
+    --l-core: #d95926;
+    --l-data: #199e70;
+    --neutral-cell: #25252c;
+    --seq-lo: #1c3050;
+    --seq-hi: #b7d3f6;
+    --warn: #fab219;
+    --warn-ink: #fab219;
+    --upward-zone: rgba(250, 178, 25, 0.06);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.45);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #111113;
+  --panel: #1b1b1f;
+  --sunken: #16161a;
+  --line: #2b2b33;
+  --line-strong: #3b3b46;
+  --ink: #eaeaef;
+  --ink-2: #a0a0ae;
+  --ink-3: #74748b;
+  --accent: #5b8def;
+  --accent-soft: rgba(91, 141, 239, 0.15);
+  --gold: #d4a23a;
+  --l-shell: #5c5c6e;
+  --l-features: #3987e5;
+  --l-core: #d95926;
+  --l-data: #199e70;
+  --neutral-cell: #25252c;
+  --seq-lo: #1c3050;
+  --seq-hi: #b7d3f6;
+  --warn: #fab219;
+  --warn-ink: #fab219;
+  --upward-zone: rgba(250, 178, 25, 0.06);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 14px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+code { font-family: var(--mono); font-size: 0.9em; background: var(--sunken); padding: 1px 5px; border-radius: 5px; }
+
+.page { max-width: 1380px; margin: 0 auto; padding: 26px clamp(14px, 3vw, 40px) 40px; }
+
+/* Header: an iOS large title, because this is an iOS app's code */
+.navline { display: flex; flex-wrap: wrap; gap: 4px 10px; font: 12px var(--mono); color: var(--ink-3); }
+.navline b { color: var(--ink-2); font-weight: 600; }
+h1 { font: 700 clamp(30px, 4.2vw, 42px)/1.05 var(--display); letter-spacing: -0.026em; margin: 8px 0 10px; text-wrap: balance; }
+.lede { max-width: 70ch; margin: 0; color: var(--ink-2); font-size: 15px; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 14px; font-size: 13px; color: var(--ink-3); }
+.facts b { font: 600 15px var(--sans); color: var(--ink); font-variant-numeric: tabular-nums; margin-right: 4px; }
+
+/* Workspace: canvas + inspector, like Xcode's editor and inspector panes */
+.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; align-items: start; margin-top: 22px; scroll-margin-top: 12px; }
+.canvas { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 10px; }
+.lens-note { font-size: 12.5px; color: var(--ink-3); flex: 1 1 220px; }
+.segmented { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; background: var(--sunken); border-radius: 9px; }
+.segmented button { border: 0; background: transparent; border-radius: 7px; padding: 5px 11px; font-size: 12.5px; font-weight: 500; color: var(--ink-2); cursor: pointer; }
+.segmented button:hover:not(:disabled) { color: var(--ink); }
+.segmented button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14), 0 0 0 0.5px var(--line-strong); }
+.segmented button:disabled { opacity: 0.4; cursor: default; }
+#treemap { min-height: 420px; }
+#treemap svg { display: block; }
+.tm-cell { cursor: pointer; }
+.tm-cell rect { transition: opacity 0.15s; }
+.tm-cell:hover rect { stroke: var(--ink); stroke-width: 1.5px; }
+.tm-cell rect.is-selected { stroke: var(--accent); stroke-width: 2.5px; }
+.tm-name { font: 500 10.5px var(--sans); pointer-events: none; }
+.tm-lines { font: 9.5px var(--mono); pointer-events: none; opacity: 0.8; }
+.tm-layer { font: 600 10.5px var(--sans); letter-spacing: 0.08em; fill: var(--ink); }
+.tm-area { cursor: pointer; }
+.tm-area text { font: 600 10px var(--sans); fill: var(--ink-2); }
+.tm-area:hover text { fill: var(--accent); }
+.stop-accent { stop-color: var(--accent); }
+.stop-gold { stop-color: var(--gold); }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin-top: 10px; font-size: 12px; color: var(--ink-2); }
+.legend em { font-style: normal; color: var(--ink-3); font-family: var(--mono); font-size: 11.5px; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.swatch.split { background: linear-gradient(135deg, var(--accent) 50%, var(--gold) 50%); }
+.ramp-row { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
+.ramp { display: inline-block; width: 110px; height: 8px; border-radius: 4px; }
+
+.inspector { position: sticky; top: 12px; display: flex; flex-direction: column; max-height: calc(100vh - 24px); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.search { position: relative; padding: 12px; border-bottom: 1px solid var(--line); }
+.search svg { position: absolute; left: 22px; top: 50%; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
+.search input { width: 100%; padding: 8px 10px 8px 30px; border: 1px solid transparent; border-radius: 8px; background: var(--sunken); color: var(--ink); font: 13px var(--sans); }
+.search input:focus { outline: none; border-color: var(--accent); }
+.results { position: absolute; left: 12px; right: 12px; top: calc(100% - 6px); z-index: 6; margin: 0; padding: 4px; list-style: none; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 10px; box-shadow: var(--shadow); }
+.results button { display: flex; justify-content: space-between; gap: 10px; width: 100%; padding: 6px 8px; border: 0; border-radius: 6px; background: none; text-align: left; cursor: pointer; }
+.results button:hover, .results button:focus-visible { background: var(--accent-soft); }
+.results .nm { font: 12.5px var(--mono); overflow-wrap: anywhere; }
+.results .sub { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
+.results .none { padding: 8px; font-size: 12.5px; color: var(--ink-3); }
+.inspector-body { overflow: auto; padding: 14px 14px 18px; }
+
+.eyebrow { display: flex; align-items: center; gap: 6px; margin: 0; font: 600 10.5px var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.ihead { margin: 4px 0 4px; font: 600 17px/1.25 var(--display); letter-spacing: -0.01em; text-wrap: balance; }
+.ihead.mono { font: 600 16px/1.3 var(--mono); letter-spacing: 0; overflow-wrap: anywhere; }
+.ipath { margin: 0; font: 11.5px var(--mono); color: var(--ink-3); overflow-wrap: anywhere; }
+.inote { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-2); }
+.back { display: inline-flex; align-items: center; gap: 4px; margin: 0 0 10px -4px; padding: 3px 6px; border: 0; border-radius: 6px; background: none; color: var(--accent); font-size: 12.5px; cursor: pointer; }
+.back:hover { background: var(--accent-soft); }
+.kv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; margin: 14px 0 4px; }
+.kv b { display: block; font: 600 16px var(--sans); font-variant-numeric: tabular-nums; }
+.kv span { font-size: 11px; color: var(--ink-3); }
+.pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 500; }
+.pill.dirty { background: var(--accent-soft); color: var(--accent); }
+.pill.warn { background: var(--upward-zone); color: var(--warn-ink); border: 1px solid var(--warn); }
+.block { margin-top: 16px; }
+.block h4 { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 4px; font: 600 12.5px var(--sans); }
+.block h4 span { font-weight: 400; font-size: 11.5px; color: var(--ink-3); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { padding: 2px 7px; border-radius: 6px; background: var(--sunken); color: var(--ink-2); font: 11.5px var(--mono); }
+.list { margin: 0; padding: 0; list-style: none; }
+.list button { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 10px; width: 100%; padding: 6px 8px; border: 0; border-radius: 7px; background: none; text-align: left; cursor: pointer; }
+.list button:hover { background: var(--sunken); }
+.list .nm { font: 12.5px var(--mono); overflow-wrap: anywhere; }
+.list .w { font: 11.5px var(--mono); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.list .sub { grid-column: 1 / -1; font-size: 11.5px; color: var(--ink-3); overflow-wrap: anywhere; }
+.list .tag { margin-left: 6px; padding: 0 5px; border-radius: 4px; background: var(--sunken); color: var(--ink-2); font: 10.5px var(--sans); }
+.more { margin: 4px 8px 0; font-size: 11.5px; color: var(--ink-3); }
+.hot { margin: 12px 0 0; padding: 0; list-style: none; }
+.hot button { position: relative; display: grid; grid-template-columns: 1.6em minmax(0, 1fr); gap: 0 6px; width: 100%; padding: 7px 8px 9px; border: 0; border-radius: 7px; background: none; text-align: left; cursor: pointer; }
+.hot button:hover { background: var(--sunken); }
+.hot .rk { grid-row: span 2; font: 600 11.5px var(--mono); color: var(--ink-3); padding-top: 1px; }
+.hot .nm { font: 600 12.5px var(--mono); overflow-wrap: anywhere; }
+.hot .meta { font-size: 11.5px; color: var(--ink-3); }
+.hot .bar { position: absolute; left: calc(8px + 1.6em + 6px); bottom: 3px; height: 2px; border-radius: 1px; background: var(--accent); opacity: 0.55; }
+.hint { margin: 14px 8px 0; font-size: 12px; color: var(--ink-3); }
+
+section.band { margin-top: 46px; }
+h2 { margin: 0 0 6px; font: 700 25px/1.2 var(--display); letter-spacing: -0.018em; text-wrap: balance; }
+.section-lede { max-width: 72ch; margin: 0; color: var(--ink-2); }
+.deps-grid { display: grid; grid-template-columns: minmax(0, auto) minmax(260px, 1fr); gap: 14px; align-items: start; margin-top: 16px; }
+.matrix-wrap { overflow-x: auto; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+#matrix svg { display: block; }
+.mx-label { font: 11px var(--sans); fill: var(--ink-2); cursor: pointer; }
+.mx-label:hover, .mx-label.hot { fill: var(--ink); font-weight: 600; }
+.mx-label.sel { fill: var(--accent); font-weight: 600; }
+.mx-zone { fill: var(--upward-zone); }
+.mx-sep { stroke: var(--line-strong); stroke-width: 1; }
+.mx-cell { cursor: pointer; }
+.mx-cell.self { fill: none; stroke: var(--line-strong); stroke-dasharray: 2 2; }
+.mx-cell.up { stroke: var(--warn); stroke-width: 2px; }
+.mx-cell:hover { stroke: var(--ink); stroke-width: 2px; }
+.mx-cell.sel { stroke: var(--accent); stroke-width: 2.5px; }
+.mx-caption { margin: 10px 2px 0; font-size: 12px; color: var(--ink-3); display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; }
+.upward { padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+.up-head { display: flex; align-items: center; gap: 8px; margin: 0; font: 600 14px var(--sans); }
+.up-head svg { flex: none; }
+.upward p { margin: 6px 0 10px; font-size: 12.5px; color: var(--ink-2); }
+.upward .stat { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+
+.flow-card { margin-top: 14px; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; }
+.flow-summary { max-width: 80ch; margin: 0 0 16px; color: var(--ink-2); }
+.flow-grid { position: relative; display: grid; grid-template-columns: repeat(5, minmax(124px, 1fr)) minmax(250px, 1.55fr); column-gap: 10px; row-gap: 12px; min-width: 960px; }
+.lane-head { padding-bottom: 7px; border-bottom: 1px solid var(--line); font: 600 10.5px var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.lane-guide { justify-self: center; width: 0; border-left: 1px dashed var(--line-strong); opacity: 0.7; }
+.wires { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; overflow: visible; color: var(--ink-3); }
+.wires path { fill: none; stroke: currentColor; stroke-width: 1.25; }
+.wires path.dashed { stroke-dasharray: 4 3; }
+.step { position: relative; z-index: 1; align-self: center; display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 7px 9px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; text-align: left; cursor: pointer; }
+.step:hover:not(:disabled) { border-color: var(--accent); }
+.step:disabled { cursor: default; }
+.step.branch { border-style: dashed; }
+.step-type { display: flex; align-items: center; gap: 6px; font: 600 11.5px var(--mono); overflow-wrap: anywhere; }
+.step-type .dot { flex: none; width: 7px; height: 7px; border-radius: 2px; }
+.step-call { font: 10.5px var(--mono); color: var(--ink-3); overflow-wrap: anywhere; }
+.step-lane { display: none; font-size: 10.5px; color: var(--ink-3); }
+.step-note { position: relative; z-index: 1; align-self: center; display: flex; gap: 10px; font-size: 13px; color: var(--ink-2); }
+.step-note .n { flex: none; min-width: 1.5em; padding-top: 1px; text-align: right; font: 600 11px var(--mono); color: var(--ink-3); }
+.step-note p { margin: 0; max-width: 60ch; }
+.drift { margin: 12px 0 0; font-size: 12.5px; color: var(--warn-ink); }
+
+footer { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 30px; margin-top: 50px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--ink-3); }
+footer h3 { margin: 0 0 4px; font: 600 12.5px var(--sans); color: var(--ink-2); }
+footer p { margin: 0 0 6px; max-width: 65ch; }
+
+.tip { position: fixed; z-index: 20; max-width: 300px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: var(--shadow); font-size: 12px; color: var(--ink-2); pointer-events: none; }
+.tip b { display: block; font: 600 12.5px var(--mono); color: var(--ink); overflow-wrap: anywhere; }
+
+@media (max-width: 1020px) {
+  .workspace { grid-template-columns: minmax(0, 1fr); }
+  .inspector { position: static; max-height: none; }
+  .deps-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  .flow-grid { grid-template-columns: minmax(0, 1fr) !important; min-width: 0; row-gap: 6px; }
+  .lane-head, .lane-guide, .wires { display: none; }
+  .step, .step-note { grid-column: 1 !important; grid-row: auto !important; }
+  .step-note { margin-bottom: 10px; }
+  .step-lane { display: block; }
+  footer { grid-template-columns: minmax(0, 1fr); }
+  .kv { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tm-cell rect { transition: none; }
+}
+</style>
+
+<div class="page">
+  <header>
+    <div class="navline" id="navline"></div>
+    <h1>Repster Code Map</h1>
+    <p class="lede">Every Swift file in the app, sized by lines of code and grouped by layer and folder. Click a box to see what it uses and what uses it. Switch the colour to find files that change often, files no test mentions, and work that isn't committed yet.</p>
+    <div class="facts" id="facts"></div>
+  </header>
+
+  <section class="workspace" id="workspace" aria-label="Map and inspector">
+    <div class="canvas">
+      <div class="toolbar">
+        <div class="segmented" id="lenses" role="group" aria-label="Colour the map by">
+          <button data-lens="layer" aria-pressed="true">Layer</button>
+          <button data-lens="churn" aria-pressed="false">Churn</button>
+          <button data-lens="tests" aria-pressed="false">Tests</button>
+          <button data-lens="dirty" aria-pressed="false">Uncommitted</button>
+          <button data-lens="links" aria-pressed="false" disabled>Connections</button>
+        </div>
+        <span class="lens-note" id="lens-note"></span>
+      </div>
+      <div id="treemap"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+    <aside class="inspector" aria-label="Inspector">
+      <div class="search">
+        <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <input id="search" type="search" placeholder="Find a file or type" autocomplete="off" aria-label="Find a file or type">
+        <ul class="results" id="results" hidden></ul>
+      </div>
+      <div class="inspector-body" id="inspector"></div>
+    </aside>
+  </section>
+
+  <section class="band" aria-labelledby="deps-title">
+    <h2 id="deps-title">Who reaches into whom</h2>
+    <p class="section-lede">Each row references the columns it has marks in; darker means more references. Folders run down through the layers (app shell, features, core, data), so a healthy reference sits above the diagonal. The shaded lower-left is lower layers reaching up into higher ones, and anything there is outlined.</p>
+    <div class="deps-grid">
+      <div class="matrix-wrap">
+        <div id="matrix"></div>
+        <div class="mx-caption" id="mx-caption"></div>
+      </div>
+      <div class="upward" id="upward"></div>
+    </div>
+  </section>
+
+  <section class="band" aria-labelledby="flows-title">
+    <h2 id="flows-title">Four paths through the app</h2>
+    <p class="section-lede">What happens behind four taps a lifter makes, traced by hand from the source. Each card opens its file in the inspector. Dashed cards run in a detached task and nothing waits for them.</p>
+    <div class="segmented" id="flow-tabs" role="group" aria-label="Choose a path" style="margin-top:14px"></div>
+    <div class="flow-card" id="flow"></div>
+  </section>
+
+  <footer>
+    <div>
+      <h3>How it's built</h3>
+      <p>The script matches type names and doesn't compile anything. Only top-level, non-private types and global functions count as targets, so nested helpers like <code>Row</code> never create false links. Names in comments and strings are ignored.</p>
+      <p>Files that only add extensions, like <code>DesignTokens.swift</code>, extend types declared elsewhere, so the files that use those extensions aren't linked to them.</p>
+    </div>
+    <div>
+      <h3>Regenerate</h3>
+      <p><code>python3 scripts/codemap/build_codemap.py</code> rewrites <code>scripts/codemap/codemap.html</code> with fresh sizes, links, churn and test reach. The four paths are hand-drawn and don't update.</p>
+      <p id="footer-meta"></p>
+    </div>
+  </footer>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+(function () {
+  "use strict";
+  const DATA = /*__CODEMAP_DATA__*/null;
+  if (!DATA || !window.d3) {
+    document.querySelector(".page").insertAdjacentHTML("afterbegin", "<p>Missing data or the d3 script. Regenerate with python3 scripts/codemap/build_codemap.py.</p>");
+    return;
+  }
+
+  // ---------- Hand-traced flows ----------
+  const FLOWS_TRACED = { commit: "1eb8cc8", date: "12 Sep 2026" };
+  const LANES = [
+    { id: "screen", name: "App & screens" },
+    { id: "vm", name: "View model" },
+    { id: "service", name: "Services" },
+    { id: "store", name: "Store" },
+    { id: "system", name: "iOS & SDKs" },
+  ];
+  const FLOWS = [
+    {
+      title: "Log a set",
+      summary: "Ticking the checkmark on a set row. One tap crosses every layer, then fans out to PRs, stats, fatigue learning, the rest timer and the next suggestion.",
+      steps: [
+        { lane: "screen", type: "SetRowView", call: "onComplete", note: "The tick on the row." },
+        { lane: "screen", type: "SetTableView", call: "dataSource.completeSet(set, input:)", note: "Packs the typed weight, reps and RIR into a <code>SetCompletionInput</code> and hands it to the view model." },
+        { lane: "vm", type: "ActiveWorkoutViewModel", call: "completeSet(_:input:)", note: "Snapshots the suggestion shown for this row first, before the row leaves the pending list." },
+        { lane: "service", type: "SetService", call: "save(setId:input:)", note: "The set pipeline. Every completed set goes through here." },
+        { lane: "store", type: "SetRepository", call: "applyCompletion · persist", note: "Values, effective weight and e1RM are written inside the repository actor, never on the main actor." },
+        { lane: "service", type: "PRService", call: "evaluate(setId:…)", note: "Decides whether this set is a PR and which older sets lose theirs." },
+        { lane: "service", type: "StatsService", call: "updateStats(for:event:)", note: "Rolls the set into the exercise's cached stats." },
+        { lane: "vm", type: "PRBadgeApplier", call: "apply(_:to:)", note: "Moves PR badges on screen, including demoted sets." },
+        { lane: "service", type: "FatigueLearningService", call: "captureCompletedSet(…)", note: "Stores the prediction next to what was actually lifted, for the fatigue model to learn from." },
+        { lane: "vm", type: "ActiveWorkoutViewModel", call: "startRestTimer(duration:)", note: "Starts rest. If the next set is a superset partner, it records zero rest instead and shows the partner prompt." },
+        { lane: "system", type: "LiveActivityManager", call: "via updateLiveActivityState()", note: "Pushes the timer to the Lock Screen and Dynamic Island, and schedules the rest notification." },
+        { lane: "vm", type: "ActiveWorkoutViewModel", call: "requestWeightSuggestionRefresh(.preserveExisting)", note: "Recomputes the next suggestion while the current one stays on screen. See <em>Suggest a weight</em>." },
+        { lane: "system", type: "AnalyticsService", call: "firstSetLogged(source:secondsSinceStart:)", note: "Tells PostHog the workout logged something. Fires once per workout." },
+      ],
+    },
+    {
+      title: "Suggest a weight",
+      summary: "What produces the number on each pending row. The maths in the middle is a pure function. Both ends are guarded so a slow answer never lands on the wrong exercise.",
+      steps: [
+        { lane: "vm", type: "ActiveWorkoutViewModel", call: "requestWeightSuggestionRefresh(mode:)", note: "Cancels any refresh in flight and bumps a generation counter." },
+        { lane: "store", type: "HealthProfileRepository", call: "resolveSuggestionProfile()", note: "Reads units, weight increments and the suggestion switches from settings." },
+        { lane: "vm", type: "SuggestionCoordinator", call: "prepare(exercise:workout:sets:profile:)", note: "Splits the exercise into pending and completed sets and builds a cache key. If the key hasn't changed, it stops here." },
+        { lane: "service", type: "LoadPrescriptionService", call: "evaluateSuggestions(…)", note: "Gates first: suggestions switched off, exercise missing, no pending sets." },
+        { lane: "store", type: "SetRepository", call: "fetchChartSets(…)", note: "Recent history for the base e1RM (6-week window by default), minus workouts excluded from progression." },
+        { lane: "service", type: "FatigueLearningService", call: "appliedFatigueRateInfo(for:profile:)", note: "The fatigue rate this exercise has learned so far." },
+        { lane: "service", type: "SuggestionEngine", call: "evaluate(_:)", note: "Pure function: base e1RM, fatigue, rest and rep targets in, one decision per set out. It lives in <code>LoadPrescriptionServiceProtocol.swift</code>." },
+        { lane: "vm", type: "SuggestionExplainer", call: "makeWeightSuggestionData(…)", note: "Turns decisions into display rows. Thrown away if the generation or exercise changed in the meantime." },
+        { lane: "screen", type: "ActiveWorkoutView", call: "weightSuggestionData → rows", note: "Suggested weight on each pending row; the suggestion card explains why." },
+      ],
+    },
+    {
+      title: "Finish a workout",
+      summary: "The Finish button on the summary sheet. The save is awaited; Apple Health deliberately isn't, so a Health error can never lose a workout.",
+      steps: [
+        { lane: "screen", type: "WorkoutSummarySheet", call: "viewModel.finishWorkout(title:notes:perceivedEffort:)", note: "Title, notes and effort from the sheet." },
+        { lane: "vm", type: "ActiveWorkoutViewModel", call: "finishWorkout(…)", note: "Tallies duration, sets, reps and PRs for analytics before anything is cleared." },
+        { lane: "service", type: "WorkoutService", call: "finishWorkout(_:…)", note: "Marks the workout completed and stamps its duration." },
+        { lane: "store", type: "WorkoutRepository", call: "save(_:)", note: "The commit. Everything after this is bookkeeping." },
+        { lane: "system", type: "HealthKitService", call: "saveWorkout(_:)", branch: true, note: "Detached task: adds the closest bodyweight for the energy estimate, writes to Apple Health, then stores the Health UUID back on the workout." },
+        { lane: "service", type: "AccessControlService", call: "recordCompletedWorkoutIfNeeded()", note: "Counts the workout against the free quota." },
+        { lane: "service", type: "FatigueLearningService", call: "suggestionAdherence(workoutId:)", note: "How closely the lifter followed suggestions. Read before learning prunes it." },
+        { lane: "system", type: "AnalyticsService", call: "workoutCompleted(…)", note: "One PostHog event with 20 properties, including suggestion adherence and access tier." },
+        { lane: "service", type: "ReviewPromptService", call: "recordCompletedWorkout()", note: "Feeds the count behind the App Store review prompt." },
+        { lane: "service", type: "FatigueLearningService", call: "processSessionEnd(workoutId:)", note: "Adaptive fatigue learning over the whole session." },
+        { lane: "system", type: "LiveActivityManager", call: "endActivity()", note: "Ends the Lock Screen activity." },
+        { lane: "screen", type: "ActiveWorkoutView", call: "isWorkoutFinished", note: "The flag flips, and the workout screen and summary sheet close." },
+      ],
+    },
+    {
+      title: "Cold launch",
+      summary: "From tapping the icon to the first screen. Everything is built once, up front, then handed down through the SwiftUI environment.",
+      steps: [
+        { lane: "screen", type: "RepsterApp", call: "init()", note: "Entry point. Builds everything below before the first frame." },
+        { lane: "store", type: "ModelContainerSetup", call: "createContainer()", note: "Opens the SwiftData store. If it throws, the app stops on <code>fatalError</code>. That's the path behind the 1.4 prewarm crash reports." },
+        { lane: "service", type: "SeedService", call: "seedIfNeeded(modelContext:)", note: "Seeds bundled data on first run." },
+        { lane: "store", type: "RepositoryContainer", call: "init(modelContainer:)", note: "Wraps the store in repositories, the actors that own every read and write." },
+        { lane: "system", type: "AnalyticsServiceFactory", call: "makeService() · configure()", note: "PostHog, set up before anything can log an event." },
+        { lane: "service", type: "ServiceContainer", call: "init(repositoryContainer:analyticsService:)", note: "Wires 19 services in dependency order: stats and PRs first, the set and workout pipelines after." },
+        { lane: "system", type: "AttributionService", call: "resolveIfNeeded()", branch: true, note: "Search Ads attribution through RevenueCat, off the launch path." },
+        { lane: "screen", type: "ContentView", call: "WindowGroup · .environment(services)", note: "Shows onboarding or the tab bar. Services and repositories go into the environment." },
+      ],
+    },
+  ];
+
+  // ---------- Model ----------
+  const $ = (s, r = document) => r.querySelector(s);
+  const fmt = (n) => Number(n).toLocaleString("en-GB");
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const reduceMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const LAYERS = [
+    { id: "Shell", name: "App shell", token: "--l-shell", rank: 0 },
+    { id: "Features", name: "Features", token: "--l-features", rank: 1 },
+    { id: "Core", name: "Core", token: "--l-core", rank: 2 },
+    { id: "Data", name: "Data", token: "--l-data", rank: 3 },
+  ];
+  const layerById = Object.fromEntries(LAYERS.map((l) => [l.id, l]));
+  const displayLayer = (area) => area.startsWith("Features/") ? "Features" : area.startsWith("Core/") ? "Core" : area.startsWith("Data/") ? "Data" : "Shell";
+  const areaName = (a) => a === "App" ? "App" : a === "Widget/LiveActivity" ? "LiveActivity widget" : a.split("/").pop();
+  const areaPath = (a) => a === "Widget/LiveActivity" ? "WorkoutLiveActivity" : a;
+  const isUpward = (from, to) => layerById[displayLayer(from)].rank > layerById[displayLayer(to)].rank;
+
+  const files = DATA.files.map((f, i) => ({ ...f, i, dlayer: displayLayer(f.area), base: f.name.replace(/\.swift$/, "") }));
+  const areas = DATA.areas
+    .map((a) => ({ ...a, dlayer: displayLayer(a.id), name: areaName(a.id) }))
+    .sort((x, y) => layerById[x.dlayer].rank - layerById[y.dlayer].rank || y.lines - x.lines);
+  const outEdges = files.map(() => []);
+  const inEdges = files.map(() => []);
+  DATA.edges.forEach((e) => { outEdges[e.from].push(e); inEdges[e.to].push(e); });
+  const typeOwner = {};
+  files.forEach((f) => f.types.forEach((t) => { if (!(t in typeOwner)) typeOwner[t] = f.i; }));
+  const areaEdgeMap = new Map(DATA.areaEdges.map((e) => [e.from + ">" + e.to, e]));
+  const layerLines = {};
+  files.forEach((f) => { layerLines[f.dlayer] = (layerLines[f.dlayer] || 0) + f.lines; });
+  const totalLines = files.reduce((s, f) => s + f.lines, 0);
+  const maxChurn = Math.max(1, ...files.map((f) => f.churn));
+  const maxTests = Math.max(1, ...files.map((f) => f.tests));
+  const dirtyCount = files.filter((f) => f.dirty).length;
+  const hotspots = files.filter((f) => f.churn > 0).map((f) => ({ f, score: f.lines * f.churn })).sort((a, b) => b.score - a.score).slice(0, 12);
+  const upward = DATA.areaEdges.filter((e) => e.from !== e.to && isUpward(e.from, e.to)).sort((a, b) => b.weight - a.weight);
+
+  const state = { lens: "layer", prevLens: "layer", file: null, area: null, pair: null, links: null, flow: 0 };
+
+  // ---------- Theme tokens ----------
+  let T = {};
+  function readTokens() {
+    const cs = getComputedStyle(document.documentElement);
+    const g = (n) => cs.getPropertyValue(n).trim();
+    T = {
+      ink: g("--ink"), ground: g("--ground"), neutral: g("--neutral-cell"), accent: g("--accent"), gold: g("--gold"),
+      seqLo: g("--seq-lo"), seqHi: g("--seq-hi"),
+      layer: { Shell: g("--l-shell"), Features: g("--l-features"), Core: g("--l-core"), Data: g("--l-data") },
+    };
+  }
+  const seq = (t) => d3.interpolateLab(T.seqLo, T.seqHi)(Math.max(0, Math.min(1, t)));
+  function textOn(fill) {
+    if (!fill || fill.startsWith("url")) fill = T.gold;
+    const c = d3.color(fill);
+    if (!c) return T.ink;
+    const { r, g, b } = c.rgb();
+    const lin = [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    const L = 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+    return L > 0.19 ? "#111113" : "#ffffff";
+  }
+
+  // ---------- Tooltip ----------
+  const tip = $("#tip");
+  function showTip(html, ev) { tip.innerHTML = html; tip.hidden = false; moveTip(ev); }
+  function moveTip(ev) {
+    const pad = 14, r = tip.getBoundingClientRect();
+    let x = ev.clientX + pad, y = ev.clientY + pad;
+    if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - pad;
+    if (y + r.height > innerHeight - 8) y = ev.clientY - r.height - pad;
+    tip.style.left = Math.max(8, x) + "px";
+    tip.style.top = Math.max(8, y) + "px";
+  }
+  function hideTip() { tip.hidden = true; }
+  const fileTip = (f) => `<b>${esc(f.name)}</b>${esc(areaPath(f.area))}<br>${fmt(f.lines)} lines · ${f.churn} commit${f.churn === 1 ? "" : "s"} in ${DATA.churnDays} days · ${f.tests} test file${f.tests === 1 ? "" : "s"}${f.dirty ? "<br>Uncommitted changes" : ""}`;
+
+  // ---------- Treemap ----------
+  let cellSel = null;
+  const fit = (s, px, cw) => { const n = Math.floor(px / cw); if (n < 3) return ""; return s.length <= n ? s : s.slice(0, n - 1) + "…"; };
+
+  function cellFill(f) {
+    switch (state.lens) {
+      case "churn": return f.churn ? seq(Math.sqrt(f.churn / maxChurn)) : T.neutral;
+      case "tests": return f.tests ? seq(Math.sqrt(f.tests / maxTests)) : T.neutral;
+      case "dirty": return f.dirty ? T.accent : T.neutral;
+      case "links": {
+        if (f.i === state.file) return T.ink;
+        const u = state.links.used.has(f.i), b = state.links.users.has(f.i);
+        return u && b ? "url(#both)" : u ? T.accent : b ? T.gold : T.neutral;
+      }
+      default: return T.layer[f.dlayer];
+    }
+  }
+  function cellDim(f) {
+    if (state.lens === "links") return !(f.i === state.file || state.links.used.has(f.i) || state.links.users.has(f.i));
+    return state.area != null && f.area !== state.area;
+  }
+
+  function renderTreemap() {
+    const host = $("#treemap");
+    const w = Math.floor(host.clientWidth);
+    if (w < 10) return;
+    const h = Math.round(Math.max(420, Math.min(700, w * 0.64)));
+    const rootData = {
+      children: LAYERS.map((l) => ({
+        layer: l,
+        children: areas.filter((a) => a.dlayer === l.id).map((a) => ({
+          area: a,
+          children: files.filter((f) => f.area === a.id).map((f) => ({ file: f, value: f.lines })),
+        })),
+      })),
+    };
+    const root = d3.hierarchy(rootData).sum((d) => d.value || 0).sort((a, b) => b.value - a.value);
+    d3.treemap().tile(d3.treemapSquarify.ratio(1.15)).size([w, h]).round(true)
+      .paddingTop((n) => (n.depth === 1 ? 20 : n.depth === 2 ? 15 : 0))
+      .paddingInner((n) => (n.depth === 0 ? 6 : n.depth === 1 ? 3 : 1))(root);
+
+    host.innerHTML = "";
+    const svg = d3.select(host).append("svg")
+      .attr("width", w).attr("height", h).attr("viewBox", `0 0 ${w} ${h}`)
+      .attr("role", "img").attr("aria-label", "Treemap of every Swift file, sized by lines of code, grouped by layer and folder");
+    const grad = svg.append("defs").append("linearGradient").attr("id", "both").attr("x1", 0).attr("y1", 0).attr("x2", 1).attr("y2", 1);
+    grad.append("stop").attr("offset", "50%").attr("class", "stop-accent");
+    grad.append("stop").attr("offset", "50%").attr("class", "stop-gold");
+
+    const layerG = svg.append("g").selectAll("g").data(root.children).join("g");
+    layerG.append("rect").attr("x", (d) => d.x0).attr("y", (d) => d.y0 + 5).attr("width", 9).attr("height", 9).attr("rx", 2)
+      .attr("fill", (d) => T.layer[d.data.layer.id]);
+    layerG.append("text").attr("class", "tm-layer").attr("x", (d) => d.x0 + 14).attr("y", (d) => d.y0 + 13.5)
+      .text((d) => fit(`${d.data.layer.name.toUpperCase()} · ${fmt(d.value)} lines`, d.x1 - d.x0 - 16, 7.2));
+
+    const areaG = svg.append("g").selectAll("g").data(root.descendants().filter((d) => d.depth === 2)).join("g")
+      .attr("class", "tm-area").on("click", (ev, d) => selectArea(d.data.area.id));
+    areaG.append("rect").attr("x", (d) => d.x0).attr("y", (d) => d.y0).attr("width", (d) => Math.max(0, d.x1 - d.x0)).attr("height", 15).attr("fill", "transparent");
+    areaG.append("text").attr("x", (d) => d.x0 + 2).attr("y", (d) => d.y0 + 11)
+      .text((d) => { const wd = d.x1 - d.x0 - 4, a = d.data.area; const full = `${a.name}  ${fmt(a.lines)}`; return full.length * 6 < wd ? full : fit(a.name, wd, 6); });
+
+    cellSel = svg.append("g").selectAll("g").data(root.leaves()).join("g")
+      .attr("class", "tm-cell").attr("transform", (d) => `translate(${d.x0},${d.y0})`)
+      .on("mouseenter", (ev, d) => showTip(fileTip(d.data.file), ev))
+      .on("mousemove", moveTip).on("mouseleave", hideTip)
+      .on("click", (ev, d) => { hideTip(); selectFile(d.data.file.i); });
+    cellSel.append("rect").attr("width", (d) => Math.max(0, d.x1 - d.x0)).attr("height", (d) => Math.max(0, d.y1 - d.y0)).attr("rx", 2);
+    cellSel.each(function (d) {
+      const cw = d.x1 - d.x0, ch = d.y1 - d.y0, g = d3.select(this), f = d.data.file;
+      if (cw < 34 || ch < 14) return;
+      const t = fit(f.base, cw - 7, 5.9);
+      if (t) g.append("text").attr("class", "tm-name").attr("x", 4).attr("y", 11.5).text(t);
+      if (ch >= 29 && cw >= 44) g.append("text").attr("class", "tm-lines").attr("x", 4).attr("y", 23.5).text(fmt(f.lines));
+    });
+    paintTreemap();
+  }
+
+  function paintTreemap() {
+    if (!cellSel) return;
+    cellSel.select("rect")
+      .attr("fill", (d) => cellFill(d.data.file))
+      .attr("opacity", (d) => (cellDim(d.data.file) && state.lens !== "links" ? 0.22 : 1))
+      .classed("is-selected", (d) => d.data.file.i === state.file);
+    cellSel.selectAll("text")
+      .attr("fill", (d) => textOn(cellFill(d.data.file)))
+      .attr("opacity", (d) => (cellDim(d.data.file) ? 0.45 : 1));
+    renderLegend();
+    syncLenses();
+  }
+
+  const LENS_NOTES = {
+    layer: "Box size is lines of code. Colour is the layer.",
+    churn: `Commits in the last ${DATA.churnDays} days. Big and dark means large and still changing, which is where bugs tend to live.`,
+    tests: "How many test files name a type from this file. Views are rarely tested directly, so read this for services and models.",
+    dirty: "Files with changes that aren't committed yet.",
+  };
+  function rampLegend(label, hi) {
+    const stops = d3.range(0, 1.0001, 0.2).map((t) => seq(Math.sqrt(1 / hi) + t * (1 - Math.sqrt(1 / hi)))).join(",");
+    return `<span>${label}<span class="ramp-row"><em>1</em><i class="ramp" style="background:linear-gradient(90deg,${stops})"></i><em>${hi}</em></span></span>`;
+  }
+  function renderLegend() {
+    const el = $("#legend");
+    const note = $("#lens-note");
+    let html = "";
+    if (state.lens === "layer") {
+      html = LAYERS.map((l) => `<span><i class="swatch" style="background:var(${l.token})"></i>${l.name} <em>${Math.round((layerLines[l.id] || 0) / totalLines * 100)}%</em></span>`).join("");
+      note.textContent = LENS_NOTES.layer;
+    } else if (state.lens === "churn") {
+      html = rampLegend("Commits", maxChurn) + `<span><i class="swatch" style="background:var(--neutral-cell)"></i>Unchanged</span>`;
+      note.textContent = LENS_NOTES.churn;
+    } else if (state.lens === "tests") {
+      html = rampLegend("Test files", maxTests) + `<span><i class="swatch" style="background:var(--neutral-cell)"></i>No test names it</span>`;
+      note.textContent = LENS_NOTES.tests;
+    } else if (state.lens === "dirty") {
+      html = `<span><i class="swatch" style="background:var(--accent)"></i>Uncommitted <em>${dirtyCount}</em></span><span><i class="swatch" style="background:var(--neutral-cell)"></i>Committed</span>`;
+      note.textContent = LENS_NOTES.dirty;
+    } else if (state.pair) {
+      const [a, b] = state.pair;
+      html = `<span><i class="swatch" style="background:var(--gold)"></i>In ${esc(areaName(a))}, referencing</span><span><i class="swatch" style="background:var(--accent)"></i>In ${esc(areaName(b))}, referenced</span>`;
+      note.textContent = `Files on each side of ${areaName(a)} → ${areaName(b)}.`;
+    } else if (state.file != null) {
+      const f = files[state.file];
+      html = `<span><i class="swatch" style="background:var(--ink)"></i>${esc(f.base)}</span><span><i class="swatch" style="background:var(--accent)"></i>It uses <em>${state.links.used.size}</em></span><span><i class="swatch" style="background:var(--gold)"></i>Uses it <em>${state.links.users.size}</em></span><span><i class="swatch split"></i>Both ways</span>`;
+      note.textContent = `What ${f.base} uses, and what uses it.`;
+    }
+    el.innerHTML = html;
+  }
+  function syncLenses() {
+    document.querySelectorAll("#lenses button").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.lens === state.lens));
+      if (b.dataset.lens === "links") b.disabled = !state.links;
+    });
+  }
+  $("#lenses").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button[data-lens]");
+    if (!b || b.disabled) return;
+    state.lens = b.dataset.lens;
+    if (state.lens !== "links") state.prevLens = state.lens;
+    paintTreemap();
+  });
+
+  // ---------- Selection ----------
+  function selectFile(i, scroll) {
+    state.file = i; state.area = null; state.pair = null;
+    state.links = { used: new Set(outEdges[i].map((e) => e.to)), users: new Set(inEdges[i].map((e) => e.from)) };
+    state.lens = "links";
+    refresh();
+    if (scroll) $("#workspace").scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "start" });
+  }
+  function selectArea(id) {
+    state.area = id; state.file = null; state.pair = null; state.links = null;
+    if (state.lens === "links") state.lens = state.prevLens;
+    refresh();
+  }
+  function selectPair(a, b, scroll) {
+    const es = DATA.edges.filter((e) => files[e.from].area === a && files[e.to].area === b);
+    state.pair = [a, b]; state.file = null; state.area = null;
+    state.links = { users: new Set(es.map((e) => e.from)), used: new Set(es.map((e) => e.to)) };
+    state.lens = "links";
+    refresh();
+    if (scroll) $("#workspace").scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "start" });
+  }
+  function clearSelection() {
+    state.file = null; state.area = null; state.pair = null; state.links = null;
+    if (state.lens === "links") state.lens = state.prevLens;
+    refresh();
+  }
+  function refresh() { paintTreemap(); renderInspector(); paintMatrix(); }
+
+  // ---------- Inspector ----------
+  const layerDot = (id) => `<i class="swatch" style="background:var(${layerById[id].token});margin:0"></i>`;
+  const back = `<button class="back" data-clear>‹ Hotspots</button>`;
+
+  function viewHome() {
+    const top = hotspots.length ? hotspots[0].score : 1;
+    return `<p class="eyebrow">Hotspots</p>
+      <h3 class="ihead">Big files that keep changing</h3>
+      <p class="inote">Ranked by lines × commits in the last ${DATA.churnDays} days. A change is most likely to break something near the top of this list.</p>
+      <ol class="hot">${hotspots.map((h, k) => `<li><button data-file="${h.f.i}">
+        <span class="rk">${k + 1}</span><span class="nm">${esc(h.f.base)}</span>
+        <span class="meta">${esc(areaName(h.f.area))} · ${fmt(h.f.lines)} lines · ${h.f.churn} commits</span>
+        <i class="bar" style="width:calc((100% - 1.6em - 22px) * ${(h.score / top).toFixed(3)})"></i></button></li>`).join("")}</ol>
+      <p class="hint">Click any box on the map, or search above, to see what a file touches.</p>`;
+  }
+
+  function edgeRows(list, key, other, limit) {
+    const shown = list.slice(0, limit);
+    const rows = shown.map((e) => {
+      const f = files[e[key]];
+      const mutual = other.has(e[key]);
+      return `<li><button data-file="${f.i}" title="${e.weight} references"><span class="nm">${esc(f.base)}${mutual ? '<span class="tag">both ways</span>' : ""}</span><span class="w">${e.weight}</span><span class="sub">${esc(areaName(f.area))} · via ${esc(e.via.join(", "))}</span></button></li>`;
+    }).join("");
+    const more = list.length > limit ? `<p class="more">and ${list.length - limit} more</p>` : "";
+    return `<ul class="list">${rows}</ul>${more}`;
+  }
+
+  function viewFile(i) {
+    const f = files[i];
+    const outs = [...outEdges[i]].sort((a, b) => b.weight - a.weight);
+    const ins = [...inEdges[i]].sort((a, b) => b.weight - a.weight);
+    const users = new Set(ins.map((e) => e.from)), used = new Set(outs.map((e) => e.to));
+    const declares = f.types.length || f.funcs.length
+      ? `<div class="chips">${f.types.map((t) => `<span class="chip">${esc(t)}</span>`).join("")}${f.funcs.map((t) => `<span class="chip">${esc(t)}()</span>`).join("")}</div>`
+      : `<p class="inote">No top-level types.${f.extends.length ? ` It extends ${f.extends.map((t) => `<code>${esc(t)}</code>`).join(", ")}, and extension members aren't tracked, so the files that use them won't show up here.` : ""}</p>`;
+    return `${back}
+      <p class="eyebrow">${layerDot(f.dlayer)} ${esc(layerById[f.dlayer].name)} · ${esc(areaName(f.area))}</p>
+      <h3 class="ihead mono">${esc(f.base)}</h3>
+      <p class="ipath">${esc(f.path)}</p>
+      ${f.dirty ? '<p style="margin:8px 0 0"><span class="pill dirty">Uncommitted changes</span></p>' : ""}
+      <div class="kv">
+        <div><b>${fmt(f.lines)}</b><span>lines</span></div>
+        <div><b>${f.churn}</b><span>commits, ${DATA.churnDays} days</span></div>
+        <div><b>${f.commits}</b><span>commits, all time</span></div>
+        <div><b>${f.lastChanged ? esc(f.lastChanged.slice(5)) : "—"}</b><span>last commit${f.lastChanged ? " " + esc(f.lastChanged.slice(0, 4)) : ""}</span></div>
+        <div><b>${f.tests}</b><span>test files name it</span></div>
+        <div><b>${ins.length}</b><span>files use it</span></div>
+      </div>
+      <div class="block"><h4>Declares</h4>${declares}</div>
+      <div class="block"><h4>It uses <span>${outs.length} files · refs</span></h4>${outs.length ? edgeRows(outs, "to", users, 14) : '<p class="inote">Nothing in the app.</p>'}</div>
+      <div class="block"><h4>Used by <span>${ins.length} files · refs</span></h4>${ins.length ? edgeRows(ins, "from", used, 14) : '<p class="inote">No other file names its types.</p>'}</div>`;
+  }
+
+  function viewArea(id) {
+    const a = areas.find((x) => x.id === id);
+    const fl = files.filter((f) => f.area === id).sort((x, y) => y.lines - x.lines);
+    const outs = DATA.areaEdges.filter((e) => e.from === id && e.to !== id).sort((x, y) => y.weight - x.weight).slice(0, 8);
+    const ins = DATA.areaEdges.filter((e) => e.to === id && e.from !== id).sort((x, y) => y.weight - x.weight).slice(0, 8);
+    const pairRows = (list, side) => `<ul class="list">${list.map((e) => `<li><button data-pair="${esc(e.from)}|${esc(e.to)}"><span class="nm">${esc(areaPath(e[side]))}</span><span class="w">${fmt(e.weight)}</span><span class="sub">via ${esc(e.via.slice(0, 3).join(", "))}</span></button></li>`).join("")}</ul>`;
+    return `${back}
+      <p class="eyebrow">${layerDot(a.dlayer)} ${esc(layerById[a.dlayer].name)} folder</p>
+      <h3 class="ihead mono">${esc(areaPath(id))}</h3>
+      <div class="kv"><div><b>${a.files}</b><span>files</span></div><div><b>${fmt(a.lines)}</b><span>lines</span></div><div><b>${Math.round(a.lines / totalLines * 1000) / 10}%</b><span>of the app</span></div></div>
+      <div class="block"><h4>Reaches into <span>refs</span></h4>${outs.length ? pairRows(outs, "to") : '<p class="inote">No other folder.</p>'}</div>
+      <div class="block"><h4>Reached from <span>refs</span></h4>${ins.length ? pairRows(ins, "from") : '<p class="inote">No other folder.</p>'}</div>
+      <div class="block"><h4>Files <span>lines</span></h4><ul class="list">${fl.map((f) => `<li><button data-file="${f.i}"><span class="nm">${esc(f.base)}</span><span class="w">${fmt(f.lines)}</span></button></li>`).join("")}</ul></div>`;
+  }
+
+  function viewPair(a, b) {
+    const e = areaEdgeMap.get(a + ">" + b);
+    const es = DATA.edges.filter((x) => files[x.from].area === a && files[x.to].area === b).sort((x, y) => y.weight - x.weight);
+    const up = a !== b && isUpward(a, b);
+    return `${back}
+      <p class="eyebrow">Folder to folder</p>
+      <h3 class="ihead mono">${esc(areaName(a))} → ${esc(areaName(b))}</h3>
+      <p class="ipath">${esc(areaPath(a))} → ${esc(areaPath(b))}</p>
+      ${up ? `<p style="margin:8px 0 0"><span class="pill warn">${warnIcon(12)} Reaches up a layer</span></p>` : ""}
+      <div class="kv"><div><b>${fmt(e ? e.weight : 0)}</b><span>references</span></div><div><b>${es.length}</b><span>file pairs</span></div></div>
+      <div class="block"><h4>File pairs <span>refs</span></h4><ul class="list">${es.slice(0, 40).map((x) => `<li><button data-file="${x.from}"><span class="nm">${esc(files[x.from].base)} → ${esc(files[x.to].base)}</span><span class="w">${x.weight}</span><span class="sub">via ${esc(x.via.join(", "))}</span></button></li>`).join("")}</ul>${es.length > 40 ? `<p class="more">and ${es.length - 40} more</p>` : ""}</div>`;
+  }
+
+  function renderInspector() {
+    const el = $("#inspector");
+    el.innerHTML = state.file != null ? viewFile(state.file) : state.pair ? viewPair(...state.pair) : state.area ? viewArea(state.area) : viewHome();
+    el.scrollTop = 0;
+  }
+  function onPick(ev) {
+    const t = ev.target.closest("[data-file],[data-area],[data-pair],[data-clear]");
+    if (!t || t.disabled) return;
+    if (t.hasAttribute("data-clear")) return clearSelection();
+    if (t.dataset.file != null) return selectFile(+t.dataset.file, t.dataset.scroll === "1");
+    if (t.dataset.area) return selectArea(t.dataset.area);
+    if (t.dataset.pair) { const [a, b] = t.dataset.pair.split("|"); return selectPair(a, b, t.closest("#upward") != null); }
+  }
+  $("#inspector").addEventListener("click", onPick);
+  $("#upward").addEventListener("click", onPick);
+  $("#flow").addEventListener("click", onPick);
+
+  // ---------- Search ----------
+  const index = [];
+  files.forEach((f) => {
+    index.push({ key: f.base.toLowerCase(), label: f.base, sub: areaName(f.area), i: f.i });
+    f.types.forEach((t) => { if (t !== f.base) index.push({ key: t.toLowerCase(), label: t, sub: "in " + f.base, i: f.i }); });
+  });
+  const search = $("#search"), results = $("#results");
+  function runSearch() {
+    const q = search.value.trim().toLowerCase();
+    if (!q) { results.hidden = true; return; }
+    const hits = index.filter((x) => x.key.includes(q))
+      .sort((a, b) => (b.key.startsWith(q) - a.key.startsWith(q)) || a.key.length - b.key.length).slice(0, 8);
+    results.innerHTML = hits.length
+      ? hits.map((h) => `<li><button data-i="${h.i}"><span class="nm">${esc(h.label)}</span><span class="sub">${esc(h.sub)}</span></button></li>`).join("")
+      : `<li class="none">Nothing matches “${esc(search.value.trim())}”.</li>`;
+    results.hidden = false;
+  }
+  function pickResult(i) { results.hidden = true; search.value = ""; selectFile(i); }
+  search.addEventListener("input", runSearch);
+  search.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") { const b = results.querySelector("button"); if (b) pickResult(+b.dataset.i); }
+    if (ev.key === "Escape") { search.value = ""; results.hidden = true; }
+    if (ev.key === "ArrowDown") { const b = results.querySelector("button"); if (b) { ev.preventDefault(); b.focus(); } }
+  });
+  results.addEventListener("click", (ev) => { const b = ev.target.closest("button[data-i]"); if (b) pickResult(+b.dataset.i); });
+  document.addEventListener("click", (ev) => { if (!ev.target.closest(".search")) results.hidden = true; });
+
+  // ---------- Matrix ----------
+  let mxCells = null, mxRows = null, mxCols = null;
+  const warnIcon = (s) => `<svg width="${s}" height="${s}" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l7 12.5H1z" fill="var(--warn)"/><path d="M8 6v4" stroke="#111113" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="12" r=".9" fill="#111113"/></svg>`;
+
+  function renderMatrix() {
+    const host = $("#matrix");
+    host.innerHTML = "";
+    const n = areas.length, cs = 20, left = 136, top = 122;
+    const W = left + n * cs + 76, H = top + n * cs + 4;
+    const svg = d3.select(host).append("svg").attr("width", W).attr("height", H).attr("viewBox", `0 0 ${W} ${H}`)
+      .attr("role", "img").attr("aria-label", "Matrix of references between folders");
+    const spans = LAYERS.map((l) => {
+      const idx = areas.map((a, k) => (a.dlayer === l.id ? k : -1)).filter((k) => k >= 0);
+      return idx.length ? { l, start: idx[0], end: idx[idx.length - 1] + 1 } : null;
+    }).filter(Boolean);
+    spans.forEach((r) => spans.forEach((c) => {
+      if (r.l.rank > c.l.rank) svg.append("rect").attr("class", "mx-zone").attr("x", left + c.start * cs).attr("y", top + r.start * cs).attr("width", (c.end - c.start) * cs).attr("height", (r.end - r.start) * cs);
+    }));
+    spans.forEach((s) => {
+      svg.append("rect").attr("x", 2).attr("y", top + s.start * cs + 2).attr("width", 3).attr("height", (s.end - s.start) * cs - 4).attr("rx", 1.5).attr("fill", T.layer[s.l.id]);
+      svg.append("rect").attr("x", left + s.start * cs + 2).attr("y", top - 5).attr("width", (s.end - s.start) * cs - 4).attr("height", 3).attr("rx", 1.5).attr("fill", T.layer[s.l.id]);
+      if (s.start > 0) {
+        svg.append("line").attr("class", "mx-sep").attr("x1", left + s.start * cs).attr("x2", left + s.start * cs).attr("y1", top).attr("y2", top + n * cs);
+        svg.append("line").attr("class", "mx-sep").attr("y1", top + s.start * cs).attr("y2", top + s.start * cs).attr("x1", left).attr("x2", left + n * cs);
+      }
+    });
+    mxRows = svg.append("g").selectAll("text").data(areas).join("text").attr("class", "mx-label")
+      .attr("x", left - 8).attr("y", (a, k) => top + k * cs + cs / 2 + 4).attr("text-anchor", "end").text((a) => a.name)
+      .on("click", (ev, a) => { selectArea(a.id); $("#workspace").scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth" }); });
+    mxCols = svg.append("g").selectAll("text").data(areas).join("text").attr("class", "mx-label")
+      .attr("transform", (a, k) => `translate(${left + k * cs + cs / 2 + 4},${top - 10}) rotate(-55)`).text((a) => a.name)
+      .on("click", (ev, a) => { selectArea(a.id); $("#workspace").scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth" }); });
+
+    const cross = DATA.areaEdges.filter((e) => e.from !== e.to);
+    const maxW = Math.max(2, ...cross.map((e) => e.weight));
+    const scale = d3.scaleLog().domain([1, maxW]).range([0.12, 1]).clamp(true);
+    const cells = [];
+    areas.forEach((ra, r) => areas.forEach((ca, c) => {
+      const e = areaEdgeMap.get(ra.id + ">" + ca.id);
+      if (e) cells.push({ r, c, e, self: r === c, up: r !== c && isUpward(ra.id, ca.id) });
+    }));
+    mxCells = svg.append("g").selectAll("rect").data(cells).join("rect")
+      .attr("class", (d) => "mx-cell" + (d.self ? " self" : "") + (d.up ? " up" : ""))
+      .attr("x", (d) => left + d.c * cs + 2).attr("y", (d) => top + d.r * cs + 2).attr("width", cs - 4).attr("height", cs - 4).attr("rx", 3)
+      .attr("fill", (d) => (d.self ? "none" : seq(scale(d.e.weight))))
+      .on("mouseenter", (ev, d) => {
+        mxRows.classed("hot", (a, k) => k === d.r);
+        mxCols.classed("hot", (a, k) => k === d.c);
+        const head = d.self ? `${areaName(d.e.from)} internally` : `${areaName(d.e.from)} → ${areaName(d.e.to)}`;
+        showTip(`<b>${esc(head)}</b>${fmt(d.e.weight)} references across ${d.e.pairs} file pair${d.e.pairs === 1 ? "" : "s"}<br>via ${esc(d.e.via.slice(0, 4).join(", "))}${d.up ? "<br>Reaches up a layer" : ""}`, ev);
+      })
+      .on("mousemove", moveTip)
+      .on("mouseleave", () => { hideTip(); mxRows.classed("hot", false); mxCols.classed("hot", false); })
+      .on("click", (ev, d) => { hideTip(); selectPair(d.e.from, d.e.to, true); });
+
+    const stops = d3.range(0, 1.0001, 0.2).map((t) => seq(0.12 + t * 0.88)).join(",");
+    $("#mx-caption").innerHTML = `<span>References<span class="ramp-row"><em>1</em><i class="ramp" style="background:linear-gradient(90deg,${stops})"></i><em>${fmt(maxW)}</em></span></span>
+      <span><i class="swatch" style="border:1px dashed var(--line-strong)"></i>Inside one folder</span>
+      <span><i class="swatch" style="border:2px solid var(--warn)"></i>Reaches up a layer</span>`;
+    paintMatrix();
+  }
+  function paintMatrix() {
+    if (!mxCells) return;
+    const ai = state.area ? areas.findIndex((a) => a.id === state.area) : -1;
+    mxRows.classed("sel", (a, k) => k === ai);
+    mxCols.classed("sel", (a, k) => k === ai);
+    mxCells.classed("sel", (d) => !!state.pair && d.e.from === state.pair[0] && d.e.to === state.pair[1]);
+  }
+
+  function renderUpward() {
+    const featureCross = DATA.areaEdges.filter((e) => e.from !== e.to && displayLayer(e.from) === "Features" && displayLayer(e.to) === "Features");
+    const intoFeature = {};
+    featureCross.forEach((e) => { intoFeature[e.to] = (intoFeature[e.to] || 0) + e.weight; });
+    const topFeature = Object.entries(intoFeature).sort((a, b) => b[1] - a[1])[0];
+    $("#upward").innerHTML = `<h3 class="up-head">${warnIcon(16)} ${upward.length} upward reference${upward.length === 1 ? "" : "s"}</h3>
+      <p>Core and Data shouldn't need to know about features. Each of these is a type declared in a higher layer but used from a lower one. Usually that means the type belongs a layer down.</p>
+      <ul class="list">${upward.map((e) => `<li><button data-pair="${esc(e.from)}|${esc(e.to)}"><span class="nm">${esc(areaPath(e.from))} → ${esc(areaPath(e.to))}</span><span class="w">${e.weight}</span><span class="sub">via ${esc(e.via.slice(0, 3).join(", "))}</span></button></li>`).join("")}</ul>
+      <p class="stat">Features also reach into each other: ${fmt(featureCross.reduce((s, e) => s + e.weight, 0))} references across ${featureCross.length} folder pairs${topFeature ? `, most of them into <strong>${esc(areaName(topFeature[0]))}</strong> (${fmt(topFeature[1])})` : ""}.</p>`;
+  }
+
+  // ---------- Flows ----------
+  function renderFlows() {
+    $("#flow-tabs").innerHTML = FLOWS.map((f, k) => `<button data-flow="${k}" aria-pressed="${k === state.flow}">${esc(f.title)}</button>`).join("");
+    const f = FLOWS[state.flow], n = f.steps.length;
+    let html = `<p class="flow-summary">${f.summary}</p><div class="flow-grid" style="grid-template-rows:auto repeat(${n},auto)">`;
+    html += `<svg class="wires" aria-hidden="true"><defs><marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0.5 L8,4 L0,7.5 z" fill="currentColor"/></marker></defs><g class="w"></g></svg>`;
+    LANES.forEach((l, k) => { html += `<div class="lane-head" style="grid-row:1;grid-column:${k + 1}">${l.name}</div>`; });
+    html += `<div class="lane-head" style="grid-row:1;grid-column:6">What happens</div>`;
+    LANES.forEach((l, k) => { html += `<div class="lane-guide" style="grid-row:2 / -1;grid-column:${k + 1}"></div>`; });
+    f.steps.forEach((s, k) => {
+      const lane = LANES.findIndex((l) => l.id === s.lane);
+      const fi = typeOwner[s.type];
+      const file = fi != null ? files[fi] : null;
+      const attrs = file ? `data-file="${fi}" data-scroll="1" title="Open ${esc(file.name)}"` : "disabled";
+      html += `<button class="step${s.branch ? " branch" : ""}" style="grid-row:${k + 2};grid-column:${lane + 1}" ${attrs}>
+        <span class="step-type"><i class="dot" style="background:var(${file ? layerById[file.dlayer].token : "--l-shell"})"></i>${esc(s.type)}</span>
+        <span class="step-call">${esc(s.call)}</span><span class="step-lane">${LANES[lane].name}${s.branch ? " · detached task" : ""}</span></button>`;
+      html += `<div class="step-note" style="grid-row:${k + 2};grid-column:6"><span class="n">${k + 1}</span><p>${s.note}</p></div>`;
+    });
+    html += `</div>`;
+    if (DATA.commit !== FLOWS_TRACED.commit) {
+      html += `<p class="drift">Traced at ${FLOWS_TRACED.commit} on ${FLOWS_TRACED.date}; the map is now at ${esc(DATA.commit)}. Check these steps if the files involved have changed.</p>`;
+    }
+    $("#flow").innerHTML = html;
+    requestAnimationFrame(drawWires);
+  }
+  function drawWires() {
+    const grid = $(".flow-grid");
+    if (!grid) return;
+    const svg = grid.querySelector(".wires");
+    if (getComputedStyle(svg).display === "none") return;
+    const g0 = grid.getBoundingClientRect();
+    svg.setAttribute("width", g0.width);
+    svg.setAttribute("height", g0.height);
+    const cards = [...grid.querySelectorAll(".step")];
+    const steps = FLOWS[state.flow].steps;
+    let paths = "", anchor = 0;
+    for (let k = 1; k < cards.length; k++) {
+      const a = cards[anchor].getBoundingClientRect(), b = cards[k].getBoundingClientRect();
+      const x1 = a.left + a.width / 2 - g0.left, y1 = a.bottom - g0.top;
+      const x2 = b.left + b.width / 2 - g0.left, y2 = b.top - g0.top - 1;
+      const ym = y2 - 6;
+      const d = Math.abs(x1 - x2) < 2 ? `M${x1},${y1} V${y2}` : `M${x1},${y1} V${ym} H${x2} V${y2}`;
+      paths += `<path d="${d}"${steps[k].branch ? ' class="dashed"' : ""} marker-end="url(#arrow)"/>`;
+      if (!steps[k].branch) anchor = k;
+    }
+    svg.querySelector("g.w").innerHTML = paths;
+  }
+  $("#flow-tabs").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button[data-flow]");
+    if (!b) return;
+    state.flow = +b.dataset.flow;
+    renderFlows();
+  });
+
+  // ---------- Header ----------
+  function renderHeader() {
+    $("#navline").innerHTML = `<span><b>${esc(DATA.branch)}</b></span><span>${esc(DATA.commit)}</span><span>built ${esc(DATA.generated)}</span>`;
+    $("#facts").innerHTML = [
+      [fmt(files.length), "Swift files"],
+      [fmt(totalLines), "lines"],
+      [areas.length, "folders"],
+      [fmt(DATA.edges.length), "file-to-file links"],
+      [DATA.testFiles, "test files"],
+      [dirtyCount, "uncommitted"],
+    ].map(([v, l]) => `<span><b>${v}</b>${l}</span>`).join("");
+    $("#footer-meta").textContent = `This copy: ${DATA.branch} at ${DATA.commit}, built ${DATA.generated}. Churn counts commits since ${DATA.churnDays} days before the build.`;
+  }
+
+  // ---------- Boot ----------
+  function renderAll() { readTokens(); renderTreemap(); renderMatrix(); }
+  renderHeader();
+  readTokens();
+  renderInspector();
+  renderUpward();
+  renderFlows();
+  renderTreemap();
+  renderMatrix();
+
+  let raf = 0;
+  new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { renderTreemap(); drawWires(); }); }).observe($("#treemap"));
+  window.addEventListener("resize", () => requestAnimationFrame(drawWires));
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", renderAll);
+  new MutationObserver(renderAll).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+})();
+</script>
