@@ -51,11 +51,12 @@ Manual (full device pass):
 - Check supersets, rest timer, PR badge promotion/demotion and suggestion refresh.
 - Edit a finished workout, then relaunch and verify the saved result.
 
-## Then — Phases 2 + 3 (remaining writes)
+## Then — Phases 2 + 3 (remaining writes, optional since the iOS 18 minimum)
 
 Automated:
 
-- Bug-2 set/PR/stats controls are clean on iOS 17.5.
+- Nothing to turn clean any more: bug 2 can't happen on a supported OS since the minimum was
+  raised to iOS 18 (2026-09-13).
 - PR, stats, template, workout, bodyweight and fatigue-learning suites pass.
 
 Manual:
@@ -65,7 +66,7 @@ Manual:
 
 ## Final — Phase 6 / release gate
 
-- Full suite on iOS 17.5, 18.6 and 26.3, one run at a time; read totals from `.xcresult`.
+- Full suite on iOS 18.6 and 26.3, one run at a time; read totals from `.xcresult`.
 - The source-ratchet allowlist is empty: repository protocols return no audited live model, and
   views/view models store none. Any new or stale entry fails the test.
 - Phase 3 repository writes use insert-only APIs with DEBUG assertions that inserted models have

@@ -38,7 +38,10 @@ documentation corrections below are complete and verified.
 - **Still needed:** Phase 5 converts the workout screens' held `[WorkoutSet]` values. Until then,
   those screens still have the risk represented by the held-live-set positive control. The
   control itself is intentionally unsafe and must keep crashing after Phase 5.
-- **Recommended next order:** Phase 5 → Phases 2–3 → Phase 6. See the short operator checklist in
+- **Minimum iOS is now 18.0 (2026-09-13).** Bug 2 exists only on iOS 17, so it can no longer
+  happen on a supported OS. Phases 2–3 are now optional architecture work, not crash fixes (§8.3).
+- **Recommended next order:** Phase 5 → Phase 6, with Phases 2–3 when convenient. See the short
+  operator checklist in
   [SWIFTDATA_LIVE_MODEL_TEST_CHECKLIST.md](SWIFTDATA_LIVE_MODEL_TEST_CHECKLIST.md).
 
 ---
@@ -351,7 +354,7 @@ needs a control that still detects the bug.
 | 4 | Real suggestion-engine regression plus set/workout snapshot stress | **Clean on iOS 18.6 and 26.3.1 (2026-09-12)** |
 | Tier C / Settings | Real `SettingsViewModel` toggles save in a loop while a main-actor loop reads its profile fields | **Pre-fix crash on iOS 18.6; clean on 18.6 and 26.3.1 (2026-09-12)** |
 | 5 | Keep `testBug3Control_HeldSetsReadWhileOwnerSaves` as the synthetic positive control. Add a separate real-path regression that drives the converted active/edit workout view-model set flows while repository saves overlap their reads | The synthetic held-live-set control must still crash; the new snapshot-based real-path regression must be clean on 18.6 and 26.3 |
-| All | Full suite on **17.5, 18.6 and 26**, one `xcodebuild` at a time, totals from `.xcresult`; golden masters unchanged; mutation checks on the changed surface (August §16) | — |
+| All | Full suite on **18.6 and 26** (17.5 was dropped with the iOS 18 minimum), one `xcodebuild` at a time, totals from `.xcresult`; golden masters unchanged; mutation checks on the changed surface (August §16) | — |
 | 5 | Device pass: log sets, PR badges appear and demote, edit a finished workout, finish a workout, suggestions refresh on exercise switch | — |
 
 **Why the harness, not `WorkoutJourneyTests`.** Re-running the journey tests on 18.6 crashes
@@ -359,7 +362,8 @@ about once per 360 runs, so 30 clean iterations would still happen about 5% of t
 bug present. The bug-3 controls crash every run on 18.6.
 
 **Destinations:**
-- Add iOS 17.5 (iPhone 15 Pro) and iOS 18.6 (iPhone 16 Pro) as standing test destinations.
+- Standing test destinations: iOS 18.6 (iPhone 16 Pro, the oldest supported runtime) and
+  iOS 26.3.1 (iPhone 17 Pro). iOS 17.5 was dropped when the minimum was raised to iOS 18 (§8.3).
 - Every run record names the device and OS.
 - Remember: `ReplayMaskCoverageTests.testEveryTextInputIsClassified` fails in any worktree under
   `/private/tmp`.
@@ -468,6 +472,19 @@ the planted-offender proof failed 1/1 with the added declaration named; the iOS 
 control crashed with `SIGSEGV`; and the iOS 18.6 held-set control crashed with `SIGABRT` plus the
 expected non-zero-retain-count log signature. The full iOS 26.3.1 suite passed: 913 total, 899
 passed, 14 marker-gated skips and 0 failures. Both race markers were consumed.
+
+### 8.3 Minimum iOS raised to 18.0 — 2026-09-13
+
+- **What changed:** `IPHONEOS_DEPLOYMENT_TARGET` went from 17.0 to 18.0 in all six build
+  configurations (the project, `Repster` and `WorkoutLiveActivityExtension`).
+- **Why:** four tests kept crashing on iOS 17.5 through the remaining bug-2 writers. One of
+  those writers, `WorkoutService.finishWorkout`, had never been seen before (investigation
+  §13). Bug 2 exists only on iOS 17. About 2–3% of iPhones were below iOS 18 in August 2026,
+  and every iOS 17 device can run iOS 18.
+- **Effect on this plan:**
+  - Phases 2–3 no longer fix a crash. They stay as optional work under the one-owner rule.
+  - Phase 5 (bug 3 on iOS 18 and 26) and the Phase 6 ratchet are unchanged.
+  - The `RUN_BUG2_*` harness tests are kept as history only.
 
 ---
 

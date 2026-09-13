@@ -10,7 +10,7 @@ Everything under "What exists today" was verified by reading the code, not assum
 
 Read these first — they change how several of these features have to be built.
 
-- **Deployment target is iOS 17.0** (`IPHONEOS_DEPLOYMENT_TARGET = 17.0`). Anything requiring iOS 18+ APIs (e.g. controls, some interactive-widget behaviour) needs either an availability gate or a deployment bump.
+- **Deployment target is iOS 18.0** (`IPHONEOS_DEPLOYMENT_TARGET = 18.0`, raised from 17.0 on 2026-09-13 to retire the iOS 17-only SwiftData crash; see TEST_SUITE_FAILURES_INVESTIGATION.md §13). Anything requiring iOS 26+ APIs needs an availability gate.
 - **Targets today:** `Repster` (app), `WorkoutLiveActivityExtension` (widget extension — currently Live Activity *only*), `RepsterTests`. There is no watchOS target and no WidgetKit timeline widget.
 - **New files must be hand-registered in `project.pbxproj`.** The project uses explicit file references with short IDs rather than folder groups. Adding a file to disk is not enough; it will not compile until it is registered. Budget time for this on every item.
 - **SwiftData + `@ModelActor` repositories.** There is a known crash class here: passing live main-context model objects into a `@ModelActor` repository caused the `EXC_BAD_ACCESS` that shipped in 1.3. Pass IDs across the actor boundary and re-fetch inside, never live models.

@@ -2,7 +2,8 @@
 
 **Written:** 2026-09-11. **Revised:** 2026-09-13 after verification, reproduction and the
 Xcode 26.3 guard audit. §12 records the Phase 1 and Phase 4 implementation; corrected historical
-claims in the body are marked and point to §11/§12.
+claims in the body are marked and point to §11/§12. §13 (2026-09-13) diagnoses four tests that
+crash on iOS 17.5: bug 2, with a new writer (`WorkoutService.finishWorkout`).
 
 ## Plain summary (read this first)
 
@@ -14,7 +15,7 @@ claims in the body are marked and point to §11/§12.
 | | What it is | Who it affects | Status |
 |---|---|---|---|
 | **Bug 1** | Two test helpers built their test database without the template tables | Tests only, never the app | **Fixed 2026-09-11** (uncommitted). Suite green on iOS 17.5 and 26 (§3.6) |
-| **Bug 2** | A crash on iOS 17 when a service changes a saved record it doesn't own | iOS 17 only: **1 active user**, and it **has crashed a real phone** (1.3, iOS 17.5.1, onboarding) | **Real onboarding path fixed (Phase 1)**; other services remain for Phases 2–3 (§12) |
+| **Bug 2** | A crash on iOS 17 when a service changes a saved record it doesn't own | iOS 17 only: **1 active user**, and it **has crashed a real phone** (1.3, iOS 17.5.1, onboarding) | **Real onboarding path fixed (Phase 1)**; other services remain for Phases 2–3 (§12). Those remaining writers still crash 4 tests on iOS 17.5 (§13) |
 | **Bug 3** | A crash when code is holding a record at the moment its repository saves it, or first fetches a record it just saved | iOS 18: 10 active users. The same pattern also crashes the harness on iOS 26 (§11.3) | **Both observed readers fixed (Phase 4)**; held workout sets remain for Phase 5 (§12) |
 
 - **"47 places" is not 47 bugs.** It is one unsafe write shape repeated across seven services.
@@ -1102,3 +1103,187 @@ repository owners and finish the insert-only DEBUG guard; Phase 6 removes the lo
 closes the source-ratchet allowlist. The concise
 manual and automated gates are in
 [SWIFTDATA_LIVE_MODEL_TEST_CHECKLIST.md](SWIFTDATA_LIVE_MODEL_TEST_CHECKLIST.md).
+
+---
+
+## 13. Four tests crash on iOS 17.5 during new-feature testing (2026-09-13)
+
+**Plain summary.**
+- **What:** four tests segfault on the iOS 17.5 simulator and pass on 18.6 and 26.3.
+- **Cause:** this is **bug 2**, the iOS 17-only cross-actor write race (§4). It is not Phase 5,
+  it is not new, and it is not caused by the onboarding polish work.
+- **Stack:** the one stack trace captured shows `WorkoutService.finishWorkout` writing
+  `Workout.status` from its own actor while SwiftData's main-thread observer reads the same
+  state. That writer had not been seen before.
+- **Exposure:** a real iOS 17 user goes through the same code whenever they finish a workout or
+  save, uncomplete or edit a set. Today that is one active user.
+- **Fix:** Phases 2–3 of the fix scope, starting with the three small `WorkoutService` sites.
+  Alternatively, drop iOS 17 support.
+
+The crashing tests:
+
+| ID | Test | Added |
+|---|---|---|
+| T1 | `AffectedSetsPreconditionTests.testAffectedSetEntriesArriveAlreadyAppliedToTheHeldInstances` (`:209`) | c5b52e7, 2026-08-13 |
+| T2 | `WorkoutJourneyTests.testUncompletingThenRecompletingASetRestoresStatsAndPR` (`:886`) | c5b52e7 |
+| T3 | `WorkoutJourneyTests.testEditingAFinishedWorkoutUpdatesTheSetAndItsStats` (`:1298`) | c5b52e7 |
+| T4 | `WorkoutJourneyTests.testEditScreenAddsOnlyTheExercisesNotAlreadyInTheWorkout` (`:1373`) | befacc4, 2026-09-12 |
+
+### 13.1 Reproduction
+
+All runs used the iPhone 15 Pro, iOS 17.5 simulator (id `4CB40DB5…`) unless stated otherwise.
+Each ran as one `xcodebuild` at a time. Totals come from `.xcresult`. Load average was 2.9–9.
+
+| Run | Result |
+|---|---|
+| Full suite (the user's run, 10:06) | 915 tests: 896 passed, 15 skipped, **4 failed (SIGSEGV)**, 4 runner restarts |
+| T1–T4 together, once | T3 crashed; the other 3 passed |
+| Each test alone, once | 4/4 passed |
+| Each test alone, `-test-iterations 10` (a crash ends the run) | **All four crash on their own**: T1 on iteration 5, T2 on 6, T3 on 1, T4 on 6 |
+| Each alone ×10 again (T1, T2, T4) | T1 crashed, T2 crashed, T4 survived 10 |
+| T1–T4 together ×3, with `-com.apple.CoreData.ConcurrencyDebug 1` | T1 SIGSEGV, T3 crash. Assertions were active (the log shows "multi-threading assertions enabled"), but **no violation was raised** |
+| iPhone 16 Pro, **iOS 18.6** (id `B7F9246C…`): T1–T4 together ×3 | 12/12 passed |
+| iPhone 17 Pro, **iOS 26.3** (the user's full suite) | 0 failures |
+| **Baseline:** worktree at `befacc4^` (b7944c8), T1–T3 together ×5 | T1 and T3 crashed |
+
+**Reading:**
+- It is a race: each test crashes on its own, and ordering doesn't matter.
+- It depends on the runtime: iOS 17 only.
+- It is not new. It already crashes before befacc4. T1 and T3 were crashing on 2026-09-11
+  (§4.3, §9.4 F1), before any of the fix work.
+- T4 is a new test, but it drives the same complete-set and finish-workout paths. The
+  duplicate-exercise change it covers is not involved in the crash.
+
+### 13.2 Stack trace
+
+Only one report was written. It is `~/Library/Logs/DiagnosticReports/Repster-2026-09-13-102312.ips`,
+incident `01C458D6`, and the same report is attached to the ConcurrencyDebug run's `.xcresult`.
+It comes from T3:
+
+```
+EXC_BAD_ACCESS (SIGSEGV)  KERN_INVALID_ADDRESS at 0x8000000000000010
+
+Thread 0  com.apple.main-thread  (crashed)
+  SwiftData +0x33a18 / +0x2dcc4 / +0x26c0 / +0x15f0 / +0x167c
+  CoreFoundation  __CFRunLoopDoObservers
+  XCTestCore      +[XCTWaiter _synchronouslyWaitForTimeInterval:] …
+
+Thread 3  com.apple.root.user-initiated-qos.cooperative
+  libdispatch  _dispatch_sync_f_slow
+  CoreData     -[NSManagedObjectContext performBlockAndWait:]
+  SwiftData    +0x87944 / +0x8b25c / +0x8ee34 / +0x48aa8
+  Repster      Workout.status.setter
+  Repster      WorkoutService.finishWorkout(_:title:notes:perceivedEffort:durationSecondsOverride:)
+  Repster      ActiveWorkoutViewModel.finishWorkout(title:notes:perceivedEffort:)
+  RepsterTests WorkoutJourneyTests.testEditingAFinishedWorkoutUpdatesTheSetAndItsStats()
+```
+
+- **Main thread:** its frames and fault address are identical to bug 2's signature (§4.1).
+- **Writer:** `WorkoutService.finishWorkout` fetches the `Workout` from `WorkoutRepository`, sets
+  `status`, `endTime`, `duration`, `title`, `notes`, `perceivedEffort` and `updatedAt` on its
+  own actor, then calls `workoutRepo.save(workout)`. This is a new writer; §4.2 only saw
+  `PRService` and `StatsService`. It is the Phase 3 `WorkoutService :91` site.
+- **Timing:** T3 crashed while *finishing* the workout, before the edit step ran.
+
+**T1, T2 and T4.**
+- About 8 crashes today wrote no report, and nothing went to `Retired/`. The throttling cause
+  is unknown, and it is not the simple 25-per-day cap.
+- T1's writers are already on record from ten reports in §4.2: `PRService.recomputeFrontierBadges`
+  → `WorkoutSet.prStatus`, and `StatsService.handleSave` → `ExerciseStats` totals.
+- T2's and T4's writers are **inferred from their code paths**, not observed.
+- A per-test stack could come from attaching command-line `lldb`. That needs Developer Mode, or
+  an admin password prompt on this Mac, so it wasn't done.
+
+**Why ConcurrencyDebug stays silent.** In bug 2, SwiftData itself performs the Core Data access
+on the context's queue: the writer thread is inside `performBlockAndWait`. The race is in
+SwiftData's own Swift-side bookkeeping, which Core Data's checker never sees. That launch
+argument cannot detect bug 2.
+
+### 13.3 Classification: bug 2, the Phases 2–3 writes
+
+- **Same signature** as bug 2 (§4.1).
+- **Same two conditions:**
+  - Both test classes are `@MainActor`, so they build their repositories on the main thread,
+    as `RepsterApp.init` does.
+  - A plain-actor service writes a model that one of those repositories owns.
+- **Same runtimes:** clean on 18.6 and 26.3, like bug 2 in §10.1.
+- **Not Phase 5.** Phase 5 is bug 3: live sets *held* by the workout screens while their
+  repository saves them. That fails on iOS 18.6 through the backing-data swap, and on 26 in the
+  harness. These four tests are clean on both runtimes. An earlier note that filed these four
+  under Phase 5 was wrong.
+
+| Test | App path it drives | Cross-actor writers on that path | Removed by |
+|---|---|---|---|
+| T1 | Set saves and PR frontier recompute | `PRService` (`WorkoutSet.prStatus`, `PerformanceRecord`), `StatsService` (`ExerciseStats`), observed in §4.2 | Phase 2 |
+| T2 | Complete, uncomplete, re-complete a set | `SetService.save` / `uncomplete` → `PRService.evaluate` / `handleDeletion`, `StatsService.updateStats` (inferred) | Phase 2 |
+| T3 | Complete a set, finish the workout, edit the set | `WorkoutService.finishWorkout` (observed), then `SetService.edit` → `PRService.evaluateAfterEdit`, `StatsService` | Phase 3 (finish), Phase 2 |
+| T4 | Complete a set, finish the workout, add exercises on the edit screen | `WorkoutService.finishWorkout`, `PRService`, `StatsService` (inferred) | Phases 2–3 |
+
+### 13.4 Can a real user hit this?
+
+**Yes, on iOS 17 only, and on core paths:**
+- finishing any workout (`WorkoutService.finishWorkout`)
+- logging, uncompleting or editing a set (`PRService`, `StatsService`)
+
+The app has the same construction: `RepsterApp.init` builds every repository on the main
+thread, and on iOS 17 main-built repositories run on main (§9.1). This is not a test-only
+pattern.
+
+Scale:
+- **One** active iOS 17 user (PostHog, 30 days to 2026-09-11).
+- The only device crash on record is the onboarding one (§11.1), which Phase 1 fixed.
+- Organizer shows no device crash on these paths so far.
+- Per action, the harness saves far faster than a person does, so the risk on a device is much
+  lower than in the tests. But it is not zero: the same race already crashed a phone once,
+  through a different writer.
+
+### 13.5 Recommended fix (not built)
+
+1. **Phase 3, `WorkoutService` first** (3 sites: finish, metadata, progression exclusions).
+   - Move each write into a `WorkoutRepository` method, following the precedent of
+     `setHealthKitUUID` and `HealthProfileRepository.update`.
+   - It is small and mechanical, it removes the writer caught here, and it runs on every workout
+     finish.
+2. **Phase 2, `PRService` and `StatsService`** (13 sites and 3 blocks).
+   - This is the hot path and the bulk of the work: about 1–2 sessions.
+   - Keep the badge-identity dependency until Phase 5
+     (SWIFTDATA_LIVE_MODEL_FIX_SCOPING.md §3, §7).
+3. **The rest of Phase 3** (Fatigue exercise 5, Template 2, Bodyweight 1), plus the insert-only
+   `save` guard.
+4. **Verification:**
+   - T1–T4 become the iOS 17.5 regression gate: each alone ×10 (today every one crashes within
+     10), and T1 ×20.
+   - `RUN_BUG2_UNSAFE_WRITES` must keep crashing, to prove the harness still detects the bug.
+   - Full suite on 17.5, 18.6 and 26.3.
+5. **Alternative (a product decision):** raise the deployment target to iOS 18.
+   - Bug 2 exists only on iOS 17, so this removes the whole class and Phases 2–3 stop being
+     crash fixes.
+   - The cost is the one active iOS 17 user, who would stop getting updates.
+6. **Don't** make these tests pass by removing `@MainActor` or building their repositories off
+   the main thread. That would hide the race while the app keeps the crashing construction
+   (§4.6).
+
+**Until one of those lands:** judge regressions on 26.3 and 18.6, and expect T1–T4 (plus other
+rotating `WorkoutJourneyTests` victims, §4.3) to segfault intermittently on 17.5.
+
+**Decision, 2026-09-13: option 5.** The deployment target was raised to iOS 18.0 (all six
+configurations: project, `Repster`, `WorkoutLiveActivityExtension`).
+- Bug 2 can no longer happen on a supported OS, so T1–T4 stop mattering: the app no longer runs
+  on 17.5.
+- The iOS 17.5 simulator stops being a test destination. The oldest one is now iOS 18.6.
+- Phases 2–3 are no longer crash fixes. They stay as optional architecture work under the
+  one-owner rule.
+- The bug-2 tests in `LiveModelRaceReproTests` (`RUN_BUG2_*`) only ever reproduced on iOS 17.
+  They stay in the file as history, but they can't demonstrate anything any more.
+- Market context: roughly 2–3% of iPhones worldwide were below iOS 18 at the end of August 2026
+  (TelemetryDeck). Every iPhone that runs iOS 17 can also run iOS 18.
+
+### 13.6 Evidence
+
+- **The user's full-suite result:**
+  `DerivedData/Repster-hjxdomcocdypqyaozeksllqltljz/Logs/Test/Test-Repster-2026.09.13_10-06-04-+0200.xcresult`
+- **The crash report:** `~/Library/Logs/DiagnosticReports/Repster-2026-09-13-102312.ips`, kept
+  until macOS prunes it.
+- **Diagnostic setup:** the baseline worktree, its DerivedData, and a temporary
+  `.xctestrun` copy carrying the ConcurrencyDebug argument. All were removed after the runs.
+- **Scope:** no app code, tests, scheme or project settings were changed.
