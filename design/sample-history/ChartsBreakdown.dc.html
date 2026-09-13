@@ -1,0 +1,116 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; background: #111113; color: #EAEAEF;
+      font-family: -apple-system, "SF Pro Text", system-ui, "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased; }
+    a { color: #5B8DEF; } a:hover { color: #7BA4F2; }
+  </style>
+</helmet>
+<div style="position: relative; width: 402px; height: 874px; overflow: hidden; background: #111113;">
+
+  <div style="padding: 62px 20px 12px; font-size: 26px; font-weight: 700; color: #EAEAEF;">Charts</div>
+
+  <div style="display: flex; gap: 4px; padding: 0 20px 16px;">
+    <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 9px 0; border-radius: 8px; background: #5B8DEF; font-size: 13px; font-weight: 600; color: #FFFFFF;">Breakdown</div>
+    <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 9px 0; border-radius: 8px; background: #1B1B1F; font-size: 13px; font-weight: 500; color: #5C5C6E;">Workouts</div>
+    <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 9px 0; border-radius: 8px; background: #1B1B1F; font-size: 13px; font-weight: 500; color: #5C5C6E;">Exercises</div>
+  </div>
+
+  <div style="padding: 0 20px 100px; display: flex; flex-direction: column; gap: 16px;">
+
+    <div style="display: flex; align-items: center; gap: 11px; background: #1B1B1F; border-radius: 14px; padding: 12px 6px 12px 12px; border: 1px dashed rgba(148,163,184,0.30);">
+      <div style="width: 30px; height: 30px; border-radius: 9px; background: rgba(148,163,184,0.10); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8" stroke-dasharray="3.2 2.6"></circle></svg>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0;">
+        <div style="font-size: 13px; font-weight: 600; color: #EAEAEF;">Sample data</div>
+        <div style="font-size: 12px; font-weight: 500; color: #9999A8;">8 weeks of Upper / Lower. Your first finished workout replaces it.</div>
+      </div>
+      <div style="font-size: 12px; font-weight: 600; color: #5C5C6E; padding: 8px; flex-shrink: 0;">Hide</div>
+    </div>
+
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 10px;">
+      <div style="font-size: 13px; font-weight: 600; color: #EAEAEF;">Volume by Category</div>
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+    </div>
+
+    <div style="display: flex; gap: 6px;">
+      <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 8px 0; border-radius: 8px; background: #5B8DEF; font-size: 12px; font-weight: 600; color: #FFFFFF;">All</div>
+      <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 8px 0; border-radius: 8px; background: #1B1B1F; font-size: 12px; font-weight: 600; color: #5C5C6E;">Year</div>
+      <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 8px 0; border-radius: 8px; background: #1B1B1F; font-size: 12px; font-weight: 600; color: #5C5C6E;">Month</div>
+      <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 8px 0; border-radius: 8px; background: #1B1B1F; font-size: 12px; font-weight: 600; color: #5C5C6E;">Week</div>
+      <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 8px 0; border-radius: 8px; background: #1B1B1F; font-size: 12px; font-weight: 600; color: #5C5C6E;">Day</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 16px; background: #1B1B1F; border-radius: 16px; border: 1px dashed rgba(148,163,184,0.30);">
+      <div style="position: relative; width: 328px; height: 240px;">
+        <svg width="328" height="240" viewBox="0 0 330 240" style="position: absolute; left: 0; top: 0;">
+          <g transform="rotate(-90 165 120)" fill="none" stroke-width="45.6">
+            <circle cx="165" cy="120" r="97.2" stroke="#5B8DEF" stroke-dasharray="271.83 610.73" stroke-dashoffset="-1.5"></circle>
+            <circle cx="165" cy="120" r="97.2" stroke="#5EC269" stroke-dasharray="143.58 610.73" stroke-dashoffset="-276.33"></circle>
+            <circle cx="165" cy="120" r="97.2" stroke="#D4A23A" stroke-dasharray="76.39 610.73" stroke-dashoffset="-422.91"></circle>
+            <circle cx="165" cy="120" r="97.2" stroke="#E05555" stroke-dasharray="51.97 610.73" stroke-dashoffset="-502.3"></circle>
+            <circle cx="165" cy="120" r="97.2" stroke="#A87EE6" stroke-dasharray="27.54 610.73" stroke-dashoffset="-557.27"></circle>
+            <circle cx="165" cy="120" r="97.2" stroke="#E89B3E" stroke-dasharray="21.43 610.73" stroke-dashoffset="-587.81"></circle>
+          </g>
+        </svg>
+        <div style="position: absolute; left: 104px; top: 98px; width: 120px; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+          <div style="font-size: 18px; font-weight: 700; color: #EAEAEF;">212k kg</div>
+          <div style="font-size: 11px; font-weight: 500; color: #9999A8;">Total Volume</div>
+        </div>
+      </div>
+
+      <div style="align-self: stretch; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; row-gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 10px; height: 10px; border-radius: 3px; background: #5B8DEF;"></div><div style="font-size: 12px; font-weight: 500; color: #9999A8;">Legs</div><div style="font-size: 12px; font-weight: 600; color: #EAEAEF;">45%</div></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 10px; height: 10px; border-radius: 3px; background: #5EC269;"></div><div style="font-size: 12px; font-weight: 500; color: #9999A8;">Back</div><div style="font-size: 12px; font-weight: 600; color: #EAEAEF;">24%</div></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 10px; height: 10px; border-radius: 3px; background: #D4A23A;"></div><div style="font-size: 12px; font-weight: 500; color: #9999A8;">Chest</div><div style="font-size: 12px; font-weight: 600; color: #EAEAEF;">13%</div></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 10px; height: 10px; border-radius: 3px; background: #E05555;"></div><div style="font-size: 12px; font-weight: 500; color: #9999A8;">Shoulders</div><div style="font-size: 12px; font-weight: 600; color: #EAEAEF;">9%</div></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 10px; height: 10px; border-radius: 3px; background: #A87EE6;"></div><div style="font-size: 12px; font-weight: 500; color: #9999A8;">Triceps</div><div style="font-size: 12px; font-weight: 600; color: #EAEAEF;">5%</div></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 10px; height: 10px; border-radius: 3px; background: #E89B3E;"></div><div style="font-size: 12px; font-weight: 500; color: #9999A8;">Biceps</div><div style="font-size: 12px; font-weight: 600; color: #EAEAEF;">4%</div></div>
+      </div>
+
+      <div style="font-size: 11px; font-weight: 500; color: #5C5C6E;">Jul 20, 2026 → Sep 12, 2026</div>
+
+      <div style="align-self: stretch; display: flex; justify-content: space-between; padding-top: 8px;">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;"><div style="font-size: 14px; font-weight: 700; color: #EAEAEF;">212k kg</div><div style="font-size: 10px; font-weight: 500; color: #5C5C6E;">Volume</div></div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;"><div style="font-size: 14px; font-weight: 700; color: #EAEAEF;">466</div><div style="font-size: 10px; font-weight: 500; color: #5C5C6E;">Sets</div></div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;"><div style="font-size: 14px; font-weight: 700; color: #EAEAEF;">4,420</div><div style="font-size: 10px; font-weight: 500; color: #5C5C6E;">Reps</div></div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;"><div style="font-size: 14px; font-weight: 700; color: #EAEAEF;">31</div><div style="font-size: 10px; font-weight: 500; color: #5C5C6E;">Workouts</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 83px; background: #1B1B1F; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));">
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 7px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="1.8" stroke-linejoin="round"><path d="M3.5 10.5L12 4l8.5 6.5V20h-5.5v-5.5h-6V20H3.5z"></path></svg>
+      <div style="font-size: 10px; font-weight: 500; color: #5C5C6E;">Home</div>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 7px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"></rect><path d="M3.5 9.5h17M8 3v4M16 3v4"></path></svg>
+      <div style="font-size: 10px; font-weight: 500; color: #5C5C6E;">Calendar</div>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 7px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16"></path><path d="M7.5 15l4-4.5 3 2.5 5-6"></path></svg>
+      <div style="font-size: 10px; font-weight: 500; color: #5B8DEF;">Charts</div>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 7px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      <div style="font-size: 10px; font-weight: 500; color: #5C5C6E;">Settings</div>
+    </div>
+  </div>
+  <div style="position: absolute; left: 175px; bottom: 60px; width: 52px; height: 52px; border-radius: 26px; background: #5B8DEF; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1B1B1F" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; background: #111113; color: #EAEAEF;
+      font-family: -apple-system, "SF Pro Text", system-ui, "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased; }
+    a { color: #5B8DEF; } a:hover { color: #7BA4F2; }
+  </style>
+</helmet>
+<div style="position: relative; width: 402px; height: 874px; overflow: hidden; background: #111113;">
+
+  <div style="padding: 62px 20px 12px; font-size: 26px; font-weight: 700; color: #EAEAEF;">Charts</div>
+
+  <div style="display: flex; gap: 4px; padding: 0 20px 16px;">
+    <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 9px 0; border-radius: 8px; background: #5B8DEF; font-size: 13px; font-weight: 600; color: #FFFFFF;">Breakdown</div>
+    <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 9px 0; border-radius: 8px; background: #1B1B1F; font-size: 13px; font-weight: 500; color: #5C5C6E;">Workouts</div>
+    <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 9px 0; border-radius: 8px; background: #1B1B1F; font-size: 13px; font-weight: 500; color: #5C5C6E;">Exercises</div>
+  </div>
+
+  <div style="padding: 0 20px 100px; display: flex; flex-direction: column; gap: 16px;">
+
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 10px;">
+      <div style="font-size: 13px; font-weight: 600; color: #EAEAEF;">Volume by Category</div>
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+    </div>
+
+    <div style="display: flex; gap: 6px;">
+      <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 8px 0; border-radius: 8px; background: #5B8DEF; font-size: 12px; font-weight: 600; color: #FFFFFF;">All</div>
+      <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 8px 0; border-radius: 8px; background: #1B1B1F; font-size: 12px; font-weight: 600; color: #5C5C6E;">Year</div>
+      <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 8px 0; border-radius: 8px; background: #1B1B1F; font-size: 12px; font-weight: 600; color: #5C5C6E;">Month</div>
+      <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 8px 0; border-radius: 8px; background: #1B1B1F; font-size: 12px; font-weight: 600; color: #5C5C6E;">Week</div>
+      <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 8px 0; border-radius: 8px; background: #1B1B1F; font-size: 12px; font-weight: 600; color: #5C5C6E;">Day</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 76px 16px; background: #1B1B1F; border-radius: 16px;">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="#5C5C6E"><path d="M11 2.05A10 10 0 1 0 21.95 13H11z"></path><path d="M13 2.05V11h8.95A10 10 0 0 0 13 2.05z"></path></svg>
+      <div style="font-size: 14px; font-weight: 500; color: #5C5C6E;">No data for this period</div>
+    </div>
+
+  </div>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 83px; background: #1B1B1F; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));">
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 7px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="1.8" stroke-linejoin="round"><path d="M3.5 10.5L12 4l8.5 6.5V20h-5.5v-5.5h-6V20H3.5z"></path></svg>
+      <div style="font-size: 10px; font-weight: 500; color: #5C5C6E;">Home</div>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 7px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"></rect><path d="M3.5 9.5h17M8 3v4M16 3v4"></path></svg>
+      <div style="font-size: 10px; font-weight: 500; color: #5C5C6E;">Calendar</div>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 7px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16"></path><path d="M7.5 15l4-4.5 3 2.5 5-6"></path></svg>
+      <div style="font-size: 10px; font-weight: 500; color: #5B8DEF;">Charts</div>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 7px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      <div style="font-size: 10px; font-weight: 500; color: #5C5C6E;">Settings</div>
+    </div>
+  </div>
+  <div style="position: absolute; left: 175px; bottom: 60px; width: 52px; height: 52px; border-radius: 26px; background: #5B8DEF; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1B1B1F" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

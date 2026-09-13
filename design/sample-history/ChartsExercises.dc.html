@@ -1,0 +1,143 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; background: #111113; color: #EAEAEF;
+      font-family: -apple-system, "SF Pro Text", system-ui, "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased; }
+    a { color: #5B8DEF; } a:hover { color: #7BA4F2; }
+  </style>
+</helmet>
+<div style="position: relative; width: 402px; height: 874px; overflow: hidden; background: #111113;">
+
+  <div style="padding: 62px 20px 12px; font-size: 26px; font-weight: 700; color: #EAEAEF;">Charts</div>
+
+  <div style="display: flex; gap: 4px; padding: 0 20px 16px;">
+    <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 9px 0; border-radius: 8px; background: #1B1B1F; font-size: 13px; font-weight: 500; color: #5C5C6E;">Breakdown</div>
+    <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 9px 0; border-radius: 8px; background: #1B1B1F; font-size: 13px; font-weight: 500; color: #5C5C6E;">Workouts</div>
+    <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 9px 0; border-radius: 8px; background: #5B8DEF; font-size: 13px; font-weight: 600; color: #FFFFFF;">Exercises</div>
+  </div>
+
+  <div style="padding: 0 20px 100px; display: flex; flex-direction: column; gap: 16px;">
+
+    <div style="display: flex; align-items: center; gap: 11px; background: #1B1B1F; border-radius: 14px; padding: 12px 6px 12px 12px; border: 1px dashed rgba(148,163,184,0.30);">
+      <div style="width: 30px; height: 30px; border-radius: 9px; background: rgba(148,163,184,0.10); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8" stroke-dasharray="3.2 2.6"></circle></svg>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0;">
+        <div style="font-size: 13px; font-weight: 600; color: #EAEAEF;">Sample data</div>
+        <div style="font-size: 12px; font-weight: 500; color: #9999A8;">8 weeks of Upper / Lower. Your first finished workout replaces it.</div>
+      </div>
+      <div style="font-size: 12px; font-weight: 600; color: #5C5C6E; padding: 8px; flex-shrink: 0;">Hide</div>
+    </div>
+
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: #1B1B1F; border: 1px solid rgba(255,255,255,0.06); border-radius: 10px;">
+      <div style="font-size: 13px; font-weight: 600; color: #EAEAEF;">Estimated 1RM</div>
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #1B1B1F; border: 1px solid rgba(91,141,239,0.30); border-radius: 10px;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="3" stroke-linecap="round" style="flex-shrink: 0;"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"></path></svg>
+      <div style="font-size: 13px; font-weight: 600; color: #5B8DEF; flex-grow: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Barbell Bench Press, Barbell Back Squat</div>
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M9 6l6 6-6 6"></path></svg>
+    </div>
+
+    <div style="display: flex; gap: 6px;">
+      <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 8px 0; border-radius: 8px; background: #5B8DEF; font-size: 12px; font-weight: 600; color: #FFFFFF;">All</div>
+      <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 8px 0; border-radius: 8px; background: #1B1B1F; font-size: 12px; font-weight: 600; color: #5C5C6E;">1y</div>
+      <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 8px 0; border-radius: 8px; background: #1B1B1F; font-size: 12px; font-weight: 600; color: #5C5C6E;">6mo</div>
+      <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 8px 0; border-radius: 8px; background: #1B1B1F; font-size: 12px; font-weight: 600; color: #5C5C6E;">3mo</div>
+      <div style="flex-grow: 1; flex-basis: 0; text-align: center; padding: 8px 0; border-radius: 8px; background: #1B1B1F; font-size: 12px; font-weight: 600; color: #5C5C6E;">1mo</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 12px; padding: 16px; background: #1B1B1F; border-radius: 16px; border: 1px dashed rgba(148,163,184,0.30);">
+      <svg width="328" height="220" viewBox="0 0 330 220" style="display: block;">
+        <path d="M32 4H330M32 51H330M32 98H330M32 145H330M32 192H330" stroke="rgba(255,255,255,0.08)" stroke-width="0.6" fill="none"></path>
+        <g font-size="11" fill="#5C5C6E" text-anchor="end">
+          <text x="26" y="8">120</text>
+          <text x="26" y="55">90</text>
+          <text x="26" y="102">60</text>
+          <text x="26" y="149">30</text>
+          <text x="26" y="196">0</text>
+        </g>
+        <g font-size="11" fill="#5C5C6E" text-anchor="middle">
+          <text x="79.5" y="213">Jul 27</text>
+          <text x="158.4" y="213">Aug 10</text>
+          <text x="237.4" y="213">Aug 24</text>
+          <text x="316.4" y="213">Sep 7</text>
+        </g>
+        <polyline points="45.64,35.33 85.12,31.42 124.6,27.5 164.08,23.58 203.56,33.77 243.04,19.67 282.52,15.75 322,11.83" fill="none" stroke="#5EC269" stroke-width="1.5"></polyline>
+        <polyline points="40,78.42 79.48,76.07 118.96,73.72 158.44,71.37 197.92,76.07 237.4,69.02 276.88,66.67 316.36,64.32" fill="none" stroke="#5B8DEF" stroke-width="1.5"></polyline>
+        <line x1="40" y1="78.42" x2="316.36" y2="65.49" stroke="#5EC269" stroke-width="1.5" stroke-dasharray="6 4"></line>
+        <g fill="#5EC269">
+          <circle cx="45.64" cy="35.33" r="2.8"></circle><circle cx="85.12" cy="31.42" r="2.8"></circle><circle cx="124.6" cy="27.5" r="2.8"></circle><circle cx="164.08" cy="23.58" r="2.8"></circle><circle cx="203.56" cy="33.77" r="2.8"></circle><circle cx="243.04" cy="19.67" r="2.8"></circle><circle cx="282.52" cy="15.75" r="2.8"></circle><circle cx="322" cy="11.83" r="2.8"></circle>
+        </g>
+        <g fill="#5B8DEF">
+          <circle cx="40" cy="78.42" r="2.8"></circle><circle cx="79.48" cy="76.07" r="2.8"></circle><circle cx="118.96" cy="73.72" r="2.8"></circle><circle cx="158.44" cy="71.37" r="2.8"></circle><circle cx="197.92" cy="76.07" r="2.8"></circle><circle cx="237.4" cy="69.02" r="2.8"></circle><circle cx="276.88" cy="66.67" r="2.8"></circle>
+        </g>
+        <circle cx="316.36" cy="64.32" r="6.8" fill="rgba(91,141,239,0.3)"></circle>
+        <circle cx="316.36" cy="64.32" r="5" fill="#5B8DEF"></circle>
+      </svg>
+
+      <div style="display: flex;">
+        <div style="display: flex; align-items: center; gap: 4px; padding: 4px 10px; background: rgba(94,194,105,0.08); border-radius: 6px; font-size: 12px; font-weight: 600; color: #5EC269;">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#5EC269" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"></path></svg>
+          1.6%
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 10px; padding-top: 12px;">
+        <div style="width: 36px; height: 36px; border-radius: 10px; background: #262630; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg>
+        </div>
+        <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+          <div style="display: flex; align-items: baseline; gap: 6px;">
+            <div style="font-size: 18px; font-weight: 700; color: #EAEAEF;">81.5 kg</div>
+            <div style="font-size: 12px; font-weight: 500; color: #5C5C6E;">72.5 kg × 5</div>
+          </div>
+          <div style="font-size: 12px; font-weight: 500; color: #9999A8;">Sep 7, 2026</div>
+        </div>
+        <div style="width: 36px; height: 36px; border-radius: 10px; background: #262630; display: flex; align-items: center; justify-content: center; flex-shrink: 0; opacity: 0.4;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9999A8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; row-gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 6px; min-width: 0;"><div style="width: 10px; height: 10px; border-radius: 3px; background: #5B8DEF; flex-shrink: 0;"></div><div style="font-size: 12px; font-weight: 500; color: #9999A8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;">Barbell Bench Press</div><div style="font-size: 12px; font-weight: 600; color: #EAEAEF; flex-shrink: 0;">81.5 kg</div></div>
+        <div style="display: flex; align-items: center; gap: 6px; min-width: 0;"><div style="width: 10px; height: 10px; border-radius: 3px; background: #5EC269; flex-shrink: 0;"></div><div style="font-size: 12px; font-weight: 500; color: #9999A8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;">Barbell Back Squat</div><div style="font-size: 12px; font-weight: 600; color: #EAEAEF; flex-shrink: 0;">115 kg</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 83px; background: #1B1B1F; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));">
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 7px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="1.8" stroke-linejoin="round"><path d="M3.5 10.5L12 4l8.5 6.5V20h-5.5v-5.5h-6V20H3.5z"></path></svg>
+      <div style="font-size: 10px; font-weight: 500; color: #5C5C6E;">Home</div>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 7px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"></rect><path d="M3.5 9.5h17M8 3v4M16 3v4"></path></svg>
+      <div style="font-size: 10px; font-weight: 500; color: #5C5C6E;">Calendar</div>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 7px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5B8DEF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16"></path><path d="M7.5 15l4-4.5 3 2.5 5-6"></path></svg>
+      <div style="font-size: 10px; font-weight: 500; color: #5B8DEF;">Charts</div>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 7px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5C5C6E" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      <div style="font-size: 10px; font-weight: 500; color: #5C5C6E;">Settings</div>
+    </div>
+  </div>
+  <div style="position: absolute; left: 175px; bottom: 60px; width: 52px; height: 52px; border-radius: 26px; background: #5B8DEF; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1B1B1F" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

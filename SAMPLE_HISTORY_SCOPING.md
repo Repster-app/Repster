@@ -1,0 +1,524 @@
+# Sample History for New Users — Scoping
+
+Status: scoped, not started. 2026-09-12. Targets 1.6.
+Nothing in this document is agreed; §12 lists the decisions it needs.
+
+---
+
+## 0. The short version
+
+While someone has **no finished workout**, three surfaces show a clearly labelled, read-only
+sample history instead of an empty state: **Charts** (all three sub-tabs), **Home › Recent**, and
+the **Training Insights** screen. The sample matches the program they picked in onboarding
+("this is what 8 weeks of Upper / Lower looks like"), and it disappears everywhere the moment their
+first real workout is finished.
+
+The sample lives in a **throwaway in-memory store** that the real chart and insight code reads.
+It never becomes a row in the user's database, so it cannot reach Smart Suggestions, PRs, the
+fatigue model, backups, Apple Health, the free-workout quota or analytics workout counts.
+
+Everywhere that *acts on* history rather than *showing* it stays real. That covers the active
+workout, suggestions, Calendar, the week strip, Copy Previous, sharing and export.
+
+---
+
+## 1. Why, and a decision this reopens
+
+From the 1.4 funnel (ONBOARDING_REDESIGN_SCOPING.md appendix, 57 onboarding starters):
+
+- All 21 people who finished onboarding without starting a workout saw the empty Home.
+- Median time from onboarding to first workout start is 0.0 minutes, so it is now or never.
+- `freeWorkoutLimit` went from 5 to 10 on 2026-08-18 because Charts and Insights had nothing to show
+  before the old limit ran out (`MonetizationService.swift:31`).
+
+A new user is told Repster "learns what you can lift", then shown a screen with nothing in it. The
+sample turns that promise into something they can look at before they have lifted anything.
+
+**This reopens a recorded decision.** ONBOARDING_REDESIGN_SCOPING.md §9 Q2 (2026-09-04):
+*"finish onboarding into Home, unchanged. No example data … Home gets its own pass later."* That
+decision was about where onboarding lands, and it left Home for a later pass. This is that pass.
+It does put example content on Home, so it needs an explicit yes (§12 Q1).
+
+---
+
+## 2. What a brand-new user sees today
+
+Audited from source, on a store with the seeded exercise library and no workouts.
+
+| Surface | Zero-history state | Where |
+|---|---|---|
+| Home › date header, week strip, Start card | Real; 7 empty days | `HomeView.swift:70-72` |
+| Home › Monthly stats | **Not rendered** (`totalWorkouts > 0` guard) | `HomeViewModel.swift:283` |
+| Home › Recent PRs | **Not rendered** | `HomeView.swift:169` |
+| Home › Training Insights hook | "Training status · Builds as you log workouts" | `TrainingInsightsHookView.swift:85-101` |
+| Home › Recent | One grey line: "Complete your first workout to see it here" | `HomeView.swift:288-293` |
+| Charts › Breakdown | Pie icon + "No data for this period" | `BreakdownTabView.swift:179` |
+| Charts › Workouts | Bar icon + "No data for this period" | `WorkoutsTabView.swift:155` |
+| Charts › Exercises | "Select Exercises" prompt | `ExercisesTabView.swift:65` |
+| Training Insights | Status card with no data; muscle panel and findings hidden | `InsightsView.swift:46, 91-148` |
+| Calendar day detail | "No workout" | `CalendarWorkoutDetailView.swift:250` |
+| Exercise › History / PRs | "No history yet" / "No PRs recorded yet" | `ExerciseHistoryView.swift:239`, `ExercisePRsView.swift:104` |
+| Copy Previous sheet | "No workouts yet" | `CopyPreviousSheet.swift:148` |
+| Templates | Populated if they picked a program; this is real data, not sample | `ProgramCatalogService` |
+
+Two of Home's four customisable sections render nothing, and one renders a line of grey text.
+The whole Charts tab is empty.
+
+---
+
+## 3. Where sample data belongs, and where it never goes
+
+**The rule:** sample data may appear on screens that **show** history back to the user. It never
+appears on screens that **act on** history. That means anything that prescribes a load, counts
+toward something, leaves the device, or states a dated fact about the user's own week.
+
+### Tier 1: build
+
+| # | Surface | What the sample shows | Why it earns it |
+|---|---|---|---|
+| 1 | **Charts: all three sub-tabs** | Muscle-group donut, workouts-over-time bars, and an e1RM line for the program's two main lifts, preselected so a chart is drawn on arrival | The tab exists to show what history looks like. Because the real `ChartDataService` does the drawing (§6), every metric, time range and exercise pill works. No combination falls back to "No data for this period". |
+| 2 | **Home › Recent** | 2–3 sample workout cards under an "Example history" header. Each opens a read-only detail view. | Replaces the one line most new users see. It is the first thing under the Start card. |
+| 3 | **Training Insights screen** | Status card ("usual week" meter), muscle volume panel, and the sides card when the program has unilateral lifts | Insights is the feature most starved at cold start. It needs 8 weeks to form a baseline (`InsightsService.swift:501-502`). |
+
+### Tier 2: cheap once the store exists; decide later
+
+| Surface | Note |
+|---|---|
+| Home › Recent PRs and Monthly stats *inside* the sample block | These render "this month" and "last 14 days". They are fine inside a labelled block, but a separate sample section each makes Home three-quarters fake. See §12 Q4. |
+| Insights findings | Blocked by a shared-state hazard (§6.3). Synthetic data tuned to pass the rule gates (`InsightRules.swift`: `minimumPairs = 12`, `minimumSets = 12`, …) is fragile. |
+| Walkthrough pages | `HowItWorksPage.swift` describes screenshots. The same generator could render them later. |
+
+### Never
+
+| Surface | Why not |
+|---|---|
+| **Active workout**: previous values, Smart Suggestions, the embedded exercise chart (`ActiveWorkoutView.swift:323`) | Suggestions prescribe real weight to a real person. A sample 60 kg bench history must never set anyone's next set. **This is the hard line.** |
+| **Week strip and Calendar** | Dated facts about the user's own days. A dot on last Tuesday says *you* trained last Tuesday. |
+| **Home Training Insights hook bars** | It reports "this week". In sample mode, the subtitle changes to "See an example" with no numbers. |
+| **Copy Previous** | Copying a sample would write a real workout seeded with sample targets. |
+| **Summary screen / share card** | It would put fake numbers on social media. |
+| **Exercise detail History / PRs / chart** | The same chart component is embedded inside the active workout. Keep one rule, "no sample near a workout", and leave these empty. |
+| **Export, Apple Health, CSV import dedupe, free-workout quota, review-prompt counter, walkthrough ceiling, `workout completed` analytics** | None of these read the sample store, so they cannot be reached. The isolation test in §10 pins that. |
+
+---
+
+## 4. What it looks like
+
+Home, zero history, Upper / Lower picked in onboarding:
+
+```
+Saturday, Sep 12
+Workout                                              ⚙
+ MON  TUE  WED  THU  FRI  SAT  SUN                        ← real, empty
+┌───────────────────────────────────────────────────┐
+│ Start Workout                                   + │     ← real
+└───────────────────────────────────────────────────┘
+
+TRAINING INSIGHTS
+┌───────────────────────────────────────────────────┐
+│ ◌  Training status                                │
+│    See an example                               › │     ← opens sample Insights
+└───────────────────────────────────────────────────┘
+
+EXAMPLE HISTORY                                  Hide
+┌───────────────────────────────────────────────────┐
+│ SAMPLE   Upper A · Thursday                     › │
+│ 5 exercises · 17 sets · 58 min                    │
+│ 4,210 kg                   ● Chest ● Back ● Arms  │
+└───────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────┐
+│ SAMPLE   Lower A · Tuesday                      › │
+│ 4 exercises · 13 sets · 51 min                    │
+│ 6,880 kg                           ● Legs ● Core  │
+└───────────────────────────────────────────────────┘
+  Your first finished workout replaces these.
+```
+
+Charts › Breakdown:
+
+```
+Charts
+ [ Breakdown | Workouts | Exercises ]
+┌───────────────────────────────────────────────────┐
+│ ◐ Sample data: 8 weeks of Upper / Lower     Hide  │
+└───────────────────────────────────────────────────┘
+        ╭───╮     Legs        31%
+      ╭─╯   ╰─╮   Back        23%
+      │  212  │   Chest       21%
+      ╰─╮sets╭╯   Shoulders   13%
+        ╰───╯     Arms        12%
+  Month · 14 workouts · 212 sets · 48,300 kg
+```
+
+Charts › Exercises opens with Barbell Bench Press and Barbell Back Squat already selected. It
+shows two rising e1RM lines with the existing trend overlay, including one light week so the line
+isn't implausibly straight.
+
+Tapping a sample card opens the existing `CalendarWorkoutDetailView` with a Sample banner. The
+toolbar has no delete, edit, share, save-as-template or exclude-from-PRs.
+
+---
+
+## 5. The sample dataset
+
+**Length: 8 weeks, ending yesterday.** This is set by the consumers, not by taste:
+
+- The Insights baseline is 8 weeks plus a 7-day current window (`InsightsService.swift:501-502`).
+  Anything shorter leaves the "usual week" meter empty, which is the feature we are trying to show.
+- Home Recent PRs look back 14 days (`HomeViewModel.swift:302`). Charts default to month and 3-month ranges.
+- Longer than 8 weeks starts to read as someone else's training log rather than an illustration.
+
+**Schedule:** the picked program's days per week (3, 4 or 6; 5×5 alternates two sessions over
+three days). It includes one missed session and one lighter week, so the Insights bands and chart
+lines show some variation.
+
+**Content: matched to the picked program.** Sessions, exercises, set counts and rep ranges come
+straight from `seed_programs.json`, the same file the onboarding picker uses. "Build my own"
+falls back to Full Body.
+
+- **The program choice is not saved today.** `OnboardingViewModel.finish()` materialises the
+  templates and keeps `materialisedProgram` only in memory (`OnboardingViewModel.swift:156-163`).
+  Add one `UserDefaults` key, `onboardingSelectedProgramId`.
+- For people who onboarded on 1.5 and still have zero history: infer the program from a template
+  folder whose name matches a catalogue program. `materialise` names the folder after the program,
+  or suffixes it on a collision. If nothing matches, fall back to Full Body.
+
+**Loads:** a small starting-load table per exercise for an ordinary intermediate lifter, not the
+user's own history and not an advanced lifter's. Progression is simple double progression: reach
+the top of the rep range at the target RIR, then add one increment next session.
+
+- **Do not run `LoadPrescriptionService` to generate it.** It is the learner. Running it writes
+  fatigue rows and would tie the sample's shape to engine changes.
+- Generate natively in the user's unit, snapped to that unit's increments. Imperial users see
+  135 / 185 / 225 lb, not 132.3 lb converted from kg.
+- RIR 1–3 on working sets. On unilateral lifts (Bulgarian Split Squat, Dumbbell Row), sides are
+  logged equal, so the sides card reads as balanced rather than telling a stranger their left side
+  seems weaker.
+
+**Deterministic:** a seeded generator keyed on program id and install date. The sample doesn't
+reshuffle between launches (people compare screens), and tests can pin its output.
+
+Content review works the same way as the programs: someone who trains checks the starting loads
+and the progression before it ships.
+
+---
+
+## 6. Architecture
+
+### 6.1 Options considered
+
+**(a) Real rows in the user's store with an `isSample` flag: rejected.**
+
+- **Every reader would need the filter.** There are about 39 `FetchDescriptor<Workout|WorkoutSet>`
+  sites across 7 files (SetRepository alone has 19), and a missed filter fails silently.
+- **Writers would ingest the rows.** PRService writes `PerformanceRecord`, StatsService writes
+  `ExerciseStats`, and FatigueLearningService writes `FatigueObservation`. The suggestion engine
+  reads the same set history (`LoadPrescriptionService.swift:225, 250`), so it would prescribe
+  from fake sessions.
+- **Backups would carry it.** `ExportService.swift:58-64` fetches every workout and set.
+- **Removal means bulk-deleting workouts and sets.** That is the delete-ordering crash class this
+  project has already fixed once.
+
+The project rejected option (a) for exercise replace for the same reason: it *"fabricates history
+in the new exercise's PR table, e1RM series, charts and fatigue model"*
+(EXERCISE_REPLACE_AND_REORDER_DESIGN.md:578).
+
+**(b) Hand-authored view fixtures: rejected for Charts.** The three tabs multiply metric × time
+range × aggregation × filter × exercise selection. Every pill a user taps would need its own
+fixture, or it would show "No data for this period" *inside the sample*, which is worse than today.
+Hand-written numbers also drift from what the real code would draw.
+
+**(c) Recommended: a throwaway in-memory store, read by the real services.**
+
+1. Build a `ModelContainer` with `isStoredInMemoryOnly: true` from `ModelContainerSetup.modelTypes`.
+   This is the same construction every test container already uses.
+2. **Copy the user's real exercises into it with their real IDs** (`Exercise.init(id:…)`,
+   `Exercise.swift:119-120`). Don't re-seed: `seed_exercises.json` has no IDs, so a re-seed mints
+   new UUIDs. Copying keeps saved chart presets valid, since they store exercise IDs in
+   `UserDefaults` (`ChartPreset.swift:23, 52`). It also picks up renames and custom exercises.
+3. Insert the generated `Workout` and `WorkoutSet` rows in **one context, saved once**, before any
+   reader touches the store. See the iOS 17 note in §9.
+4. Run `PRService.rebuildAll()` and `StatsService.rebuildAll()` against the sample store, so PR
+   and stats rows exist for the charts that read them. Both only loop `fetchAll → rebuild` through
+   repositories and have no outside side effects.
+5. Create `RepositoryContainer(modelContainer: sampleContainer)` (`RepositoryContainer.swift:21`)
+   and build from it **only** `ChartDataService`, `StatsService`, `PRService` and `InsightsService`.
+   **Never construct a `ServiceContainer` for the sample.** Its init wires `SubscriptionService`,
+   `AccessControlService` and `HealthKitService` (`ServiceContainer.swift:46-47, 102`).
+6. Inject those services into the screens. The three view models already take their data services
+   by protocol (`HomeView.swift:34-56`, `ChartsTabView.swift:17-23`, `InsightsView.swift:14-22`).
+   The environment `ServiceContainer` stays real, so analytics calls in the views keep going to the
+   real analytics service, which is what we want.
+7. Disposal is dropping the reference. There is no delete path, no schema change and no migration.
+
+### 6.2 Home does not need services at all
+
+Home's recent cards can be built straight from the sample store's repository snapshots with
+`WorkoutAggregateSummary.summarize`. It is pure and is already what `HomeViewModel.swift:366` calls.
+
+The read-only detail reuses `CalendarWorkoutDetailView`, which takes `[WorkoutDetail]` values
+(`WorkoutDetailFromHomeView.swift:53-62`) built with `ExerciseGroup.build`, also pure (`:244`). A
+new `SampleWorkoutDetailView` builds the same value and passes `nil` for every action.
+
+### 6.3 The one hazard in reusing InsightsService
+
+`InsightsService` keeps state in **`UserDefaults.standard`**: the last analysis signature and
+per-rule refire timestamps (`InsightsService.swift:170-171, 202-206, 416-425`). If a sample-backed
+instance called `refreshIfNeeded()`, it would overwrite the real instance's state. That would
+re-run the real analysis and could suppress real findings behind refire intervals.
+
+`fetchTrainingStatus()` and `fetchSidesStatus()` don't touch `UserDefaults` (`:214-230`), so the
+v1 sample calls **only those two**. The findings section stays hidden in sample mode, which is
+already how cold start behaves (`InsightsView.swift:91-93`). Sample findings would need a
+`UserDefaults` suite injected into `InsightsService` first.
+
+### 6.4 The gate
+
+`SampleHistoryGate` shows the sample when the user has **zero completed workouts** and hasn't
+pressed Hide. It is data-driven, so there is no "has ever finished a workout" flag to keep in sync.
+
+| Surface | Real-is-empty test |
+|---|---|
+| Home | `recentWorkouts.isEmpty`, already computed |
+| Charts | The same shared "has a completed workout" count. **Not** `fetchEarliestWorkoutDate()`, which loads every workout (§14, fix 3) |
+| Insights | Real `TrainingStatus.hasData == false` |
+
+- **One rule on every surface: the sample shows until the first workout is finished.** Real Charts
+  include in-progress ticked sets (`ChartDataService.swift:61-62`), but the gate counts completed
+  workouts only. Sets ticked during the first workout therefore appear when it is finished. An
+  earlier draft said Charts turned real at the first ticked set; that was wrong (§14).
+- **One Hide button hides every surface.** One `@AppStorage` key; three separate dismissals would
+  be nagging.
+
+### 6.5 Labelling and interaction rules
+
+- Every sample surface has a visible **Sample** pill and a one-line banner. Colour is never the
+  only signal.
+- VoiceOver reads "Sample:" before each sample card and chart.
+- Sample is **read-only**: no delete, edit, share, save-as-template, copy or PR exclusion, and no
+  navigation from a sample chart into the real Exercise detail.
+- Copy on every sample surface says the same thing: "Your first finished workout replaces this."
+
+### 6.6 Cost
+
+8 weeks × 3–6 sessions × 4–5 exercises × 3–4 sets comes to about 300–600 sets. Build lazily off
+the main actor the first time a sample surface appears, keep it for the app session, and rebuild
+when the unit preference changes. Measure the build on the oldest supported device.
+
+---
+
+## 7. Changes by layer
+
+**New**
+
+| File | Role |
+|---|---|
+| `Core/Sample/SampleHistoryGenerator.swift` | Pure. Takes (program, exercise snapshots, unit, reference date, seed) and returns sample workouts as values |
+| `Resources/sample_history_loads.json` | Starting load and increment per exercise name, in kg and lb. Names must match `seed_exercises.json`. |
+| `Core/Sample/SampleHistoryStore.swift` | Actor. Builds the in-memory container, copies exercises, inserts, rebuilds PRs and stats, exposes the read services |
+| `Core/Sample/SampleHistoryGate.swift` | Show/hide rule and the Hide key |
+| `Features/Shared/Views/SampleDataBanner.swift` | Pill and banner |
+| `Features/Home/Views/SampleHistorySection.swift` | Home block |
+| `Features/Home/Views/SampleWorkoutDetailView.swift` | Read-only detail on `CalendarWorkoutDetailView` |
+
+**Changed**
+
+| File | Change |
+|---|---|
+| `HomeView` / `HomeViewModel` | Branch the Recent section (`HomeView.swift:288-293`); hook subtitle in sample mode |
+| `ChartsTabView` / `ChartsTabViewModel` | Swap `chartDataService` when the gate says sample; add banner; preselect two lifts on Exercises |
+| `InsightsView` / `InsightsViewModel` | Sample status and sides; banner; no findings |
+| `OnboardingViewModel.finish()` | Save `onboardingSelectedProgramId` |
+| `SettingsService.resetAllAppData()` → `clearStoredAppState` | Clear the Hide key too; a reset means starting fresh |
+| `AnalyticsServiceProtocol` | Changes described in §8 |
+
+No schema change and no migration. `ModelContainerSetup.createContainer()` is untouched.
+
+---
+
+## 8. Analytics
+
+**Keep the existing empty-state series readable.** `empty state shown` fires for Home and Charts
+(`HomeView.swift:274-279`, `ChartsTabView.swift:63-68`). The Charts trigger is
+`breakdownHasData == false`, and in sample mode the breakdown *has* data, so the event would stop
+firing. Compute the trigger from the **real** service, and add `sample_shown: true|false` so the
+series stays comparable across the release.
+
+New events:
+
+- `sample history viewed` with `screen` (home / charts / insights), once per view lifetime
+- `sample workout opened`
+- `sample history hidden` with `screen`
+
+**Measuring it:** activation (onboarding completed → first workout started and finished). This hits
+the same limit as the onboarding redesign: 57 people can only detect roughly a doubling
+(ONBOARDING_REDESIGN_SCOPING.md §4.6). **Ship on the reasoning** and read the numbers
+directionally. The secondary check is whether first sessions reach Charts and Insights more often.
+
+The sample holds no personal data, so session replay needs no masking change.
+
+---
+
+## 9. Edge cases
+
+| Case | Handling |
+|---|---|
+| "Build my own" picked | Full Body sample; banner reads "a sample full-body program" |
+| Onboarded on 1.5, choice not saved | Infer from template folder name, else Full Body (§5) |
+| Program exercise deleted or renamed | Skip it; the same rule as `materialise` (ONBOARDING §6). Never fail the sample. |
+| Imperial units | Generated in lb with lb increments |
+| Unit changed while the sample is showing | Rebuild the store |
+| Mid first workout | Home shows the resume card and keeps the Recent sample. Charts and Insights keep the sample too; nothing is finished yet. |
+| Finishes first workout | Everything goes real on the next load. Charts show one data point, which is honest but a steep drop; see §12 Q2. |
+| Deletes their only workout | Sample returns unless Hidden (the gate is data-driven) |
+| Reset all data | Sample returns; the Hide key is cleared |
+| Imported CSV history | Never shown; they have history |
+| Paywall | Browsing the sample is never a workout, so it can't touch the quota. Nothing to gate. |
+| **iOS 17** | The suite has an iOS 17-only cross-actor write race that has crashed a real device. The sample store must do every write in one context and save before any reader exists. No reader and writer may share it concurrently. |
+
+---
+
+## 10. Tests
+
+**Unit**
+
+- **Isolation (the highest-value test).** Build the sample store, browse every sample service, then
+  assert the real container's counts of `Workout`, `WorkoutSet`, `PerformanceRecord`,
+  `ExerciseStats`, `FatigueObservation` and `InsightRecord` are unchanged. Also assert that
+  `insightsLastAnalysisSignature` and `insightsLastFiredByRule` in `UserDefaults` are untouched.
+- The generator is deterministic: same seed, same output.
+- Every program in `seed_programs.json` generates a sample whose exercises all resolve, and every
+  name in `sample_history_loads.json` resolves against `seed_exercises.json`.
+- Loads are snapped to increments in both units. No set is dated today or later. Every set is
+  completed and has data.
+- Charts over the sample store return data for every `WorkoutsTimeRange` and for the Breakdown
+  week, month, year and all ranges. The two preselected lifts have at least 6 points each.
+- Insights over the sample store: `hasData == true`, `baselineSets != nil`, muscles non-empty.
+- Gate:
+  - zero completed workouts → sample
+  - one completed workout → real
+  - Hidden → real empty state
+  - imported history → real
+
+**On device**
+
+- Fresh install → onboarding → Home shows the sample → finish a short workout → the sample is gone
+  everywhere.
+- The free-workout counter is unchanged after browsing the sample.
+- Export produces an empty archive.
+- Nothing is written to Apple Health.
+- VoiceOver reads "Sample:".
+
+---
+
+## 11. Build order
+
+| PR | Contents | Depends on |
+|---|---|---|
+| **PR1** | Generator, load table, determinism and catalogue tests. Pure code, no UI. | — |
+| **PR2** | `SampleHistoryStore` + the isolation test | PR1 |
+| **PR3** | Gate, Hide key, save the onboarding program id | — |
+| **PR4** | **Charts**: service swap, banner, preselected lifts. The biggest payoff, so it ships first. | PR2, PR3 |
+| **PR5** | Home sample block + read-only detail | PR2, PR3 |
+| **PR6** | Insights status, muscle panel and sides | PR2, PR3 |
+| **PR7** | Analytics, including the `sample_shown` property on `empty state shown` | PR4–PR6 |
+
+The long poles are PR1's content (starting loads and progression, reviewed by someone who trains)
+and PR2's isolation guarantees. PR4–PR6 are mostly wiring once the store exists.
+
+---
+
+## 12. Open questions
+
+1. **Reopen the 2026-09-04 "no example data" decision for Home?** Recommended: yes. That decision
+   covered the onboarding landing and left Home for a later pass.
+2. **When does it disappear?**
+   - *Recommended:* at the first finished workout.
+   - *Alternative:* after N workouts (for example 3), so Charts don't drop to a single dot.
+   - Mixing sample and real data on one screen is ruled out either way.
+3. **Program-matched or one fixed sample for everyone?** Recommended: program-matched. It shows
+   *their* plan, and the generator makes it no more work than a fixed sample.
+4. **Home: Recent cards only, or also sample Recent PRs and Monthly stats inside the same block?**
+   Recommended: Recent only in v1.
+5. **Insights findings in v1?** Recommended: no. They need the `UserDefaults` injection first, and
+   synthetic data tuned to fire rules is fragile.
+6. **Real numbers or unit-less shapes?** Recommended: real numbers in the user's unit. A chart with
+   no values doesn't show what the feature does.
+
+---
+
+## 13. Not in scope
+
+- Sample data in the active workout, Calendar, week strip, Exercise detail, Copy Previous or
+  sharing (§3, never).
+- A paywall that shows the sample charts.
+- Reusing the generator behind a DEBUG launch argument to render App Store screenshots from
+  consistent data. It is a natural follow-on, and the v2 screenshot set in
+  `marketing/generated/app-store-v2` would benefit, but it is separate work.
+
+---
+
+## 14. Safety review (2026-09-13)
+
+The question: can this touch an existing user's data, and does the sample always go away when
+it should? This section checks the code itself, not what the design says it intends.
+
+### Verified safe
+
+| Risk | Evidence |
+|---|---|
+| Sample rows reaching the user's store | Every write the design makes goes to the sample container's own context: the inserts and the PR and stats rebuilds. The only shared state among the reused services is InsightsService's two `UserDefaults` keys (§6.3). PRService, StatsService, ChartDataService and the repositories have no statics, NotificationCenter traffic or singletons. |
+| Two containers in one process | This already happens on every test run. RepsterTests is hosted in the app (`TEST_HOST = Repster.app`), and the app builds its on-disk container at launch with no test detection. Twenty test files then create in-memory containers alongside it. |
+| iCloud syncing a second store | `Repster.entitlements` grants HealthKit only. There is no iCloud container, so SwiftData has nothing to sync to. Still set `cloudKitDatabase: .none` on the sample configuration, so adding iCloud later can't change this. |
+| Quota, review prompt, Apple Health, walkthrough counter | All of these fire from `finishWorkout` or from closing the active-workout screen. The sample never creates a workout, so none of them can run. |
+| Export | `ExportService` reads only the real container. |
+| Who counts as having no history | `WorkoutStatus` has exactly two cases, `inProgress` and `completed`. CSV import writes `.completed` (`ImportService.swift:119`). Backup restore copies each workout's archived status (`ExportService.swift:503`). Imported and restored users therefore never see the sample. |
+| Copying exercise IDs | No model uses `@Attribute(.unique)`, and the two stores are separate, so the same ID in both is allowed. |
+| Existing users with history | The sample store is built only when a gate passes. These users pay for the gate check and nothing else, and the gate must be cheap (fix 3). |
+| Existing users who never finished a workout | They will see the sample after updating. This is intended: they are in the same position as a new install. |
+
+### Must fix before this ships
+
+These are design gaps; the code doesn't have them yet only because the feature isn't built.
+
+1. **Charts never reloads after a workout.**
+   - Home refreshes when the workout screen closes (`homeRefreshTrigger`, `ContentView.swift:292, 309`), but Charts is passed nothing.
+   - Each Charts sub-tab loads only while `chartData == nil` (`BreakdownTabView.swift:84-88`, `WorkoutsTabView.swift:121-125`).
+   - **Consequence:** as written, someone who sees the sample, finishes their first workout and returns to Charts would **still see the sample until they relaunch**.
+   - **Fix:** give Charts the same refresh trigger as Home, and re-run the gate on it.
+   - This staleness exists today for every user, separately from this feature.
+2. **Sample interactions would count as real Insights usage.**
+   - `InsightsView` fires `insightsViewed` on every open, with `hasBaseline`, `sidesState` and `findingCount` (`InsightsView.swift:82-87`).
+   - It also fires `musclePanelExpanded`, `sidesGroupOpened` and `sidesExerciseOpened`.
+   - **Consequence:** in sample mode these would report a baseline the user does not have.
+   - **Fix:** every event fired from a sample surface either carries `sample: true` or is suppressed. §8 only covered `empty state shown`.
+3. **Don't use `fetchEarliestWorkoutDate()` as a gate.**
+   - It fetches every workout, sorts them, and filters in memory (`WorkoutRepository.swift:101-107`).
+   - **Consequence:** a full-history load on every check, for exactly the users who will never see the sample.
+   - **Fix:** use one shared, cheap "has a completed workout" count for all three surfaces.
+4. **Two navigation paths would open a sample workout using real services.**
+   - Home routes by `UUID` into `WorkoutDetailFromHomeView`, which loads from the real store and has a delete menu.
+   - The Exercises tab's **View Workout** button opens the same view (`ExercisesTabView.swift:104-124, 155-177`).
+   - **Consequence:** a sample ID finds nothing in the real store, so the result is a blank screen, not data loss.
+   - **Fix:** give sample mode its own route type. Hide View Workout, or point it at the sample detail view.
+5. **Reset must discard the sample store.**
+   - `resetAllAppData` re-seeds the library, which gives every exercise a new ID.
+   - **Consequence:** a sample store built before the reset would reference IDs that no longer exist.
+   - **Fix:** discard it on reset, alongside clearing the Hide key (§7).
+6. **Leaving sample mode clears the Exercises preselection.**
+   - The preselected lifts live in `selectedExercises`, in memory.
+   - **Fix:** clear them when the gate flips, so real Charts don't open on lifts the user may never have done.
+
+### Tests this adds to §10
+
+- With Charts already opened, finish a first workout: Charts shows real data with no relaunch.
+- Every analytics event fired while the sample is on screen carries `sample: true`.
+- Reset with the sample store built: the next sample render uses the new exercise IDs.
+- Opening a sample workout from Home, or through View Workout, never calls the real `WorkoutService`.
+
+### What this review can't prove
+
+I read the reused services for shared state, but not every transitive call. What proves it is the
+isolation test in §10: build the sample, browse every sample screen, and assert the real store and
+the Insights `UserDefaults` keys are unchanged. It must pass on iOS 17, which is where the known
+cross-actor write race lives.

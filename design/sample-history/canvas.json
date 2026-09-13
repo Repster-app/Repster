@@ -1,0 +1,22 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html",            "x": 0,    "y": 0,    "w": 402, "h": 940, "title": "Home — with sample history" },
+    { "file": "SampleWorkout.dc.html",   "x": 482,  "y": 0,    "w": 402, "h": 874, "title": "Sample workout — read-only" },
+    { "file": "ChartsBreakdown.dc.html", "x": 964,  "y": 0,    "w": 402, "h": 874, "title": "Charts › Breakdown — sample" },
+    { "file": "ChartsExercises.dc.html", "x": 1446, "y": 0,    "w": 402, "h": 874, "title": "Charts › Exercises — sample" },
+    { "file": "Insights.dc.html",        "x": 1928, "y": 0,    "w": 402, "h": 874, "title": "Training Insights — sample" },
+    { "file": "HomeToday.dc.html",       "x": 0,    "y": 1300, "w": 402, "h": 874, "title": "Today — Home, zero history" },
+    { "file": "ChartsToday.dc.html",     "x": 482,  "y": 1300, "w": 402, "h": 874, "title": "Today — Charts, zero history" }
+  ],
+  "annotations": [
+    { "id": "note-home", "x": 0, "y": -210, "w": 402, "text": "Only RECENT changes. The week strip, Start card and walkthrough banner stay real.\n\nSample cards carry a program position (Week 8 · Day 4), not a date: the week strip above is real and empty, and \"Friday, Sep 11\" would contradict it.\n\nThe Insights hook gets a link instead of numbers — it reports \"this week\", which is a fact about the user." },
+    { "id": "note-detail", "x": 482, "y": -210, "w": 402, "text": "Tapping Upper B. The same CalendarWorkoutDetailView real history uses, fed from the sample store — so it looks exactly like a logged session.\n\nRead-only: no share button, no ⋯ menu (edit, save as template, delete), no copy." },
+    { "id": "note-breakdown", "x": 964, "y": -210, "w": 402, "text": "The real ChartDataService running over a throwaway in-memory store, so every metric in the dropdown and every time-range pill works. Nothing falls back to \"No data for this period\".\n\nOne banner, one Hide that hides every sample surface at once." },
+    { "id": "note-exercises", "x": 1446, "y": -210, "w": 402, "text": "Opens with the program's two main lifts preselected, instead of \"Select exercises to view progress\".\n\nWeek 5 is a lighter week, so the line isn't implausibly straight." },
+    { "id": "note-insights", "x": 1928, "y": -210, "w": 402, "text": "Status card and muscle panel only — both need 8 weeks of history, which is why the sample is 8 weeks long.\n\nNo findings: a sample-backed InsightsService calling refreshIfNeeded() would overwrite the real Insights state in UserDefaults." },
+    { "id": "note-today", "x": 0, "y": 1110, "w": 884, "text": "TODAY, for comparison — what a brand-new user sees now. All 21 people in the 1.4 funnel who finished onboarding without starting a workout saw this Home." },
+    { "id": "note-marking", "x": 964, "y": 1300, "w": 402, "text": "How sample is marked, on every surface:\n\n• SAMPLE pill — PR-badge grammar (9pt bold, 4pt radius), in the app's existing slate \"stale\" token: calm, not a warning.\n• Dashed slate border on every sample card and chart.\n• One banner with Hide, and the same line everywhere: \"Your first finished workout replaces it.\"" },
+    { "id": "note-never", "x": 1446, "y": 1300, "w": 402, "text": "Never sample:\n\n• Active workout and Smart Suggestions — they prescribe real weight\n• Calendar and the week strip — dated facts about the user's own days\n• Copy Previous — would write a real workout\n• Share card and summary\n• Exercise detail — its chart is embedded in the active workout\n• Export, Apple Health, free-workout quota" }
+  ],
+  "launch": { "view": "canvas" }
+}
