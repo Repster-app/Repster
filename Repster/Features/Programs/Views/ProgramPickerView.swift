@@ -38,9 +38,9 @@ struct ProgramPickerView: View {
                         ForEach(programs) { program in
                             programCard(program)
                         }
-                    }
 
-                    buildOwnLink
+                        buildOwnCard
+                    }
 
                     if let program = choice.program {
                         rotationPreview(program)
@@ -78,7 +78,7 @@ struct ProgramPickerView: View {
     private func programCard(_ program: ProgramSeedDTO) -> some View {
         let isOn = choice.program?.id == program.id
 
-        return Button {
+        return card(isOn: isOn) {
             choice = .program(program)
         } label: {
             VStack(alignment: .leading, spacing: 3) {
@@ -105,18 +105,53 @@ struct ProgramPickerView: View {
                     .font(.system(size: 12))
                     .foregroundStyle(Color.textTertiary)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(isOn ? Color.accentSoft : Color.bgCard)
-            .cornerRadius(14)
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(isOn ? Color.accent.opacity(0.35) : Color.border, lineWidth: 1)
-            )
+        }
+        .accessibilityLabel("\(program.name), \(program.daysPerWeek) days per week, \(program.summary)")
+    }
+
+    /// A card like the programs, so it reads as a real answer rather than a way to dodge the
+    /// question. No days badge: there is nothing to count until the user builds something.
+    private var buildOwnCard: some View {
+        card(isOn: choice == .buildOwn) {
+            choice = .buildOwn
+        } label: {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 9) {
+                    Text("Build my own")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.textPrimary)
+
+                    Spacer(minLength: 0)
+
+                    selectionTick(isOn: choice == .buildOwn)
+                }
+
+                Text("Start with an empty library and add sessions as you go")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.textTertiary)
+            }
+        }
+        .accessibilityLabel("Build my own. Start with an empty library and add sessions as you go")
+    }
+
+    private func card<Label: View>(
+        isOn: Bool,
+        action: @escaping () -> Void,
+        @ViewBuilder label: () -> Label
+    ) -> some View {
+        Button(action: action) {
+            label()
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(isOn ? Color.accentSoft : Color.bgCard)
+                .cornerRadius(14)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(isOn ? Color.accent.opacity(0.35) : Color.border, lineWidth: 1)
+                )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(program.name), \(program.daysPerWeek) days per week, \(program.summary)")
         .accessibilityAddTraits(isOn ? [.isSelected] : [])
     }
 
@@ -132,22 +167,6 @@ struct ProgramPickerView: View {
                     .foregroundStyle(.white)
             }
         }
-    }
-
-    /// An escape hatch, not a peer of the real programs — so it is a link, not a fifth card.
-    private var buildOwnLink: some View {
-        Button {
-            choice = (choice == .buildOwn) ? .undecided : .buildOwn
-        } label: {
-            Text("I'd rather build my own")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(choice == .buildOwn ? Color.accent : Color.textTertiary)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 15)
-                .padding(.bottom, 3)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Rotation preview

@@ -50,6 +50,18 @@ enum ImportSource: String, CaseIterable, Identifiable, Sendable {
             return true
         }
     }
+
+    /// Why the unit has to be picked by hand. Nil for sources whose export names its units.
+    var unitSystemHint: String? {
+        switch self {
+        case .fitNotes:
+            return nil
+        case .strong:
+            return "Strong exports don't include units — pick the one used in your export."
+        case .hevy:
+            return "Hevy's column is labeled kg but uses your in-app unit — pick the one used in your export."
+        }
+    }
 }
 
 // MARK: - ImportUnitSystem

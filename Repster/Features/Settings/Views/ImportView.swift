@@ -115,9 +115,11 @@ struct ImportView: View {
                             onSelect: { viewModel.chooseUnitSystem($0, for: viewModel.selectedSource) }
                         )
 
-                        Text(compactUnitHint(for: viewModel.selectedSource))
-                            .font(.footnote)
-                            .foregroundStyle(Color.textSecondary)
+                        if let hint = viewModel.selectedSource.unitSystemHint {
+                            Text(hint)
+                                .font(.footnote)
+                                .foregroundStyle(Color.textSecondary)
+                        }
                     }
                     .padding(.horizontal, 20)
                 }
@@ -195,17 +197,6 @@ struct ImportView: View {
                 }
                 .buttonStyle(.plain)
             }
-        }
-    }
-
-    private func compactUnitHint(for source: ImportSource) -> String {
-        switch source {
-        case .strong:
-            return "Strong exports don't include units — pick the one used in your export."
-        case .hevy:
-            return "Hevy's column is labeled kg but uses your in-app unit — pick the one used in your export."
-        case .fitNotes:
-            return ""
         }
     }
 

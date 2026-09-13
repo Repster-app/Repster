@@ -5,8 +5,9 @@
 // on its own initiative therefore has to explain itself first and reach HealthKit only
 // when the user says yes — a "Not now" here costs nothing and stays recoverable.
 //
-// Built to drop into any container: the onboarding step uses it as a full page, and a
-// What's New sheet can present it as-is.
+// Presented as a sheet after the first finished workout (`ContentView.offerAppleHealthIfEarned`);
+// What's New asks in its own row instead. It's one question with two answers, so the sheet
+// sizes itself to its content rather than taking the whole screen.
 
 import SwiftUI
 
@@ -14,10 +15,18 @@ struct AppleHealthPromptView: View {
     /// Owned by the host, so presenting the prompt twice can't lose in-flight state.
     let model: AppleHealthConnectionModel
 
-    /// Called after authorization succeeds. Onboarding advances; a sheet would dismiss.
+    /// Called after authorization succeeds. The host dismisses the sheet.
     let onConnected: () -> Void
     /// Called when the user taps "Not now".
     let onDecline: () -> Void
+
+    @State private var measuredHeight: CGFloat = 520
+
+    /// Floor keeps a short layout from looking like an error; ceiling keeps large Dynamic Type
+    /// from pinning the sheet to the top of the screen, and the ScrollView takes over from there.
+    private var detentHeight: CGFloat {
+        min(max(measuredHeight + 16, 360), 640)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -56,13 +65,21 @@ struct AppleHealthPromptView: View {
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.bgCard, in: RoundedRectangle(cornerRadius: 12))
+                    .background(Color.bg, in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.border, lineWidth: 1)
+                    )
                     .padding(.horizontal, 32)
                 }
                 .padding(.top, 24)
                 .padding(.bottom, 12)
+                .measuringHeight()
             }
+            .scrollBounceBehavior(.basedOnSize)
 
+            // No background of its own: one used to stop at the buttons' width and left a
+            // darker box floating in the sheet.
             VStack(spacing: 12) {
                 Button("Connect Apple Health") {
                     Task {
@@ -80,14 +97,18 @@ struct AppleHealthPromptView: View {
                 .foregroundStyle(Color.textSecondary)
                 .disabled(model.isConnecting)
             }
+            .frame(maxWidth: .infinity)
             .padding(.horizontal, 32)
             .padding(.top, 12)
-            .padding(.bottom, 48)
-            .background(Color.bg)
+            .padding(.bottom, 16)
+            .measuringHeight()
         }
-        // No `onAppear` reporting here on purpose: inside a paged TabView that fires for
-        // neighbouring pages too. The host calls `model.promptShown()` when the prompt is
-        // genuinely on screen.
+        .onPreferenceChange(PromptHeightKey.self) { measuredHeight = $0 }
+        .presentationDetents([.height(detentHeight)])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color.bgCard)
+        // No `onAppear` reporting here: the host calls `model.promptShown()` when the prompt
+        // is genuinely on screen.
         //
         // A denial isn't an error worth an alert here — the user just chose. It's shown
         // because it's the one place to say where the decision can be reversed.
@@ -112,5 +133,26 @@ struct AppleHealthPromptView: View {
                 .foregroundStyle(Color.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+}
+
+// MARK: - Height measurement
+
+/// Sums the scroll content and the button bar, which together are the sheet's natural height.
+private struct PromptHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value += nextValue()
+    }
+}
+
+private extension View {
+    func measuringHeight() -> some View {
+        background(
+            GeometryReader { proxy in
+                Color.clear.preference(key: PromptHeightKey.self, value: proxy.size.height)
+            }
+        )
     }
 }

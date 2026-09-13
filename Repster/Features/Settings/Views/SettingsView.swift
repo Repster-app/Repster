@@ -150,7 +150,7 @@ struct SettingsView: View {
             // No banner event from here: opening it deliberately is a different intent,
             // and mixing the two makes the banner's tap rate unreadable.
             .sheet(isPresented: $showHowItWorks) {
-                HowItWorksView(analyticsService: analyticsService)
+                HowItWorksView(analyticsService: analyticsService, finishTitle: "Done")
             }
             .sheet(isPresented: $showWhatsNew) {
                 if let release = WhatsNewRelease.current {

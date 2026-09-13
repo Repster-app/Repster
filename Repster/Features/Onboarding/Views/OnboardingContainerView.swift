@@ -100,7 +100,7 @@ struct OnboardingContainerView: View {
             }
         }
         .sheet(isPresented: $showingWalkthrough) {
-            HowItWorksView(analyticsService: services.analyticsService)
+            HowItWorksView(analyticsService: services.analyticsService, finishTitle: "Done")
         }
     }
 

@@ -16,6 +16,10 @@ struct HowItWorksView: View {
 
     let analyticsService: any AnalyticsServiceProtocol
 
+    /// The last page's button. Only the Home banner can promise a workout next; every other
+    /// host closes back to where it was opened, so it passes "Done".
+    var finishTitle = "Start your first workout"
+
     @Environment(\.dismiss) private var dismiss
     @State private var index = 0
     @State private var reportedPages: Set<HowItWorksPage> = []
@@ -61,7 +65,7 @@ struct HowItWorksView: View {
             Button {
                 advance()
             } label: {
-                Text(isLast ? "Start your first workout" : "Next")
+                Text(isLast ? finishTitle : "Next")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)

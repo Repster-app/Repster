@@ -1,5 +1,8 @@
 // ImportStepView.swift
-// Import step during onboarding — reuses the source-aware ImportViewModel.
+// The import sheet opened from onboarding's final step — reuses the source-aware ImportViewModel.
+//
+// Every way out of this sheet returns to that step, where "Start training" is still the only
+// way into the app. So no button here may read as if it starts the app.
 
 import SwiftUI
 import UniformTypeIdentifiers
@@ -78,7 +81,7 @@ struct ImportStepView: View {
                             .fontWeight(.bold)
                             .foregroundStyle(Color.textPrimary)
 
-                        Text("Bring over past workouts from FitNotes or Strong now, or start fresh and import later from Settings.")
+                        Text("Bring over past workouts from FitNotes, Strong or Hevy. You can also do this later from Settings.")
                             .font(.subheadline)
                             .foregroundStyle(Color.textSecondary)
                             .multilineTextAlignment(.center)
@@ -96,12 +99,25 @@ struct ImportStepView: View {
                             }
                         }
 
-                        Text("Units in CSV")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Color.textSecondary)
-                            .padding(.top, 4)
+                        // FitNotes exports carry both kg and lbs columns, so the unit only picks
+                        // which one is preferred, and step 1's answer already covers that. Strong
+                        // and Hevy don't say, and a wrong guess scales every weight by 2.2×, so
+                        // their picker starts blank. Any picker on screen is one to answer.
+                        if viewModel.selectedSource.requiresUnitSystem {
+                            Text("Units in your \(viewModel.selectedSource.displayName) export")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Color.textSecondary)
+                                .padding(.top, 4)
 
-                        onboardingUnitPicker
+                            onboardingUnitPicker
+
+                            if let hint = viewModel.selectedSource.unitSystemHint {
+                                Text(hint)
+                                    .font(.footnote)
+                                    .foregroundStyle(Color.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
                     }
                     .padding(.horizontal, 32)
                 }
@@ -124,7 +140,7 @@ struct ImportStepView: View {
                 Button {
                     onSkip()
                 } label: {
-                    Label("Start Without Importing", systemImage: "arrow.right.circle")
+                    Text("Not now")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                 }
@@ -318,7 +334,7 @@ struct ImportStepView: View {
 
             Spacer()
 
-            Button("Get Started") { onFinish() }
+            Button("Done") { onFinish() }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .padding(.horizontal, 32)
@@ -356,7 +372,7 @@ struct ImportStepView: View {
             Spacer()
 
             HStack(spacing: 16) {
-                Button("Start Without Importing") { onSkip() }
+                Button("Not now") { onSkip() }
                     .buttonStyle(.bordered)
                     .frame(maxWidth: .infinity)
 
