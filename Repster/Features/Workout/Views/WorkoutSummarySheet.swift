@@ -1,5 +1,5 @@
 // WorkoutSummarySheet.swift
-// Workout summary sheet shown when user taps "Finish Workout".
+// Workout summary sheet shown when user taps "End".
 // Spec: FR-008 (Workout summary with stats, notes, RPE)
 // Contract: WP07 T032 (summary view), T033 (notes + RPE), T035 (save & close)
 //
@@ -31,7 +31,7 @@ enum CoachPreferences {
 
 /// Summary sheet presenting workout statistics, notes, and effort input.
 ///
-/// Shown as a sheet from ActiveWorkoutView when "Finish" is tapped.
+/// Shown as a sheet from ActiveWorkoutView when "End" is tapped.
 /// "Save & Close" calls ViewModel.finishWorkout() then dismisses.
 struct WorkoutSummarySheet: View {
 

@@ -463,11 +463,11 @@ struct ActiveWorkoutView: View {
                     .frame(width: 44, height: 36)
             }
 
-            // Finish Workout button
+            // End Workout button
             Button {
                 viewModel.showFinishSheet = true
             } label: {
-                Text("Finish")
+                Text("End")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 12)
