@@ -298,6 +298,7 @@
 		WN0004 /* WhatsNewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WN1004 /* WhatsNewTests.swift */; };
 		RPM0001 /* ReplayMaskCoverageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = RPM1001 /* ReplayMaskCoverageTests.swift */; };
 		SDR0001 /* SwiftDataLiveModelBoundaryRatchetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SDR1001 /* SwiftDataLiveModelBoundaryRatchetTests.swift */; };
+		OBC0001 /* OnboardingCompletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = OBC1001 /* OnboardingCompletionTests.swift */; };
 		ZA0001 /* TrendLineCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZB0001 /* TrendLineCalculator.swift */; };
 		ZA0002 /* ChartsTabViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZB0002 /* ChartsTabViewModel.swift */; };
 		ZA0003 /* BreakdownTabViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZB0003 /* BreakdownTabViewModel.swift */; };
@@ -643,6 +644,7 @@
 		WN1004 /* WhatsNewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNewTests.swift; sourceTree = "<group>"; };
 		RPM1001 /* ReplayMaskCoverageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplayMaskCoverageTests.swift; sourceTree = "<group>"; };
 		SDR1001 /* SwiftDataLiveModelBoundaryRatchetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataLiveModelBoundaryRatchetTests.swift; sourceTree = "<group>"; };
+		OBC1001 /* OnboardingCompletionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingCompletionTests.swift; sourceTree = "<group>"; };
 		ZB0001 /* TrendLineCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendLineCalculator.swift; sourceTree = "<group>"; };
 		ZB0002 /* ChartsTabViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartsTabViewModel.swift; sourceTree = "<group>"; };
 		ZB0003 /* BreakdownTabViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreakdownTabViewModel.swift; sourceTree = "<group>"; };
@@ -1552,6 +1554,7 @@
 				WN1004 /* WhatsNewTests.swift */,
 				RPM1001 /* ReplayMaskCoverageTests.swift */,
 				SDR1001 /* SwiftDataLiveModelBoundaryRatchetTests.swift */,
+				OBC1001 /* OnboardingCompletionTests.swift */,
 				AHO011 /* AppleHealthOfferTests.swift */,
 			);
 			path = RepsterTests;
@@ -2028,6 +2031,7 @@
 				WN0004 /* WhatsNewTests.swift in Sources */,
 				RPM0001 /* ReplayMaskCoverageTests.swift in Sources */,
 				SDR0001 /* SwiftDataLiveModelBoundaryRatchetTests.swift in Sources */,
+				OBC0001 /* OnboardingCompletionTests.swift in Sources */,
 				AHO001 /* AppleHealthOfferTests.swift in Sources */,
 				TT0003 /* ChartDataServiceTests.swift in Sources */,
 				TT0004 /* WorkoutHistoryBackupTests.swift in Sources */,

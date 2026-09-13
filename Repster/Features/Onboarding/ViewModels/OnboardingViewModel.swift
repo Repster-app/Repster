@@ -131,6 +131,24 @@ final class OnboardingViewModel {
 
     // MARK: - Finish
 
+    /// Set once `completeOnboarding()` has saved everything.
+    private(set) var hasFinished = false
+
+    /// The final step's action. Saves once, however many times "Start training" is tapped.
+    ///
+    /// A tap after a successful save only asks the caller to retry the hand-off to the app, so
+    /// it can't log a second bodyweight entry. Returns false while an earlier tap is still
+    /// saving; that tap completes the hand-off itself. `finish()` stays repeatable on purpose:
+    /// the SwiftData race harness drives it thousands of times.
+    func completeOnboarding() async -> Bool {
+        if isSaving { return false }
+        if !hasFinished {
+            await finish()
+            hasFinished = true
+        }
+        return true
+    }
+
     /// Save all selections and complete onboarding.
     /// Errors are non-fatal — defaults are applied. The caller sets @AppStorage flag after this returns.
     func finish() async {

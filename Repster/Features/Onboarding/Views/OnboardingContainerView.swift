@@ -66,7 +66,7 @@ struct OnboardingContainerView: View {
                     },
                     onFinish: {
                         Task {
-                            await viewModel.finish()
+                            guard await viewModel.completeOnboarding() else { return }
                             services.updateCachedUnitPreference(viewModel.selectedUnit)
                             onComplete()
                         }

@@ -9,8 +9,6 @@ struct RepsterApp: App {
     let repositories: RepositoryContainer
     let services: ServiceContainer
 
-    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-
     init() {
         #if DEBUG
         Purchases.logLevel = .debug
@@ -88,28 +86,44 @@ struct RepsterApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if hasCompletedOnboarding {
-                ContentView()
-            } else {
-                OnboardingContainerView(
-                    settingsService: services.settingsService,
-                    bodyweightService: services.bodyweightService,
-                    importService: services.importService,
-                    analyticsService: services.analyticsService,
-                    programCatalogService: services.programCatalogService,
-                    onComplete: {
-                        // A fresh install starts caught up, so What's New never greets
-                        // someone with news about the only version they have ever run.
-                        // This is also what makes an empty `lastSeenWhatsNewVersion`
-                        // unambiguously mean "upgraded from a build before it existed".
-                        WhatsNewPreferences.markSeen()
-                        hasCompletedOnboarding = true
-                    }
-                )
-            }
+            AppRootView()
         }
         .modelContainer(modelContainer)
         .environment(repositories)
         .environment(services)
+    }
+}
+
+/// Chooses between onboarding and the app.
+///
+/// The flag lives on this view rather than on `RepsterApp`. As an `App`-level `@AppStorage` set
+/// from onboarding's completion closure it saved, but the scene did not always re-evaluate:
+/// "Start training" completed onboarding and the screen stayed put until the next launch
+/// (2 of 3 fresh installs on the iOS 17.5 simulator, 2026-09-13). A view invalidates itself
+/// when its own `@AppStorage` changes.
+private struct AppRootView: View {
+    @Environment(ServiceContainer.self) private var services
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+
+    var body: some View {
+        if hasCompletedOnboarding {
+            ContentView()
+        } else {
+            OnboardingContainerView(
+                settingsService: services.settingsService,
+                bodyweightService: services.bodyweightService,
+                importService: services.importService,
+                analyticsService: services.analyticsService,
+                programCatalogService: services.programCatalogService,
+                onComplete: {
+                    // A fresh install starts caught up, so What's New never greets
+                    // someone with news about the only version they have ever run.
+                    // This is also what makes an empty `lastSeenWhatsNewVersion`
+                    // unambiguously mean "upgraded from a build before it existed".
+                    WhatsNewPreferences.markSeen()
+                    hasCompletedOnboarding = true
+                }
+            )
+        }
     }
 }
