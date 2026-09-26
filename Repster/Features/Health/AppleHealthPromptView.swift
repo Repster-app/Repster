@@ -22,10 +22,10 @@ struct AppleHealthPromptView: View {
 
     @State private var measuredHeight: CGFloat = 520
 
-    /// Floor keeps a short layout from looking like an error; ceiling keeps large Dynamic Type
-    /// from pinning the sheet to the top of the screen, and the ScrollView takes over from there.
+    /// Clamped in `promptDetentHeight` so a short layout can't look like an error and large
+    /// Dynamic Type can't pin the sheet to the top of the screen.
     private var detentHeight: CGFloat {
-        min(max(measuredHeight + 16, 360), 640)
+        promptDetentHeight(for: measuredHeight)
     }
 
     var body: some View {
@@ -136,23 +136,4 @@ struct AppleHealthPromptView: View {
     }
 }
 
-// MARK: - Height measurement
-
-/// Sums the scroll content and the button bar, which together are the sheet's natural height.
-private struct PromptHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value += nextValue()
-    }
-}
-
-private extension View {
-    func measuringHeight() -> some View {
-        background(
-            GeometryReader { proxy in
-                Color.clear.preference(key: PromptHeightKey.self, value: proxy.size.height)
-            }
-        )
-    }
-}
+// Height measurement lives in `PromptSheetHeight.swift`, shared with the rest-alarm prompt.

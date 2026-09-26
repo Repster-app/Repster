@@ -76,6 +76,7 @@
 		A80006 /* ExerciseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80006 /* ExerciseService.swift */; };
 		AC0001 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0001 /* DesignTokens.swift */; };
 		ACDT01 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0001 /* DesignTokens.swift */; };
+		PSH001 /* PromptSheetHeight.swift in Sources */ = {isa = PBXBuildFile; fileRef = PSH101 /* PromptSheetHeight.swift */; };
 		AC0002 /* SetInputField.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0002 /* SetInputField.swift */; };
 		AC0003 /* PRBadgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0003 /* PRBadgeView.swift */; };
 		AC0004 /* SetNumberBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0004 /* SetNumberBadge.swift */; };
@@ -429,6 +430,7 @@
 		B80006 /* ExerciseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseService.swift; sourceTree = "<group>"; };
 		B90001 /* Repster.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Repster.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC0001 /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
+		PSH101 /* PromptSheetHeight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptSheetHeight.swift; sourceTree = "<group>"; };
 		BC0002 /* SetInputField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetInputField.swift; sourceTree = "<group>"; };
 		BC0003 /* PRBadgeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PRBadgeView.swift; sourceTree = "<group>"; };
 		BC0004 /* SetNumberBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetNumberBadge.swift; sourceTree = "<group>"; };
@@ -1230,6 +1232,7 @@
 				RPLY11 /* ReplayPrivacy.swift */,
 				BC9999 /* DebugLog.swift */,
 				BH0003 /* MuscleGroupColors.swift */,
+				PSH101 /* PromptSheetHeight.swift */,
 			);
 			path = Extensions;
 			sourceTree = "<group>";
@@ -1835,6 +1838,7 @@
 				AC0012 /* ExercisePickerSheet.swift in Sources */,
 				AC0013 /* RestTimerView.swift in Sources */,
 				RTA0002 /* RestAlarmPromptView.swift in Sources */,
+				PSH001 /* PromptSheetHeight.swift in Sources */,
 				AC0014 /* WorkoutSummarySheet.swift in Sources */,
 				AC9001 /* WorkoutShareCard.swift in Sources */,
 				AC9002 /* WorkoutShareCardBuilder.swift in Sources */,

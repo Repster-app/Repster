@@ -196,7 +196,6 @@ struct ActiveWorkoutView: View {
                 onDecline: { viewModel.declineRestAlarmAuthorization() },
                 isRequesting: viewModel.isRequestingRestAlarmAuthorization
             )
-            .presentationDetents([.medium, .large])
         }
         // Finish workout summary sheet (WP07 T032)
         .sheet(isPresented: $viewModel.showFinishSheet) {

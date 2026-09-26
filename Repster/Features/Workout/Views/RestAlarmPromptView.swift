@@ -10,6 +10,11 @@
 // So this asks first, in context: the first time a rest timer actually starts, when a countdown
 // has just appeared on screen and the reason explains itself. "Not now" never reaches iOS, which
 // leaves the real prompt unspent and recoverable from Settings later.
+//
+// It's one question with two answers, so — like its twin, `AppleHealthPromptView` — the sheet
+// sizes itself to its content. It used to sit on a fixed `.medium` detent that the content
+// outgrew: the subtitle was the only flexible view in the stack, so it absorbed the overflow
+// and truncated mid-sentence, and both buttons were clipped off the bottom.
 
 import SwiftUI
 
@@ -23,35 +28,55 @@ struct RestAlarmPromptView: View {
     /// Set while the system sheet is up, so the button can't be tapped twice.
     var isRequesting: Bool = false
 
+    @State private var measuredHeight: CGFloat = 480
+
+    private var detentHeight: CGFloat {
+        promptDetentHeight(for: measuredHeight)
+    }
+
     var body: some View {
-        VStack(spacing: 24) {
-            Spacer(minLength: 8)
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: 24) {
+                    VStack(spacing: 12) {
+                        Image(systemName: "bell.badge")
+                            .font(.system(size: 44))
+                            .foregroundStyle(Color.accent)
 
-            Image(systemName: "bell.badge")
-                .font(.system(size: 44))
-                .foregroundStyle(Color.accent)
+                        Text("Know when rest is over")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(Color.textPrimary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
 
-            VStack(spacing: 10) {
-                Text("Know when rest is over")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundStyle(Color.textPrimary)
+                        Text("Repster can tell you the moment your rest ends.")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 32)
+                    }
 
-                Text("Repster can tell you the moment your rest ends — even if you lock your phone or leave this screen.")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
+                    VStack(alignment: .leading, spacing: 16) {
+                        point("iphone.slash", "Works with your phone locked or in your pocket")
+                        point("square.on.square", "Works while you're checking history or another app")
+                        point("slider.horizontal.3", "Turn it off any time in Settings → Workout Preferences")
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.bg, in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.border, lineWidth: 1)
+                    )
+                    .padding(.horizontal, 32)
+                }
+                .padding(.top, 24)
+                .padding(.bottom, 12)
+                .measuringHeight()
             }
-
-            VStack(alignment: .leading, spacing: 14) {
-                point("iphone.slash", "Works with your phone locked or in your pocket")
-                point("square.on.square", "Works while you're checking history or another app")
-                point("slider.horizontal.3", "Turn it off any time in Settings → Workout Preferences")
-            }
-            .padding(.horizontal, 8)
-
-            Spacer(minLength: 8)
+            .scrollBounceBehavior(.basedOnSize)
 
             VStack(spacing: 10) {
                 Button(action: onEnable) {
@@ -76,29 +101,35 @@ struct RestAlarmPromptView: View {
                 .buttonStyle(.plain)
                 .disabled(isRequesting)
             }
+            .padding(.horizontal, 32)
+            .padding(.top, 12)
+            .padding(.bottom, 16)
+            .measuringHeight()
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 20)
-        .background(Color.bg)
+        .onPreferenceChange(PromptHeightKey.self) { measuredHeight = $0 }
+        .presentationDetents([.height(detentHeight)])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color.bgCard)
     }
 
     private func point(_ icon: String, _ text: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 16))
+                .font(.footnote)
                 .foregroundStyle(Color.accent)
-                .frame(width: 24)
+                .frame(width: 20)
 
             Text(text)
-                .font(.subheadline)
+                .font(.footnote)
                 .foregroundStyle(Color.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-
-            Spacer(minLength: 0)
         }
     }
 }
 
 #Preview {
-    RestAlarmPromptView(onEnable: {}, onDecline: {})
+    Color.bg
+        .sheet(isPresented: .constant(true)) {
+            RestAlarmPromptView(onEnable: {}, onDecline: {})
+        }
 }
