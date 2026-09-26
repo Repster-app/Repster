@@ -208,12 +208,20 @@ struct SideSession: Sendable, Equatable, Identifiable {
     }
 }
 
-/// The most reps each side has done at one weight.
+/// The best single set at one weight — both sides as they were logged together.
+///
+/// Never two sides from two different sets: the whole comparison rests on both sides sharing a
+/// weight inside one set, and a row that mixed two sets would invite the reader to compare
+/// reserves that were never side by side.
 struct SideBestRow: Sendable, Equatable, Identifiable {
     /// Kilograms, as logged. Nil for bodyweight work.
     let weight: Double?
     let left: Int
     let right: Int
+    /// Reps in reserve, when the set has them for both sides. Nil follows `capacity`: a blank isn't
+    /// failure, and two "5+" sides compare on reps alone, so neither gets a reserve here.
+    let leftRIR: Double?
+    let rightRIR: Double?
 
     var id: String { weight.map { String(format: "%.3f", $0) } ?? "bodyweight" }
 }
@@ -340,6 +348,15 @@ enum SidesAnalysis {
         return (left, right)
     }
 
+    /// The reserves a best-set row may print, following `capacity` exactly: both sides or neither,
+    /// and a censored "5+" is shown as the floor it was counted as. Two "5+" sides compared on reps
+    /// alone get nothing, because nothing about their reserve was comparable.
+    static func comparableRIR(_ leftRIR: Double?, _ rightRIR: Double?) -> (left: Double?, right: Double?) {
+        guard let leftRIR, let rightRIR else { return (nil, nil) }
+        guard usableRIR.contains(leftRIR) || usableRIR.contains(rightRIR) else { return (nil, nil) }
+        return (min(leftRIR, censoredRIR), min(rightRIR, censoredRIR))
+    }
+
     /// Relative, not absolute: one rep matters more on a set of 6 than a set of 15.
     static func degree(gap: Double, meanCapacity: Double) -> SideDegree {
         guard meanCapacity > 0 else { return .much }
@@ -418,10 +435,24 @@ enum SidesAnalysis {
         let right: Double
     }
 
+    /// Ranked by the same capacity the verdict uses, then by reps, then by recency — so the row a
+    /// lifter reads is the set the verdict would have leaned on hardest.
     private struct BestAccumulator {
         let weight: Double?
-        var left: Int
-        var right: Int
+        let left: Int
+        let right: Int
+        let leftRIR: Double?
+        let rightRIR: Double?
+        let capacity: Double
+        let date: Date
+
+        var totalReps: Int { left + right }
+
+        func isBeaten(by other: BestAccumulator) -> Bool {
+            if other.capacity != capacity { return other.capacity > capacity }
+            if other.totalReps != totalReps { return other.totalReps > totalReps }
+            return other.date > date
+        }
     }
 
     private static func sessions(from samples: [Sample]) -> [SideSession] {
@@ -476,10 +507,19 @@ enum SidesAnalysis {
 
             let weight = set.weight.flatMap { $0 > 0 ? $0 : nil }
             let key = weight.map { String(format: "%.3f", $0) } ?? "bodyweight"
-            var best = bests[exercise.id]?[key] ?? BestAccumulator(weight: weight, left: 0, right: 0)
-            best.left = max(best.left, left)
-            best.right = max(best.right, right)
-            bests[exercise.id, default: [:]][key] = best
+            let reserve = comparableRIR(set.leftRIR, set.rightRIR)
+            let candidate = BestAccumulator(
+                weight: weight,
+                left: left,
+                right: right,
+                leftRIR: reserve.left,
+                rightRIR: reserve.right,
+                capacity: cap.left + cap.right,
+                date: set.date
+            )
+            if bests[exercise.id]?[key]?.isBeaten(by: candidate) ?? true {
+                bests[exercise.id, default: [:]][key] = candidate
+            }
         }
 
         var groups: [SideGroupSummary] = []
@@ -500,7 +540,15 @@ enum SidesAnalysis {
                     classification = classify(recent)
                 }
                 let bestRows = (bests[id] ?? [:]).values
-                    .map { SideBestRow(weight: $0.weight, left: $0.left, right: $0.right) }
+                    .map {
+                        SideBestRow(
+                            weight: $0.weight,
+                            left: $0.left,
+                            right: $0.right,
+                            leftRIR: $0.leftRIR,
+                            rightRIR: $0.rightRIR
+                        )
+                    }
                     .sorted { ($0.weight ?? -1) > ($1.weight ?? -1) }
                 summaries.append(SideExerciseSummary(
                     id: id,

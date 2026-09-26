@@ -166,6 +166,20 @@ extension Color {
     /// #353D53 — A group still collecting sessions.
     static let sidesCollecting = Color(red: 0.208, green: 0.239, blue: 0.325)
 
+    /// #3A4257 — The trailing side's bar, and the reps a best set actually did. Slate rather than
+    /// a second hue: an imbalance is a direction, not a failure, so nothing here is "the bad one".
+    static let sidesTrail = Color(red: 0.227, green: 0.259, blue: 0.341)
+
+    /// Accent at 30% — what was left in the tank on a best set, so "done" still reads first.
+    static let sidesReserve = accent.opacity(0.30)
+
+    /// #6B7185 — A mark with no side to call: an even session, or the L/R letters on a ladder row.
+    static let sidesNeutralMark = Color(red: 0.420, green: 0.443, blue: 0.522)
+
+    /// #8A8A9C — Captions and axis labels inside Sides. ``textTertiary`` is 2.6:1 on ``bgCard``,
+    /// under AA for body text; this is 5.1:1. Scoped to Sides rather than changed globally.
+    static let sidesCaption = Color(red: 0.541, green: 0.541, blue: 0.612)
+
     /// #2A2B33 — Regions nothing tracks, and the parts of the body that aren't muscles.
     static let bodyBase = Color(red: 0.165, green: 0.169, blue: 0.200)
 

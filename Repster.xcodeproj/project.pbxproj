@@ -271,6 +271,7 @@
 		SD0003 /* BodyMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SD1003 /* BodyMapView.swift */; };
 		SD0004 /* SidesCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SD1004 /* SidesCardView.swift */; };
 		SD0005 /* SideGroupDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SD1005 /* SideGroupDetailView.swift */; };
+		SD0007 /* SideExerciseCharts.swift in Sources */ = {isa = PBXBuildFile; fileRef = SD1007 /* SideExerciseCharts.swift */; };
 		SD0006 /* SidesAnalysisTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SD1006 /* SidesAnalysisTests.swift */; };
 		LR0001 /* LiveModelRaceReproTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = LR1001 /* LiveModelRaceReproTests.swift */; };
 		TT0001 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */; };
@@ -618,6 +619,7 @@
 		SD1003 /* BodyMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyMapView.swift; sourceTree = "<group>"; };
 		SD1004 /* SidesCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidesCardView.swift; sourceTree = "<group>"; };
 		SD1005 /* SideGroupDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SideGroupDetailView.swift; sourceTree = "<group>"; };
+		SD1007 /* SideExerciseCharts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SideExerciseCharts.swift; sourceTree = "<group>"; };
 		SD1006 /* SidesAnalysisTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidesAnalysisTests.swift; sourceTree = "<group>"; };
 		LR1001 /* LiveModelRaceReproTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveModelRaceReproTests.swift; sourceTree = "<group>"; };
 		TT2001 /* RepsterTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RepsterTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1519,6 +1521,7 @@
 				SD1003 /* BodyMapView.swift */,
 				SD1004 /* SidesCardView.swift */,
 				SD1005 /* SideGroupDetailView.swift */,
+				SD1007 /* SideExerciseCharts.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -2014,6 +2017,7 @@
 				SD0003 /* BodyMapView.swift in Sources */,
 				SD0004 /* SidesCardView.swift in Sources */,
 				SD0005 /* SideGroupDetailView.swift in Sources */,
+				SD0007 /* SideExerciseCharts.swift in Sources */,
 				IN0012 /* InsightChartViews.swift in Sources */,
 				IN0013 /* InsightRules+Progress.swift in Sources */,
 				IN0014 /* InsightRules+Readiness.swift in Sources */,

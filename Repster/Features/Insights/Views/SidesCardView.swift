@@ -298,9 +298,12 @@ enum SidesPreviewData {
         status: .imbalance(exercises: 3),
         exercises: [
             exercise("One Legged Leg Curl", .stronger(.right, .clearly), [(9, 9.5), (9, 10), (7, 9.5)],
-                     bests: [SideBestRow(weight: 30, left: 6, right: 6), SideBestRow(weight: 25, left: 10, right: 10)]),
+                     // Matched reps, different reserve: the case the old table drew as a tie.
+                     bests: [SideBestRow(weight: 30, left: 6, right: 6, leftRIR: 1, rightRIR: 2),
+                             SideBestRow(weight: 25, left: 10, right: 10, leftRIR: 0, rightRIR: 1)]),
             exercise("Leg Extension - 1 leg", .stronger(.left, .slightly), [(12, 12), (9, 8), (13, 13), (9, 7.5), (10, 9), (10.5, 10.5)],
-                     bests: [SideBestRow(weight: 50, left: 9, right: 9), SideBestRow(weight: 45, left: 12, right: 12)], oneSided: 1),
+                     bests: [SideBestRow(weight: 50, left: 9, right: 9, leftRIR: 2, rightRIR: 1),
+                             SideBestRow(weight: 45, left: 12, right: 12, leftRIR: nil, rightRIR: nil)], oneSided: 1),
             exercise("1 Leg Stand Up", .stronger(.right, .slightly), [(7.5, 8), (9, 9), (8.5, 8.5), (10, 11), (12, 12), (7, 10)]),
             exercise("1 Legged Hip Thrust", .possible(.left), [(11, 9.5), (10.5, 8.5), (9.5, 9.5)]),
             exercise("Leg Curl 1 Leg", .collecting(sessions: 1), [(12, 12)]),

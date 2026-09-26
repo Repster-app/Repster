@@ -158,29 +158,43 @@ struct SideExerciseDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 22) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(SidesCopy.statusLine(for: exercise))
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.textPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
-
+                    // The size of the gap leads and the consistency supports it: a lifter asks how
+                    // far apart their sides are before they ask how often.
                     if let gap = SidesCopy.gapLine(for: exercise) {
                         Text(gap)
+                            .font(.system(size: 19, weight: .bold))
+                            .kerning(-0.2)
+                            .foregroundStyle(Color.textPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Text(SidesCopy.statusLine(for: exercise))
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(Color.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text(SidesCopy.statusLine(for: exercise))
+                            .font(.system(size: 19, weight: .bold))
+                            .kerning(-0.2)
+                            .foregroundStyle(Color.textPrimary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
 
+                if exercise.status.isClassified {
+                    SideBalanceBeam(averageGap: exercise.averageGap, status: exercise.status)
+                }
+
                 if !exercise.sessions.isEmpty {
-                    SidesSectionLabel(text: "EACH SESSION, BOTH SIDES")
-                    SideDifferenceChart(sessions: exercise.sessions)
+                    VStack(alignment: .leading, spacing: 12) {
+                        SidesSectionLabel(text: "EACH SESSION")
+                        SideSessionLadder(sessions: exercise.sessions)
+                    }
                 }
 
                 if !exercise.bestReps.isEmpty {
-                    SidesSectionLabel(text: "BEST REPS PER SIDE")
-                    bestTable
+                    SideEffortTable(rows: exercise.bestReps, unitPreference: unitPreference)
                 }
 
                 if let note = incompleteNote {
@@ -188,7 +202,7 @@ struct SideExerciseDetailView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 12)
+            .padding(.top, 14)
             .padding(.bottom, 32)
         }
         .background(Color.bgCard)
@@ -199,50 +213,6 @@ struct SideExerciseDetailView: View {
             hasReportedOpen = true
             onFirstAppear()
         }
-    }
-
-    private var bestTable: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                Text("WEIGHT")
-                Spacer(minLength: 8)
-                Text("LEFT").frame(width: 60, alignment: .trailing)
-                Text("RIGHT").frame(width: 60, alignment: .trailing)
-            }
-            .font(.system(size: 10, weight: .semibold))
-            .kerning(0.5)
-            .foregroundStyle(Color.textTertiary)
-            .padding(.bottom, 6)
-
-            ForEach(exercise.bestReps) { row in
-                HStack(spacing: 0) {
-                    Text(weightLabel(row.weight))
-                        .foregroundStyle(Color.textSecondary)
-                    Spacer(minLength: 8)
-                    Text("\(row.left)")
-                        .foregroundStyle(row.left >= row.right ? Color.textPrimary : Color.textSecondary)
-                        .frame(width: 60, alignment: .trailing)
-                    Text("\(row.right)")
-                        .foregroundStyle(row.right >= row.left ? Color.textPrimary : Color.textSecondary)
-                        .frame(width: 60, alignment: .trailing)
-                }
-                .font(.system(size: 13, weight: .semibold))
-                .monospacedDigit()
-                .padding(.vertical, 8)
-                .overlay(alignment: .top) {
-                    Rectangle()
-                        .fill(Color.border)
-                        .frame(height: 1)
-                }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(weightLabel(row.weight)): left \(row.left), right \(row.right)")
-            }
-        }
-    }
-
-    private func weightLabel(_ kg: Double?) -> String {
-        guard let kg else { return "Bodyweight" }
-        return UnitConversion.formatWeightLabel(kg, unitPreference: unitPreference)
     }
 
     /// Rows with a side missing: one-sided reps aren't compared at all; RIR on one side
@@ -280,131 +250,6 @@ struct SideExerciseDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.bgInput)
         .cornerRadius(10)
-    }
-}
-
-// MARK: - Chart
-
-/// C2 (D18), per exercise: one column per session — up when the right side did more, down
-/// when the left did, one to three steps tall like the strength mark. No axis numbers.
-struct SideDifferenceChart: View {
-    let sessions: [SideSession]
-
-    private let step: CGFloat = 11
-    private var half: CGFloat { step * 3 }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center, spacing: 8) {
-                VStack(alignment: .leading, spacing: 0) {
-                    sideLabel("Right")
-                    Spacer(minLength: 0)
-                    sideLabel("Left")
-                }
-                .frame(width: 50, height: half * 2 + 2)
-
-                HStack(alignment: .center, spacing: 0) {
-                    ForEach(sessions) { session in
-                        column(session)
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .frame(height: half * 2 + 2)
-                .background(guides)
-            }
-
-            if let first = sessions.first, let last = sessions.last {
-                HStack(spacing: 0) {
-                    Text(first.date.formatted(.dateTime.month(.abbreviated).day()))
-                    Spacer(minLength: 8)
-                    if sessions.count > 1 {
-                        Text(last.date.formatted(.dateTime.month(.abbreviated).day()))
-                    }
-                }
-                .font(.system(size: 9.5, weight: .semibold))
-                .foregroundStyle(Color.textTertiary)
-                .padding(.leading, 58)
-            }
-
-            Text("Each column is one session. Taller means a bigger difference — the same three steps as the strength mark.")
-                .font(.system(size: 11.5, weight: .medium))
-                .foregroundStyle(Color.textTertiary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilitySummary)
-    }
-
-    private func sideLabel(_ side: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(side)
-                .font(.system(size: 10.5, weight: .semibold))
-                .foregroundStyle(Color.textSecondary)
-            Text("stronger")
-                .font(.system(size: 9.5, weight: .medium))
-                .foregroundStyle(Color.textTertiary)
-        }
-    }
-
-    private func column(_ session: SideSession) -> some View {
-        let height = CGFloat(session.degree?.rawValue ?? 0) * step - 1
-        return VStack(spacing: 0) {
-            ZStack(alignment: .bottom) {
-                Color.clear
-                if session.lean == .right { bar(height) }
-            }
-            .frame(height: half)
-
-            ZStack {
-                Color.clear
-                if session.lean == nil {
-                    Circle()
-                        .fill(Color.textTertiary)
-                        .frame(width: 5, height: 5)
-                }
-            }
-            .frame(height: 2)
-
-            ZStack(alignment: .top) {
-                Color.clear
-                if session.lean == .left { bar(height) }
-            }
-            .frame(height: half)
-        }
-    }
-
-    private func bar(_ height: CGFloat) -> some View {
-        RoundedRectangle(cornerRadius: 3)
-            .fill(Color.sidesStronger)
-            .frame(minWidth: 3, maxWidth: 16)
-            .frame(height: height)
-    }
-
-    private var guides: some View {
-        Canvas { context, size in
-            let mid = size.height / 2
-            var baseline = Path()
-            baseline.move(to: CGPoint(x: 0, y: mid))
-            baseline.addLine(to: CGPoint(x: size.width, y: mid))
-            context.stroke(baseline, with: .color(.bodyOutline), lineWidth: 1)
-
-            for level in 1...3 {
-                for direction in [-1.0, 1.0] {
-                    let y = mid + CGFloat(direction) * CGFloat(level) * step
-                    var line = Path()
-                    line.move(to: CGPoint(x: 0, y: y))
-                    line.addLine(to: CGPoint(x: size.width, y: y))
-                    context.stroke(line, with: .color(Color.white.opacity(0.04)), style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
-                }
-            }
-        }
-    }
-
-    private var accessibilitySummary: String {
-        let right = sessions.filter { $0.lean == .right }.count
-        let left = sessions.filter { $0.lean == .left }.count
-        let even = sessions.count - right - left
-        return "Of \(sessions.count) sessions, the right side was stronger in \(right), the left in \(left), and they were even in \(even)."
     }
 }
 
@@ -504,5 +349,36 @@ enum SidesCopy {
 #if DEBUG
 #Preview("Legs deep dive") {
     SideGroupDetailSheet(group: SidesPreviewData.legs, unitPreference: .metric)
+}
+
+/// One per state, because the beam and the ladder each read differently in all four and a device
+/// pass on only the confirmed case would miss three of them.
+#Preview("Exercise — stronger") {
+    NavigationStack {
+        SideExerciseDetailView(exercise: SidesPreviewData.legs.exercises[0], unitPreference: .metric)
+    }
+}
+
+#Preview("Exercise — seems stronger") {
+    NavigationStack {
+        SideExerciseDetailView(exercise: SidesPreviewData.legs.exercises[3], unitPreference: .metric)
+    }
+}
+
+#Preview("Exercise — even") {
+    NavigationStack {
+        SideExerciseDetailView(
+            exercise: SidesPreviewData.exercise(
+                "1 Leg Press", .even, [(10, 10), (9, 9.5), (11, 10.5), (10, 10), (9.5, 9.5), (12, 12)]
+            ),
+            unitPreference: .metric
+        )
+    }
+}
+
+#Preview("Exercise — collecting") {
+    NavigationStack {
+        SideExerciseDetailView(exercise: SidesPreviewData.legs.exercises[4], unitPreference: .metric)
+    }
 }
 #endif

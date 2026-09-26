@@ -379,6 +379,115 @@ final class SidesAnalysisTests: XCTestCase {
         XCTAssertNil(summary.bestReps[0].weight)
     }
 
+    // MARK: - Best set at each weight (SIDES_DETAIL_REDESIGN_SCOPING.md §4)
+
+    /// The row is a side-by-side comparison, so both halves must come from one set. Maxing the
+    /// sides independently pairs the best left with a right it never trained beside — invisible
+    /// while only reps showed, wrong the moment a reserve is printed next to each number.
+    @MainActor
+    func testBestSetComesFromOneSetNotTwoHalves() async throws {
+        let curl = unilateral("One Legged Leg Curl")
+        try seed([curl])
+        try session(curl.id, daysAgo: 3, [
+            Side(left: 7, right: 5, leftRIR: 0, rightRIR: 0),
+            Side(left: 5, right: 8, leftRIR: 0, rightRIR: 0),
+        ])
+
+        let summary = try exercise("One Legged Leg Curl", in: try await sides())
+        let row = try XCTUnwrap(summary.bestReps.first)
+        XCTAssertEqual(row.left, 5)
+        XCTAssertEqual(row.right, 8)
+    }
+
+    @MainActor
+    func testBestSetTieBreaksOnRepsWhenCapacityMatches() async throws {
+        let curl = unilateral("One Legged Leg Curl")
+        try seed([curl])
+        try session(curl.id, daysAgo: 3, [
+            rir(6, left: 2, right: 2),
+            rir(7, left: 1, right: 1),
+        ])
+
+        let summary = try exercise("One Legged Leg Curl", in: try await sides())
+        let row = try XCTUnwrap(summary.bestReps.first)
+        XCTAssertEqual(row.left, 7)
+        XCTAssertEqual(row.leftRIR, 1)
+    }
+
+    @MainActor
+    func testBestSetTieBreaksOnRecencyLast() async throws {
+        let curl = unilateral("One Legged Leg Curl")
+        try seed([curl])
+        try session(curl.id, daysAgo: 17, [Side(left: 6, right: 6, leftRIR: 1, rightRIR: 2)])
+        try session(curl.id, daysAgo: 3, [Side(left: 6, right: 6, leftRIR: 2, rightRIR: 1)])
+
+        let summary = try exercise("One Legged Leg Curl", in: try await sides())
+        let row = try XCTUnwrap(summary.bestReps.first)
+        XCTAssertEqual(row.leftRIR, 2, "same capacity and same reps: the newer set wins")
+        XCTAssertEqual(row.rightRIR, 1)
+    }
+
+    /// The case the old table drew as a tie: matched reps, different reserve.
+    @MainActor
+    func testBestSetCarriesBothReserves() async throws {
+        let curl = unilateral("One Legged Leg Curl")
+        try seed([curl])
+        try history(curl.id, Array(repeating: [rir(6, left: 1, right: 2)], count: 6))
+
+        let summary = try exercise("One Legged Leg Curl", in: try await sides())
+        let row = try XCTUnwrap(summary.bestReps.first)
+        XCTAssertEqual(row.left, 6)
+        XCTAssertEqual(row.right, 6)
+        XCTAssertEqual(row.leftRIR, 1)
+        XCTAssertEqual(row.rightRIR, 2)
+        XCTAssertEqual(summary.status, .stronger(.right, .clearly), "equal reps, and the verdict still lands")
+    }
+
+    @MainActor
+    func testBestSetDropsReserveWhenOnlyOneSideHasIt() async throws {
+        let curl = unilateral("One Legged Leg Curl")
+        try seed([curl])
+        try session(curl.id, daysAgo: 3, [Side(left: 6, right: 6, leftRIR: 1, rightRIR: nil)])
+
+        let summary = try exercise("One Legged Leg Curl", in: try await sides())
+        let row = try XCTUnwrap(summary.bestReps.first)
+        XCTAssertNil(row.leftRIR, "a blank isn\u{2019}t failure, so neither side gets a reserve")
+        XCTAssertNil(row.rightRIR)
+        XCTAssertEqual(summary.rirOnOneSideSets, 1)
+    }
+
+    @MainActor
+    func testCensoredReserveShowsItsFloorAndTwoOfThemShowNothing() async throws {
+        let curl = unilateral("One Legged Leg Curl")
+        let press = unilateral("One Legged Press")
+        try seed([curl, press])
+        try session(curl.id, daysAgo: 3, [Side(left: 6, right: 6, leftRIR: 5, rightRIR: 2)])
+        try session(press.id, daysAgo: 3, [Side(left: 6, right: 6, leftRIR: 5, rightRIR: 5)])
+
+        let result = try await sides()
+        let oneCensored = try XCTUnwrap(try exercise("One Legged Leg Curl", in: result).bestReps.first)
+        XCTAssertEqual(oneCensored.leftRIR, SidesAnalysis.censoredRIR)
+        XCTAssertEqual(oneCensored.rightRIR, 2)
+
+        let bothCensored = try XCTUnwrap(try exercise("One Legged Press", in: result).bestReps.first)
+        XCTAssertNil(bothCensored.leftRIR, "two 5+ sides compare on reps alone, so no reserve is comparable")
+        XCTAssertNil(bothCensored.rightRIR)
+    }
+
+    @MainActor
+    func testBestSetRowsRunHeaviestFirstWithBodyweightLast() async throws {
+        let pistol = unilateral("Pistol Squat", equipment: .bodyweight)
+        try seed([pistol])
+        try session(pistol.id, daysAgo: 3, [
+            Side(left: 8, right: 8, leftRIR: 0, rightRIR: 0, weight: nil),
+            Side(left: 5, right: 5, leftRIR: 0, rightRIR: 0, weight: 50),
+            Side(left: 6, right: 6, leftRIR: 0, rightRIR: 0, weight: 30),
+        ])
+
+        let summary = try exercise("Pistol Squat", in: try await sides())
+        XCTAssertEqual(summary.bestReps.map(\.weight), [50, 30, nil])
+    }
+
     // MARK: - Groups (D21)
 
     /// Opposite directions in one group are just two imbalances — no "mixed" state.
