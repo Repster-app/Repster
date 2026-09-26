@@ -429,7 +429,7 @@ struct ActiveWorkoutView: View {
 
     // MARK: - Header Bar (T023)
 
-    /// Top bar with back button, elapsed timer, +Exercise button, and Finish button.
+    /// Top bar with back button, elapsed timer, +Exercise button, and End button.
     private var headerBar: some View {
         HStack(spacing: 8) {
             // Back / dismiss button
@@ -454,13 +454,8 @@ struct ActiveWorkoutView: View {
             Spacer()
 
             // +Exercise button
-            Button {
+            AddExerciseButton {
                 viewModel.presentAddExerciseSheet()
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.accent)
-                    .frame(width: 44, height: 36)
             }
 
             // End Workout button

@@ -133,13 +133,8 @@ struct EditWorkoutView: View {
             }
 
             // +Exercise button
-            Button {
+            AddExerciseButton {
                 viewModel.showAddExerciseSheet = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.accent)
-                    .frame(width: 44, height: 44)
             }
         }
         .padding(.horizontal, 20)

@@ -214,6 +214,7 @@
 		AW0008 /* WorkoutExclusionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0008 /* WorkoutExclusionSheet.swift */; };
 		AW0009 /* ProgressionExclusionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = BW0009 /* ProgressionExclusionViews.swift */; };
 		SN0001 /* SetNoteStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = SN1001 /* SetNoteStrip.swift */; };
+		AXB001 /* AddExerciseButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AXF001 /* AddExerciseButton.swift */; };
 		AX0001 /* ExerciseMuscleGroupCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BX0001 /* ExerciseMuscleGroupCatalog.swift */; };
 		AX0002 /* WorkoutSetPerformanceFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BX0002 /* WorkoutSetPerformanceFormatter.swift */; };
 		FL0001 /* FatigueObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = FL1001 /* FatigueObservation.swift */; };
@@ -562,6 +563,7 @@
 		BW0008 /* WorkoutExclusionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutExclusionSheet.swift; sourceTree = "<group>"; };
 		BW0009 /* ProgressionExclusionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressionExclusionViews.swift; sourceTree = "<group>"; };
 		SN1001 /* SetNoteStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetNoteStrip.swift; sourceTree = "<group>"; };
+		AXF001 /* AddExerciseButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddExerciseButton.swift; sourceTree = "<group>"; };
 		BX0001 /* ExerciseMuscleGroupCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMuscleGroupCatalog.swift; sourceTree = "<group>"; };
 		BX0002 /* WorkoutSetPerformanceFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSetPerformanceFormatter.swift; sourceTree = "<group>"; };
 		FL1001 /* FatigueObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FatigueObservation.swift; sourceTree = "<group>"; };
@@ -1356,6 +1358,7 @@
 				BW0008 /* WorkoutExclusionSheet.swift */,
 				BW0009 /* ProgressionExclusionViews.swift */,
 				SN1001 /* SetNoteStrip.swift */,
+				AXF001 /* AddExerciseButton.swift */,
 				BW0006 /* WeightSuggestionCardView.swift */,
 				BW0090 /* SuggestionExplainerSheet.swift */,
 				BW0007 /* WeightSuggestionModuleView.swift */,
@@ -1917,6 +1920,7 @@
 				AW0008 /* WorkoutExclusionSheet.swift in Sources */,
 				AW0009 /* ProgressionExclusionViews.swift in Sources */,
 				SN0001 /* SetNoteStrip.swift in Sources */,
+				AXB001 /* AddExerciseButton.swift in Sources */,
 				AX0002 /* WorkoutSetPerformanceFormatter.swift in Sources */,
 				AJ0004 /* SettingsViewModel.swift in Sources */,
 				AJ0005 /* SettingsView.swift in Sources */,
