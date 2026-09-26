@@ -2495,7 +2495,12 @@ final class ActiveWorkoutViewModel {
                 durationSecondsOverride: durationSeconds
             )
 
-            let accessSnapshot = await accessControlService.recordCompletedWorkoutIfNeeded()
+            // A workout with nothing ticked must not spend a free slot — the user logged
+            // nothing, so there is nothing to charge for. Read the snapshot instead, as the
+            // summary sheet and the share card builder already do for the same reason.
+            let accessSnapshot = completedSetCount > 0
+                ? await accessControlService.recordCompletedWorkoutIfNeeded()
+                : await accessControlService.currentAccessSnapshot()
             let accessTier: String = accessSnapshot.hasFullAccess ? "subscribed" : "free"
 
             let loggedRIRs = completedSets.compactMap(\.performanceRIR)
