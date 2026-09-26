@@ -7,6 +7,10 @@
 > does, so the plateau is a feedback loop created by the card anchoring the lifter to an exact rep
 > count. O2's attribution of the 32.5 kg case to the censored "5+" chip is also wrong; see the
 > behaviour audit §2.1. Start from the open-questions doc.
+>
+> **Consolidated, 2026-09-21.** O4's proposal, its D1–D6 and the worked example now live in
+> [PROGRESSION_LADDER_SCOPING.md](PROGRESSION_LADDER_SCOPING.md) alongside sizing and the cheaper alternatives. This doc stays the source for
+> P1's fix history and for why O1–O3 were dropped.
 
 **Date:** 2026-08-26 · **Branch:** NewMain
 **Status:** P1 fixed and shipped to the branch. P2 open. O2/O3/O4 undecided.

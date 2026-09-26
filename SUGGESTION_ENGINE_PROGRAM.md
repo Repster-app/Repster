@@ -2,6 +2,10 @@
 
 **Date:** 2026-08-26 · **Branch:** NewMain · **Status:** synthesis, no code changes
 
+> **Partly corrected, 2026-09-21.** C4/R3 and the collision map still hold, but §C's claim that O4
+> needs new persisted state is true only of the *plan-holding* tier — see
+> [PROGRESSION_LADDER_SCOPING.md](PROGRESSION_LADDER_SCOPING.md) §8. That doc is now the source of truth for progression and the ladder.
+
 Four documents written in four sessions describe what is actually **one body of work on one
 engine**. This doc maps them onto each other, resolves the places where they contradict, names
 the root causes none of them owns, and proposes a single sequence.
@@ -273,6 +277,12 @@ Three docs want to reach data that isn't in it ([:10](Repster/Core/Services/Prot
 Thread `targetRIR` and `prescribedWeight` **once** and two docs get their first-choice design
 instead of their fallback. Independently, each looks like a cost not worth paying; together it's
 one small change.
+
+**Corrected 2026-09-21 — true only of the plan-holding tier (L3).** A ladder that reads last
+session's top set from history needs no new persisted state: `SuggestionEngineInput.baseSourceTopSet`
+already carries weight, reps, RIR and date into the engine unused, and
+`peakAcrossRecentWorkouts(limit: 1)` already computes last session. See
+[PROGRESSION_LADDER_SCOPING.md](PROGRESSION_LADDER_SCOPING.md) §8. Original claim below.
 
 PROGRESSION O4 is the only item in the whole program needing genuinely new *persisted* state
 (ladder position) — worth isolating for exactly that reason.

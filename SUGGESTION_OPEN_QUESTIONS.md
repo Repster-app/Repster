@@ -1,5 +1,10 @@
 # Smart Suggestions — what's still open
 
+> **Progression and the ladder moved, 2026-09-21.** §1, §2.1–2.5 and §3 were consolidated into
+> [PROGRESSION_LADDER_SCOPING.md](PROGRESSION_LADDER_SCOPING.md), which is now the single source of truth for that feature — it adds sizing,
+> a UX walkthrough, the cheap alternatives and the derived-vs-persisted finding. This doc remains the
+> source for **§4** (default-rep-target shapes) and **§5** (loose ends).
+
 **Date:** 2026-08-27 · **Branch:** NewMain
 **Scope:** only what is **not** decided and **not** built. Everything shipped in the epoch-2 release
 is deliberately excluded — see [SUGGESTION_ENGINE_IMPLEMENTATION_PLAN.md](SUGGESTION_ENGINE_IMPLEMENTATION_PLAN.md)
