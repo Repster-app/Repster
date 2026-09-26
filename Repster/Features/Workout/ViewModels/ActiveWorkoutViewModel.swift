@@ -608,21 +608,38 @@ final class ActiveWorkoutViewModel {
     /// pair existed therefore reads as supersetted afterwards; that is the accepted cost of the
     /// simpler model, and it is why the history chip is worded per session rather than per set.
     ///
-    /// The pair must end up adjacent in the strip: a container cannot wrap two tabs with a third
-    /// between them, so a non-adjacent partner is moved next to the anchor. Ordering happens
-    /// **after** the group is written, so a failed write leaves the workout's order untouched.
+    /// The group must end up contiguous in the strip: a container cannot wrap two tabs with a third
+    /// between them, so whichever side has to move is moved. Ordering happens **after** the group is
+    /// written, so a failed write leaves the workout's order untouched.
+    ///
+    /// When the partner is **already in a group, the anchor joins it** rather than a new group being
+    /// minted over both. Minting was the original behaviour and it silently took the partner out of
+    /// whatever it was paired with, leaving that exercise holding a group id nothing else carried —
+    /// invisible on screen, because a group of one draws unmarked. Joining is also what the gesture
+    /// means: reaching for an exercise that is visibly already in a superset is how you ask for a
+    /// third member. Supersets of three-plus supersede the pairs-only limit in
+    /// SUPERSETS_SCOPING.md §6 constraint 2; every rule downstream of the group already handles N.
     func createSuperset(anchorExerciseId: UUID, partnerExerciseId: UUID) async {
         guard anchorExerciseId != partnerExerciseId else { return }
         guard exercises.contains(where: { $0.id == anchorExerciseId }),
               exercises.contains(where: { $0.id == partnerExerciseId })
         else { return }
 
+        // A group of one is not a group — the partner's id is stale and joining it would make the
+        // stale state real. `isInSuperset` is the check that rejects it; `supersetGroupId` alone
+        // would not.
+        let joinedGroupId = isInSuperset(partnerExerciseId)
+            ? supersetGroupId(for: partnerExerciseId)
+            : nil
+
+        // Joining writes the anchor's rows only: the group already has an id and its members
+        // already carry it. One fewer write, and the partner's rows are never touched.
         let anchorSets = setsByExercise[anchorExerciseId] ?? []
-        let partnerSets = setsByExercise[partnerExerciseId] ?? []
+        let partnerSets = joinedGroupId == nil ? (setsByExercise[partnerExerciseId] ?? []) : []
         let setIds = (anchorSets + partnerSets).map(\.id)
         guard !setIds.isEmpty else { return }
 
-        let groupId = UUID()
+        let groupId = joinedGroupId ?? UUID()
         do {
             try await setService.applySupersetGroup(setIds: setIds, groupId: groupId)
         } catch {
@@ -632,8 +649,13 @@ final class ActiveWorkoutViewModel {
             return
         }
 
-        applySupersetGroupLocally(groupId, to: [anchorExerciseId, partnerExerciseId])
-        moveAdjacent(partnerExerciseId, after: anchorExerciseId)
+        if joinedGroupId != nil {
+            applySupersetGroupLocally(groupId, to: [anchorExerciseId])
+            moveToEndOfGroup(anchorExerciseId, groupId: groupId)
+        } else {
+            applySupersetGroupLocally(groupId, to: [anchorExerciseId, partnerExerciseId])
+            moveAdjacent(partnerExerciseId, after: anchorExerciseId)
+        }
 
         analyticsService.recordWorkoutInteraction(.supersetCreates)
     }
@@ -643,9 +665,15 @@ final class ActiveWorkoutViewModel {
     /// Clears the group from every set of *this* exercise only. A pair dissolves cleanly from
     /// either side with no second write: the exercise left behind becomes a group of one, which
     /// every reader already treats as ungrouped (SUPERSETS_IMPLEMENTATION_PLAN.md G5).
+    ///
+    /// Leaving from the **middle** of a three-plus group needs one more step — see
+    /// `moveClearOfGroup`.
     func removeFromSuperset(exerciseId: UUID) async {
         let setIds = (setsByExercise[exerciseId] ?? []).map(\.id)
         guard !setIds.isEmpty else { return }
+
+        // Read before the write clears it: this is the group being stepped out of.
+        let departedGroupId = supersetGroupId(for: exerciseId)
 
         do {
             try await setService.applySupersetGroup(setIds: setIds, groupId: nil)
@@ -657,6 +685,10 @@ final class ActiveWorkoutViewModel {
         }
 
         applySupersetGroupLocally(nil, to: [exerciseId])
+
+        if let departedGroupId {
+            moveClearOfGroup(exerciseId, groupId: departedGroupId)
+        }
 
         // The prompt may have been pointing into the group that just stopped existing.
         if supersetPrompt != nil, !isInSuperset(currentExercise?.id ?? exerciseId) {
@@ -686,6 +718,51 @@ final class ActiveWorkoutViewModel {
         else { return }
 
         reorderExercises(from: IndexSet(integer: partnerIndex), to: anchorIndex + 1)
+    }
+
+    /// Put `exerciseId` immediately after the last existing member of `groupId`.
+    ///
+    /// The mirror of `moveAdjacent`, and the reason joining needs its own move: dragging a *member*
+    /// out to meet the newcomer would strand the rest of the group, and non-adjacent members of one
+    /// group produce separate runs — two containers, same colour, one group. The newcomer goes to
+    /// the group instead.
+    ///
+    /// `exerciseId` is excluded from the search because it already carries `groupId` by this point.
+    private func moveToEndOfGroup(_ exerciseId: UUID, groupId: UUID) {
+        guard let lastMemberIndex = exercises.lastIndex(where: {
+            $0.id != exerciseId && supersetGroupId(for: $0.id) == groupId
+        }) else { return }
+
+        guard let index = exercises.firstIndex(where: { $0.id == exerciseId }),
+              index != lastMemberIndex + 1
+        else { return }
+
+        reorderExercises(from: IndexSet(integer: index), to: lastMemberIndex + 1)
+    }
+
+    /// Step an ex-member out of the run it just left, when it was sitting in the middle of it.
+    ///
+    /// Removing the middle of a three-plus group leaves the survivors either side of an exercise
+    /// that is no longer in the group, and the two halves of the app disagree about what that
+    /// means: `runs` splits at the gap, so neither half draws a container, while `members` still
+    /// reports them grouped — so rest stays suppressed between two exercises that look completely
+    /// unrelated, and the menu still offers Remove from Superset on both. Unreachable while groups
+    /// were pairs; two taps away now that they can hold three.
+    ///
+    /// Only a genuine gap moves anything. Leaving from either end already leaves the run contiguous.
+    private func moveClearOfGroup(_ exerciseId: UUID, groupId: UUID) {
+        guard let index = exercises.firstIndex(where: { $0.id == exerciseId }) else { return }
+
+        let memberIndices = exercises.indices.filter {
+            supersetGroupId(for: exercises[$0].id) == groupId
+        }
+        guard memberIndices.count > 1,
+              let firstMember = memberIndices.first,
+              let lastMember = memberIndices.last,
+              index > firstMember, index < lastMember
+        else { return }
+
+        reorderExercises(from: IndexSet(integer: index), to: lastMember + 1)
     }
 
     // MARK: - Superset prompt

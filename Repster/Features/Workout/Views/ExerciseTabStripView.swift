@@ -139,6 +139,7 @@ struct ExerciseTabStripView: View {
                         else { return true }
                         return abs(candidateIndex - anchorIndex) == 1
                     },
+                    existingGroup: { existingGroup(forCandidate: $0) },
                     onPick: { partnerId in
                         Task {
                             await dataSource.createSuperset(
@@ -179,6 +180,28 @@ struct ExerciseTabStripView: View {
     /// same groups, so the two have to agree on which group is which colour.
     private func markColor(for run: SupersetGrouping.Run) -> Color? {
         SupersetPalette.color(for: run, in: supersetRuns)
+    }
+
+    /// The superset a partner candidate is already in, described the way the picker needs it.
+    ///
+    /// Third surface to draw from `SupersetPalette`, for the same reason as the second: the picker
+    /// opens over the strip, so a group has to wear the same colour in both or the dot is worse
+    /// than nothing. Returns nil for an ungrouped candidate *and* for a group of one — the latter
+    /// is a stale id, and `color(for:in:)` already refuses to draw it.
+    private func existingGroup(forCandidate candidateId: UUID) -> SupersetPartnerPicker.ExistingGroup? {
+        guard let groupId = dataSource.supersetGroupId(for: candidateId) else { return nil }
+
+        let runs = supersetRuns
+        guard let run = runs.first(where: { $0.exercises.contains { $0.id == candidateId } }),
+              let color = SupersetPalette.color(for: run, in: runs)
+        else { return nil }
+
+        let partnerNames = dataSource.supersetMembers(of: groupId)
+            .filter { $0.id != candidateId }
+            .map(\.name)
+        guard !partnerNames.isEmpty else { return nil }
+
+        return SupersetPartnerPicker.ExistingGroup(partnerNames: partnerNames, color: color)
     }
 
     /// Two-plus adjacent members of one group, drawn as a single segmented control.

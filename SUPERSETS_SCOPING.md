@@ -292,8 +292,30 @@ movement, not the structure.
    Press"). Reorder was rebuilt on `applyOrdering` with identity-based selection on 2026-08-29
    ([EXERCISE_REPLACE_AND_REORDER_DESIGN.md](EXERCISE_REPLACE_AND_REORDER_DESIGN.md)), so it is
    sound to build on — an earlier draft of this doc said otherwise and was working from a stale note.
-2. **Pairs only, for v1.** Groups of three are a data-model no-op but a strip-width problem. Ship
-   two, see if anyone asks.
+2. ~~**Pairs only, for v1.** Groups of three are a data-model no-op but a strip-width problem. Ship
+   two, see if anyone asks.~~ **Superseded 2026-09-21 — someone asked.**
+
+   A bug report about "multiple supersets" turned out to be this constraint with no UI: picking a
+   partner that was already in a group minted a *new* group over both, which pulled that partner out
+   of its existing group and left the exercise it had been paired with holding an id nothing else
+   carried. A group of one draws unmarked, so the first superset silently vanished from the strip.
+   Reaching for a visibly grouped exercise is how someone asks for a third member, so `createSuperset`
+   now **joins** the partner's group instead of minting over it, and the picker says which group a
+   candidate is already in — in that group's own strip colour, plus the partner names in the
+   accessibility label, because the strip has no letters to name a group with.
+
+   Everything downstream already handled N: `next` cycles N members and computes `wrapped` correctly,
+   the reorder sheet moves an N-run as a unit, and the calendar, history and template detail views all
+   render N. Two things did not, and were fixed with it — joining moves the *anchor* to the end of the
+   group rather than dragging a member out to meet it (which would strand the rest and split one group
+   across two containers), and leaving from the **middle** of a three-plus group now steps out of the
+   run. That second one is the sharp edge the pairs-only limit had been hiding: `runs` splits at the
+   gap so neither half draws a container, while `members` still reports them grouped, so rest stayed
+   suppressed between two exercises that looked entirely unrelated.
+
+   Strip width is still the real cost, and it is now a device question rather than a hypothetical: the
+   container sits inside a horizontal `ScrollView`, so three tabs scroll rather than clip, but whether
+   a three-tab container reads as one group is not something the code can answer.
 
 ### Template authoring — cycle the palette · decided 2026-08-31
 

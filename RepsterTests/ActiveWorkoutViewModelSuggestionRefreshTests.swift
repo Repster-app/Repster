@@ -370,6 +370,183 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         XCTAssertFalse(viewModel.isInSuperset(context.bench))
     }
 
+    // MARK: - Joining an existing group (supersets of three)
+    //
+    // Picking a partner that is already in a superset used to mint a brand new group over both,
+    // which took that partner out of the group it was in and left whatever it had been paired with
+    // holding an id nothing else carried — a group of one, which draws unmarked, so the superset
+    // simply vanished from the strip with nothing said. Reaching for a visibly grouped exercise is
+    // how you ask for a third member, so that is what it now does.
+
+    /// Bench, Incline, Cable Fly and Pec Deck in strip order, with `groupedIndices` sharing a group.
+    @MainActor
+    private func makeGroupJoinViewModel(
+        setService: SetServiceStub,
+        groupedIndices: Set<Int>
+    ) -> (viewModel: ActiveWorkoutViewModel, ids: [UUID], group: UUID) {
+        let viewModel = makeOrderingViewModel(setService: setService)
+        let workoutId = UUID()
+        viewModel.workout = Workout(id: workoutId, date: Date(), status: .inProgress).testSnapshot
+
+        let made = ["Bench Press", "Incline DB Press", "Cable Fly", "Pec Deck"]
+            .map { makeExercise(name: $0) }
+        viewModel.exercises = made.map(ChartExerciseData.init(from:))
+
+        let group = UUID()
+        var byExercise: [UUID: [WorkoutSet]] = [:]
+        var all: [WorkoutSet] = []
+
+        for (index, exercise) in made.enumerated() {
+            let set = WorkoutSet(
+                workoutId: workoutId,
+                exerciseId: exercise.id,
+                weight: 80,
+                reps: 8,
+                rir: 2,
+                setType: .working,
+                orderInWorkout: index + 1,
+                orderInExercise: 1,
+                supersetGroupId: groupedIndices.contains(index) ? group : nil,
+                completed: false
+            )
+            byExercise[exercise.id] = [set]
+            all.append(set)
+        }
+
+        viewModel.setsByExercise = byExercise
+        setService.workoutSets[workoutId] = all
+
+        return (viewModel, made.map(\.id), group)
+    }
+
+    func testPickingAGroupedPartnerJoinsThatGroupInsteadOfStealingIt() async throws {
+        let setService = SetServiceStub()
+        let context = makeGroupJoinViewModel(setService: setService, groupedIndices: [0, 1])
+        let viewModel = context.viewModel
+        let (bench, incline, fly) = (context.ids[0], context.ids[1], context.ids[2])
+
+        await viewModel.createSuperset(anchorExerciseId: fly, partnerExerciseId: incline)
+
+        XCTAssertEqual(
+            viewModel.supersetGroupId(for: bench), context.group,
+            "the member nobody picked must stay in the group it was already in"
+        )
+        XCTAssertEqual(viewModel.supersetGroupId(for: incline), context.group)
+        XCTAssertEqual(
+            viewModel.supersetGroupId(for: fly), context.group,
+            "and the anchor adopts that group rather than minting a new one"
+        )
+
+        let runs = SupersetGrouping.runs(
+            exercises: viewModel.exercises,
+            setsByExercise: viewModel.setsByExercise
+        )
+        XCTAssertEqual(runs.filter(\.isMarked).count, 1, "one container, not two")
+        XCTAssertEqual(runs[0].exercises.map(\.id), [bench, incline, fly])
+        XCTAssertTrue(viewModel.isInSuperset(bench))
+    }
+
+    /// The group's existing members are not rewritten — they already carry the id being joined.
+    func testJoiningAGroupWritesOnlyTheAnchorsSets() async throws {
+        let setService = SetServiceStub()
+        let context = makeGroupJoinViewModel(setService: setService, groupedIndices: [0, 1])
+        let viewModel = context.viewModel
+        let (incline, fly) = (context.ids[1], context.ids[2])
+
+        await viewModel.createSuperset(anchorExerciseId: fly, partnerExerciseId: incline)
+
+        XCTAssertEqual(setService.supersetGroupWrites.count, 1)
+        let write = try XCTUnwrap(setService.supersetGroupWrites.first)
+        XCTAssertEqual(write.groupId, context.group)
+        XCTAssertEqual(
+            Set(write.setIds),
+            Set((viewModel.setsByExercise[fly] ?? []).map(\.id)),
+            "only the newcomer's rows"
+        )
+    }
+
+    /// The newcomer goes to the group. Pulling a member out to meet it would strand the rest and
+    /// split one group across two containers.
+    func testJoiningFromBeforeTheGroupMovesTheAnchorToTheEnd() async throws {
+        let setService = SetServiceStub()
+        let context = makeGroupJoinViewModel(setService: setService, groupedIndices: [2, 3])
+        let viewModel = context.viewModel
+        let (bench, incline, fly, pecDeck) = (context.ids[0], context.ids[1], context.ids[2], context.ids[3])
+
+        await viewModel.createSuperset(anchorExerciseId: bench, partnerExerciseId: fly)
+
+        XCTAssertEqual(
+            viewModel.exercises.map(\.id), [incline, fly, pecDeck, bench],
+            "the anchor travels to the end of the group, the group does not come to it"
+        )
+
+        let runs = SupersetGrouping.runs(
+            exercises: viewModel.exercises,
+            setsByExercise: viewModel.setsByExercise
+        )
+        XCTAssertEqual(runs.filter(\.isMarked).count, 1)
+        XCTAssertEqual(runs[1].exercises.map(\.id), [fly, pecDeck, bench])
+    }
+
+    /// Leaving from the middle would otherwise seat an ungrouped exercise between two members:
+    /// `runs` splits at the gap so neither half draws a container, while `members` still reports
+    /// them grouped — rest stays suppressed between two exercises that look entirely unrelated.
+    func testLeavingTheMiddleOfATrioKeepsTheSurvivorsContiguous() async throws {
+        let setService = SetServiceStub()
+        let context = makeGroupJoinViewModel(setService: setService, groupedIndices: [0, 1, 2])
+        let viewModel = context.viewModel
+        let (bench, incline, fly, pecDeck) = (context.ids[0], context.ids[1], context.ids[2], context.ids[3])
+
+        await viewModel.removeFromSuperset(exerciseId: incline)
+
+        XCTAssertNil(viewModel.supersetGroupId(for: incline))
+        XCTAssertEqual(
+            viewModel.exercises.map(\.id), [bench, fly, incline, pecDeck],
+            "the exercise that left steps out of the run rather than sitting in the middle of it"
+        )
+
+        let runs = SupersetGrouping.runs(
+            exercises: viewModel.exercises,
+            setsByExercise: viewModel.setsByExercise
+        )
+        XCTAssertEqual(runs.filter(\.isMarked).count, 1, "the survivors still draw as one superset")
+        XCTAssertEqual(runs[0].exercises.map(\.id), [bench, fly])
+        XCTAssertTrue(viewModel.isInSuperset(bench), "and really are still grouped")
+    }
+
+    /// Leaving from an end already leaves the run contiguous, so nothing moves.
+    func testLeavingTheEndOfATrioMovesNothing() async throws {
+        let setService = SetServiceStub()
+        let context = makeGroupJoinViewModel(setService: setService, groupedIndices: [0, 1, 2])
+        let viewModel = context.viewModel
+        let (bench, incline, fly, pecDeck) = (context.ids[0], context.ids[1], context.ids[2], context.ids[3])
+
+        await viewModel.removeFromSuperset(exerciseId: fly)
+
+        XCTAssertEqual(viewModel.exercises.map(\.id), [bench, incline, fly, pecDeck])
+
+        let runs = SupersetGrouping.runs(
+            exercises: viewModel.exercises,
+            setsByExercise: viewModel.setsByExercise
+        )
+        XCTAssertEqual(runs[0].exercises.map(\.id), [bench, incline])
+        XCTAssertTrue(runs[0].isMarked)
+    }
+
+    /// A group of one is a stale id, not a group — joining it would make the stale state real.
+    func testPickingAPartnerWhoseGroupHasNoOtherMembersMintsAFreshGroup() async throws {
+        let setService = SetServiceStub()
+        let context = makeGroupJoinViewModel(setService: setService, groupedIndices: [1])
+        let viewModel = context.viewModel
+        let (bench, incline) = (context.ids[0], context.ids[1])
+
+        await viewModel.createSuperset(anchorExerciseId: bench, partnerExerciseId: incline)
+
+        let joined = try XCTUnwrap(viewModel.supersetGroupId(for: bench))
+        XCTAssertNotEqual(joined, context.group, "the stale id is replaced, not adopted")
+        XCTAssertEqual(viewModel.supersetGroupId(for: incline), joined)
+    }
+
     /// Do all of Incline first, then go back to Bench: every remaining Bench set points at an
     /// exercise with nothing left to do, and gets no rest for it.
     func testCompletingASetWhenThePartnerIsAlreadyFinishedStillRests() async throws {
