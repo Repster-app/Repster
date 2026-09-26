@@ -2,6 +2,10 @@
 
 Status: scoped, not started. 2026-09-12. Targets 1.6.
 Nothing in this document is agreed; §12 lists the decisions it needs.
+Companion: `design/sample-history/` — seven phone screens (the five sample surfaces plus today's
+empty Home and Charts for comparison), published at
+https://claude.ai/code/artifact/507f6efd-85bc-4c45-a358-8ecb28ff11eb. The mockups are the visual
+reference; the sketches below are a summary of them.
 
 ---
 
@@ -122,17 +126,21 @@ TRAINING INSIGHTS
 
 EXAMPLE HISTORY                                  Hide
 ┌───────────────────────────────────────────────────┐
-│ SAMPLE   Upper A · Thursday                     › │
-│ 5 exercises · 17 sets · 58 min                    │
-│ 4,210 kg                   ● Chest ● Back ● Arms  │
+│ SAMPLE   Lower B               Week 8 · Day 4   › │
+│ 4 exercises · 13 sets · 52 min                    │
+│ 7,745 kg                            ● Back ● Legs │
 └───────────────────────────────────────────────────┘
 ┌───────────────────────────────────────────────────┐
-│ SAMPLE   Lower A · Tuesday                      › │
-│ 4 exercises · 13 sets · 51 min                    │
-│ 6,880 kg                           ● Legs ● Core  │
+│ SAMPLE   Upper B               Week 8 · Day 3   › │
+│ 5 exercises · 16 sets · 58 min                    │
+│ 4,388 kg               ● Chest ● Back ● Shoulders │
 └───────────────────────────────────────────────────┘
   Your first finished workout replaces these.
 ```
+
+**Sample cards carry a position in the program, not a calendar date.** The week strip directly
+above them is real and empty, so "Thursday, Sep 10" on a card would contradict the screen it sits
+on. The dates still exist underneath — the charts need them — they are just not shown here.
 
 Charts › Breakdown:
 
@@ -142,12 +150,13 @@ Charts
 ┌───────────────────────────────────────────────────┐
 │ ◐ Sample data: 8 weeks of Upper / Lower     Hide  │
 └───────────────────────────────────────────────────┘
-        ╭───╮     Legs        31%
-      ╭─╯   ╰─╮   Back        23%
-      │  212  │   Chest       21%
-      ╰─╮sets╭╯   Shoulders   13%
-        ╰───╯     Arms        12%
-  Month · 14 workouts · 212 sets · 48,300 kg
+        ╭───╮     Legs        45%
+      ╭─╯   ╰─╮   Back        24%
+      │ 212k  │   Chest       13%
+      ╰─╮ kg ╭╯   Shoulders    9%
+        ╰───╯     Triceps      5%
+                  Biceps       4%
+  All · 31 workouts · 466 sets · 4,420 reps
 ```
 
 Charts › Exercises opens with Barbell Bench Press and Barbell Back Squat already selected. It
@@ -237,7 +246,7 @@ Hand-written numbers also drift from what the real code would draw.
    new UUIDs. Copying keeps saved chart presets valid, since they store exercise IDs in
    `UserDefaults` (`ChartPreset.swift:23, 52`). It also picks up renames and custom exercises.
 3. Insert the generated `Workout` and `WorkoutSet` rows in **one context, saved once**, before any
-   reader touches the store. See the iOS 17 note in §9.
+   reader touches the store.
 4. Run `PRService.rebuildAll()` and `StatsService.rebuildAll()` against the sample store, so PR
    and stats rows exist for the charts that read them. Both only loop `fetchAll → rebuild` through
    repositories and have no outside side effects.
@@ -292,8 +301,12 @@ pressed Hide. It is data-driven, so there is no "has ever finished a workout" fl
 
 ### 6.5 Labelling and interaction rules
 
-- Every sample surface has a visible **Sample** pill and a one-line banner. Colour is never the
-  only signal.
+- Every sample surface has a visible **Sample** pill and a one-line banner.
+- The pill reuses the PR badge's shape — 9pt bold, 4pt radius, a 20% border — in the app's slate
+  `stale` token. That token already means archival or lower-confidence rather than warning, which
+  is exactly what a sample is.
+- Every sample card, chart and banner also carries a **dashed slate border**, so colour is never
+  the only signal and the marking survives greyscale.
 - VoiceOver reads "Sample:" before each sample card and chart.
 - Sample is **read-only**: no delete, edit, share, save-as-template, copy or PR exclusion, and no
   navigation from a sample chart into the real Exercise detail.
@@ -374,7 +387,6 @@ The sample holds no personal data, so session replay needs no masking change.
 | Reset all data | Sample returns; the Hide key is cleared |
 | Imported CSV history | Never shown; they have history |
 | Paywall | Browsing the sample is never a workout, so it can't touch the quota. Nothing to gate. |
-| **iOS 17** | The suite has an iOS 17-only cross-actor write race that has crashed a real device. The sample store must do every write in one context and save before any reader exists. No reader and writer may share it concurrently. |
 
 ---
 
@@ -520,5 +532,8 @@ These are design gaps; the code doesn't have them yet only because the feature i
 
 I read the reused services for shared state, but not every transitive call. What proves it is the
 isolation test in §10: build the sample, browse every sample screen, and assert the real store and
-the Insights `UserDefaults` keys are unchanged. It must pass on iOS 17, which is where the known
-cross-actor write race lives.
+the Insights `UserDefaults` keys are unchanged.
+
+(An earlier draft made this test conditional on the iOS 17 cross-actor write race. The minimum
+deployment target was raised to 18.0 on 2026-09-13, so that constraint is gone. Writing the sample
+store in one context and saving before any reader exists is still the right shape.)
