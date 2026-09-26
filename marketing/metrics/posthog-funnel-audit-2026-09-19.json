@@ -1,0 +1,1296 @@
+{
+  "as_of": "2026-09-19",
+  "project_id": 180066,
+  "timezone": "Europe/Copenhagen",
+  "scope": "Read-only audit. Aggregates only; no person IDs or credentials saved.",
+  "mature_activation": {
+    "query": {
+      "breakdownFilter": {
+        "breakdown": "$app_version",
+        "breakdown_limit": 25,
+        "breakdown_type": "event"
+      },
+      "dateRange": {
+        "date_from": "2026-08-10",
+        "date_to": "2026-09-19"
+      },
+      "funnelsFilter": {
+        "breakdownAttributionType": "step",
+        "breakdownAttributionValue": 0,
+        "exclusions": [],
+        "funnelAggregateByHogQL": null,
+        "funnelOrderType": "ordered",
+        "funnelStepReference": "total",
+        "funnelVizType": "steps",
+        "funnelWindowInterval": 7,
+        "funnelWindowIntervalUnit": "day",
+        "layout": "vertical"
+      },
+      "kind": "FunnelsQuery",
+      "properties": [
+        {
+          "key": "internal_team",
+          "operator": "is_not",
+          "type": "person",
+          "value": [
+            "true"
+          ]
+        },
+        {
+          "key": "$is_emulator",
+          "operator": "is_not",
+          "type": "event",
+          "value": [
+            "true"
+          ]
+        },
+        {
+          "key": "$is_testflight",
+          "operator": "is_not",
+          "type": "event",
+          "value": [
+            "true"
+          ]
+        }
+      ],
+      "series": [
+        {
+          "event": "onboarding step viewed",
+          "kind": "EventsNode",
+          "math": "first_time_for_user",
+          "optionalInFunnel": false,
+          "properties": [
+            {
+              "key": "step",
+              "operator": "exact",
+              "type": "event",
+              "value": [
+                "welcome"
+              ]
+            },
+            {
+              "key": "timestamp < toDateTime('2026-09-12 00:00:00', 'Europe/Copenhagen')",
+              "type": "hogql"
+            }
+          ]
+        },
+        {
+          "event": "onboarding completed",
+          "kind": "EventsNode",
+          "optionalInFunnel": false
+        },
+        {
+          "event": "workout started",
+          "kind": "EventsNode",
+          "optionalInFunnel": false
+        },
+        {
+          "event": "first set logged",
+          "kind": "EventsNode",
+          "optionalInFunnel": false
+        },
+        {
+          "event": "workout completed",
+          "kind": "EventsNode",
+          "optionalInFunnel": false,
+          "properties": [
+            {
+              "key": "set_count_bucket",
+              "operator": "is_not",
+              "type": "event",
+              "value": [
+                "0"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "results": [
+      [
+        {
+          "action_id": "onboarding step viewed",
+          "name": "onboarding step viewed",
+          "custom_name": null,
+          "order": 0,
+          "people": [],
+          "count": 58,
+          "type": "events",
+          "average_conversion_time": null,
+          "median_conversion_time": null,
+          "breakdown": [
+            "1.4"
+          ],
+          "breakdown_value": [
+            "1.4"
+          ]
+        },
+        {
+          "action_id": "onboarding completed",
+          "name": "onboarding completed",
+          "custom_name": null,
+          "order": 1,
+          "people": [],
+          "count": 51,
+          "type": "events",
+          "average_conversion_time": 11644.642274519976,
+          "median_conversion_time": 28.905999898910522,
+          "breakdown": [
+            "1.4"
+          ],
+          "breakdown_value": [
+            "1.4"
+          ]
+        },
+        {
+          "action_id": "workout started",
+          "name": "workout started",
+          "custom_name": null,
+          "order": 2,
+          "people": [],
+          "count": 27,
+          "type": "events",
+          "average_conversion_time": 337.71414815938033,
+          "median_conversion_time": 10.713000059127808,
+          "breakdown": [
+            "1.4"
+          ],
+          "breakdown_value": [
+            "1.4"
+          ]
+        },
+        {
+          "action_id": "first set logged",
+          "name": "first set logged",
+          "custom_name": null,
+          "order": 3,
+          "people": [],
+          "count": 11,
+          "type": "events",
+          "average_conversion_time": 24277.224363630467,
+          "median_conversion_time": 133.87199997901917,
+          "breakdown": [
+            "1.4"
+          ],
+          "breakdown_value": [
+            "1.4"
+          ]
+        },
+        {
+          "action_id": "workout completed",
+          "name": "workout completed",
+          "custom_name": null,
+          "order": 4,
+          "people": [],
+          "count": 8,
+          "type": "events",
+          "average_conversion_time": 28282.059500038624,
+          "median_conversion_time": 2930.7254999876022,
+          "breakdown": [
+            "1.4"
+          ],
+          "breakdown_value": [
+            "1.4"
+          ]
+        }
+      ],
+      [
+        {
+          "action_id": "onboarding step viewed",
+          "name": "onboarding step viewed",
+          "custom_name": null,
+          "order": 0,
+          "people": [],
+          "count": 6,
+          "type": "events",
+          "average_conversion_time": null,
+          "median_conversion_time": null,
+          "breakdown": [
+            "1.5"
+          ],
+          "breakdown_value": [
+            "1.5"
+          ]
+        },
+        {
+          "action_id": "onboarding completed",
+          "name": "onboarding completed",
+          "custom_name": null,
+          "order": 1,
+          "people": [],
+          "count": 6,
+          "type": "events",
+          "average_conversion_time": 55.794999957084656,
+          "median_conversion_time": 54.332499980926514,
+          "breakdown": [
+            "1.5"
+          ],
+          "breakdown_value": [
+            "1.5"
+          ]
+        },
+        {
+          "action_id": "workout started",
+          "name": "workout started",
+          "custom_name": null,
+          "order": 2,
+          "people": [],
+          "count": 2,
+          "type": "events",
+          "average_conversion_time": 18.528000116348267,
+          "median_conversion_time": 18.528000116348267,
+          "breakdown": [
+            "1.5"
+          ],
+          "breakdown_value": [
+            "1.5"
+          ]
+        },
+        {
+          "action_id": "first set logged",
+          "name": "first set logged",
+          "custom_name": null,
+          "order": 3,
+          "people": [],
+          "count": 0,
+          "type": "events",
+          "average_conversion_time": null,
+          "median_conversion_time": null,
+          "breakdown": [
+            "1.5"
+          ],
+          "breakdown_value": [
+            "1.5"
+          ]
+        },
+        {
+          "action_id": "workout completed",
+          "name": "workout completed",
+          "custom_name": null,
+          "order": 4,
+          "people": [],
+          "count": 0,
+          "type": "events",
+          "average_conversion_time": null,
+          "median_conversion_time": null,
+          "breakdown": [
+            "1.5"
+          ],
+          "breakdown_value": [
+            "1.5"
+          ]
+        }
+      ]
+    ],
+    "_posthogUrl": "https://eu.posthog.com/project/180066/insights/new#q=%7B%22kind%22%3A%22InsightVizNode%22%2C%22source%22%3A%7B%22breakdownFilter%22%3A%7B%22breakdown%22%3A%22%24app_version%22%2C%22breakdown_limit%22%3A25%2C%22breakdown_type%22%3A%22event%22%7D%2C%22dateRange%22%3A%7B%22date_from%22%3A%222026-08-10%22%2C%22date_to%22%3A%222026-09-19%22%7D%2C%22funnelsFilter%22%3A%7B%22breakdownAttributionType%22%3A%22step%22%2C%22breakdownAttributionValue%22%3A0%2C%22exclusions%22%3A%5B%5D%2C%22funnelAggregateByHogQL%22%3Anull%2C%22funnelOrderType%22%3A%22ordered%22%2C%22funnelStepReference%22%3A%22total%22%2C%22funnelVizType%22%3A%22steps%22%2C%22funnelWindowInterval%22%3A7%2C%22funnelWindowIntervalUnit%22%3A%22day%22%2C%22layout%22%3A%22vertical%22%7D%2C%22kind%22%3A%22FunnelsQuery%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22internal_team%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22person%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_emulator%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_testflight%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%5D%2C%22series%22%3A%5B%7B%22event%22%3A%22onboarding%20step%20viewed%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22first_time_for_user%22%2C%22optionalInFunnel%22%3Afalse%2C%22properties%22%3A%5B%7B%22key%22%3A%22step%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22welcome%22%5D%7D%2C%7B%22key%22%3A%22timestamp%20%3C%20toDateTime('2026-09-12%2000%3A00%3A00'%2C%20'Europe%2FCopenhagen')%22%2C%22type%22%3A%22hogql%22%7D%5D%7D%2C%7B%22event%22%3A%22onboarding%20completed%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%7D%2C%7B%22event%22%3A%22workout%20started%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%7D%2C%7B%22event%22%3A%22first%20set%20logged%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%7D%2C%7B%22event%22%3A%22workout%20completed%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%2C%22properties%22%3A%5B%7B%22key%22%3A%22set_count_bucket%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%220%22%5D%7D%5D%7D%5D%7D%7D"
+  },
+  "current_activation": {
+    "query": {
+      "breakdownFilter": {
+        "breakdown": "$app_version",
+        "breakdown_limit": 25,
+        "breakdown_type": "event"
+      },
+      "dateRange": {
+        "date_from": "2026-08-10",
+        "date_to": "2026-09-19"
+      },
+      "funnelsFilter": {
+        "breakdownAttributionType": "step",
+        "breakdownAttributionValue": 0,
+        "exclusions": [],
+        "funnelAggregateByHogQL": null,
+        "funnelOrderType": "ordered",
+        "funnelStepReference": "total",
+        "funnelVizType": "steps",
+        "funnelWindowInterval": 7,
+        "funnelWindowIntervalUnit": "day",
+        "layout": "vertical"
+      },
+      "kind": "FunnelsQuery",
+      "properties": [
+        {
+          "key": "internal_team",
+          "operator": "is_not",
+          "type": "person",
+          "value": [
+            "true"
+          ]
+        },
+        {
+          "key": "$is_emulator",
+          "operator": "is_not",
+          "type": "event",
+          "value": [
+            "true"
+          ]
+        },
+        {
+          "key": "$is_testflight",
+          "operator": "is_not",
+          "type": "event",
+          "value": [
+            "true"
+          ]
+        }
+      ],
+      "series": [
+        {
+          "event": "onboarding step viewed",
+          "kind": "EventsNode",
+          "math": "first_time_for_user",
+          "optionalInFunnel": false,
+          "properties": [
+            {
+              "key": "step",
+              "operator": "exact",
+              "type": "event",
+              "value": [
+                "welcome"
+              ]
+            }
+          ]
+        },
+        {
+          "event": "onboarding completed",
+          "kind": "EventsNode",
+          "optionalInFunnel": false
+        },
+        {
+          "event": "workout started",
+          "kind": "EventsNode",
+          "optionalInFunnel": false
+        },
+        {
+          "event": "first set logged",
+          "kind": "EventsNode",
+          "optionalInFunnel": false
+        },
+        {
+          "event": "workout completed",
+          "kind": "EventsNode",
+          "optionalInFunnel": false,
+          "properties": [
+            {
+              "key": "set_count_bucket",
+              "operator": "is_not",
+              "type": "event",
+              "value": [
+                "0"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "results": [
+      [
+        {
+          "action_id": "onboarding step viewed",
+          "name": "onboarding step viewed",
+          "custom_name": null,
+          "order": 0,
+          "people": [],
+          "count": 58,
+          "type": "events",
+          "average_conversion_time": null,
+          "median_conversion_time": null,
+          "breakdown": [
+            "1.4"
+          ],
+          "breakdown_value": [
+            "1.4"
+          ]
+        },
+        {
+          "action_id": "onboarding completed",
+          "name": "onboarding completed",
+          "custom_name": null,
+          "order": 1,
+          "people": [],
+          "count": 51,
+          "type": "events",
+          "average_conversion_time": 11644.642274519976,
+          "median_conversion_time": 28.905999898910522,
+          "breakdown": [
+            "1.4"
+          ],
+          "breakdown_value": [
+            "1.4"
+          ]
+        },
+        {
+          "action_id": "workout started",
+          "name": "workout started",
+          "custom_name": null,
+          "order": 2,
+          "people": [],
+          "count": 27,
+          "type": "events",
+          "average_conversion_time": 337.71414815938033,
+          "median_conversion_time": 10.713000059127808,
+          "breakdown": [
+            "1.4"
+          ],
+          "breakdown_value": [
+            "1.4"
+          ]
+        },
+        {
+          "action_id": "first set logged",
+          "name": "first set logged",
+          "custom_name": null,
+          "order": 3,
+          "people": [],
+          "count": 11,
+          "type": "events",
+          "average_conversion_time": 24277.224363630467,
+          "median_conversion_time": 133.87199997901917,
+          "breakdown": [
+            "1.4"
+          ],
+          "breakdown_value": [
+            "1.4"
+          ]
+        },
+        {
+          "action_id": "workout completed",
+          "name": "workout completed",
+          "custom_name": null,
+          "order": 4,
+          "people": [],
+          "count": 8,
+          "type": "events",
+          "average_conversion_time": 28282.059500038624,
+          "median_conversion_time": 2930.7254999876022,
+          "breakdown": [
+            "1.4"
+          ],
+          "breakdown_value": [
+            "1.4"
+          ]
+        }
+      ],
+      [
+        {
+          "action_id": "onboarding step viewed",
+          "name": "onboarding step viewed",
+          "custom_name": null,
+          "order": 0,
+          "people": [],
+          "count": 29,
+          "type": "events",
+          "average_conversion_time": null,
+          "median_conversion_time": null,
+          "breakdown": [
+            "1.5"
+          ],
+          "breakdown_value": [
+            "1.5"
+          ]
+        },
+        {
+          "action_id": "onboarding completed",
+          "name": "onboarding completed",
+          "custom_name": null,
+          "order": 1,
+          "people": [],
+          "count": 25,
+          "type": "events",
+          "average_conversion_time": 4523.00748000145,
+          "median_conversion_time": 50.51600003242493,
+          "breakdown": [
+            "1.5"
+          ],
+          "breakdown_value": [
+            "1.5"
+          ]
+        },
+        {
+          "action_id": "workout started",
+          "name": "workout started",
+          "custom_name": null,
+          "order": 2,
+          "people": [],
+          "count": 16,
+          "type": "events",
+          "average_conversion_time": 38.49037501215935,
+          "median_conversion_time": 10.132000088691711,
+          "breakdown": [
+            "1.5"
+          ],
+          "breakdown_value": [
+            "1.5"
+          ]
+        },
+        {
+          "action_id": "first set logged",
+          "name": "first set logged",
+          "custom_name": null,
+          "order": 3,
+          "people": [],
+          "count": 6,
+          "type": "events",
+          "average_conversion_time": 15251.532833337784,
+          "median_conversion_time": 168.12349998950958,
+          "breakdown": [
+            "1.5"
+          ],
+          "breakdown_value": [
+            "1.5"
+          ]
+        },
+        {
+          "action_id": "workout completed",
+          "name": "workout completed",
+          "custom_name": null,
+          "order": 4,
+          "people": [],
+          "count": 2,
+          "type": "events",
+          "average_conversion_time": 979.2354999780655,
+          "median_conversion_time": 979.2354999780655,
+          "breakdown": [
+            "1.5"
+          ],
+          "breakdown_value": [
+            "1.5"
+          ]
+        }
+      ]
+    ],
+    "_posthogUrl": "https://eu.posthog.com/project/180066/insights/new#q=%7B%22kind%22%3A%22InsightVizNode%22%2C%22source%22%3A%7B%22breakdownFilter%22%3A%7B%22breakdown%22%3A%22%24app_version%22%2C%22breakdown_limit%22%3A25%2C%22breakdown_type%22%3A%22event%22%7D%2C%22dateRange%22%3A%7B%22date_from%22%3A%222026-08-10%22%2C%22date_to%22%3A%222026-09-19%22%7D%2C%22funnelsFilter%22%3A%7B%22breakdownAttributionType%22%3A%22step%22%2C%22breakdownAttributionValue%22%3A0%2C%22exclusions%22%3A%5B%5D%2C%22funnelAggregateByHogQL%22%3Anull%2C%22funnelOrderType%22%3A%22ordered%22%2C%22funnelStepReference%22%3A%22total%22%2C%22funnelVizType%22%3A%22steps%22%2C%22funnelWindowInterval%22%3A7%2C%22funnelWindowIntervalUnit%22%3A%22day%22%2C%22layout%22%3A%22vertical%22%7D%2C%22kind%22%3A%22FunnelsQuery%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22internal_team%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22person%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_emulator%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_testflight%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%5D%2C%22series%22%3A%5B%7B%22event%22%3A%22onboarding%20step%20viewed%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22first_time_for_user%22%2C%22optionalInFunnel%22%3Afalse%2C%22properties%22%3A%5B%7B%22key%22%3A%22step%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22welcome%22%5D%7D%5D%7D%2C%7B%22event%22%3A%22onboarding%20completed%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%7D%2C%7B%22event%22%3A%22workout%20started%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%7D%2C%7B%22event%22%3A%22first%20set%20logged%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%7D%2C%7B%22event%22%3A%22workout%20completed%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%2C%22properties%22%3A%5B%7B%22key%22%3A%22set_count_bucket%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%220%22%5D%7D%5D%7D%5D%7D%7D"
+  },
+  "weekly_retention": {
+    "query": {
+      "dateRange": {
+        "date_from": "2026-08-10",
+        "date_to": "2026-09-19"
+      },
+      "kind": "RetentionQuery",
+      "properties": [
+        {
+          "key": "internal_team",
+          "operator": "is_not",
+          "type": "person",
+          "value": [
+            "true"
+          ]
+        },
+        {
+          "key": "$is_emulator",
+          "operator": "is_not",
+          "type": "event",
+          "value": [
+            "true"
+          ]
+        },
+        {
+          "key": "$is_testflight",
+          "operator": "is_not",
+          "type": "event",
+          "value": [
+            "true"
+          ]
+        }
+      ],
+      "retentionFilter": {
+        "aggregationPropertyType": "event",
+        "aggregationType": "count",
+        "cumulative": false,
+        "period": "Week",
+        "retentionReference": "total",
+        "retentionType": "retention_first_ever_occurrence",
+        "returningEntity": {
+          "id": "workout completed",
+          "properties": [
+            {
+              "key": "set_count_bucket",
+              "operator": "is_not",
+              "type": "event",
+              "value": [
+                "0"
+              ]
+            }
+          ],
+          "type": "events"
+        },
+        "targetEntity": {
+          "id": "workout completed",
+          "properties": [
+            {
+              "key": "set_count_bucket",
+              "operator": "is_not",
+              "type": "event",
+              "value": [
+                "0"
+              ]
+            }
+          ],
+          "type": "events"
+        },
+        "timeWindowMode": "24_hour_windows",
+        "totalIntervals": 6
+      }
+    },
+    "results": [
+      {
+        "breakdown_value": null,
+        "date": "2026-08-10T00:00:00+02:00",
+        "label": "Week 0",
+        "values": [
+          {
+            "aggregation_value": null,
+            "count": 6,
+            "label": "Week 0"
+          },
+          {
+            "aggregation_value": null,
+            "count": 1,
+            "label": "Week 1"
+          },
+          {
+            "aggregation_value": null,
+            "count": 1,
+            "label": "Week 2"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 3"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 4"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 5"
+          }
+        ]
+      },
+      {
+        "breakdown_value": null,
+        "date": "2026-08-17T00:00:00+02:00",
+        "label": "Week 1",
+        "values": [
+          {
+            "aggregation_value": null,
+            "count": 7,
+            "label": "Week 0"
+          },
+          {
+            "aggregation_value": null,
+            "count": 3,
+            "label": "Week 1"
+          },
+          {
+            "aggregation_value": null,
+            "count": 3,
+            "label": "Week 2"
+          },
+          {
+            "aggregation_value": null,
+            "count": 1,
+            "label": "Week 3"
+          },
+          {
+            "aggregation_value": null,
+            "count": 1,
+            "label": "Week 4"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 5"
+          }
+        ]
+      },
+      {
+        "breakdown_value": null,
+        "date": "2026-08-24T00:00:00+02:00",
+        "label": "Week 2",
+        "values": [
+          {
+            "aggregation_value": null,
+            "count": 6,
+            "label": "Week 0"
+          },
+          {
+            "aggregation_value": null,
+            "count": 1,
+            "label": "Week 1"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 2"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 3"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 4"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 5"
+          }
+        ]
+      },
+      {
+        "breakdown_value": null,
+        "date": "2026-08-31T00:00:00+02:00",
+        "label": "Week 3",
+        "values": [
+          {
+            "aggregation_value": null,
+            "count": 2,
+            "label": "Week 0"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 1"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 2"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 3"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 4"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 5"
+          }
+        ]
+      },
+      {
+        "breakdown_value": null,
+        "date": "2026-09-07T00:00:00+02:00",
+        "label": "Week 4",
+        "values": [
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 0"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 1"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 2"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 3"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 4"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 5"
+          }
+        ]
+      },
+      {
+        "breakdown_value": null,
+        "date": "2026-09-14T00:00:00+02:00",
+        "label": "Week 5",
+        "values": [
+          {
+            "aggregation_value": null,
+            "count": 2,
+            "label": "Week 0"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 1"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 2"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 3"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 4"
+          },
+          {
+            "aggregation_value": null,
+            "count": 0,
+            "label": "Week 5"
+          }
+        ]
+      }
+    ],
+    "_posthogUrl": "https://eu.posthog.com/project/180066/insights/new#q=%7B%22kind%22%3A%22InsightVizNode%22%2C%22source%22%3A%7B%22dateRange%22%3A%7B%22date_from%22%3A%222026-08-10%22%2C%22date_to%22%3A%222026-09-19%22%7D%2C%22kind%22%3A%22RetentionQuery%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22internal_team%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22person%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_emulator%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_testflight%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%5D%2C%22retentionFilter%22%3A%7B%22aggregationPropertyType%22%3A%22event%22%2C%22aggregationType%22%3A%22count%22%2C%22cumulative%22%3Afalse%2C%22period%22%3A%22Week%22%2C%22retentionReference%22%3A%22total%22%2C%22retentionType%22%3A%22retention_first_ever_occurrence%22%2C%22returningEntity%22%3A%7B%22id%22%3A%22workout%20completed%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22set_count_bucket%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%220%22%5D%7D%5D%2C%22type%22%3A%22events%22%7D%2C%22targetEntity%22%3A%7B%22id%22%3A%22workout%20completed%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22set_count_bucket%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%220%22%5D%7D%5D%2C%22type%22%3A%22events%22%7D%2C%22timeWindowMode%22%3A%2224_hour_windows%22%2C%22totalIntervals%22%3A6%7D%7D%7D"
+  },
+  "payment_funnel": {
+    "query": {
+      "breakdownFilter": {
+        "breakdown": "source",
+        "breakdown_limit": 25,
+        "breakdown_type": "event"
+      },
+      "dateRange": {
+        "date_from": "2026-08-10",
+        "date_to": "2026-09-19"
+      },
+      "funnelsFilter": {
+        "breakdownAttributionType": "first_touch",
+        "exclusions": [],
+        "funnelAggregateByHogQL": null,
+        "funnelOrderType": "ordered",
+        "funnelStepReference": "total",
+        "funnelVizType": "steps",
+        "funnelWindowInterval": 7,
+        "funnelWindowIntervalUnit": "day",
+        "layout": "vertical"
+      },
+      "kind": "FunnelsQuery",
+      "properties": [
+        {
+          "key": "internal_team",
+          "operator": "is_not",
+          "type": "person",
+          "value": [
+            "true"
+          ]
+        },
+        {
+          "key": "$is_emulator",
+          "operator": "is_not",
+          "type": "event",
+          "value": [
+            "true"
+          ]
+        },
+        {
+          "key": "$is_testflight",
+          "operator": "is_not",
+          "type": "event",
+          "value": [
+            "true"
+          ]
+        }
+      ],
+      "series": [
+        {
+          "event": "paywall shown",
+          "kind": "EventsNode",
+          "optionalInFunnel": false
+        },
+        {
+          "event": "purchase started",
+          "kind": "EventsNode",
+          "optionalInFunnel": false
+        },
+        {
+          "event": "purchase completed",
+          "kind": "EventsNode",
+          "optionalInFunnel": false
+        }
+      ]
+    },
+    "results": [
+      [
+        {
+          "action_id": "paywall shown",
+          "name": "paywall shown",
+          "custom_name": null,
+          "order": 0,
+          "people": [],
+          "count": 18,
+          "type": "events",
+          "average_conversion_time": null,
+          "median_conversion_time": null,
+          "breakdown": [
+            "paywall"
+          ],
+          "breakdown_value": [
+            "paywall"
+          ]
+        },
+        {
+          "action_id": "purchase started",
+          "name": "purchase started",
+          "custom_name": null,
+          "order": 1,
+          "people": [],
+          "count": 3,
+          "type": "events",
+          "average_conversion_time": 14.438666741053263,
+          "median_conversion_time": 16.219000101089478,
+          "breakdown": [
+            "paywall"
+          ],
+          "breakdown_value": [
+            "paywall"
+          ]
+        },
+        {
+          "action_id": "purchase completed",
+          "name": "purchase completed",
+          "custom_name": null,
+          "order": 2,
+          "people": [],
+          "count": 3,
+          "type": "events",
+          "average_conversion_time": 51.11966665585836,
+          "median_conversion_time": 58.67799997329712,
+          "breakdown": [
+            "paywall"
+          ],
+          "breakdown_value": [
+            "paywall"
+          ]
+        }
+      ],
+      [
+        {
+          "action_id": "paywall shown",
+          "name": "paywall shown",
+          "custom_name": null,
+          "order": 0,
+          "people": [],
+          "count": 1,
+          "type": "events",
+          "average_conversion_time": null,
+          "median_conversion_time": null,
+          "breakdown": [
+            "settings"
+          ],
+          "breakdown_value": [
+            "settings"
+          ]
+        },
+        {
+          "action_id": "purchase started",
+          "name": "purchase started",
+          "custom_name": null,
+          "order": 1,
+          "people": [],
+          "count": 0,
+          "type": "events",
+          "average_conversion_time": null,
+          "median_conversion_time": null,
+          "breakdown": [
+            "settings"
+          ],
+          "breakdown_value": [
+            "settings"
+          ]
+        },
+        {
+          "action_id": "purchase completed",
+          "name": "purchase completed",
+          "custom_name": null,
+          "order": 2,
+          "people": [],
+          "count": 0,
+          "type": "events",
+          "average_conversion_time": null,
+          "median_conversion_time": null,
+          "breakdown": [
+            "settings"
+          ],
+          "breakdown_value": [
+            "settings"
+          ]
+        }
+      ]
+    ],
+    "_posthogUrl": "https://eu.posthog.com/project/180066/insights/new#q=%7B%22kind%22%3A%22InsightVizNode%22%2C%22source%22%3A%7B%22breakdownFilter%22%3A%7B%22breakdown%22%3A%22source%22%2C%22breakdown_limit%22%3A25%2C%22breakdown_type%22%3A%22event%22%7D%2C%22dateRange%22%3A%7B%22date_from%22%3A%222026-08-10%22%2C%22date_to%22%3A%222026-09-19%22%7D%2C%22funnelsFilter%22%3A%7B%22breakdownAttributionType%22%3A%22first_touch%22%2C%22exclusions%22%3A%5B%5D%2C%22funnelAggregateByHogQL%22%3Anull%2C%22funnelOrderType%22%3A%22ordered%22%2C%22funnelStepReference%22%3A%22total%22%2C%22funnelVizType%22%3A%22steps%22%2C%22funnelWindowInterval%22%3A7%2C%22funnelWindowIntervalUnit%22%3A%22day%22%2C%22layout%22%3A%22vertical%22%7D%2C%22kind%22%3A%22FunnelsQuery%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22internal_team%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22person%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_emulator%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_testflight%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%5D%2C%22series%22%3A%5B%7B%22event%22%3A%22paywall%20shown%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%7D%2C%7B%22event%22%3A%22purchase%20started%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%7D%2C%7B%22event%22%3A%22purchase%20completed%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%7D%5D%7D%7D"
+  },
+  "attribution_funnel_across_install_types": {
+    "query": {
+      "breakdownFilter": {
+        "breakdown": "acquisition_channel",
+        "breakdown_limit": 25,
+        "breakdown_type": "event"
+      },
+      "dateRange": {
+        "date_from": "2026-08-10",
+        "date_to": "2026-09-11"
+      },
+      "funnelsFilter": {
+        "breakdownAttributionType": "step",
+        "breakdownAttributionValue": 0,
+        "exclusions": [],
+        "funnelAggregateByHogQL": null,
+        "funnelOrderType": "ordered",
+        "funnelStepReference": "total",
+        "funnelVizType": "steps",
+        "funnelWindowInterval": 7,
+        "funnelWindowIntervalUnit": "day",
+        "layout": "vertical"
+      },
+      "kind": "FunnelsQuery",
+      "properties": [
+        {
+          "key": "internal_team",
+          "operator": "is_not",
+          "type": "person",
+          "value": [
+            "true"
+          ]
+        },
+        {
+          "key": "$is_emulator",
+          "operator": "is_not",
+          "type": "event",
+          "value": [
+            "true"
+          ]
+        },
+        {
+          "key": "$is_testflight",
+          "operator": "is_not",
+          "type": "event",
+          "value": [
+            "true"
+          ]
+        }
+      ],
+      "series": [
+        {
+          "event": "attribution resolved",
+          "kind": "EventsNode",
+          "math": "first_time_for_user",
+          "optionalInFunnel": false
+        },
+        {
+          "event": "workout started",
+          "kind": "EventsNode",
+          "optionalInFunnel": false
+        },
+        {
+          "event": "first set logged",
+          "kind": "EventsNode",
+          "optionalInFunnel": false
+        },
+        {
+          "event": "workout completed",
+          "kind": "EventsNode",
+          "optionalInFunnel": false,
+          "properties": [
+            {
+              "key": "set_count_bucket",
+              "operator": "is_not",
+              "type": "event",
+              "value": [
+                "0"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "results": [
+      [
+        {
+          "action_id": "attribution resolved",
+          "name": "attribution resolved",
+          "custom_name": null,
+          "order": 0,
+          "people": [],
+          "count": 72,
+          "type": "events",
+          "average_conversion_time": null,
+          "median_conversion_time": null,
+          "breakdown": [
+            "apple_search_ads"
+          ],
+          "breakdown_value": [
+            "apple_search_ads"
+          ]
+        },
+        {
+          "action_id": "workout started",
+          "name": "workout started",
+          "custom_name": null,
+          "order": 1,
+          "people": [],
+          "count": 33,
+          "type": "events",
+          "average_conversion_time": 2693.634969696854,
+          "median_conversion_time": 41.6470000743866,
+          "breakdown": [
+            "apple_search_ads"
+          ],
+          "breakdown_value": [
+            "apple_search_ads"
+          ]
+        },
+        {
+          "action_id": "first set logged",
+          "name": "first set logged",
+          "custom_name": null,
+          "order": 2,
+          "people": [],
+          "count": 16,
+          "type": "events",
+          "average_conversion_time": 16701.141749992967,
+          "median_conversion_time": 72.20449995994568,
+          "breakdown": [
+            "apple_search_ads"
+          ],
+          "breakdown_value": [
+            "apple_search_ads"
+          ]
+        },
+        {
+          "action_id": "workout completed",
+          "name": "workout completed",
+          "custom_name": null,
+          "order": 3,
+          "people": [],
+          "count": 13,
+          "type": "events",
+          "average_conversion_time": 7937.034153846594,
+          "median_conversion_time": 2966.1470000743866,
+          "breakdown": [
+            "apple_search_ads"
+          ],
+          "breakdown_value": [
+            "apple_search_ads"
+          ]
+        }
+      ],
+      [
+        {
+          "action_id": "attribution resolved",
+          "name": "attribution resolved",
+          "custom_name": null,
+          "order": 0,
+          "people": [],
+          "count": 8,
+          "type": "events",
+          "average_conversion_time": null,
+          "median_conversion_time": null,
+          "breakdown": [
+            "organic"
+          ],
+          "breakdown_value": [
+            "organic"
+          ]
+        },
+        {
+          "action_id": "workout started",
+          "name": "workout started",
+          "custom_name": null,
+          "order": 1,
+          "people": [],
+          "count": 5,
+          "type": "events",
+          "average_conversion_time": 408.83159999847413,
+          "median_conversion_time": 25.052000045776367,
+          "breakdown": [
+            "organic"
+          ],
+          "breakdown_value": [
+            "organic"
+          ]
+        },
+        {
+          "action_id": "first set logged",
+          "name": "first set logged",
+          "custom_name": null,
+          "order": 2,
+          "people": [],
+          "count": 5,
+          "type": "events",
+          "average_conversion_time": 124.64799995422364,
+          "median_conversion_time": 39.70199990272522,
+          "breakdown": [
+            "organic"
+          ],
+          "breakdown_value": [
+            "organic"
+          ]
+        },
+        {
+          "action_id": "workout completed",
+          "name": "workout completed",
+          "custom_name": null,
+          "order": 3,
+          "people": [],
+          "count": 5,
+          "type": "events",
+          "average_conversion_time": 2654.3302000522613,
+          "median_conversion_time": 2908.2460000514984,
+          "breakdown": [
+            "organic"
+          ],
+          "breakdown_value": [
+            "organic"
+          ]
+        }
+      ]
+    ],
+    "_posthogUrl": "https://eu.posthog.com/project/180066/insights/new#q=%7B%22kind%22%3A%22InsightVizNode%22%2C%22source%22%3A%7B%22breakdownFilter%22%3A%7B%22breakdown%22%3A%22acquisition_channel%22%2C%22breakdown_limit%22%3A25%2C%22breakdown_type%22%3A%22event%22%7D%2C%22dateRange%22%3A%7B%22date_from%22%3A%222026-08-10%22%2C%22date_to%22%3A%222026-09-11%22%7D%2C%22funnelsFilter%22%3A%7B%22breakdownAttributionType%22%3A%22step%22%2C%22breakdownAttributionValue%22%3A0%2C%22exclusions%22%3A%5B%5D%2C%22funnelAggregateByHogQL%22%3Anull%2C%22funnelOrderType%22%3A%22ordered%22%2C%22funnelStepReference%22%3A%22total%22%2C%22funnelVizType%22%3A%22steps%22%2C%22funnelWindowInterval%22%3A7%2C%22funnelWindowIntervalUnit%22%3A%22day%22%2C%22layout%22%3A%22vertical%22%7D%2C%22kind%22%3A%22FunnelsQuery%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22internal_team%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22person%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_emulator%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_testflight%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%5D%2C%22series%22%3A%5B%7B%22event%22%3A%22attribution%20resolved%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22first_time_for_user%22%2C%22optionalInFunnel%22%3Afalse%7D%2C%7B%22event%22%3A%22workout%20started%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%7D%2C%7B%22event%22%3A%22first%20set%20logged%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%7D%2C%7B%22event%22%3A%22workout%20completed%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%2C%22properties%22%3A%5B%7B%22key%22%3A%22set_count_bucket%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%220%22%5D%7D%5D%7D%5D%7D%7D"
+  },
+  "program_bridge": {
+    "query": "WITH newcomers AS (\n    SELECT person_id,\n        min(timestamp) AS first_onboarding,\n        argMin(properties.$app_version, timestamp) AS entry_version,\n        argMin(properties.step, timestamp) AS entry_step\n    FROM events\n    WHERE event = 'onboarding step viewed'\n        AND timestamp < '2026-09-20'\n        AND coalesce(person.properties.internal_team, false) != true\n        AND coalesce(properties.$is_emulator, false) != true\n        AND coalesce(properties.$is_testflight, false) != true\n    GROUP BY person_id\n    HAVING first_onboarding >= '2026-09-07'\n        AND entry_version = '1.5'\n        AND entry_step = 'welcome'\n), activity AS (\n    SELECT person_id,\n        countIf(event = 'workout started') AS starts,\n        countIf(event = 'first set logged') AS first_sets,\n        countIf(event = 'program selected' AND properties.program_id != 'own') AS chose_program,\n        countIf(event = '$screen' AND properties.$screen_name = 'Templates') AS template_views,\n        countIf(event = 'template started') AS template_starts,\n        countIf(event = 'workout started' AND properties.source != 'empty') AS nonempty_source_starts,\n        countIf(event = 'onboarding completed') AS onboarding_completions\n    FROM events\n    WHERE timestamp >= '2026-09-07' AND timestamp < '2026-09-20'\n        AND coalesce(person.properties.internal_team, false) != true\n        AND coalesce(properties.$is_emulator, false) != true\n        AND coalesce(properties.$is_testflight, false) != true\n    GROUP BY person_id\n)\nSELECT count() AS newcomers,\n    countIf(a.chose_program > 0) AS picked_program,\n    countIf(a.chose_program > 0 AND a.starts > 0) AS picked_program_and_started,\n    countIf(a.chose_program > 0 AND a.template_views > 0) AS picked_program_and_viewed_templates,\n    countIf(a.chose_program > 0 AND a.template_starts > 0) AS picked_program_and_started_template,\n    countIf(a.starts > 0) AS started_any_workout,\n    countIf(a.starts > 0 AND a.nonempty_source_starts = 0) AS starters_only_empty_source,\n    countIf(a.starts > 0 AND a.first_sets = 0) AS started_but_no_first_set,\n    countIf(a.starts > 0 AND a.onboarding_completions = 0) AS started_without_onboarding_completion\nFROM newcomers n\nJOIN activity a ON n.person_id = a.person_id",
+    "results": {
+      "newcomers": 29,
+      "picked_program": 21,
+      "picked_program_and_started": 13,
+      "picked_program_and_viewed_templates": 1,
+      "picked_program_and_started_template": 0,
+      "started_any_workout": 16,
+      "starters_only_empty_source": 15,
+      "started_but_no_first_set": 10,
+      "started_without_onboarding_completion": 0
+    }
+  },
+  "attribution_observed_aug10_sep19": {
+    "apple_search_ads_download": 89,
+    "apple_search_ads_redownload": 2,
+    "organic_unknown": 12
+  },
+  "caveats": [
+    "Friends with grants not reliably identifiable.",
+    "internal_team filters use person-on-event snapshots; not guaranteed retrospective exclusion.",
+    "Current 1.5 cohorts are immature.",
+    "Client purchase callbacks are not verified revenue.",
+    "Analytics persons are anonymous installation identities, not necessarily unique human customers.",
+    "No session recordings were watched.",
+    "Queries execute through the current partial day; no sampling option was requested and results expose no sampling factor."
+  ]
+}
+
