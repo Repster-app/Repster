@@ -12,6 +12,7 @@ struct RepsterApp: App {
     init() {
         #if DEBUG
         Purchases.logLevel = .debug
+        KeychainWorkoutQuotaStore.applyDebugLaunchOverride()
         #endif
         Purchases.configure(withAPIKey: RevenueCatConfiguration.apiKey)
 

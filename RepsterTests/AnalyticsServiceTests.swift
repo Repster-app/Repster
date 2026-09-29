@@ -376,6 +376,37 @@ final class AnalyticsServiceTests: XCTestCase {
         XCTAssertEqual(client.captures.last?.properties["source"] as? String, "settings")
     }
 
+    /// Event only, no screen view — unlike `paywallShown`, so the sheet can't pad the
+    /// Paywall screen count.
+    func testFreeLimitSheetShownCarriesTheLimit() {
+        let (service, client, defaults) = makeService()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        service.configure()
+        service.freeLimitSheetShown(freeWorkoutLimit: 10)
+
+        XCTAssertTrue(client.screens.isEmpty)
+        XCTAssertEqual(client.captures.last?.event, "free limit sheet shown")
+        XCTAssertEqual(client.captures.last?.properties["free_workout_limit"] as? Int, 10)
+    }
+
+    func testFreeLimitSheetClosedReportsTheResult() {
+        let (service, client, defaults) = makeService()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        service.configure()
+        service.freeLimitSheetClosed(result: .seePlans)
+
+        XCTAssertEqual(client.captures.last?.event, "free limit sheet closed")
+        XCTAssertEqual(client.captures.last?.properties["result"] as? String, "see_plans")
+    }
+
+    func testFreeLimitSheetResultsAreDistinctAndStable() {
+        XCTAssertEqual(FreeLimitSheetResult.seePlans.rawValue, "see_plans")
+        XCTAssertEqual(FreeLimitSheetResult.notNow.rawValue, "not_now")
+        XCTAssertEqual(FreeLimitSheetResult.swiped.rawValue, "swiped")
+    }
+
     func testWorkoutStartContextStoreRoundTrips() {
         let defaults = UserDefaults(suiteName: defaultsSuiteName)!
         defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }

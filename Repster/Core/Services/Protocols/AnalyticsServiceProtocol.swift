@@ -110,6 +110,16 @@ enum PaywallSource: String {
     case membershipSettings = "membership_settings"
 }
 
+/// How the free-limit sheet was closed. Keep the raw values stable — they're the
+/// breakdown dimension on the sheet → paywall funnel.
+enum FreeLimitSheetResult: String {
+    case seePlans = "see_plans"
+    case notNow = "not_now"
+    /// Pulled down without answering. Kept apart from `notNow` because a swipe is the
+    /// user leaving, not choosing.
+    case swiped
+}
+
 enum WorkoutStartSource: String {
     case empty
     case exerciseList = "exercise_list"
@@ -375,6 +385,25 @@ extension AnalyticsServiceProtocol {
 
     func restorePurchasesTapped(source: PaywallSource) {
         track(.restorePurchasesTapped, properties: [.source: .string(source.rawValue)])
+    }
+
+    // Free-limit sheet
+    //
+    // Raised instead of the paywall when a free user with no workouts left tries to start
+    // one (PAYWALL_BRIDGE_SCOPING.md). The workout-gate paywall is only reachable through
+    // it, so `paywall shown` with source `paywall` drops by exactly the users who answer
+    // "Not now" — read the two events together, never the paywall one alone.
+
+    func freeLimitSheetShown(freeWorkoutLimit: Int) {
+        track(.freeLimitSheetShown, properties: [
+            .freeWorkoutLimit: .int(freeWorkoutLimit)
+        ])
+    }
+
+    func freeLimitSheetClosed(result: FreeLimitSheetResult) {
+        track(.freeLimitSheetClosed, properties: [
+            .result: .string(result.rawValue)
+        ])
     }
 
     // Workout
@@ -1063,6 +1092,8 @@ enum AnalyticsEvent: String, CaseIterable {
     case purchaseCompleted = "purchase completed"
     case purchaseCancelled = "purchase cancelled"
     case restorePurchasesTapped = "restore purchases tapped"
+    case freeLimitSheetShown = "free limit sheet shown"
+    case freeLimitSheetClosed = "free limit sheet closed"
     case unitSystemToggled = "unit system toggled"
     case analyticsOptOutToggled = "analytics opt-out toggled"
     case insightExpanded = "insight expanded"
@@ -1134,6 +1165,7 @@ enum AnalyticsPropertyKey: String, CaseIterable {
     case enabled
     case accessTier = "access_tier"
     case remainingFreeWorkouts = "remaining_free_workouts"
+    case freeWorkoutLimit = "free_workout_limit"
     /// How many sets in the workout had both a suggestion and a logged weight.
     case suggestionSetsComparedBucket = "suggestion_sets_compared_bucket"
     /// Share of those logged at the suggested weight. The headline quality signal for Smart

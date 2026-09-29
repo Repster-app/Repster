@@ -234,6 +234,23 @@ final class KeychainWorkoutQuotaStore: WorkoutQuotaStoreProtocol, @unchecked Sen
     }
 }
 
+#if DEBUG
+extension KeychainWorkoutQuotaStore {
+    /// Launch argument `-RepsterFreeWorkoutsUsed N` writes N as the consumed count, so the
+    /// free-limit sheet (N = 10) is reachable without logging ten real workouts. It lands in
+    /// the Keychain like a real count and outlives the launch — pass `0` to reset. Has no
+    /// effect with an active entitlement, which never reaches the gate.
+    static let debugUsedCountArgument = "RepsterFreeWorkoutsUsed"
+
+    static func applyDebugLaunchOverride(defaults: UserDefaults = .standard) {
+        guard let raw = defaults.string(forKey: debugUsedCountArgument),
+              let used = Int(raw) else { return }
+        KeychainWorkoutQuotaStore().saveConsumedWorkoutCount(used)
+        dbg("[Monetization] DEBUG launch override: \(used) free workouts used")
+    }
+}
+#endif
+
 actor SubscriptionService: SubscriptionServiceProtocol {
     let entitlementIdentifier: String
     private var cachedSnapshot: SubscriptionSnapshot

@@ -153,6 +153,16 @@ struct ContentView: View {
     /// Whether the RevenueCat paywall is presented.
     @State private var showPaywall = false
 
+    /// Whether the free-limit sheet is presented — the workout gate's stop before the
+    /// paywall. See `FreeLimitSheet`.
+    @State private var showFreeLimitSheet = false
+
+    /// The sheet's recap, loaded before it opens. Nil hides the row.
+    @State private var freeLimitRecap: FreeLimitRecap?
+
+    /// Set by the sheet's buttons. Still nil at dismissal means it was swiped away.
+    @State private var freeLimitSheetResult: FreeLimitSheetResult?
+
     /// Whether the What's New sheet is presented.
     @State private var showWhatsNew = false
 
@@ -261,6 +271,36 @@ struct ContentView: View {
         }
         .fullScreenCover(isPresented: $showActiveWorkout) {
             ActiveWorkoutView(services: services)
+        }
+        // The paywall opens from here, after this sheet has finished dismissing — presenting
+        // one sheet while another is still animating out is dropped by UIKit.
+        .sheet(isPresented: $showFreeLimitSheet, onDismiss: {
+            let result = freeLimitSheetResult ?? .swiped
+            freeLimitSheetResult = nil
+            services.analyticsService.freeLimitSheetClosed(result: result)
+            if result == .seePlans {
+                showPaywall = true
+            }
+        }) {
+            FreeLimitSheet(
+                freeWorkoutLimit: accessSnapshot.freeWorkoutLimit,
+                recap: freeLimitRecap,
+                onShown: {
+                    services.analyticsService.freeLimitSheetShown(
+                        freeWorkoutLimit: accessSnapshot.freeWorkoutLimit
+                    )
+                    // Same reasoning as the paywall below: this is the first half of the ask.
+                    reviewPrompt.suppressForThisSession()
+                },
+                onSeePlans: {
+                    freeLimitSheetResult = .seePlans
+                    showFreeLimitSheet = false
+                },
+                onNotNow: {
+                    freeLimitSheetResult = .notNow
+                    showFreeLimitSheet = false
+                }
+            )
         }
         .sheet(isPresented: $showPaywall, onDismiss: {
             services.analyticsService.paywallDismissed(source: .paywall)
@@ -513,18 +553,32 @@ struct ContentView: View {
         }
     }
 
+    /// The one gate every start path goes through. Out of free workouts, it raises the
+    /// free-limit sheet rather than the paywall; the sheet offers the paywall itself.
     @MainActor
-    private func ensureWorkoutCreationAccess(dismissBeforePaywall: (() -> Void)? = nil) async -> Bool {
+    private func ensureWorkoutCreationAccess(dismissBeforeFreeLimitSheet: (() -> Void)? = nil) async -> Bool {
         let canStart = await services.accessControlService.canStartNewWorkout()
         await refreshMonetizationState(forceSubscriptionRefresh: false)
 
         guard canStart else {
-            dismissBeforePaywall?()
-            showPaywall = true
+            dismissBeforeFreeLimitSheet?()
+            freeLimitRecap = await loadFreeLimitRecap()
+            showFreeLimitSheet = true
             return false
         }
 
         return true
+    }
+
+    /// Loaded before the sheet opens so it appears at its final height instead of growing
+    /// when the numbers land. The same all-time summary Charts shows, so the two agree.
+    /// Nil on failure — the sheet works without it.
+    @MainActor
+    private func loadFreeLimitRecap() async -> FreeLimitRecap? {
+        guard let summary = try? await services.chartDataService.fetchBreakdownSummary(timeRange: .all) else {
+            return nil
+        }
+        return FreeLimitRecap(workouts: summary.totalWorkouts, sets: summary.totalSets)
     }
 
     @MainActor
@@ -580,7 +634,7 @@ struct ContentView: View {
     @MainActor
     private func startWorkoutWithExercises(_ exerciseIds: [UUID]) {
         Task {
-            guard await ensureWorkoutCreationAccess(dismissBeforePaywall: {
+            guard await ensureWorkoutCreationAccess(dismissBeforeFreeLimitSheet: {
                 showExerciseList = false
             }) else { return }
 
