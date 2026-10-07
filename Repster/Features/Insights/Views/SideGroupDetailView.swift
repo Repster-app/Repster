@@ -13,6 +13,36 @@ struct SideGroupDetailSheet: View {
     let group: SideGroupSummary
     let unitPreference: UnitPreference
     var onExerciseOpened: (SideExerciseSummary) -> Void = { _ in }
+    var onExerciseEdited: () -> Void = {}
+
+    private enum Route: Hashable {
+        case exercise(UUID)
+        case untracked
+    }
+
+    /// Only exercises that can carry a verdict. `exercisesByGroup` is filled before the unilateral
+    /// guard, so the full list is every exercise trained in the group — for Legs that was a couple
+    /// of real rows inside a dozen "Not tracked by side". The rest are one line at the bottom.
+    private var tracked: [SideExerciseSummary] { group.exercises.filter(\.status.isTracked) }
+    private var untracked: [SideExerciseSummary] { group.exercises.filter { !$0.status.isTracked } }
+
+    /// One ruler for the whole group, so the rows can be read against each other. That comparison
+    /// is the only thing this screen shows that the exercise screen cannot.
+    private var scale: Double {
+        max(3, (tracked.map { abs($0.averageGap) }.max() ?? 0).rounded(.up))
+    }
+
+    /// Two exercises in one group leaning opposite ways is exactly why the map never names a side.
+    private var leansBothWays: Bool {
+        let leans = Set(tracked.compactMap { summary -> SideLean? in
+            switch summary.status {
+            case let .stronger(lean, _): return lean
+            case let .possible(lean): return lean
+            default: return nil
+            }
+        })
+        return leans.count > 1
+    }
 
     var body: some View {
         NavigationStack {
@@ -20,18 +50,36 @@ struct SideGroupDetailSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     header
                     SidesDivider()
-                    SidesSectionLabel(text: "EXERCISES")
 
-                    VStack(spacing: 0) {
-                        ForEach(Array(group.exercises.enumerated()), id: \.element.id) { index, exercise in
-                            exerciseRow(exercise, isLast: index == group.exercises.count - 1)
+                    if tracked.isEmpty {
+                        Text("Nothing here is tracked by side yet.")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color.textSecondary)
+                    } else {
+                        SidesSectionLabel(text: "EXERCISES")
+
+                        VStack(spacing: 0) {
+                            ForEach(Array(tracked.enumerated()), id: \.element.id) { index, exercise in
+                                exerciseRow(exercise, isLast: index == tracked.count - 1)
+                            }
                         }
+                        .padding(.top, -8)
+
+                        axis
+
+                        Text("Every exercise on one scale, so you can read them against each other.")
+                            .font(.system(size: 11.5, weight: .medium))
+                            .foregroundStyle(Color.sidesCaption)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(.top, -8)
+
+                    if !untracked.isEmpty {
+                        untrackedRow
+                    }
 
                     Text("Each exercise is judged on its last \(SidesAnalysis.sessionsConsidered) sessions, comparing both sides at the same weight.")
                         .font(.system(size: 11.5, weight: .medium))
-                        .foregroundStyle(Color.textTertiary)
+                        .foregroundStyle(Color.sidesCaption)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, 16)
@@ -40,11 +88,16 @@ struct SideGroupDetailSheet: View {
             }
             .background(Color.bgCard)
             .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(for: UUID.self) { id in
-                if let exercise = group.exercises.first(where: { $0.id == id }) {
-                    SideExerciseDetailView(exercise: exercise, unitPreference: unitPreference) {
-                        onExerciseOpened(exercise)
+            .navigationDestination(for: Route.self) { route in
+                switch route {
+                case let .exercise(id):
+                    if let exercise = group.exercises.first(where: { $0.id == id }) {
+                        SideExerciseDetailView(exercise: exercise, unitPreference: unitPreference) {
+                            onExerciseOpened(exercise)
+                        }
                     }
+                case .untracked:
+                    SideUntrackedListView(exercises: untracked, onChanged: onExerciseEdited)
                 }
             }
         }
@@ -56,96 +109,220 @@ struct SideGroupDetailSheet: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 16) {
-            BodyFigure(view: thumbnailView) { region, _ in
-                SidesBodyFill.color(region: region, statuses: [group.id: group.status], only: group.id)
-            }
-            .frame(width: 56)
+        VStack(alignment: .leading, spacing: 6) {
+            Text(group.displayName)
+                .font(.system(size: 24, weight: .bold))
+                .kerning(-0.3)
+                .foregroundStyle(Color.textPrimary)
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text(group.displayName)
-                    .font(.system(size: 24, weight: .bold))
-                    .kerning(-0.3)
-                    .foregroundStyle(Color.textPrimary)
-
-                Text(SidesCopy.statusLine(for: group))
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Text(trackedChip)
-                    .font(.system(size: 10.5, weight: .semibold))
-                    .foregroundStyle(Color.textSecondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.bgSubtle)
-                    .cornerRadius(6)
-            }
+            Text(headline)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    /// Groups that live on the back of the body show the back.
-    private var thumbnailView: BodyView {
-        ["back", "glutes", "hamstrings"].contains(group.id) ? .back : .front
-    }
-
-    private var trackedChip: String {
-        let count = group.trackedExerciseCount
-        return count == 1 ? "1 exercise tracked" : "\(count) exercises tracked"
+    private var headline: String {
+        let line = SidesCopy.statusLine(for: group)
+        return leansBothWays ? "\(line) — and not all the same way" : line
     }
 
     // MARK: - Rows
 
-    @ViewBuilder
     private func exerciseRow(_ exercise: SideExerciseSummary, isLast: Bool) -> some View {
-        let tracked = exercise.status.isTracked
-        let content = VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Text(exercise.name)
-                    .font(.system(size: 13.5, weight: .medium))
-                    .foregroundStyle(tracked ? Color.textPrimary : Color.textSecondary)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                if tracked {
+        NavigationLink(value: Route.exercise(exercise.id)) {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 8) {
+                    Text(exercise.name)
+                        .font(.system(size: 13.5, weight: .medium))
+                        .foregroundStyle(Color.textPrimary)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(Color.textTertiary)
                 }
-            }
 
+                HStack(spacing: 10) {
+                    Text(exercise.status.sentence)
+                        .font(.system(size: 12.5, weight: exercise.status.isStronger ? .semibold : .medium))
+                        .foregroundStyle(exercise.status.isStronger ? Color.textPrimary : Color.textSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                    Spacer(minLength: 0)
+                    SideStrengthMark(status: exercise.status)
+                    SideMiniBeam(averageGap: exercise.averageGap, status: exercise.status, scale: scale)
+                }
+            }
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .overlay(alignment: .bottom) {
+                if !isLast {
+                    Rectangle()
+                        .fill(Color.border)
+                        .frame(height: 1)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Shows each session")
+    }
+
+    /// Labels the shared ruler once, under the column the beams line up in.
+    private var axis: some View {
+        HStack(spacing: 10) {
+            Spacer(minLength: 0)
+            ZStack {
+                HStack(spacing: 0) {
+                    Text("Left")
+                    Spacer(minLength: 0)
+                    Text("Right")
+                }
+                Text("Even")
+            }
+            .font(.system(size: 9.5, weight: .semibold))
+            .foregroundStyle(Color.sidesCaption)
+            .frame(width: SideMiniBeam.width)
+        }
+        .padding(.top, -6)
+    }
+
+    private var untrackedRow: some View {
+        NavigationLink(value: Route.untracked) {
             HStack(spacing: 10) {
-                Text(exercise.status.sentence)
-                    .font(.system(size: 12.5, weight: exercise.status.isStronger ? .semibold : .medium))
-                    .foregroundStyle(
-                        exercise.status.isStronger ? Color.textPrimary : (tracked ? Color.textSecondary : Color.textTertiary)
-                    )
+                Text(untrackedLine)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
-                SideStrengthMark(status: exercise.status)
+                Text("Mark one")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.accent)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.textTertiary)
             }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.bgInput)
+            .cornerRadius(10)
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
-        .overlay(alignment: .bottom) {
-            if !isLast {
-                Rectangle()
-                    .fill(Color.border)
-                    .frame(height: 1)
-            }
-        }
+        .buttonStyle(.plain)
+    }
 
-        if tracked {
-            NavigationLink(value: exercise.id) {
-                content
+    private var untrackedLine: String {
+        let name = group.displayName.lowercased()
+        return untracked.count == 1
+            ? "1 other \(name) exercise isn\u{2019}t tracked by side"
+            : "\(untracked.count) other \(name) exercises aren\u{2019}t tracked by side"
+    }
+}
+
+// MARK: - Not tracked by side
+
+/// The exercises a group trains that log one number for both sides. Each opens its own editor,
+/// where the Unilateral switch lives — the flag is the whole reach of the feature, and 6 of the 69
+/// seeded exercises carry it, so this list is the only place the reach can grow.
+struct SideUntrackedListView: View {
+    let exercises: [SideExerciseSummary]
+    var onChanged: () -> Void = {}
+
+    @Environment(ServiceContainer.self) private var services
+    @State private var editing: ChartExerciseData?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("These log one number for both sides. Mark one Unilateral and Repster compares left against right from your next session.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.sidesCaption)
+                        .padding(.top, 2)
+                    Text("Only worth it for movements you train one side at a time. A back squat logged per side would compare two numbers that never differ.")
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(Color.sidesCaption)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.bgInput)
+                .cornerRadius(10)
+
+                VStack(spacing: 0) {
+                    ForEach(Array(exercises.enumerated()), id: \.element.id) { index, exercise in
+                        row(exercise, isLast: index == exercises.count - 1)
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 32)
+        }
+        .background(Color.bgCard)
+        .navigationTitle("Not tracked by side")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $editing) { data in
+            CreateEditExerciseSheet(exercise: data, services: services, onSave: onChanged)
+        }
+    }
+
+    @ViewBuilder
+    private func row(_ exercise: SideExerciseSummary, isLast: Bool) -> some View {
+        if exercise.canTrackSides {
+            Button {
+                Task { editing = try? await services.exerciseService.fetchExerciseSnapshot(exercise.id) }
+            } label: {
+                HStack(spacing: 10) {
+                    Text(exercise.name)
+                        .font(.system(size: 13.5, weight: .medium))
+                        .foregroundStyle(Color.textPrimary)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color.textTertiary)
+                }
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .overlay(alignment: .bottom) { divider(isLast) }
             }
             .buttonStyle(.plain)
-            .accessibilityHint("Shows each session")
+            .accessibilityHint("Opens this exercise to mark it Unilateral")
         } else {
-            content
-                .accessibilityElement(children: .combine)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(exercise.name)
+                    .font(.system(size: 13.5, weight: .medium))
+                    .foregroundStyle(Color.textTertiary)
+                    .lineLimit(1)
+                Text("Doesn\u{2019}t log reps, so sides can\u{2019}t be compared")
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Color.textTertiary)
+            }
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .bottom) { divider(isLast) }
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    @ViewBuilder
+    private func divider(_ isLast: Bool) -> some View {
+        if !isLast {
+            Rectangle().fill(Color.border).frame(height: 1)
         }
     }
 }
+
+/// Already carries `id`; `.sheet(item:)` needs the conformance spelled out.
+extension ChartExerciseData: Identifiable {}
 
 // MARK: - Exercise
 

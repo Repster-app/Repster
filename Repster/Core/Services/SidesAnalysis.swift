@@ -244,6 +244,9 @@ struct SideExerciseSummary: Sendable, Equatable, Identifiable {
     let oneSideOnlySets: Int
     /// Rows with RIR on only one side. Compared on reps alone — a blank isn't failure.
     let rirOnOneSideSets: Int
+    /// Whether the tracking type could log sides at all. False means marking it Unilateral would
+    /// change nothing, so the "not tracked" list offers it as a reason rather than an action.
+    let canTrackSides: Bool
 }
 
 struct SideGroupSummary: Sendable, Equatable, Identifiable {
@@ -560,7 +563,8 @@ enum SidesAnalysis {
                     differingCount: classification.differingCount,
                     bestReps: bestRows,
                     oneSideOnlySets: oneSideOnly[id] ?? 0,
-                    rirOnOneSideSets: rirOnOneSide[id] ?? 0
+                    rirOnOneSideSets: rirOnOneSide[id] ?? 0,
+                    canTrackSides: exercise.supportsUnilateralLogging
                 ))
             }
 

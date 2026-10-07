@@ -202,9 +202,10 @@ struct SideSessionLadder: View {
     private let barHeight: CGFloat = 9
 
     /// One scale for every row, so a session where both sides did more stands taller than one
-    /// where both did less.
+    /// where both did less. The headroom matters at one session: without it the leading bar fills
+    /// the track and a first session reads as maxed out rather than as a starting point.
     private var ceiling: Double {
-        max(1, sessions.flatMap { [$0.left, $0.right] }.max() ?? 1)
+        max(1, (sessions.flatMap { [$0.left, $0.right] }.max() ?? 1) * 1.15)
     }
 
     var body: some View {
@@ -452,5 +453,67 @@ struct SideEffortTable: View {
         let right = effortLabel(reps: row.right, reserve: row.rightRIR)
         return "\(weightLabel(row.weight)): left \(left); right \(right)."
             .replacingOccurrences(of: " · ", with: ", ")
+    }
+}
+
+
+// MARK: - Group row beam
+
+/// The balance beam shrunk to a list row. The scale comes from the caller so every exercise in a
+/// muscle group is drawn against the same ruler — the one thing the group screen can show that the
+/// exercise screen cannot.
+struct SideMiniBeam: View {
+    let averageGap: Double
+    let status: SideStatus
+    /// Reps either side of centre, shared across the group.
+    let scale: Double
+
+    static let width: CGFloat = 120
+    private let height: CGFloat = 10
+
+    var body: some View {
+        Canvas { context, size in draw(&context, size) }
+            .frame(width: Self.width, height: height)
+            .accessibilityHidden(true)
+    }
+
+    private func draw(_ context: inout GraphicsContext, _ size: CGSize) {
+        let centre = size.width / 2
+        let perRep = centre / max(scale, 1)
+        let radius = size.height / 2
+
+        context.fill(
+            Path(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: radius),
+            with: .color(.bgInput)
+        )
+        let tie = SidesAnalysis.tieBelow * perRep
+        context.fill(
+            Path(CGRect(x: centre - tie, y: 0, width: tie * 2, height: size.height)),
+            with: .color(.bgSubtle)
+        )
+
+        let reach = CGFloat(abs(averageGap)) * perRep
+        let fill = CGRect(
+            x: averageGap > 0 ? centre : centre - reach,
+            y: 0,
+            width: max(reach, 1),
+            height: size.height
+        )
+        let rounded = Path(roundedRect: fill, cornerRadius: min(radius, fill.width / 2))
+
+        switch status {
+        case .stronger:
+            context.fill(rounded, with: .color(.sidesStronger))
+        case .possible:
+            context.fill(rounded, with: .color(.sidesStronger.opacity(0.12)))
+            context.stroke(rounded, with: .color(.sidesStronger), style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+        case .even, .collecting, .notTracked:
+            break
+        }
+
+        context.fill(
+            Path(CGRect(x: centre - 0.5, y: -2, width: 1, height: size.height + 4)),
+            with: .color(status.isClassified ? .sidesTrail : .bodyOutline)
+        )
     }
 }

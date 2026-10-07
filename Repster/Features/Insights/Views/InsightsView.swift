@@ -70,9 +70,16 @@ struct InsightsView: View {
         .navigationTitle("Training Insights")
         .navigationBarTitleDisplayMode(.large)
         .sheet(item: $viewModel.selectedSideGroup) { group in
-            SideGroupDetailSheet(group: group, unitPreference: services.unitPreference) { exercise in
-                services.analyticsService.sidesExerciseOpened(status: exercise.status)
-            }
+            SideGroupDetailSheet(
+                group: group,
+                unitPreference: services.unitPreference,
+                onExerciseOpened: { exercise in
+                    services.analyticsService.sidesExerciseOpened(status: exercise.status)
+                },
+                // Marking an exercise Unilateral changes who is in the comparison, so the panel
+                // behind the sheet has to be rebuilt rather than left on stale groups.
+                onExerciseEdited: { Task { await viewModel.load() } }
+            )
         }
         .task {
             await viewModel.load()

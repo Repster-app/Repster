@@ -488,6 +488,27 @@ final class SidesAnalysisTests: XCTestCase {
         XCTAssertEqual(summary.bestReps.map(\.weight), [50, 30, nil])
     }
 
+    /// The "not tracked by side" list offers marking as an action, so it has to know which
+    /// exercises marking would do nothing for.
+    @MainActor
+    func testCanTrackSidesFollowsTheTrackingType() async throws {
+        let split = unilateral("Bulgarian Split Squat")
+        let sled = Exercise(
+            name: "Sled Push", equipmentType: .sled,
+            trackingType: .weightDistance, primaryMuscle: "legs", unilateral: false
+        )
+        try seed([split, sled])
+        try history(split.id, Array(repeating: [rir(8, left: 1, right: 2)], count: 3))
+        try session(sled.id, daysAgo: 3, [Side(left: 10, right: 10, leftRIR: 0, rightRIR: 0)])
+
+        let result = try await sides()
+        XCTAssertTrue(try exercise("Bulgarian Split Squat", in: result).canTrackSides)
+        XCTAssertFalse(
+            try exercise("Sled Push", in: result).canTrackSides,
+            "weight and distance logs no reps, so marking it Unilateral would change nothing"
+        )
+    }
+
     // MARK: - Groups (D21)
 
     /// Opposite directions in one group are just two imbalances — no "mixed" state.

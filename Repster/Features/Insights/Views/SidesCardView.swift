@@ -6,6 +6,12 @@
 //
 // Never drawn when nothing has both sides logged (D10) — InsightsView checks `state`
 // first, so this view never renders an empty state.
+//
+// The body figures were archived on 2026-09-29: two 244pt figures made this card ~650pt, about a
+// screenful, and they carried no information the group rows don't say in words. `BodyFigure`,
+// `BodyMapGeometry`, `SidesBodyFill` and the generated paths all stay, kept compiling and correct
+// by SidesAnalysisTests — including the mirror trap, where the library's `left` is the figure's
+// right on the front view only. Restoring the map is putting `figures` and `legend` back here.
 
 import SwiftUI
 
@@ -13,20 +19,12 @@ struct SidesCardView: View {
     let status: SidesStatus
     let onSelectGroup: (SideGroupSummary) -> Void
 
-    private static let figureWidth: CGFloat = 124
-
-    private var statuses: [String: SideGroupStatus] {
-        Dictionary(uniqueKeysWithValues: status.groups.map { ($0.id, $0.status) })
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             header
 
             VStack(alignment: .leading, spacing: 12) {
                 headline
-                figures
-                legend
 
                 Rectangle()
                     .fill(Color.border)
@@ -102,83 +100,6 @@ struct SidesCardView: View {
         return "Your last \(SidesAnalysis.sessionsConsidered) sessions of each exercise, compared at the same weight"
     }
 
-    // MARK: - Figures
-
-    private var figures: some View {
-        HStack(alignment: .bottom, spacing: 22) {
-            figure(.front, caption: "FRONT")
-            figure(.back, caption: "BACK")
-        }
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(figuresAccessibilityLabel)
-    }
-
-    private func figure(_ view: BodyView, caption: String) -> some View {
-        let statuses = statuses
-        return VStack(spacing: 6) {
-            BodyFigure(view: view) { region, _ in
-                SidesBodyFill.color(region: region, statuses: statuses)
-            }
-            .frame(width: Self.figureWidth)
-
-            Text(caption)
-                .font(.system(size: 9.5, weight: .semibold))
-                .kerning(0.6)
-                .foregroundStyle(Color.textTertiary)
-        }
-    }
-
-    private var figuresAccessibilityLabel: String {
-        let parts = status.groups.map { "\($0.displayName): \($0.status.sentence.lowercased())" }
-        return (["Body map, front and back"] + parts).joined(separator: ". ")
-    }
-
-    // MARK: - Legend
-
-    private var legendItems: [(color: Color, label: String)] {
-        if status.state == .building {
-            return [(.sidesCollecting, "Collecting"), (.bodyBase, "Not tracked")]
-        }
-        return [(.sidesImbalance, "Imbalance found"), (.sidesEven, "Even"), (.sidesCollecting, "Collecting"), (.bodyBase, "Not tracked")]
-    }
-
-    private var legend: some View {
-        let items = legendItems
-        return VStack(spacing: 6) {
-            HStack(spacing: 14) {
-                ForEach(Array(items.prefix(3).enumerated()), id: \.offset) { _, item in
-                    legendItem(item.color, item.label)
-                }
-            }
-            if items.count > 3 {
-                HStack(spacing: 14) {
-                    ForEach(Array(items.dropFirst(3).enumerated()), id: \.offset) { _, item in
-                        legendItem(item.color, item.label)
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .accessibilityHidden(true)
-    }
-
-    private func legendItem(_ color: Color, _ label: String) -> some View {
-        HStack(spacing: 5) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(color)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 2)
-                        .strokeBorder(color == .bodyBase ? Color.bodyOutline : Color.clear, lineWidth: 1)
-                )
-                .frame(width: 10, height: 8)
-
-            Text(label)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Color.textTertiary)
-        }
-    }
-
     // MARK: - Rows
 
     /// No strength mark here: a group has no single degree — its exercises do.
@@ -220,12 +141,6 @@ struct SidesCardView: View {
         let list = ListFormatter.localizedString(byJoining: names)
         let verb = names.count == 1 ? "isn’t" : "aren’t"
         return HStack(alignment: .top, spacing: 8) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color.bodyBase)
-                .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(Color.bodyOutline, lineWidth: 1))
-                .frame(width: 10, height: 8)
-                .padding(.top, 4)
-
             Text("\(list) \(verb) tracked by side — only exercises marked Unilateral, with left and right logged, count.")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Color.textSecondary)
@@ -280,7 +195,8 @@ enum SidesPreviewData {
         _ status: SideStatus,
         _ pairs: [(left: Double, right: Double)],
         bests: [SideBestRow] = [],
-        oneSided: Int = 0
+        oneSided: Int = 0,
+        canTrackSides: Bool = true
     ) -> SideExerciseSummary {
         let list = sessions(pairs)
         let classification = SidesAnalysis.classify(list)
@@ -288,7 +204,7 @@ enum SidesPreviewData {
             id: UUID(), name: name, status: status, sessions: list,
             averageGap: classification.averageGap, leadCount: classification.leadCount,
             differingCount: classification.differingCount, bestReps: bests,
-            oneSideOnlySets: oneSided, rirOnOneSideSets: 0
+            oneSideOnlySets: oneSided, rirOnOneSideSets: 0, canTrackSides: canTrackSides
         )
     }
 
@@ -309,7 +225,13 @@ enum SidesPreviewData {
             exercise("Leg Curl 1 Leg", .collecting(sessions: 1), [(12, 12)]),
             SideExerciseSummary(
                 id: UUID(), name: "Barbell Hip Thrust", status: .notTracked(.notUnilateral), sessions: [],
-                averageGap: 0, leadCount: 0, differingCount: 0, bestReps: [], oneSideOnlySets: 0, rirOnOneSideSets: 0
+                averageGap: 0, leadCount: 0, differingCount: 0, bestReps: [], oneSideOnlySets: 0,
+                rirOnOneSideSets: 0, canTrackSides: true
+            ),
+            SideExerciseSummary(
+                id: UUID(), name: "Sled Push", status: .notTracked(.notUnilateral), sessions: [],
+                averageGap: 0, leadCount: 0, differingCount: 0, bestReps: [], oneSideOnlySets: 0,
+                rirOnOneSideSets: 0, canTrackSides: false
             ),
         ]
     )

@@ -1,0 +1,2747 @@
+{
+  "generated_on": "2026-09-26",
+  "project": {
+    "organization": "Repster",
+    "name": "Default project",
+    "id": 180066,
+    "timezone": "Europe/Copenhagen"
+  },
+  "periods": {
+    "current": [
+      "2026-09-19",
+      "2026-09-25"
+    ],
+    "previous": [
+      "2026-09-12",
+      "2026-09-18"
+    ]
+  },
+  "definitions": {
+    "users": "Unique PostHog persons (anonymous installation identities)",
+    "active": "Any captured event",
+    "meaningful_workout": "workout completed with set_count_bucket in 1, 2-3, 4-6, 7-10, 11+",
+    "filters": [
+      {
+        "key": "internal_team",
+        "type": "person",
+        "operator": "is_not",
+        "value": [
+          "true"
+        ]
+      },
+      {
+        "key": "$is_emulator",
+        "type": "event",
+        "operator": "is_not",
+        "value": [
+          "true"
+        ]
+      },
+      {
+        "key": "$is_testflight",
+        "type": "event",
+        "operator": "is_not",
+        "value": [
+          "true"
+        ]
+      }
+    ]
+  },
+  "trends": {
+    "current": {
+      "_posthogUrl": "https://eu.posthog.com/project/180066/insights/new#q=%7B%22kind%22%3A%22InsightVizNode%22%2C%22source%22%3A%7B%22dateRange%22%3A%7B%22date_from%22%3A%222026-09-19%22%2C%22date_to%22%3A%222026-09-25%22%7D%2C%22interval%22%3A%22day%22%2C%22kind%22%3A%22TrendsQuery%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22internal_team%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22person%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_emulator%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_testflight%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%5D%2C%22series%22%3A%5B%7B%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22dau%22%2C%22name%22%3A%22Active%20users%22%7D%2C%7B%22event%22%3A%22onboarding%20step%20viewed%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22dau%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22step%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22welcome%22%5D%7D%5D%7D%2C%7B%22event%22%3A%22onboarding%20completed%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22dau%22%7D%2C%7B%22event%22%3A%22workout%20started%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22dau%22%7D%2C%7B%22event%22%3A%22first%20set%20logged%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22dau%22%7D%2C%7B%22event%22%3A%22workout%20completed%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22dau%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22set_count_bucket%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%221%22%2C%222-3%22%2C%224-6%22%2C%227-10%22%2C%2211%2B%22%5D%7D%5D%7D%2C%7B%22event%22%3A%22template%20started%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22dau%22%7D%2C%7B%22event%22%3A%22paywall%20shown%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22dau%22%7D%2C%7B%22event%22%3A%22workout%20completed%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22total%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22set_count_bucket%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%221%22%2C%222-3%22%2C%224-6%22%2C%227-10%22%2C%2211%2B%22%5D%7D%5D%7D%5D%2C%22trendsFilter%22%3A%7B%22aggregationAxisFormat%22%3A%22numeric%22%2C%22display%22%3A%22ActionsTable%22%2C%22metricColorByDirection%22%3Afalse%2C%22metricShowChange%22%3Atrue%2C%22metricSummary%22%3A%22total%22%2C%22showAlertThresholdLines%22%3Afalse%2C%22showLabelsOnSeries%22%3Afalse%2C%22showLegend%22%3Afalse%2C%22showMultipleYAxes%22%3Afalse%2C%22showPercentStackView%22%3Afalse%2C%22showValuesOnSeries%22%3Afalse%2C%22smoothingIntervals%22%3A1%2C%22yAxisScaleType%22%3A%22linear%22%7D%7D%7D",
+      "query": {
+        "dateRange": {
+          "date_from": "2026-09-19",
+          "date_to": "2026-09-25"
+        },
+        "interval": "day",
+        "kind": "TrendsQuery",
+        "properties": [
+          {
+            "key": "internal_team",
+            "operator": "is_not",
+            "type": "person",
+            "value": [
+              "true"
+            ]
+          },
+          {
+            "key": "$is_emulator",
+            "operator": "is_not",
+            "type": "event",
+            "value": [
+              "true"
+            ]
+          },
+          {
+            "key": "$is_testflight",
+            "operator": "is_not",
+            "type": "event",
+            "value": [
+              "true"
+            ]
+          }
+        ],
+        "series": [
+          {
+            "kind": "EventsNode",
+            "math": "dau",
+            "name": "Active users"
+          },
+          {
+            "event": "onboarding step viewed",
+            "kind": "EventsNode",
+            "math": "dau",
+            "properties": [
+              {
+                "key": "step",
+                "operator": "exact",
+                "type": "event",
+                "value": [
+                  "welcome"
+                ]
+              }
+            ]
+          },
+          {
+            "event": "onboarding completed",
+            "kind": "EventsNode",
+            "math": "dau"
+          },
+          {
+            "event": "workout started",
+            "kind": "EventsNode",
+            "math": "dau"
+          },
+          {
+            "event": "first set logged",
+            "kind": "EventsNode",
+            "math": "dau"
+          },
+          {
+            "event": "workout completed",
+            "kind": "EventsNode",
+            "math": "dau",
+            "properties": [
+              {
+                "key": "set_count_bucket",
+                "operator": "exact",
+                "type": "event",
+                "value": [
+                  "1",
+                  "2-3",
+                  "4-6",
+                  "7-10",
+                  "11+"
+                ]
+              }
+            ]
+          },
+          {
+            "event": "template started",
+            "kind": "EventsNode",
+            "math": "dau"
+          },
+          {
+            "event": "paywall shown",
+            "kind": "EventsNode",
+            "math": "dau"
+          },
+          {
+            "event": "workout completed",
+            "kind": "EventsNode",
+            "math": "total",
+            "properties": [
+              {
+                "key": "set_count_bucket",
+                "operator": "exact",
+                "type": "event",
+                "value": [
+                  "1",
+                  "2-3",
+                  "4-6",
+                  "7-10",
+                  "11+"
+                ]
+              }
+            ]
+          }
+        ],
+        "trendsFilter": {
+          "aggregationAxisFormat": "numeric",
+          "display": "ActionsTable",
+          "metricColorByDirection": false,
+          "metricShowChange": true,
+          "metricSummary": "total",
+          "showAlertThresholdLines": false,
+          "showLabelsOnSeries": false,
+          "showLegend": false,
+          "showMultipleYAxes": false,
+          "showPercentStackView": false,
+          "showValuesOnSeries": false,
+          "smoothingIntervals": 1,
+          "yAxisScaleType": "linear"
+        }
+      },
+      "results": [
+        {
+          "data": [],
+          "days": [],
+          "count": 0,
+          "aggregated_value": 31,
+          "label": "All events",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-25T23:59:59.999999+02:00",
+            "date_from": "2026-09-19T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsTable",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-19T00:00:00+02:00",
+              "2026-09-20T00:00:00+02:00",
+              "2026-09-21T00:00:00+02:00",
+              "2026-09-22T00:00:00+02:00",
+              "2026-09-23T00:00:00+02:00",
+              "2026-09-24T00:00:00+02:00",
+              "2026-09-25T00:00:00+02:00"
+            ],
+            "id": null,
+            "type": "events",
+            "order": 0,
+            "name": "All events",
+            "custom_name": "Active users",
+            "math": "dau",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 0
+        },
+        {
+          "data": [],
+          "days": [],
+          "count": 0,
+          "aggregated_value": 20,
+          "label": "onboarding step viewed",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-25T23:59:59.999999+02:00",
+            "date_from": "2026-09-19T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsTable",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-19T00:00:00+02:00",
+              "2026-09-20T00:00:00+02:00",
+              "2026-09-21T00:00:00+02:00",
+              "2026-09-22T00:00:00+02:00",
+              "2026-09-23T00:00:00+02:00",
+              "2026-09-24T00:00:00+02:00",
+              "2026-09-25T00:00:00+02:00"
+            ],
+            "id": "onboarding step viewed",
+            "type": "events",
+            "order": 1,
+            "name": "onboarding step viewed",
+            "custom_name": null,
+            "math": "dau",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 1
+        },
+        {
+          "data": [],
+          "days": [],
+          "count": 0,
+          "aggregated_value": 18,
+          "label": "onboarding completed",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-25T23:59:59.999999+02:00",
+            "date_from": "2026-09-19T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsTable",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-19T00:00:00+02:00",
+              "2026-09-20T00:00:00+02:00",
+              "2026-09-21T00:00:00+02:00",
+              "2026-09-22T00:00:00+02:00",
+              "2026-09-23T00:00:00+02:00",
+              "2026-09-24T00:00:00+02:00",
+              "2026-09-25T00:00:00+02:00"
+            ],
+            "id": "onboarding completed",
+            "type": "events",
+            "order": 2,
+            "name": "onboarding completed",
+            "custom_name": null,
+            "math": "dau",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 2
+        },
+        {
+          "data": [],
+          "days": [],
+          "count": 0,
+          "aggregated_value": 15,
+          "label": "workout started",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-25T23:59:59.999999+02:00",
+            "date_from": "2026-09-19T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsTable",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-19T00:00:00+02:00",
+              "2026-09-20T00:00:00+02:00",
+              "2026-09-21T00:00:00+02:00",
+              "2026-09-22T00:00:00+02:00",
+              "2026-09-23T00:00:00+02:00",
+              "2026-09-24T00:00:00+02:00",
+              "2026-09-25T00:00:00+02:00"
+            ],
+            "id": "workout started",
+            "type": "events",
+            "order": 3,
+            "name": "workout started",
+            "custom_name": null,
+            "math": "dau",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 3
+        },
+        {
+          "data": [],
+          "days": [],
+          "count": 0,
+          "aggregated_value": 10,
+          "label": "first set logged",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-25T23:59:59.999999+02:00",
+            "date_from": "2026-09-19T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsTable",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-19T00:00:00+02:00",
+              "2026-09-20T00:00:00+02:00",
+              "2026-09-21T00:00:00+02:00",
+              "2026-09-22T00:00:00+02:00",
+              "2026-09-23T00:00:00+02:00",
+              "2026-09-24T00:00:00+02:00",
+              "2026-09-25T00:00:00+02:00"
+            ],
+            "id": "first set logged",
+            "type": "events",
+            "order": 4,
+            "name": "first set logged",
+            "custom_name": null,
+            "math": "dau",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 4
+        },
+        {
+          "data": [],
+          "days": [],
+          "count": 0,
+          "aggregated_value": 8,
+          "label": "workout completed",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-25T23:59:59.999999+02:00",
+            "date_from": "2026-09-19T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsTable",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-19T00:00:00+02:00",
+              "2026-09-20T00:00:00+02:00",
+              "2026-09-21T00:00:00+02:00",
+              "2026-09-22T00:00:00+02:00",
+              "2026-09-23T00:00:00+02:00",
+              "2026-09-24T00:00:00+02:00",
+              "2026-09-25T00:00:00+02:00"
+            ],
+            "id": "workout completed",
+            "type": "events",
+            "order": 5,
+            "name": "workout completed",
+            "custom_name": null,
+            "math": "dau",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 5
+        },
+        {
+          "data": [],
+          "days": [],
+          "count": 0,
+          "aggregated_value": 3,
+          "label": "template started",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-25T23:59:59.999999+02:00",
+            "date_from": "2026-09-19T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsTable",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-19T00:00:00+02:00",
+              "2026-09-20T00:00:00+02:00",
+              "2026-09-21T00:00:00+02:00",
+              "2026-09-22T00:00:00+02:00",
+              "2026-09-23T00:00:00+02:00",
+              "2026-09-24T00:00:00+02:00",
+              "2026-09-25T00:00:00+02:00"
+            ],
+            "id": "template started",
+            "type": "events",
+            "order": 6,
+            "name": "template started",
+            "custom_name": null,
+            "math": "dau",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 6
+        },
+        {
+          "data": [],
+          "days": [],
+          "count": 0,
+          "aggregated_value": 1,
+          "label": "paywall shown",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-25T23:59:59.999999+02:00",
+            "date_from": "2026-09-19T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsTable",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-19T00:00:00+02:00",
+              "2026-09-20T00:00:00+02:00",
+              "2026-09-21T00:00:00+02:00",
+              "2026-09-22T00:00:00+02:00",
+              "2026-09-23T00:00:00+02:00",
+              "2026-09-24T00:00:00+02:00",
+              "2026-09-25T00:00:00+02:00"
+            ],
+            "id": "paywall shown",
+            "type": "events",
+            "order": 7,
+            "name": "paywall shown",
+            "custom_name": null,
+            "math": "dau",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 7
+        },
+        {
+          "data": [],
+          "days": [],
+          "count": 0,
+          "aggregated_value": 15,
+          "label": "workout completed",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-25T23:59:59.999999+02:00",
+            "date_from": "2026-09-19T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsTable",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-19T00:00:00+02:00",
+              "2026-09-20T00:00:00+02:00",
+              "2026-09-21T00:00:00+02:00",
+              "2026-09-22T00:00:00+02:00",
+              "2026-09-23T00:00:00+02:00",
+              "2026-09-24T00:00:00+02:00",
+              "2026-09-25T00:00:00+02:00"
+            ],
+            "id": "workout completed",
+            "type": "events",
+            "order": 8,
+            "name": "workout completed",
+            "custom_name": null,
+            "math": "total",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 8
+        }
+      ]
+    },
+    "previous": {
+      "_posthogUrl": "https://eu.posthog.com/project/180066/insights/new#q=%7B%22kind%22%3A%22InsightVizNode%22%2C%22source%22%3A%7B%22dateRange%22%3A%7B%22date_from%22%3A%222026-09-12%22%2C%22date_to%22%3A%222026-09-18%22%7D%2C%22interval%22%3A%22day%22%2C%22kind%22%3A%22TrendsQuery%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22internal_team%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22person%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_emulator%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_testflight%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%5D%2C%22series%22%3A%5B%7B%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22dau%22%2C%22name%22%3A%22Active%20users%22%7D%2C%7B%22event%22%3A%22onboarding%20step%20viewed%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22dau%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22step%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22welcome%22%5D%7D%5D%7D%2C%7B%22event%22%3A%22onboarding%20completed%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22dau%22%7D%2C%7B%22event%22%3A%22workout%20started%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22dau%22%7D%2C%7B%22event%22%3A%22first%20set%20logged%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22dau%22%7D%2C%7B%22event%22%3A%22workout%20completed%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22dau%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22set_count_bucket%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%221%22%2C%222-3%22%2C%224-6%22%2C%227-10%22%2C%2211%2B%22%5D%7D%5D%7D%2C%7B%22event%22%3A%22template%20started%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22dau%22%7D%2C%7B%22event%22%3A%22paywall%20shown%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22dau%22%7D%2C%7B%22event%22%3A%22workout%20completed%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22total%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22set_count_bucket%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%221%22%2C%222-3%22%2C%224-6%22%2C%227-10%22%2C%2211%2B%22%5D%7D%5D%7D%5D%2C%22trendsFilter%22%3A%7B%22aggregationAxisFormat%22%3A%22numeric%22%2C%22display%22%3A%22ActionsTable%22%2C%22metricColorByDirection%22%3Afalse%2C%22metricShowChange%22%3Atrue%2C%22metricSummary%22%3A%22total%22%2C%22showAlertThresholdLines%22%3Afalse%2C%22showLabelsOnSeries%22%3Afalse%2C%22showLegend%22%3Afalse%2C%22showMultipleYAxes%22%3Afalse%2C%22showPercentStackView%22%3Afalse%2C%22showValuesOnSeries%22%3Afalse%2C%22smoothingIntervals%22%3A1%2C%22yAxisScaleType%22%3A%22linear%22%7D%7D%7D",
+      "query": {
+        "dateRange": {
+          "date_from": "2026-09-12",
+          "date_to": "2026-09-18"
+        },
+        "interval": "day",
+        "kind": "TrendsQuery",
+        "properties": [
+          {
+            "key": "internal_team",
+            "operator": "is_not",
+            "type": "person",
+            "value": [
+              "true"
+            ]
+          },
+          {
+            "key": "$is_emulator",
+            "operator": "is_not",
+            "type": "event",
+            "value": [
+              "true"
+            ]
+          },
+          {
+            "key": "$is_testflight",
+            "operator": "is_not",
+            "type": "event",
+            "value": [
+              "true"
+            ]
+          }
+        ],
+        "series": [
+          {
+            "kind": "EventsNode",
+            "math": "dau",
+            "name": "Active users"
+          },
+          {
+            "event": "onboarding step viewed",
+            "kind": "EventsNode",
+            "math": "dau",
+            "properties": [
+              {
+                "key": "step",
+                "operator": "exact",
+                "type": "event",
+                "value": [
+                  "welcome"
+                ]
+              }
+            ]
+          },
+          {
+            "event": "onboarding completed",
+            "kind": "EventsNode",
+            "math": "dau"
+          },
+          {
+            "event": "workout started",
+            "kind": "EventsNode",
+            "math": "dau"
+          },
+          {
+            "event": "first set logged",
+            "kind": "EventsNode",
+            "math": "dau"
+          },
+          {
+            "event": "workout completed",
+            "kind": "EventsNode",
+            "math": "dau",
+            "properties": [
+              {
+                "key": "set_count_bucket",
+                "operator": "exact",
+                "type": "event",
+                "value": [
+                  "1",
+                  "2-3",
+                  "4-6",
+                  "7-10",
+                  "11+"
+                ]
+              }
+            ]
+          },
+          {
+            "event": "template started",
+            "kind": "EventsNode",
+            "math": "dau"
+          },
+          {
+            "event": "paywall shown",
+            "kind": "EventsNode",
+            "math": "dau"
+          },
+          {
+            "event": "workout completed",
+            "kind": "EventsNode",
+            "math": "total",
+            "properties": [
+              {
+                "key": "set_count_bucket",
+                "operator": "exact",
+                "type": "event",
+                "value": [
+                  "1",
+                  "2-3",
+                  "4-6",
+                  "7-10",
+                  "11+"
+                ]
+              }
+            ]
+          }
+        ],
+        "trendsFilter": {
+          "aggregationAxisFormat": "numeric",
+          "display": "ActionsTable",
+          "metricColorByDirection": false,
+          "metricShowChange": true,
+          "metricSummary": "total",
+          "showAlertThresholdLines": false,
+          "showLabelsOnSeries": false,
+          "showLegend": false,
+          "showMultipleYAxes": false,
+          "showPercentStackView": false,
+          "showValuesOnSeries": false,
+          "smoothingIntervals": 1,
+          "yAxisScaleType": "linear"
+        }
+      },
+      "results": [
+        {
+          "data": [],
+          "days": [],
+          "count": 0,
+          "aggregated_value": 33,
+          "label": "All events",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-18T23:59:59.999999+02:00",
+            "date_from": "2026-09-12T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsTable",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-12T00:00:00+02:00",
+              "2026-09-13T00:00:00+02:00",
+              "2026-09-14T00:00:00+02:00",
+              "2026-09-15T00:00:00+02:00",
+              "2026-09-16T00:00:00+02:00",
+              "2026-09-17T00:00:00+02:00",
+              "2026-09-18T00:00:00+02:00"
+            ],
+            "id": null,
+            "type": "events",
+            "order": 0,
+            "name": "All events",
+            "custom_name": "Active users",
+            "math": "dau",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 0
+        },
+        {
+          "data": [],
+          "days": [],
+          "count": 0,
+          "aggregated_value": 22,
+          "label": "onboarding step viewed",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-18T23:59:59.999999+02:00",
+            "date_from": "2026-09-12T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsTable",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-12T00:00:00+02:00",
+              "2026-09-13T00:00:00+02:00",
+              "2026-09-14T00:00:00+02:00",
+              "2026-09-15T00:00:00+02:00",
+              "2026-09-16T00:00:00+02:00",
+              "2026-09-17T00:00:00+02:00",
+              "2026-09-18T00:00:00+02:00"
+            ],
+            "id": "onboarding step viewed",
+            "type": "events",
+            "order": 1,
+            "name": "onboarding step viewed",
+            "custom_name": null,
+            "math": "dau",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 1
+        },
+        {
+          "data": [],
+          "days": [],
+          "count": 0,
+          "aggregated_value": 18,
+          "label": "onboarding completed",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-18T23:59:59.999999+02:00",
+            "date_from": "2026-09-12T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsTable",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-12T00:00:00+02:00",
+              "2026-09-13T00:00:00+02:00",
+              "2026-09-14T00:00:00+02:00",
+              "2026-09-15T00:00:00+02:00",
+              "2026-09-16T00:00:00+02:00",
+              "2026-09-17T00:00:00+02:00",
+              "2026-09-18T00:00:00+02:00"
+            ],
+            "id": "onboarding completed",
+            "type": "events",
+            "order": 2,
+            "name": "onboarding completed",
+            "custom_name": null,
+            "math": "dau",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 2
+        },
+        {
+          "data": [],
+          "days": [],
+          "count": 0,
+          "aggregated_value": 18,
+          "label": "workout started",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-18T23:59:59.999999+02:00",
+            "date_from": "2026-09-12T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsTable",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-12T00:00:00+02:00",
+              "2026-09-13T00:00:00+02:00",
+              "2026-09-14T00:00:00+02:00",
+              "2026-09-15T00:00:00+02:00",
+              "2026-09-16T00:00:00+02:00",
+              "2026-09-17T00:00:00+02:00",
+              "2026-09-18T00:00:00+02:00"
+            ],
+            "id": "workout started",
+            "type": "events",
+            "order": 3,
+            "name": "workout started",
+            "custom_name": null,
+            "math": "dau",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 3
+        },
+        {
+          "data": [],
+          "days": [],
+          "count": 0,
+          "aggregated_value": 9,
+          "label": "first set logged",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-18T23:59:59.999999+02:00",
+            "date_from": "2026-09-12T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsTable",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-12T00:00:00+02:00",
+              "2026-09-13T00:00:00+02:00",
+              "2026-09-14T00:00:00+02:00",
+              "2026-09-15T00:00:00+02:00",
+              "2026-09-16T00:00:00+02:00",
+              "2026-09-17T00:00:00+02:00",
+              "2026-09-18T00:00:00+02:00"
+            ],
+            "id": "first set logged",
+            "type": "events",
+            "order": 4,
+            "name": "first set logged",
+            "custom_name": null,
+            "math": "dau",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 4
+        },
+        {
+          "data": [],
+          "days": [],
+          "count": 0,
+          "aggregated_value": 6,
+          "label": "workout completed",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-18T23:59:59.999999+02:00",
+            "date_from": "2026-09-12T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsTable",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-12T00:00:00+02:00",
+              "2026-09-13T00:00:00+02:00",
+              "2026-09-14T00:00:00+02:00",
+              "2026-09-15T00:00:00+02:00",
+              "2026-09-16T00:00:00+02:00",
+              "2026-09-17T00:00:00+02:00",
+              "2026-09-18T00:00:00+02:00"
+            ],
+            "id": "workout completed",
+            "type": "events",
+            "order": 5,
+            "name": "workout completed",
+            "custom_name": null,
+            "math": "dau",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 5
+        },
+        {
+          "data": [],
+          "days": [],
+          "count": 0,
+          "aggregated_value": 2,
+          "label": "template started",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-18T23:59:59.999999+02:00",
+            "date_from": "2026-09-12T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsTable",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-12T00:00:00+02:00",
+              "2026-09-13T00:00:00+02:00",
+              "2026-09-14T00:00:00+02:00",
+              "2026-09-15T00:00:00+02:00",
+              "2026-09-16T00:00:00+02:00",
+              "2026-09-17T00:00:00+02:00",
+              "2026-09-18T00:00:00+02:00"
+            ],
+            "id": "template started",
+            "type": "events",
+            "order": 6,
+            "name": "template started",
+            "custom_name": null,
+            "math": "dau",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 6
+        },
+        {
+          "data": [],
+          "days": [],
+          "count": 0,
+          "aggregated_value": 0,
+          "label": "paywall shown",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-18T23:59:59.999999+02:00",
+            "date_from": "2026-09-12T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsTable",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-12T00:00:00+02:00",
+              "2026-09-13T00:00:00+02:00",
+              "2026-09-14T00:00:00+02:00",
+              "2026-09-15T00:00:00+02:00",
+              "2026-09-16T00:00:00+02:00",
+              "2026-09-17T00:00:00+02:00",
+              "2026-09-18T00:00:00+02:00"
+            ],
+            "id": "paywall shown",
+            "type": "events",
+            "order": 7,
+            "name": "paywall shown",
+            "custom_name": null,
+            "math": "dau",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 7
+        },
+        {
+          "data": [],
+          "days": [],
+          "count": 0,
+          "aggregated_value": 16,
+          "label": "workout completed",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-18T23:59:59.999999+02:00",
+            "date_from": "2026-09-12T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsTable",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-12T00:00:00+02:00",
+              "2026-09-13T00:00:00+02:00",
+              "2026-09-14T00:00:00+02:00",
+              "2026-09-15T00:00:00+02:00",
+              "2026-09-16T00:00:00+02:00",
+              "2026-09-17T00:00:00+02:00",
+              "2026-09-18T00:00:00+02:00"
+            ],
+            "id": "workout completed",
+            "type": "events",
+            "order": 8,
+            "name": "workout completed",
+            "custom_name": null,
+            "math": "total",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 8
+        }
+      ]
+    },
+    "daily": {
+      "_posthogUrl": "https://eu.posthog.com/project/180066/insights/new#q=%7B%22kind%22%3A%22InsightVizNode%22%2C%22source%22%3A%7B%22dateRange%22%3A%7B%22date_from%22%3A%222026-09-12%22%2C%22date_to%22%3A%222026-09-25%22%7D%2C%22interval%22%3A%22day%22%2C%22kind%22%3A%22TrendsQuery%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22internal_team%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22person%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_emulator%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_testflight%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%5D%2C%22series%22%3A%5B%7B%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22dau%22%2C%22name%22%3A%22Active%20users%22%7D%2C%7B%22event%22%3A%22onboarding%20step%20viewed%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22dau%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22step%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22welcome%22%5D%7D%5D%7D%2C%7B%22event%22%3A%22workout%20completed%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22total%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22set_count_bucket%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%221%22%2C%222-3%22%2C%224-6%22%2C%227-10%22%2C%2211%2B%22%5D%7D%5D%7D%5D%2C%22trendsFilter%22%3A%7B%22aggregationAxisFormat%22%3A%22numeric%22%2C%22display%22%3A%22ActionsLineGraph%22%2C%22metricColorByDirection%22%3Afalse%2C%22metricShowChange%22%3Atrue%2C%22metricSummary%22%3A%22total%22%2C%22showAlertThresholdLines%22%3Afalse%2C%22showLabelsOnSeries%22%3Afalse%2C%22showLegend%22%3Afalse%2C%22showMultipleYAxes%22%3Afalse%2C%22showPercentStackView%22%3Afalse%2C%22showValuesOnSeries%22%3Afalse%2C%22smoothingIntervals%22%3A1%2C%22yAxisScaleType%22%3A%22linear%22%7D%7D%7D",
+      "query": {
+        "dateRange": {
+          "date_from": "2026-09-12",
+          "date_to": "2026-09-25"
+        },
+        "interval": "day",
+        "kind": "TrendsQuery",
+        "properties": [
+          {
+            "key": "internal_team",
+            "operator": "is_not",
+            "type": "person",
+            "value": [
+              "true"
+            ]
+          },
+          {
+            "key": "$is_emulator",
+            "operator": "is_not",
+            "type": "event",
+            "value": [
+              "true"
+            ]
+          },
+          {
+            "key": "$is_testflight",
+            "operator": "is_not",
+            "type": "event",
+            "value": [
+              "true"
+            ]
+          }
+        ],
+        "series": [
+          {
+            "kind": "EventsNode",
+            "math": "dau",
+            "name": "Active users"
+          },
+          {
+            "event": "onboarding step viewed",
+            "kind": "EventsNode",
+            "math": "dau",
+            "properties": [
+              {
+                "key": "step",
+                "operator": "exact",
+                "type": "event",
+                "value": [
+                  "welcome"
+                ]
+              }
+            ]
+          },
+          {
+            "event": "workout completed",
+            "kind": "EventsNode",
+            "math": "total",
+            "properties": [
+              {
+                "key": "set_count_bucket",
+                "operator": "exact",
+                "type": "event",
+                "value": [
+                  "1",
+                  "2-3",
+                  "4-6",
+                  "7-10",
+                  "11+"
+                ]
+              }
+            ]
+          }
+        ],
+        "trendsFilter": {
+          "aggregationAxisFormat": "numeric",
+          "display": "ActionsLineGraph",
+          "metricColorByDirection": false,
+          "metricShowChange": true,
+          "metricSummary": "total",
+          "showAlertThresholdLines": false,
+          "showLabelsOnSeries": false,
+          "showLegend": false,
+          "showMultipleYAxes": false,
+          "showPercentStackView": false,
+          "showValuesOnSeries": false,
+          "smoothingIntervals": 1,
+          "yAxisScaleType": "linear"
+        }
+      },
+      "results": [
+        {
+          "data": [
+            2,
+            5,
+            11,
+            5,
+            11,
+            7,
+            6,
+            5,
+            5,
+            10,
+            6,
+            7,
+            7,
+            5
+          ],
+          "labels": [
+            "12-Sep-2026",
+            "13-Sep-2026",
+            "14-Sep-2026",
+            "15-Sep-2026",
+            "16-Sep-2026",
+            "17-Sep-2026",
+            "18-Sep-2026",
+            "19-Sep-2026",
+            "20-Sep-2026",
+            "21-Sep-2026",
+            "22-Sep-2026",
+            "23-Sep-2026",
+            "24-Sep-2026",
+            "25-Sep-2026"
+          ],
+          "days": [
+            "2026-09-12",
+            "2026-09-13",
+            "2026-09-14",
+            "2026-09-15",
+            "2026-09-16",
+            "2026-09-17",
+            "2026-09-18",
+            "2026-09-19",
+            "2026-09-20",
+            "2026-09-21",
+            "2026-09-22",
+            "2026-09-23",
+            "2026-09-24",
+            "2026-09-25"
+          ],
+          "count": 92,
+          "label": "All events",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-25T23:59:59.999999+02:00",
+            "date_from": "2026-09-12T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsLineGraph",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-12T00:00:00+02:00",
+              "2026-09-13T00:00:00+02:00",
+              "2026-09-14T00:00:00+02:00",
+              "2026-09-15T00:00:00+02:00",
+              "2026-09-16T00:00:00+02:00",
+              "2026-09-17T00:00:00+02:00",
+              "2026-09-18T00:00:00+02:00",
+              "2026-09-19T00:00:00+02:00",
+              "2026-09-20T00:00:00+02:00",
+              "2026-09-21T00:00:00+02:00",
+              "2026-09-22T00:00:00+02:00",
+              "2026-09-23T00:00:00+02:00",
+              "2026-09-24T00:00:00+02:00",
+              "2026-09-25T00:00:00+02:00"
+            ],
+            "id": null,
+            "type": "events",
+            "order": 0,
+            "name": "All events",
+            "custom_name": "Active users",
+            "math": "dau",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 0
+        },
+        {
+          "data": [
+            1,
+            3,
+            5,
+            1,
+            6,
+            2,
+            5,
+            4,
+            1,
+            5,
+            1,
+            4,
+            4,
+            1
+          ],
+          "labels": [
+            "12-Sep-2026",
+            "13-Sep-2026",
+            "14-Sep-2026",
+            "15-Sep-2026",
+            "16-Sep-2026",
+            "17-Sep-2026",
+            "18-Sep-2026",
+            "19-Sep-2026",
+            "20-Sep-2026",
+            "21-Sep-2026",
+            "22-Sep-2026",
+            "23-Sep-2026",
+            "24-Sep-2026",
+            "25-Sep-2026"
+          ],
+          "days": [
+            "2026-09-12",
+            "2026-09-13",
+            "2026-09-14",
+            "2026-09-15",
+            "2026-09-16",
+            "2026-09-17",
+            "2026-09-18",
+            "2026-09-19",
+            "2026-09-20",
+            "2026-09-21",
+            "2026-09-22",
+            "2026-09-23",
+            "2026-09-24",
+            "2026-09-25"
+          ],
+          "count": 43,
+          "label": "onboarding step viewed",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-25T23:59:59.999999+02:00",
+            "date_from": "2026-09-12T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsLineGraph",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-12T00:00:00+02:00",
+              "2026-09-13T00:00:00+02:00",
+              "2026-09-14T00:00:00+02:00",
+              "2026-09-15T00:00:00+02:00",
+              "2026-09-16T00:00:00+02:00",
+              "2026-09-17T00:00:00+02:00",
+              "2026-09-18T00:00:00+02:00",
+              "2026-09-19T00:00:00+02:00",
+              "2026-09-20T00:00:00+02:00",
+              "2026-09-21T00:00:00+02:00",
+              "2026-09-22T00:00:00+02:00",
+              "2026-09-23T00:00:00+02:00",
+              "2026-09-24T00:00:00+02:00",
+              "2026-09-25T00:00:00+02:00"
+            ],
+            "id": "onboarding step viewed",
+            "type": "events",
+            "order": 1,
+            "name": "onboarding step viewed",
+            "custom_name": null,
+            "math": "dau",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 1
+        },
+        {
+          "data": [
+            0,
+            1,
+            3,
+            3,
+            2,
+            4,
+            3,
+            1,
+            2,
+            2,
+            4,
+            2,
+            1,
+            3
+          ],
+          "labels": [
+            "12-Sep-2026",
+            "13-Sep-2026",
+            "14-Sep-2026",
+            "15-Sep-2026",
+            "16-Sep-2026",
+            "17-Sep-2026",
+            "18-Sep-2026",
+            "19-Sep-2026",
+            "20-Sep-2026",
+            "21-Sep-2026",
+            "22-Sep-2026",
+            "23-Sep-2026",
+            "24-Sep-2026",
+            "25-Sep-2026"
+          ],
+          "days": [
+            "2026-09-12",
+            "2026-09-13",
+            "2026-09-14",
+            "2026-09-15",
+            "2026-09-16",
+            "2026-09-17",
+            "2026-09-18",
+            "2026-09-19",
+            "2026-09-20",
+            "2026-09-21",
+            "2026-09-22",
+            "2026-09-23",
+            "2026-09-24",
+            "2026-09-25"
+          ],
+          "count": 31,
+          "label": "workout completed",
+          "filter": {
+            "insight": "TRENDS",
+            "properties": [
+              {
+                "key": "internal_team",
+                "label": null,
+                "operator": "is_not",
+                "type": "person",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_emulator",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              },
+              {
+                "key": "$is_testflight",
+                "label": null,
+                "operator": "is_not",
+                "type": "event",
+                "value": [
+                  "true"
+                ]
+              }
+            ],
+            "filter_test_accounts": false,
+            "date_to": "2026-09-25T23:59:59.999999+02:00",
+            "date_from": "2026-09-12T00:00:00+02:00",
+            "entity_type": "events",
+            "interval": "day",
+            "aggregationAxisFormat": "numeric",
+            "display": "ActionsLineGraph",
+            "excludeBoxPlotOutliers": true,
+            "hideWeekends": false,
+            "legendPosition": "bottom",
+            "metricColorByDirection": false,
+            "metricShowChange": true,
+            "metricSummary": "total",
+            "resultCustomizationBy": "value",
+            "showAlertThresholdLines": false,
+            "showAnnotations": true,
+            "showLabelsOnSeries": false,
+            "showLegend": false,
+            "showMultipleYAxes": false,
+            "showPercentStackView": false,
+            "showValuesOnSeries": false,
+            "smoothingIntervals": 1,
+            "stackBreakdownValues": false,
+            "yAxisScaleType": "linear",
+            "yAxisStartAtZero": true
+          },
+          "action": {
+            "days": [
+              "2026-09-12T00:00:00+02:00",
+              "2026-09-13T00:00:00+02:00",
+              "2026-09-14T00:00:00+02:00",
+              "2026-09-15T00:00:00+02:00",
+              "2026-09-16T00:00:00+02:00",
+              "2026-09-17T00:00:00+02:00",
+              "2026-09-18T00:00:00+02:00",
+              "2026-09-19T00:00:00+02:00",
+              "2026-09-20T00:00:00+02:00",
+              "2026-09-21T00:00:00+02:00",
+              "2026-09-22T00:00:00+02:00",
+              "2026-09-23T00:00:00+02:00",
+              "2026-09-24T00:00:00+02:00",
+              "2026-09-25T00:00:00+02:00"
+            ],
+            "id": "workout completed",
+            "type": "events",
+            "order": 2,
+            "name": "workout completed",
+            "custom_name": null,
+            "math": "total",
+            "math_property": null,
+            "math_hogql": null,
+            "math_group_type_index": null,
+            "properties": {}
+          },
+          "order": 2
+        }
+      ]
+    }
+  },
+  "funnels": {
+    "current": {
+      "_posthogUrl": "https://eu.posthog.com/project/180066/insights/new#q=%7B%22kind%22%3A%22InsightVizNode%22%2C%22source%22%3A%7B%22dateRange%22%3A%7B%22date_from%22%3A%222026-09-19%22%2C%22date_to%22%3A%222026-09-25%22%7D%2C%22funnelsFilter%22%3A%7B%22breakdownAttributionType%22%3A%22first_touch%22%2C%22exclusions%22%3A%5B%5D%2C%22funnelAggregateByHogQL%22%3Anull%2C%22funnelOrderType%22%3A%22ordered%22%2C%22funnelStepReference%22%3A%22total%22%2C%22funnelVizType%22%3A%22steps%22%2C%22funnelWindowInterval%22%3A7%2C%22funnelWindowIntervalUnit%22%3A%22day%22%2C%22layout%22%3A%22vertical%22%7D%2C%22kind%22%3A%22FunnelsQuery%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22internal_team%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22person%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_emulator%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_testflight%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22timestamp%20%3C%20toDateTime('2026-09-26%2000%3A00%3A00'%2C%20'Europe%2FCopenhagen')%22%2C%22type%22%3A%22hogql%22%7D%5D%2C%22series%22%3A%5B%7B%22event%22%3A%22onboarding%20step%20viewed%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22first_time_for_user%22%2C%22optionalInFunnel%22%3Afalse%2C%22properties%22%3A%5B%7B%22key%22%3A%22step%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22welcome%22%5D%7D%5D%7D%2C%7B%22event%22%3A%22onboarding%20completed%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%7D%2C%7B%22event%22%3A%22workout%20started%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%7D%2C%7B%22event%22%3A%22first%20set%20logged%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%7D%2C%7B%22event%22%3A%22workout%20completed%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%2C%22properties%22%3A%5B%7B%22key%22%3A%22set_count_bucket%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%221%22%2C%222-3%22%2C%224-6%22%2C%227-10%22%2C%2211%2B%22%5D%7D%5D%7D%5D%7D%7D",
+      "query": {
+        "dateRange": {
+          "date_from": "2026-09-19",
+          "date_to": "2026-09-25"
+        },
+        "funnelsFilter": {
+          "breakdownAttributionType": "first_touch",
+          "exclusions": [],
+          "funnelAggregateByHogQL": null,
+          "funnelOrderType": "ordered",
+          "funnelStepReference": "total",
+          "funnelVizType": "steps",
+          "funnelWindowInterval": 7,
+          "funnelWindowIntervalUnit": "day",
+          "layout": "vertical"
+        },
+        "kind": "FunnelsQuery",
+        "properties": [
+          {
+            "key": "internal_team",
+            "operator": "is_not",
+            "type": "person",
+            "value": [
+              "true"
+            ]
+          },
+          {
+            "key": "$is_emulator",
+            "operator": "is_not",
+            "type": "event",
+            "value": [
+              "true"
+            ]
+          },
+          {
+            "key": "$is_testflight",
+            "operator": "is_not",
+            "type": "event",
+            "value": [
+              "true"
+            ]
+          },
+          {
+            "key": "timestamp < toDateTime('2026-09-26 00:00:00', 'Europe/Copenhagen')",
+            "type": "hogql"
+          }
+        ],
+        "series": [
+          {
+            "event": "onboarding step viewed",
+            "kind": "EventsNode",
+            "math": "first_time_for_user",
+            "optionalInFunnel": false,
+            "properties": [
+              {
+                "key": "step",
+                "operator": "exact",
+                "type": "event",
+                "value": [
+                  "welcome"
+                ]
+              }
+            ]
+          },
+          {
+            "event": "onboarding completed",
+            "kind": "EventsNode",
+            "optionalInFunnel": false
+          },
+          {
+            "event": "workout started",
+            "kind": "EventsNode",
+            "optionalInFunnel": false
+          },
+          {
+            "event": "first set logged",
+            "kind": "EventsNode",
+            "optionalInFunnel": false
+          },
+          {
+            "event": "workout completed",
+            "kind": "EventsNode",
+            "optionalInFunnel": false,
+            "properties": [
+              {
+                "key": "set_count_bucket",
+                "operator": "exact",
+                "type": "event",
+                "value": [
+                  "1",
+                  "2-3",
+                  "4-6",
+                  "7-10",
+                  "11+"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "results": [
+        {
+          "action_id": "onboarding step viewed",
+          "name": "onboarding step viewed",
+          "custom_name": null,
+          "order": 0,
+          "people": [],
+          "count": 20,
+          "type": "events",
+          "average_conversion_time": null,
+          "median_conversion_time": null
+        },
+        {
+          "action_id": "onboarding completed",
+          "name": "onboarding completed",
+          "custom_name": null,
+          "order": 1,
+          "people": [],
+          "count": 18,
+          "type": "events",
+          "average_conversion_time": 80.09505558013916,
+          "median_conversion_time": 35.49650001525879
+        },
+        {
+          "action_id": "workout started",
+          "name": "workout started",
+          "custom_name": null,
+          "order": 2,
+          "people": [],
+          "count": 9,
+          "type": "events",
+          "average_conversion_time": 7417.570666657553,
+          "median_conversion_time": 9.699000120162964
+        },
+        {
+          "action_id": "first set logged",
+          "name": "first set logged",
+          "custom_name": null,
+          "order": 3,
+          "people": [],
+          "count": 5,
+          "type": "events",
+          "average_conversion_time": 597.4728000164032,
+          "median_conversion_time": 687.353000164032
+        },
+        {
+          "action_id": "workout completed",
+          "name": "workout completed",
+          "custom_name": null,
+          "order": 4,
+          "people": [],
+          "count": 2,
+          "type": "events",
+          "average_conversion_time": 4361.646499991417,
+          "median_conversion_time": 4361.646499991417
+        }
+      ]
+    },
+    "previous": {
+      "_posthogUrl": "https://eu.posthog.com/project/180066/insights/new#q=%7B%22kind%22%3A%22InsightVizNode%22%2C%22source%22%3A%7B%22dateRange%22%3A%7B%22date_from%22%3A%222026-09-12%22%2C%22date_to%22%3A%222026-09-18%22%7D%2C%22funnelsFilter%22%3A%7B%22breakdownAttributionType%22%3A%22first_touch%22%2C%22exclusions%22%3A%5B%5D%2C%22funnelAggregateByHogQL%22%3Anull%2C%22funnelOrderType%22%3A%22ordered%22%2C%22funnelStepReference%22%3A%22total%22%2C%22funnelVizType%22%3A%22steps%22%2C%22funnelWindowInterval%22%3A7%2C%22funnelWindowIntervalUnit%22%3A%22day%22%2C%22layout%22%3A%22vertical%22%7D%2C%22kind%22%3A%22FunnelsQuery%22%2C%22properties%22%3A%5B%7B%22key%22%3A%22internal_team%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22person%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_emulator%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22%24is_testflight%22%2C%22operator%22%3A%22is_not%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22true%22%5D%7D%2C%7B%22key%22%3A%22timestamp%20%3C%20toDateTime('2026-09-19%2000%3A00%3A00'%2C%20'Europe%2FCopenhagen')%22%2C%22type%22%3A%22hogql%22%7D%5D%2C%22series%22%3A%5B%7B%22event%22%3A%22onboarding%20step%20viewed%22%2C%22kind%22%3A%22EventsNode%22%2C%22math%22%3A%22first_time_for_user%22%2C%22optionalInFunnel%22%3Afalse%2C%22properties%22%3A%5B%7B%22key%22%3A%22step%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%22welcome%22%5D%7D%5D%7D%2C%7B%22event%22%3A%22onboarding%20completed%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%7D%2C%7B%22event%22%3A%22workout%20started%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%7D%2C%7B%22event%22%3A%22first%20set%20logged%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%7D%2C%7B%22event%22%3A%22workout%20completed%22%2C%22kind%22%3A%22EventsNode%22%2C%22optionalInFunnel%22%3Afalse%2C%22properties%22%3A%5B%7B%22key%22%3A%22set_count_bucket%22%2C%22operator%22%3A%22exact%22%2C%22type%22%3A%22event%22%2C%22value%22%3A%5B%221%22%2C%222-3%22%2C%224-6%22%2C%227-10%22%2C%2211%2B%22%5D%7D%5D%7D%5D%7D%7D",
+      "query": {
+        "dateRange": {
+          "date_from": "2026-09-12",
+          "date_to": "2026-09-18"
+        },
+        "funnelsFilter": {
+          "breakdownAttributionType": "first_touch",
+          "exclusions": [],
+          "funnelAggregateByHogQL": null,
+          "funnelOrderType": "ordered",
+          "funnelStepReference": "total",
+          "funnelVizType": "steps",
+          "funnelWindowInterval": 7,
+          "funnelWindowIntervalUnit": "day",
+          "layout": "vertical"
+        },
+        "kind": "FunnelsQuery",
+        "properties": [
+          {
+            "key": "internal_team",
+            "operator": "is_not",
+            "type": "person",
+            "value": [
+              "true"
+            ]
+          },
+          {
+            "key": "$is_emulator",
+            "operator": "is_not",
+            "type": "event",
+            "value": [
+              "true"
+            ]
+          },
+          {
+            "key": "$is_testflight",
+            "operator": "is_not",
+            "type": "event",
+            "value": [
+              "true"
+            ]
+          },
+          {
+            "key": "timestamp < toDateTime('2026-09-19 00:00:00', 'Europe/Copenhagen')",
+            "type": "hogql"
+          }
+        ],
+        "series": [
+          {
+            "event": "onboarding step viewed",
+            "kind": "EventsNode",
+            "math": "first_time_for_user",
+            "optionalInFunnel": false,
+            "properties": [
+              {
+                "key": "step",
+                "operator": "exact",
+                "type": "event",
+                "value": [
+                  "welcome"
+                ]
+              }
+            ]
+          },
+          {
+            "event": "onboarding completed",
+            "kind": "EventsNode",
+            "optionalInFunnel": false
+          },
+          {
+            "event": "workout started",
+            "kind": "EventsNode",
+            "optionalInFunnel": false
+          },
+          {
+            "event": "first set logged",
+            "kind": "EventsNode",
+            "optionalInFunnel": false
+          },
+          {
+            "event": "workout completed",
+            "kind": "EventsNode",
+            "optionalInFunnel": false,
+            "properties": [
+              {
+                "key": "set_count_bucket",
+                "operator": "exact",
+                "type": "event",
+                "value": [
+                  "1",
+                  "2-3",
+                  "4-6",
+                  "7-10",
+                  "11+"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "results": [
+        {
+          "action_id": "onboarding step viewed",
+          "name": "onboarding step viewed",
+          "custom_name": null,
+          "order": 0,
+          "people": [],
+          "count": 21,
+          "type": "events",
+          "average_conversion_time": null,
+          "median_conversion_time": null
+        },
+        {
+          "action_id": "onboarding completed",
+          "name": "onboarding completed",
+          "custom_name": null,
+          "order": 1,
+          "people": [],
+          "count": 17,
+          "type": "events",
+          "average_conversion_time": 6626.837117671967,
+          "median_conversion_time": 42.681999921798706
+        },
+        {
+          "action_id": "workout started",
+          "name": "workout started",
+          "custom_name": null,
+          "order": 2,
+          "people": [],
+          "count": 12,
+          "type": "events",
+          "average_conversion_time": 46.75074998537699,
+          "median_conversion_time": 8.835000038146973
+        },
+        {
+          "action_id": "first set logged",
+          "name": "first set logged",
+          "custom_name": null,
+          "order": 3,
+          "people": [],
+          "count": 4,
+          "type": "events",
+          "average_conversion_time": 22681.524749994278,
+          "median_conversion_time": 145.43250000476837
+        },
+        {
+          "action_id": "workout completed",
+          "name": "workout completed",
+          "custom_name": null,
+          "order": 4,
+          "people": [],
+          "count": 2,
+          "type": "events",
+          "average_conversion_time": 979.2354999780655,
+          "median_conversion_time": 979.2354999780655
+        }
+      ]
+    }
+  },
+  "audits": {
+    "dimensions": {
+      "query": "SELECT\n    if(timestamp >= toDateTime('2026-09-19 00:00:00','Europe/Copenhagen'), 'current', 'previous') AS period,\n    event,\n    properties.$app_version AS version,\n    properties.source AS source,\n    properties.access_tier AS access_tier,\n    properties.set_count_bucket AS sets,\n    count() AS events,\n    count(DISTINCT person_id) AS persons\nFROM events\nWHERE timestamp >= toDateTime('2026-09-12 00:00:00','Europe/Copenhagen')\n  AND timestamp < toDateTime('2026-09-26 00:00:00','Europe/Copenhagen')\n  AND event IN ('workout started','workout completed','paywall shown')\n  AND coalesce(toString(person.properties.internal_team), 'false') != 'true'\n  AND coalesce(toString(properties.$is_testflight), 'false') != 'true'\n  AND coalesce(toString(properties.$is_emulator), 'false') != 'true'\nGROUP BY period,event,version,source,access_tier,sets\nORDER BY period,event,events DESC",
+      "result": "period|event|version|source|access_tier|sets|events|persons\ncurrent|paywall shown|1.5|settings|(null)|(null)|2|1\ncurrent|workout completed|1.5|empty|free|11+|7|3\ncurrent|workout completed|1.5|empty|subscribed|11+|3|1\ncurrent|workout completed|1.5|template|subscribed|11+|2|1\ncurrent|workout completed|1.4|template|subscribed|11+|1|1\ncurrent|workout completed|1.5|template|subscribed|7-10|1|1\ncurrent|workout completed|1.5|template|free|11+|1|1\ncurrent|workout started|1.5|empty|(null)|(null)|20|12\ncurrent|workout started|1.5|template|(null)|(null)|4|3\ncurrent|workout started|1.4|template|(null)|(null)|2|1\nprevious|workout completed|1.5|template|subscribed|11+|6|2\nprevious|workout completed|1.5|empty|free|11+|4|2\nprevious|workout completed|1.5|empty|subscribed|11+|3|1\nprevious|workout completed|1.5|empty|free|1|2|1\nprevious|workout completed|1.5|empty|free|2-3|1|1\nprevious|workout completed|1.5|empty|free|0|1|1\nprevious|workout started|1.5|empty|(null)|(null)|28|16\nprevious|workout started|1.5|template|(null)|(null)|6|2\nprevious|workout started|1.5|copy_previous|(null)|(null)|1|1"
+    },
+    "program_handoff": {
+      "query": "WITH entrants AS (\n    SELECT person_id, min(timestamp) AS entered\n    FROM events\n    WHERE event = 'onboarding step viewed'\n      AND properties.step = 'welcome'\n      AND timestamp < toDateTime('2026-09-26 00:00:00','Europe/Copenhagen')\n      AND coalesce(toString(person.properties.internal_team), 'false') != 'true'\n      AND coalesce(toString(properties.$is_testflight), 'false') != 'true'\n      AND coalesce(toString(properties.$is_emulator), 'false') != 'true'\n    GROUP BY person_id\n    HAVING entered >= toDateTime('2026-09-19 00:00:00','Europe/Copenhagen')\n), activity AS (\n    SELECT e.person_id,\n        countIf(e.event = 'program selected') AS programs,\n        countIf(e.event = 'template started') AS templates,\n        countIf(e.event = 'workout started') AS starts,\n        countIf(e.event = 'workout started' AND e.properties.source = 'empty') AS empty_starts,\n        countIf(e.event = 'first set logged') AS first_sets\n    FROM events e JOIN entrants c ON e.person_id = c.person_id\n    WHERE e.timestamp >= c.entered\n      AND e.timestamp >= toDateTime('2026-09-19 00:00:00','Europe/Copenhagen')\n      AND e.timestamp < toDateTime('2026-09-26 00:00:00','Europe/Copenhagen')\n      AND coalesce(toString(e.person.properties.internal_team), 'false') != 'true'\n      AND coalesce(toString(e.properties.$is_testflight), 'false') != 'true'\n      AND coalesce(toString(e.properties.$is_emulator), 'false') != 'true'\n    GROUP BY e.person_id\n)\nSELECT count() AS entrants, countIf(programs > 0) AS program_selectors,\n    countIf(programs > 0 AND starts > 0) AS selectors_starting,\n    countIf(programs > 0 AND templates > 0) AS selectors_using_templates,\n    countIf(programs > 0 AND starts > 0 AND starts = empty_starts) AS selectors_only_empty,\n    countIf(starts > 0) AS starters,\n    countIf(starts > 0 AND first_sets = 0) AS starters_no_sets\nFROM activity",
+      "result": "entrants|program_selectors|selectors_starting|selectors_using_templates|selectors_only_empty|starters|starters_no_sets\n20|16|8|0|8|9|4"
+    },
+    "weekly_overlap": {
+      "query": "WITH counts AS (\nSELECT person_id,\n    countIf(timestamp < toDateTime('2026-09-19 00:00:00','Europe/Copenhagen')) AS previous_workouts,\n    countIf(timestamp >= toDateTime('2026-09-19 00:00:00','Europe/Copenhagen')) AS current_workouts\nFROM events\nWHERE event = 'workout completed'\n  AND properties.set_count_bucket IN ('1','2-3','4-6','7-10','11+')\n  AND timestamp >= toDateTime('2026-09-12 00:00:00','Europe/Copenhagen')\n  AND timestamp < toDateTime('2026-09-26 00:00:00','Europe/Copenhagen')\n  AND coalesce(toString(person.properties.internal_team), 'false') != 'true'\n  AND coalesce(toString(properties.$is_testflight), 'false') != 'true'\n  AND coalesce(toString(properties.$is_emulator), 'false') != 'true'\nGROUP BY person_id\n)\nSELECT previous_workouts, current_workouts, count() AS persons\nFROM counts GROUP BY previous_workouts,current_workouts ORDER BY current_workouts DESC, previous_workouts DESC",
+      "result": "previous_workouts|current_workouts|persons\n0|5|1\n3|3|1\n2|2|1\n4|1|1\n3|1|1\n0|1|3\n3|0|1\n1|0|1"
+    },
+    "acquisition": {
+      "query": {
+        "kind": "HogQLQuery",
+        "query": "SELECT\n if(timestamp >= toDateTime('2026-09-19 00:00:00','Europe/Copenhagen'), 'current', 'previous') AS period,\n event, properties.acquisition_channel AS channel, properties.asa_conversion_type AS conversion_type,\n properties.$geoip_country_name AS country, properties.remaining_free_workouts AS remaining_free,\n count() AS events, count(DISTINCT person_id) AS persons\nFROM events\nWHERE timestamp >= toDateTime('2026-09-12 00:00:00','Europe/Copenhagen')\n AND timestamp < toDateTime('2026-09-26 00:00:00','Europe/Copenhagen')\n AND coalesce(toString(person.properties.internal_team), 'false') != 'true'\n AND coalesce(toString(properties.$is_testflight), 'false') != 'true'\n AND coalesce(toString(properties.$is_emulator), 'false') != 'true'\n AND (event = 'attribution resolved' OR (event = 'workout completed' AND properties.access_tier = 'free'))\nGROUP BY period,event,channel,conversion_type,country,remaining_free\nORDER BY period,event,events DESC"
+      },
+      "results": "period|event|channel|conversion_type|country|remaining_free|events|persons\ncurrent|attribution resolved|apple_search_ads|download|United Kingdom|(null)|7|7\ncurrent|attribution resolved|apple_search_ads|download|The Netherlands|(null)|3|3\ncurrent|attribution resolved|apple_search_ads|download|Iceland|(null)|2|2\ncurrent|attribution resolved|apple_search_ads|download|Sweden|(null)|2|2\ncurrent|attribution resolved|apple_search_ads|download|Italy|(null)|1|1\ncurrent|attribution resolved|apple_search_ads|download|Hungary|(null)|1|1\ncurrent|attribution resolved|apple_search_ads|download|Norway|(null)|1|1\ncurrent|attribution resolved|apple_search_ads|download|Faroe Islands|(null)|1|1\ncurrent|workout completed|(null)|(null)|The Netherlands|7.0|1|1\ncurrent|workout completed|(null)|(null)|The Netherlands|9.0|1|1\ncurrent|workout completed|(null)|(null)|Belgium|3.0|1|1\ncurrent|workout completed|(null)|(null)|Poland|9.0|1|1\ncurrent|workout completed|(null)|(null)|Norway|9.0|1|1\ncurrent|workout completed|(null)|(null)|The Netherlands|5.0|1|1\ncurrent|workout completed|(null)|(null)|The Netherlands|6.0|1|1\ncurrent|workout completed|(null)|(null)|The Netherlands|8.0|1|1\nprevious|attribution resolved|apple_search_ads|download|United Kingdom|(null)|4|4\nprevious|attribution resolved|apple_search_ads|download|Hungary|(null)|4|4\nprevious|attribution resolved|apple_search_ads|download|The Netherlands|(null)|2|2\nprevious|attribution resolved|apple_search_ads|download|France|(null)|2|2\nprevious|attribution resolved|organic|unknown|Ukraine|(null)|1|1\nprevious|attribution resolved|organic|unknown|South Africa|(null)|1|1\nprevious|attribution resolved|apple_search_ads|download|Spain|(null)|1|1\nprevious|attribution resolved|apple_search_ads|download|Belgium|(null)|1|1\nprevious|attribution resolved|organic|unknown|Estonia|(null)|1|1\nprevious|attribution resolved|apple_search_ads|download|Iceland|(null)|1|1\nprevious|attribution resolved|apple_search_ads|download|Denmark|(null)|1|1\nprevious|attribution resolved|organic|unknown|Albania|(null)|1|1\nprevious|attribution resolved|apple_search_ads|download|Italy|(null)|1|1\nprevious|workout completed|(null)|(null)|United States|9.0|1|1\nprevious|workout completed|(null)|(null)|United States|7.0|1|1\nprevious|workout completed|(null)|(null)|Belgium|8.0|1|1\nprevious|workout completed|(null)|(null)|Belgium|6.0|1|1\nprevious|workout completed|(null)|(null)|Denmark|6.0|1|1\nprevious|workout completed|(null)|(null)|United States|8.0|1|1\nprevious|workout completed|(null)|(null)|Denmark|9.0|1|1\nprevious|workout completed|(null)|(null)|Belgium|9.0|1|1",
+      "__formatted_results_override": "period|event|channel|conversion_type|country|remaining_free|events|persons\ncurrent|attribution resolved|apple_search_ads|download|United Kingdom|(null)|7|7\ncurrent|attribution resolved|apple_search_ads|download|The Netherlands|(null)|3|3\ncurrent|attribution resolved|apple_search_ads|download|Iceland|(null)|2|2\ncurrent|attribution resolved|apple_search_ads|download|Sweden|(null)|2|2\ncurrent|attribution resolved|apple_search_ads|download|Italy|(null)|1|1\ncurrent|attribution resolved|apple_search_ads|download|Hungary|(null)|1|1\ncurrent|attribution resolved|apple_search_ads|download|Norway|(null)|1|1\ncurrent|attribution resolved|apple_search_ads|download|Faroe Islands|(null)|1|1\ncurrent|workout completed|(null)|(null)|The Netherlands|7.0|1|1\ncurrent|workout completed|(null)|(null)|The Netherlands|9.0|1|1\ncurrent|workout completed|(null)|(null)|Belgium|3.0|1|1\ncurrent|workout completed|(null)|(null)|Poland|9.0|1|1\ncurrent|workout completed|(null)|(null)|Norway|9.0|1|1\ncurrent|workout completed|(null)|(null)|The Netherlands|5.0|1|1\ncurrent|workout completed|(null)|(null)|The Netherlands|6.0|1|1\ncurrent|workout completed|(null)|(null)|The Netherlands|8.0|1|1\nprevious|attribution resolved|apple_search_ads|download|United Kingdom|(null)|4|4\nprevious|attribution resolved|apple_search_ads|download|Hungary|(null)|4|4\nprevious|attribution resolved|apple_search_ads|download|The Netherlands|(null)|2|2\nprevious|attribution resolved|apple_search_ads|download|France|(null)|2|2\nprevious|attribution resolved|organic|unknown|Ukraine|(null)|1|1\nprevious|attribution resolved|organic|unknown|South Africa|(null)|1|1\nprevious|attribution resolved|apple_search_ads|download|Spain|(null)|1|1\nprevious|attribution resolved|apple_search_ads|download|Belgium|(null)|1|1\nprevious|attribution resolved|organic|unknown|Estonia|(null)|1|1\nprevious|attribution resolved|apple_search_ads|download|Iceland|(null)|1|1\nprevious|attribution resolved|apple_search_ads|download|Denmark|(null)|1|1\nprevious|attribution resolved|organic|unknown|Albania|(null)|1|1\nprevious|attribution resolved|apple_search_ads|download|Italy|(null)|1|1\nprevious|workout completed|(null)|(null)|United States|9.0|1|1\nprevious|workout completed|(null)|(null)|United States|7.0|1|1\nprevious|workout completed|(null)|(null)|Belgium|8.0|1|1\nprevious|workout completed|(null)|(null)|Belgium|6.0|1|1\nprevious|workout completed|(null)|(null)|Denmark|6.0|1|1\nprevious|workout completed|(null)|(null)|United States|8.0|1|1\nprevious|workout completed|(null)|(null)|Denmark|9.0|1|1\nprevious|workout completed|(null)|(null)|Belgium|9.0|1|1"
+    },
+    "first_completions": {
+      "query": {
+        "kind": "HogQLQuery",
+        "query": "WITH current_people AS (\n    SELECT DISTINCT person_id\n    FROM events\n    WHERE event = 'workout completed'\n      AND timestamp >= toDateTime('2026-09-19 00:00:00', 'Europe/Copenhagen')\n      AND timestamp < toDateTime('2026-09-26 00:00:00', 'Europe/Copenhagen')\n      AND properties.set_count_bucket IN ('1','2-3','4-6','7-10','11+')\n      AND coalesce(toString(person.properties.internal_team), 'false') != 'true'\n      AND coalesce(toString(properties.$is_testflight), 'false') != 'true'\n      AND coalesce(toString(properties.$is_emulator), 'false') != 'true'\n), history AS (\n    SELECT person_id, min(timestamp) AS first_completion,\n      countIf(timestamp >= toDateTime('2026-09-19 00:00:00','Europe/Copenhagen')) AS current_workouts\n    FROM events\n    WHERE event = 'workout completed'\n      AND person_id IN (SELECT person_id FROM current_people)\n      AND timestamp < toDateTime('2026-09-26 00:00:00','Europe/Copenhagen')\n      AND properties.set_count_bucket IN ('1','2-3','4-6','7-10','11+')\n      AND coalesce(toString(person.properties.internal_team), 'false') != 'true'\n      AND coalesce(toString(properties.$is_testflight), 'false') != 'true'\n      AND coalesce(toString(properties.$is_emulator), 'false') != 'true'\n    GROUP BY person_id\n)\nSELECT first_completion AS first_workout_date,\n current_workouts, count() AS persons\nFROM history\nGROUP BY first_workout_date,current_workouts\nORDER BY current_workouts DESC,first_workout_date"
+      },
+      "results": "first_workout_date|current_workouts|persons\n2026-09-19T20:24:23.794000+02:00|5|1\n2026-05-19T08:37:45.704000+02:00|3|1\n2026-05-19T18:59:40.094000+02:00|2|1\n2026-08-10T21:46:31.558000+02:00|1|1\n2026-08-19T16:58:27.157000+02:00|1|1\n2026-09-14T09:39:30.361000+02:00|1|1\n2026-09-20T16:25:53.041000+02:00|1|1\n2026-09-22T22:38:30.299000+02:00|1|1",
+      "__formatted_results_override": "first_workout_date|current_workouts|persons\n2026-09-19T20:24:23.794000+02:00|5|1\n2026-05-19T08:37:45.704000+02:00|3|1\n2026-05-19T18:59:40.094000+02:00|2|1\n2026-08-10T21:46:31.558000+02:00|1|1\n2026-08-19T16:58:27.157000+02:00|1|1\n2026-09-14T09:39:30.361000+02:00|1|1\n2026-09-20T16:25:53.041000+02:00|1|1\n2026-09-22T22:38:30.299000+02:00|1|1"
+    },
+    "unfiltered_event_inventory": "event|events|persons\n$screen|632|53\nonboarding step viewed|161|42\nApplication Opened|132|57\nempty state shown|89|43\nworkout started|69|31\nwalkthrough banner shown|64|43\nwalkthrough page viewed|54|10\nApplication Installed|44|44\nfirst set logged|40|17\nattribution resolved|39|39\nprogram selected|37|35\nonboarding completed|36|36\nworkout completed|35|12\nonboarding extra tapped|27|15\nworkout resumed|23|11\nexercise created|22|3\nworkout discarded|21|14\nsides exercise opened|14|1\nApplication Updated|13|10\nsides group opened|13|1\nwalkthrough completed|13|9\nwhats new shown|12|10\ntemplate started|10|3\napple health prompt shown|9|9\napple health prompt answered|7|7\nwalkthrough banner dismissed|5|5\nworkout abandoned|4|4\nshare card opened|3|1\nshare card shared|3|1\ntemplate created|3|2\npaywall dismissed|2|1\npaywall shown|2|1\nwalkthrough banner tapped|2|2\nreview prompt requested|1|1\nshare card dismissed|1|1"
+  },
+  "limitations": [
+    "Recent onboarding cohorts do not yet have seven complete days of follow-up; funnel observations frozen at each week end.",
+    "Internal/test exclusions retain unknown flags and may not exclude unmarked friends; person properties are event-time.",
+    "Collection is optional; absent errors do not establish crash-free operation.",
+    "Workout-completion events lack workout IDs for independent exact deduplication.",
+    "Purchase callbacks and subscribed entitlements do not establish verified revenue."
+  ]
+}

@@ -10,7 +10,7 @@ import SwiftUI
 /// Displays the workout elapsed time and toggles pause/resume when tapped.
 ///
 /// Format: "M:SS" under 1 hour, "H:MM:SS" over 1 hour.
-/// Uses monospaced font design to prevent layout shifts as digits change.
+/// Uses monospaced digits to prevent layout shifts as digits change.
 struct ElapsedTimerView: View {
 
     /// The current workout elapsed time. Nil hides the timer until the workout is loaded.
@@ -27,11 +27,14 @@ struct ElapsedTimerView: View {
             Button(action: onTap) {
                 HStack(spacing: 6) {
                     Text(formatElapsed(elapsedTime))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .fixedSize()
 
                     Image(systemName: isPaused ? "play.fill" : "pause.fill")
                         .font(.system(size: 11, weight: .semibold))
                 }
-                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.textPrimary)
                 .padding(.horizontal, 10)
                 .frame(minWidth: 76, minHeight: 32)
@@ -40,6 +43,9 @@ struct ElapsedTimerView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            // Over an hour the text grows to H:MM:SS; keep it on one line and
+            // let the header's spacers give way first.
+            .layoutPriority(1)
             .accessibilityLabel(isPaused ? "Workout timer paused" : "Workout timer running")
             .accessibilityHint(isPaused ? "Tap to resume the workout timer" : "Tap to pause the workout timer")
         }
