@@ -162,6 +162,8 @@
 		AL0002 /* ImportServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = BL0002 /* ImportServiceProtocol.swift */; };
 		AL0003 /* ExportServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = BL0003 /* ExportServiceProtocol.swift */; };
 		AL0004 /* ExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BL0004 /* ExportService.swift */; };
+		TDS001 /* TrainingDataSharingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = TDS101 /* TrainingDataSharingService.swift */; };
+		TDS002 /* TrainingDataSharingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TDS102 /* TrainingDataSharingTests.swift */; };
 		MUA001 /* MuscleAttributionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = MUA101 /* MuscleAttributionTests.swift */; };
 		AL0005 /* ExportViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BL0005 /* ExportViewModel.swift */; };
 		AL0006 /* ExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BL0006 /* ExportView.swift */; };
@@ -523,6 +525,8 @@
 		BL0002 /* ImportServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportServiceProtocol.swift; sourceTree = "<group>"; };
 		BL0003 /* ExportServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportServiceProtocol.swift; sourceTree = "<group>"; };
 		BL0004 /* ExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportService.swift; sourceTree = "<group>"; };
+		TDS101 /* TrainingDataSharingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingDataSharingService.swift; sourceTree = "<group>"; };
+		TDS102 /* TrainingDataSharingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingDataSharingTests.swift; sourceTree = "<group>"; };
 		MUA101 /* MuscleAttributionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuscleAttributionTests.swift; sourceTree = "<group>"; };
 		BL0005 /* ExportViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportViewModel.swift; sourceTree = "<group>"; };
 		BL0006 /* ExportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportView.swift; sourceTree = "<group>"; };
@@ -1206,6 +1210,7 @@
 				BW0001 /* LoadPrescriptionService.swift */,
 				BIM001 /* ImportService.swift */,
 				BL0004 /* ExportService.swift */,
+				TDS101 /* TrainingDataSharingService.swift */,
 				B70003 /* ServiceContainer.swift */,
 				BM0004 /* SeedService.swift */,
 				BM0005 /* GhostSetRepsBackfillMigration.swift */,
@@ -1550,6 +1555,7 @@
 				HK1003 /* HealthKitEnergyEstimateTests.swift */,
 				TT2002 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift */,
 				TT9202 /* WorkoutShareCardTests.swift */,
+				TDS102 /* TrainingDataSharingTests.swift */,
 				MUA101 /* MuscleAttributionTests.swift */,
 				WEX1006 /* WorkoutExportTests.swift */,
 				TT2004 /* ChartDataServiceTests.swift */,
@@ -1979,6 +1985,7 @@
 				AL0002 /* ImportServiceProtocol.swift in Sources */,
 				AL0003 /* ExportServiceProtocol.swift in Sources */,
 				AL0004 /* ExportService.swift in Sources */,
+				TDS001 /* TrainingDataSharingService.swift in Sources */,
 				AL0005 /* ExportViewModel.swift in Sources */,
 				AL0006 /* ExportView.swift in Sources */,
 				AM0001 /* SeedExerciseDTO.swift in Sources */,
@@ -2061,6 +2068,7 @@
 				HK0003 /* HealthKitEnergyEstimateTests.swift in Sources */,
 				TT0001 /* ActiveWorkoutViewModelSuggestionRefreshTests.swift in Sources */,
 				TT9201 /* WorkoutShareCardTests.swift in Sources */,
+				TDS002 /* TrainingDataSharingTests.swift in Sources */,
 				MUA001 /* MuscleAttributionTests.swift in Sources */,
 				WEX1005 /* WorkoutExportTests.swift in Sources */,
 				LR0001 /* LiveModelRaceReproTests.swift in Sources */,

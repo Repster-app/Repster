@@ -42,9 +42,9 @@
 
   <section class="page-hero">
     <div class="page-inner">
-      <p class="eyebrow">Last updated: September 6, 2026</p>
+      <p class="eyebrow">Last updated: October 29, 2026</p>
       <h1>Privacy Policy</h1>
-      <p>Repster is designed so your workout data stays on your device unless you choose to export or share it.</p>
+      <p>Your workout history is stored on your device. Unless you turn it off, Repster shares an anonymous copy of the workouts you finish, without notes, titles or bodyweight, to improve the app.</p>
     </div>
   </section>
 
@@ -52,7 +52,7 @@
     <article class="policy">
       <section class="policy-section">
         <h2>Overview</h2>
-        <p>Repster is a workout logging app for iOS. Workout history, exercises, templates, bodyweight entries, and settings are stored locally on your device unless you choose to export or share them. We do not operate workout-data servers or user accounts.</p>
+        <p>Repster is a workout logging app for iOS. Workout history, exercises, templates, bodyweight entries, and settings are stored locally on your device. Repster has no user accounts. Unless you turn it off, an anonymous copy of the workouts you finish is shared with Repster's analytics provider, as described under Training Data Sharing.</p>
         <p>Repster does not sell your personal information.</p>
       </section>
 
@@ -65,7 +65,7 @@
           <li>Bodyweight entries, fatigue learning data, and recommendation settings.</li>
           <li>App settings such as units, formulas, rest timers, import settings, and subscription access state.</li>
         </ul>
-        <p>This data does not leave your device unless you explicitly export, share, back up, or otherwise move it outside the app. Repster does not send exercise names, set weights, reps, notes, CSV contents, bodyweight values, or raw workout logs to product analytics.</p>
+        <p>This data stays on your device unless you export, share or back it up, or it is covered by Training Data Sharing below. Notes, workout titles, CSV file contents and bodyweight values never leave your device through analytics or training data sharing.</p>
       </section>
 
       <section class="policy-section">
@@ -80,7 +80,16 @@
       <section class="policy-section">
         <h2>Anonymous Product Analytics</h2>
         <p>Repster uses PostHog EU cloud for anonymous product analytics. Analytics help us understand aggregate app usage: which screens are opened, how onboarding progresses, when workouts are started, completed, discarded or abandoned, coarse ranges for things like workout duration and set counts, how many times features inside a workout were used (for example opening the history or charts view for an exercise, or skipping a rest timer), paywall and purchase actions, import completion, and backup export. Repster does not create accounts, and analytics are grouped under a random identifier generated on your device at install time.</p>
-        <p>Analytics are enabled by default and can be turned off in the app at Settings &gt; Data &amp; Backups &gt; Share Anonymous Analytics. Turning this off disables event collection, session recordings, surveys, crash and error diagnostics, and advertising attribution together.</p>
+        <p>Analytics are enabled by default and can be turned off in the app at Settings &gt; Data &amp; Backups &gt; Share Anonymous Analytics. Turning this off disables event collection, session recordings, surveys, crash and error diagnostics, advertising attribution and training data sharing together.</p>
+      </section>
+
+      <section class="policy-section">
+        <h2>Training Data Sharing</h2>
+        <p>From Repster 1.6, the app shares the training content of the workouts you finish, so we can improve its suggestions and its built-in exercise library and understand how people train. For each finished workout this is its date, length and effort rating, whether it counts toward progress and records, and, for each exercise, its name, equipment and muscle group and whether it is one of Repster's built-in exercises. For each set it is the set type, weight, reps (per side for one-sided exercises), time or distance, reps in reserve or RPE, rest time, whether the set was ticked off, and the target Repster suggested.</p>
+        <p>When you create an exercise, by hand or because a CSV import needed one, its name and settings are shared too. If you edit or delete a workout that was shared, the change is shared as well, so the copy stays accurate.</p>
+        <p><strong>Never shared:</strong> workout, set and template notes; workout titles; your bodyweight, including any weight figure that has bodyweight added in; the contents of CSV files, and the workouts an import brings in; and anything from Apple Health.</p>
+        <p>Training data goes to PostHog EU cloud under the same random identifier as the rest of analytics. It is not linked to your name, email address or any other real-world identity.</p>
+        <p>Training data sharing is on by default and can be turned off at Settings &gt; Data &amp; Backups &gt; Share Training Data. Turning off Share Anonymous Analytics turns it off too. Workouts you logged before Repster 1.6 are not shared unless you switch Share Training Data on yourself. Switching it on shares those earlier workouts and the exercises you created. Turning it off stops sharing immediately.</p>
       </section>
 
       <section class="policy-section">
@@ -125,12 +134,12 @@
       <section class="policy-section">
         <h2>Data Deletion</h2>
         <p>You can delete local app data using reset options in Repster where available. You can also remove local app data by uninstalling the app from your device.</p>
-        <p>Because Repster does not run workout-data servers, there is no separate Repster server copy of your workout history to delete. Subscription records held by Apple or RevenueCat are handled under their own policies.</p>
+        <p>Repster does not keep a server copy of your full workout history. Training data you shared, as described under Training Data Sharing, is held in PostHog under your anonymous identifier, which is not connected to your identity. Subscription records held by Apple or RevenueCat are handled under their own policies.</p>
       </section>
 
       <section class="policy-section">
         <h2>What Repster Does Not Do</h2>
-        <p>Repster does not sell data, does not use IDFA, does not show ads inside the app, and does not enable PostHog interaction autocapture or heatmaps. Analytics are not used for ad targeting, and the campaign information described under Advertising and Attribution is used only to measure Repster's own Apple Search Ads campaigns. Repster has no user accounts, so no analytics data is linked to a name, email address, or any other real-world identity. Repster does not send workout notes, bodyweight values, CSV contents or raw workout logs to analytics, and product analytics events carry only bucketed counts — a set count arrives as a range such as “4-6”, never as an exact figure, and a note is recorded only as whether one was written. Session recordings do show the training content displayed on screen, including exercise, workout and template names; notes, bodyweight and import previews stay hidden there too. Repster does not read health data from Apple Health, and no health data is sent off your device.</p>
+        <p>Repster does not sell data, does not use IDFA, does not show ads inside the app, and does not enable PostHog interaction autocapture or heatmaps. Analytics are not used for ad targeting, and the campaign information described under Advertising and Attribution is used only to measure Repster's own Apple Search Ads campaigns. Repster has no user accounts, so no analytics data is linked to a name, email address, or any other real-world identity. Repster does not send workout notes, workout titles, bodyweight values or CSV contents to analytics. Product analytics events carry only bucketed counts — a set count arrives as a range such as “4-6”, never as an exact figure, and a note is recorded only as whether one was written. Exact sets, reps and weights are sent only as training data, as described under Training Data Sharing, and only while it is on. Session recordings do show the training content displayed on screen, including exercise, workout and template names; notes, bodyweight and import previews stay hidden there too. Repster does not read health data from Apple Health, and no health data is sent off your device.</p>
       </section>
 
       <section class="policy-section">

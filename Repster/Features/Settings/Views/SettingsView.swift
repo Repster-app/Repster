@@ -1006,6 +1006,7 @@ private struct DataBackupsView: View {
     let settingsService: any SettingsServiceProtocol
     let onDataReset: @MainActor @Sendable () async -> Void
     @State private var shareAnonymousAnalytics = true
+    @State private var shareTrainingData = true
     @Environment(ServiceContainer.self) private var services
 
     var body: some View {
@@ -1083,6 +1084,7 @@ private struct DataBackupsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             shareAnonymousAnalytics = services.analyticsService.isCollectionEnabled
+            shareTrainingData = services.analyticsService.isTrainingDataSharingEnabled
         }
     }
 
@@ -1106,8 +1108,31 @@ private struct DataBackupsView: View {
                 Label("Share Anonymous Analytics", systemImage: "chart.bar")
                     .foregroundStyle(Color.textPrimary)
             }
+
+            // Rides on analytics: with that off nothing is sent, so this shows off and locked
+            // rather than on-but-inert. Its own value is kept for when analytics comes back.
+            Toggle(isOn: Binding(
+                get: { shareAnonymousAnalytics && shareTrainingData },
+                set: { enabled in
+                    shareTrainingData = enabled
+                    if enabled {
+                        services.analyticsService.setTrainingDataSharingEnabled(true)
+                        services.analyticsService.trainingDataSharingToggled(enabled: true)
+                        // Switching it on by hand is what allows the earlier history to go.
+                        let sharing = services.trainingDataSharing
+                        Task { await sharing.shareHistory() }
+                    } else {
+                        services.analyticsService.trainingDataSharingToggled(enabled: false)
+                        services.analyticsService.setTrainingDataSharingEnabled(false)
+                    }
+                }
+            )) {
+                Label("Share Training Data", systemImage: "dumbbell")
+                    .foregroundStyle(Color.textPrimary)
+            }
+            .disabled(!shareAnonymousAnalytics)
         } footer: {
-            Text("Shares anonymous product usage only. Workout notes, exercise names, set weights, reps, CSV contents, and bodyweight values are never sent.")
+            Text("Analytics shares anonymous product usage. Training Data adds the workouts you finish (exercises, sets, weights, reps and RIR) and the names of exercises you create, to improve suggestions and the exercise library. Notes, workout titles and bodyweight are never sent. Switching Training Data on yourself also shares the workouts you logged before. Turning Analytics off stops both.")
                 .foregroundStyle(Color.textTertiary)
         }
     }

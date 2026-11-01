@@ -89,6 +89,15 @@ declaration has to come from `Repster/PrivacyInfo.xcprivacy` (already done).
 - Linked to user: `No`
 - Used for tracking: `No`
 - Reason: workout started/completed/discarded and workout duration bucket are exercise-related, even though they are coarse.
+- **As of 1.6 this is no longer coarse.** Share Training Data (on by default, under
+  Share Anonymous Analytics) sends each finished workout set by set: exercise names,
+  weights, reps, RIR/RPE, rest, targets, completion. Same answers — `Analytics`, not
+  linked, not tracking — but the review note below must say so. Design:
+  `TRAINING_DATA_SHARING_DESIGN.md`.
+- **Open question for 1.6:** custom exercise names are typed by the user. Decide
+  whether that also needs `User Content` -> `Other User Content`. Leaning no (they are
+  exercise labels inside fitness data, capped at 80 characters), but it is a judgement
+  call, not a settled answer.
 
 `Product Interaction`
 
@@ -210,7 +219,7 @@ Use this in the App Review Notes field:
 >
 > The app uses anonymous PostHog EU product analytics for aggregate usage statistics only. It does not use IDFA, advertising, tracking, autocapture, or heatmaps. Users can turn all analytics off in Settings -> Data & Backups -> Share Anonymous Analytics, which disables events, session recordings, surveys, crash and error diagnostics, and Apple Search Ads attribution together.
 >
-> The app captures anonymous session recordings to diagnose usability problems, and users can turn them off with everything else under Settings -> Data & Backups -> Share Anonymous Analytics. Recordings show the app's own interface text and the training content on screen — exercise names, workout and template names, and the sets, reps and weights of a workout — which is what makes them useful for finding where people get stuck. The app has no photo picker and no user-supplied imagery, so every image in a recording is one the app ships. Three things are masked on device before any recording is uploaded and are never received: workout, set and template notes; the user's bodyweight wherever it is displayed, including the bodyweight log; and the preview of a training file being imported. Text typed inside a pop-up dialogue cannot be masked that way, so recording stops entirely while such a dialogue is open. Recordings are not linked to any account, name or email address, because the app has no accounts. Analytics events themselves carry only bucketed counts and never exact figures, notes, CSV contents, bodyweight values, or raw workout logs.
+> The app captures anonymous session recordings to diagnose usability problems, and users can turn them off with everything else under Settings -> Data & Backups -> Share Anonymous Analytics. Recordings show the app's own interface text and the training content on screen — exercise names, workout and template names, and the sets, reps and weights of a workout — which is what makes them useful for finding where people get stuck. The app has no photo picker and no user-supplied imagery, so every image in a recording is one the app ships. Three things are masked on device before any recording is uploaded and are never received: workout, set and template notes; the user's bodyweight wherever it is displayed, including the bodyweight log; and the preview of a training file being imported. Text typed inside a pop-up dialogue cannot be masked that way, so recording stops entirely while such a dialogue is open. Recordings are not linked to any account, name or email address, because the app has no accounts. Product analytics events carry only bucketed counts and never exact figures, notes, CSV contents or bodyweight values. Separately, a "Share Training Data" setting (Settings -> Data & Backups, on by default, and switched off together with analytics) sends the training content of each finished workout to the same analytics provider under the same anonymous identifier: exercise names, sets, weights, reps, reps in reserve, rest time and targets. It never includes notes, workout titles, bodyweight, CSV contents or Health data, and workouts logged before 1.6 are only sent if the user switches the setting on themselves.
 >
 > The app sends crash and error diagnostics (exception type, stack trace, device model, OS and app version) so crashes can be found and fixed. These contain no workout data and are covered by the same Share Anonymous Analytics toggle.
 >

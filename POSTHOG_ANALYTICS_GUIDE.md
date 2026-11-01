@@ -234,6 +234,7 @@ Every event carries `rule_id`, one of: `strengthTrend`, `consistency`,
 | `workout exported` | `entry_point` (`calendar` / `workout_detail`), `destination` (`UIActivity.ActivityType` raw value, or `unknown`) | One saved workout's JSON export left the app (WORKOUT_EXPORT_SCOPING.md). Fires only on a completed share sheet, never on the menu tap. `destination` says which outside systems people send workouts to. Added 2026-10-22 for 1.6, so it counts forward only. |
 | `unit system toggled` | `unit_system` | |
 | `analytics opt-out toggled` | `enabled` | Fires in both directions (deliberately sent *before* the opt-out takes effect). |
+| `training data sharing toggled` | `enabled` | Share Training Data switch (1.6). `false` marks where that install's `training *` events should stop being used. The set-level `training *` events themselves are documented in `TRAINING_DATA_SHARING_DESIGN.md`, not here. |
 | `review prompt requested` | `trigger`, `completed_workout_count` | |
 
 ### Apple Health

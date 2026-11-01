@@ -247,6 +247,8 @@ final class AnalyticsService: AnalyticsServiceProtocol {
     static let collectionEnabledDefaultsKey = "shareAnonymousAnalyticsEnabled"
     /// DEBUG-only escape hatch — see `AnalyticsServiceFactory.makeService`.
     static let debugCaptureEnabledDefaultsKey = "analyticsDebugCaptureEnabled"
+    static let trainingDataSharingEnabledDefaultsKey = "shareTrainingDataEnabled"
+    static let trainingDataSharingSinceDefaultsKey = "shareTrainingDataSince"
 
     private let client: any AnalyticsClientProtocol
     private let configuration: AnalyticsConfiguration
@@ -272,6 +274,7 @@ final class AnalyticsService: AnalyticsServiceProtocol {
     func configure() {
         client.configure(configuration, startOptedOut: !isCollectionEnabled)
         applyCurrentCollectionPreference()
+        startTrainingDataSharingWindowIfNeeded()
     }
 
     func setCollectionEnabled(_ enabled: Bool) {
@@ -327,6 +330,44 @@ final class AnalyticsService: AnalyticsServiceProtocol {
             .errorContext: .string(context.rawValue),
             .errorType: .string(String(describing: type(of: error)))
         ]))
+    }
+
+    // MARK: - Training data
+
+    /// On unless the user has switched it off.
+    var isTrainingDataSharingEnabled: Bool {
+        if userDefaults.object(forKey: Self.trainingDataSharingEnabledDefaultsKey) == nil {
+            return true
+        }
+        return userDefaults.bool(forKey: Self.trainingDataSharingEnabledDefaultsKey)
+    }
+
+    var trainingDataSharingSince: Date? {
+        userDefaults.object(forKey: Self.trainingDataSharingSinceDefaultsKey) as? Date
+    }
+
+    /// Switching it on by hand is the consent that covers workouts logged before the default
+    /// started, so the window opens all the way back. The caller then shares that history.
+    func setTrainingDataSharingEnabled(_ enabled: Bool) {
+        userDefaults.set(enabled, forKey: Self.trainingDataSharingEnabledDefaultsKey)
+        if enabled {
+            userDefaults.set(Date.distantPast, forKey: Self.trainingDataSharingSinceDefaultsKey)
+        }
+    }
+
+    /// Gated on both switches. Bypasses `sanitize` on purpose — see the protocol.
+    func captureTrainingData(_ event: TrainingDataEvent, properties: [String: Any]) {
+        guard isCollectionEnabled, isTrainingDataSharingEnabled else { return }
+        client.capture(event.rawValue, properties: properties)
+    }
+
+    /// The first launch of a build with training data sharing fixes where the default-on window
+    /// starts. Everything logged before it was logged under a policy that said it stays on the
+    /// device, so none of it is shared unless the user switches sharing on themselves. Runs on
+    /// every launch and only ever writes once.
+    private func startTrainingDataSharingWindowIfNeeded() {
+        guard userDefaults.object(forKey: Self.trainingDataSharingSinceDefaultsKey) == nil else { return }
+        userDefaults.set(Date(), forKey: Self.trainingDataSharingSinceDefaultsKey)
     }
 
     /// Version is deliberately not stamped here. PostHog's static context already

@@ -12,6 +12,7 @@ actor ImportService: ImportServiceProtocol {
     private let prService: any PRServiceProtocol
     private let statsService: any StatsServiceProtocol
     private let modelContainer: ModelContainer
+    private let trainingDataSharing: any TrainingDataSharingServiceProtocol
 
     // MARK: - Constants
 
@@ -26,7 +27,8 @@ actor ImportService: ImportServiceProtocol {
         healthProfileRepo: any HealthProfileRepositoryProtocol,
         prService: any PRServiceProtocol,
         statsService: any StatsServiceProtocol,
-        modelContainer: ModelContainer
+        modelContainer: ModelContainer,
+        trainingDataSharing: any TrainingDataSharingServiceProtocol = NoopTrainingDataSharingService()
     ) {
         self.exerciseRepo = exerciseRepo
         self.workoutRepo = workoutRepo
@@ -35,6 +37,7 @@ actor ImportService: ImportServiceProtocol {
         self.prService = prService
         self.statsService = statsService
         self.modelContainer = modelContainer
+        self.trainingDataSharing = trainingDataSharing
     }
 
     // MARK: - ImportServiceProtocol
@@ -98,6 +101,7 @@ actor ImportService: ImportServiceProtocol {
             var setsInserted = 0
             var workoutsCreated = 0
             var exercisesCreated = 0
+            var createdExerciseIds: [UUID] = []
 
             var workoutsByKey = try await existingWorkoutLookup(for: document.workouts)
 
@@ -143,6 +147,7 @@ actor ImportService: ImportServiceProtocol {
                         context.insert(newExercise)
                         exerciseLookup[exerciseLookupKey] = newExercise
                         exercisesCreated += 1
+                        createdExerciseIds.append(newExercise.id)
                         exercise = newExercise
                     }
 
@@ -210,6 +215,13 @@ actor ImportService: ImportServiceProtocol {
                 warnings: document.warnings,
                 duration: Date().timeIntervalSince(startedAt)
             )
+            // Only the exercises the import had to create, never the imported workouts: those
+            // are training from before Repster, and history is shared only when the user switches
+            // sharing on themselves. The names show how other apps label the same lifts.
+            let sharing = trainingDataSharing
+            let sharedExerciseIds = createdExerciseIds
+            Task { await sharing.exercisesCreated(sharedExerciseIds, source: .csvImport) }
+
             continuation.yield(.completed(result))
             continuation.finish()
         } catch let error as ImportError {

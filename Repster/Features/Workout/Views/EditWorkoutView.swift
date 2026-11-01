@@ -32,7 +32,8 @@ struct EditWorkoutView: View {
             setService: services.setService,
             exerciseService: services.exerciseService,
             statsService: services.statsService,
-            settingsService: services.settingsService
+            settingsService: services.settingsService,
+            trainingDataSharing: services.trainingDataSharing
         ))
         self.services = services
     }
@@ -106,6 +107,7 @@ struct EditWorkoutView: View {
                 Task {
                     await viewModel.saveDirtySets()
                     await viewModel.saveNotes()
+                    viewModel.shareEditsIfChanged()
                     dismiss()
                 }
             } label: {

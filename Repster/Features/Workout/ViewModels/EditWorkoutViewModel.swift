@@ -17,6 +17,7 @@ final class EditWorkoutViewModel {
     private let exerciseService: any ExerciseServiceProtocol
     private let statsService: any StatsServiceProtocol
     private let settingsService: any SettingsServiceProtocol
+    private let trainingDataSharing: any TrainingDataSharingServiceProtocol
 
     // MARK: - State
 
@@ -41,6 +42,12 @@ final class EditWorkoutViewModel {
     /// IDs of sets whose text fields have been edited but not yet persisted.
     private var dirtySetIds: Set<UUID> = []
 
+    /// The workout's shared content as it was when the screen opened, so Done re-sends it only
+    /// when something that is shared actually changed. Captured once: edits save as they happen,
+    /// so a second load mid-session would take the edited state as the baseline.
+    private var sharingBaseline: Data?
+    private var hasCapturedSharingBaseline = false
+
     // MARK: - Init
 
     init(
@@ -49,7 +56,8 @@ final class EditWorkoutViewModel {
         setService: any SetServiceProtocol,
         exerciseService: any ExerciseServiceProtocol,
         statsService: any StatsServiceProtocol,
-        settingsService: any SettingsServiceProtocol
+        settingsService: any SettingsServiceProtocol,
+        trainingDataSharing: any TrainingDataSharingServiceProtocol = NoopTrainingDataSharingService()
     ) {
         self.workoutId = workoutId
         self.workoutService = workoutService
@@ -57,6 +65,7 @@ final class EditWorkoutViewModel {
         self.exerciseService = exerciseService
         self.statsService = statsService
         self.settingsService = settingsService
+        self.trainingDataSharing = trainingDataSharing
     }
 
     // MARK: - Load
@@ -64,6 +73,10 @@ final class EditWorkoutViewModel {
     /// Load a completed workout with all its exercises and sets.
     func loadWorkout() async {
         isLoading = true
+        if !hasCapturedSharingBaseline {
+            sharingBaseline = await trainingDataSharing.encodedWorkout(workoutId)
+            hasCapturedSharingBaseline = true
+        }
         do {
             if let profile = try? await settingsService.fetchSettingsSnapshot() {
                 unitPreference = profile.unitPreference
@@ -117,6 +130,16 @@ final class EditWorkoutViewModel {
             #endif
             isLoading = false
         }
+    }
+
+    // MARK: - Training data
+
+    /// Called from Done, after the last saves. Fire-and-forget so it never holds up the dismiss.
+    func shareEditsIfChanged() {
+        let sharing = trainingDataSharing
+        let workoutId = workoutId
+        let baseline = sharingBaseline
+        Task { await sharing.shareWorkout(workoutId, reason: .edited, unlessUnchangedFrom: baseline) }
     }
 
     // MARK: - Set Actions

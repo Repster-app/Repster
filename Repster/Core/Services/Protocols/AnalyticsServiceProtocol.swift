@@ -35,6 +35,18 @@ protocol AnalyticsServiceProtocol {
     /// Declared here for the same dynamic-dispatch reason as the person-property
     /// overload above.
     func captureError(_ error: Error, context: AnalyticsErrorContext)
+
+    /// Share Training Data — the set-level channel in `TrainingDataSharingService`. A second
+    /// switch under Share Anonymous Analytics, never a replacement for it: turning analytics
+    /// off stops this too.
+    ///
+    /// All four are declared here for the same dynamic-dispatch reason as the overloads above.
+    var isTrainingDataSharingEnabled: Bool { get }
+    var trainingDataSharingSince: Date? { get }
+    func setTrainingDataSharingEnabled(_ enabled: Bool)
+    /// Raw properties on purpose: these events carry the training log, which the bucketed
+    /// `AnalyticsPropertyValue` path exists to keep out of every other event.
+    func captureTrainingData(_ event: TrainingDataEvent, properties: [String: Any])
 }
 
 extension AnalyticsServiceProtocol {
@@ -71,6 +83,12 @@ extension AnalyticsServiceProtocol {
     /// new conformer that should count interactions must override this, or it will
     /// silently count none.
     func recordWorkoutInteraction(_ interaction: WorkoutInteraction) {}
+
+    /// Off for conformers that cannot send anything. `AnalyticsService` overrides all four.
+    var isTrainingDataSharingEnabled: Bool { false }
+    var trainingDataSharingSince: Date? { nil }
+    func setTrainingDataSharingEnabled(_ enabled: Bool) {}
+    func captureTrainingData(_ event: TrainingDataEvent, properties: [String: Any]) {}
 }
 
 /// Where a handled failure came from. A closed list for the same reason
@@ -557,6 +575,14 @@ extension AnalyticsServiceProtocol {
     /// the event is dropped by the opt-out gate.
     func analyticsOptOutToggled(enabled: Bool) {
         track(.analyticsOptOutToggled, properties: [
+            .enabled: .bool(enabled)
+        ])
+    }
+
+    /// A normal analytics event, so it still arrives after training data is switched off — and
+    /// marks the point after which that install's training data should be left out.
+    func trainingDataSharingToggled(enabled: Bool) {
+        track(.trainingDataSharingToggled, properties: [
             .enabled: .bool(enabled)
         ])
     }
@@ -1109,6 +1135,7 @@ enum AnalyticsEvent: String, CaseIterable {
     case freeLimitSheetClosed = "free limit sheet closed"
     case unitSystemToggled = "unit system toggled"
     case analyticsOptOutToggled = "analytics opt-out toggled"
+    case trainingDataSharingToggled = "training data sharing toggled"
     case insightExpanded = "insight expanded"
     case insightRated = "insight rated"
     case insightRatingReason = "insight rating reason"

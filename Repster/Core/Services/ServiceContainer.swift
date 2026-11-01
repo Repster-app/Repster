@@ -32,6 +32,7 @@ final class ServiceContainer {
     let fatigueLearningService: FatigueLearningService
     let insightsService: any InsightsServiceProtocol
     let healthKitService: any HealthKitServiceProtocol
+    let trainingDataSharing: any TrainingDataSharingServiceProtocol
     let healthProfileRepo: any HealthProfileRepositoryProtocol
     var unitPreference: UnitPreference = .metric
 
@@ -45,6 +46,13 @@ final class ServiceContainer {
 
         let subscriptionService = SubscriptionService(errorReporter: errorReporter)
         let accessControlService = AccessControlService(subscriptionService: subscriptionService)
+
+        // Share Training Data — reads the store through its own context, so it needs nothing
+        // but the container. Workout, exercise and import services report ids to it.
+        let trainingDataSharing = TrainingDataSharingService(
+            modelContainer: repositoryContainer.modelContainer,
+            sink: AnalyticsTrainingDataSink(analytics: analyticsService)
+        )
 
         // 1. StatsService — depends on repos only
         let statsService = StatsService(
@@ -110,7 +118,8 @@ final class ServiceContainer {
             statsService: statsService,
             fatigueLearningService: fatigueLearningService,
             bodyweightService: bodyweightService,
-            healthKitService: healthKitService
+            healthKitService: healthKitService,
+            trainingDataSharing: trainingDataSharing
         )
 
         // 8. SettingsService — depends on HealthProfileRepository + PRService + StatsService
@@ -130,7 +139,8 @@ final class ServiceContainer {
             templateRepository: repositoryContainer.templateRepository,
             prService: prService,
             statsService: statsService,
-            fatigueLearningService: fatigueLearningService
+            fatigueLearningService: fatigueLearningService,
+            trainingDataSharing: trainingDataSharing
         )
 
         // 10. ImportService — depends on repos + PRService + StatsService + ModelContainer
@@ -141,7 +151,8 @@ final class ServiceContainer {
             healthProfileRepo: repositoryContainer.healthProfileRepository,
             prService: prService,
             statsService: statsService,
-            modelContainer: repositoryContainer.modelContainer
+            modelContainer: repositoryContainer.modelContainer,
+            trainingDataSharing: trainingDataSharing
         )
 
         // 11. WorkoutHistoryBackupService — archive export + restore
@@ -197,6 +208,7 @@ final class ServiceContainer {
         self.fatigueLearningService = fatigueLearningService
         self.insightsService = insightsService
         self.healthKitService = healthKitService
+        self.trainingDataSharing = trainingDataSharing
         self.healthProfileRepo = repositoryContainer.healthProfileRepository
     }
 

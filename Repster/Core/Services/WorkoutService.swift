@@ -16,6 +16,7 @@ actor WorkoutService: WorkoutServiceProtocol {
     private let fatigueLearningService: FatigueLearningService
     private let bodyweightService: BodyweightServiceProtocol
     private let healthKitService: HealthKitServiceProtocol
+    private let trainingDataSharing: any TrainingDataSharingServiceProtocol
 
     init(
         workoutRepository: WorkoutRepositoryProtocol,
@@ -24,7 +25,8 @@ actor WorkoutService: WorkoutServiceProtocol {
         statsService: StatsServiceProtocol,
         fatigueLearningService: FatigueLearningService,
         bodyweightService: BodyweightServiceProtocol,
-        healthKitService: HealthKitServiceProtocol
+        healthKitService: HealthKitServiceProtocol,
+        trainingDataSharing: any TrainingDataSharingServiceProtocol = NoopTrainingDataSharingService()
     ) {
         self.workoutRepo = workoutRepository
         self.setRepo = setRepository
@@ -33,6 +35,7 @@ actor WorkoutService: WorkoutServiceProtocol {
         self.fatigueLearningService = fatigueLearningService
         self.bodyweightService = bodyweightService
         self.healthKitService = healthKitService
+        self.trainingDataSharing = trainingDataSharing
     }
 
     // MARK: - Workout Lifecycle (FR-001, FR-003, FR-004)
@@ -96,6 +99,16 @@ actor WorkoutService: WorkoutServiceProtocol {
         if let start = workout.startTime, let end = workout.endTime {
             scheduleHealthKitMirror(workoutId: workoutId, start: start, end: end)
         }
+
+        scheduleTrainingDataShare(workoutId, reason: .finished)
+    }
+
+    /// Fire-and-forget for the same reasons as the Health mirror: sharing must never cost the
+    /// user a finished workout or slow the dismiss. Only the id crosses — the sharing service
+    /// re-reads the workout through its own context, and checks both settings itself.
+    private func scheduleTrainingDataShare(_ workoutId: UUID, reason: TrainingWorkoutShareReason) {
+        let sharing = trainingDataSharing
+        Task { await sharing.shareWorkout(workoutId, reason: reason) }
     }
 
     // MARK: - Apple Health Mirroring
@@ -211,6 +224,11 @@ actor WorkoutService: WorkoutServiceProtocol {
         workout.updatedAt = Date()
         try await workoutRepo.save(workout)
 
+        // The exclusion flags travel with the shared workout, so a change re-sends it.
+        if workout.status == .completed {
+            scheduleTrainingDataShare(workoutId, reason: .edited)
+        }
+
         let affectedExerciseIds: Set<UUID>
         if previousExcludeWorkout != excludeWorkout {
             affectedExerciseIds = workoutExerciseIds
@@ -252,6 +270,11 @@ actor WorkoutService: WorkoutServiceProtocol {
         // 2. Get affected exerciseIds BEFORE deleting sets
         let affectedExerciseIds = try await setRepo.fetchExerciseIds(for: workoutId)
 
+        // Read before the model is deleted. Discarding an in-progress workout shared nothing,
+        // so it has nothing to retract.
+        let wasCompleted = workout.status == .completed
+        let workoutDate = workout.date
+
         // 2b. Remove the mirrored Health sample, if we wrote one. Read the UUID out before
         // the model is deleted. Fire-and-forget — a Health failure must not block deletion.
         if let healthKitUUID = workout.healthKitWorkoutUUID {
@@ -266,6 +289,11 @@ actor WorkoutService: WorkoutServiceProtocol {
 
         // 5. Delete the workout itself
         try await workoutRepo.delete(workout)
+
+        if wasCompleted {
+            let sharing = trainingDataSharing
+            Task { await sharing.workoutDeleted(workoutId, workoutDate: workoutDate) }
+        }
 
         // 6. Rebuild PRs + stats for each affected exercise
         for exerciseId in affectedExerciseIds {

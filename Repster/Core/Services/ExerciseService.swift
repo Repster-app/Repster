@@ -144,6 +144,7 @@ actor ExerciseService: ExerciseServiceProtocol {
     private let prService: PRServiceProtocol
     private let statsService: StatsServiceProtocol
     private let fatigueLearningService: FatigueLearningService
+    private let trainingDataSharing: any TrainingDataSharingServiceProtocol
 
     init(
         exerciseRepository: ExerciseRepositoryProtocol,
@@ -153,8 +154,10 @@ actor ExerciseService: ExerciseServiceProtocol {
         templateRepository: TemplateRepositoryProtocol,
         prService: PRServiceProtocol,
         statsService: StatsServiceProtocol,
-        fatigueLearningService: FatigueLearningService
+        fatigueLearningService: FatigueLearningService,
+        trainingDataSharing: any TrainingDataSharingServiceProtocol = NoopTrainingDataSharingService()
     ) {
+        self.trainingDataSharing = trainingDataSharing
         self.exerciseRepo = exerciseRepository
         self.setRepo = setRepository
         self.exerciseStatsRepo = exerciseStatsRepository
@@ -169,7 +172,11 @@ actor ExerciseService: ExerciseServiceProtocol {
 
     @discardableResult
     func createExercise(fields: ExerciseEditableFields) async throws -> UUID {
-        try await exerciseRepo.create(fields: fields)
+        let exerciseId = try await exerciseRepo.create(fields: fields)
+        // What people add by hand is what the built-in library is missing.
+        let sharing = trainingDataSharing
+        Task { await sharing.exercisesCreated([exerciseId], source: .manual) }
+        return exerciseId
     }
 
     func fetchExercise(_ exerciseId: UUID) async throws -> Exercise? {
