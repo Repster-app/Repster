@@ -177,9 +177,9 @@ Two properties mean something different from history:
 | Event | Key properties | Meaning |
 |---|---|---|
 | `share card opened` | `entry_point`, `variant`, `prs_hit`, `access_tier`, `exercise_list_shown`, `weights_shown`, `days_since_workout` (history only) | The preview sheet reached the screen. **The headline number** — this over `workout completed` is the open rate the phase-2 gate reads. Fires once per presentation. Also sends `$screen` = `Share Card`. |
-| `share card shared` | `entry_point`, `variant`, `destination`, `prs_hit`, `days_since_workout` (history only) | A card that actually left the app. Fired from `UIActivityViewController`'s completion handler or a landed Photos save — **never on the tap that raises the share sheet**, so `shared ÷ opened` is a real completion rate and not taps over taps. Cancelling the iOS share sheet sends nothing. |
+| `share card shared` | `entry_point`, `variant`, `destination`, `prs_hit`, `days_since_workout` (history only) | A card that actually left the app. Fired from a landed Photos save, or (1.5 only) `UIActivityViewController`'s completion handler — **never on a tap**, so `shared ÷ opened` is a real completion rate and not taps over taps. Cancelling the iOS share sheet sent nothing. |
 | `share card dismissed` | `entry_point`, `variant` | Closed **without sharing** — the X or a swipe down, which are one event here. Silent after a successful share, so `opened` splits cleanly into shared and abandoned. |
-| `share card failed` | `entry_point`, `error_type` | Three different things, and they must be read apart. `render_failed` is a broken card (the Share button never enables). `photos_permission_denied` is a refused Photos prompt — a user decision, not a bug. `photo_save_failed` is the silent one: Photos said yes and nothing landed. Deduped per kind per presentation. |
+| `share card failed` | `entry_point`, `error_type` | Three different things, and they must be read apart. `render_failed` is a broken card (Save to Photos never enables). `photos_permission_denied` is a refused Photos prompt — a user decision, not a bug. `photo_save_failed` is the silent one: Photos said yes and nothing landed. Deduped per kind per presentation. |
 
 `variant` is the card design on screen: `record`, `muscles`, `volume` or `trace`. On
 `opened` it is the remembered style; on `shared` it is the one actually sent.
@@ -189,6 +189,10 @@ Two properties mean something different from history:
 own: `save_to_photos` for the dedicated save button, and `unknown` when the share sheet
 reports success without naming an activity. It is an open set on purpose — the question it
 answers is whether this is an iMessage feature or an Instagram feature.
+
+**1.6 removed the Share button** (0 non-team uses by 2026-10-22; the one share-sheet share was
+the team's own "Save Image"). From 1.6 the card's only exit is Save to Photos, so new builds
+send `destination = save_to_photos` and nothing else. Activity-type values come from 1.5.
 
 `prs_hit` is a **raw integer**, matching `workout completed`. That is deliberate: the funnel
 below splits both steps on the same property, which a bucketed string on one side would
@@ -295,8 +299,8 @@ The question: *do people keep training in the app?*
     phase-2 decision. Step 1 → 2 is the open rate; the gate is **≥ 8%**, read after 4 weeks
     or 200 completed workouts, whichever is later. Step 2 → 3 is the completion rate, bar
     **≥ 50%**
-11. **Where cards go** (Trends, breakdown `destination`) — `share card shared`. Informational
-    at this volume, but it decides whether a square variant is worth building
+11. **Where cards go** (Trends, breakdown `destination`) — `share card shared`. Only
+    `save_to_photos` from 1.6 on (Share button removed), so this reads 1.5 traffic only
 12. **Card abandonment** (Trends, breakdown `variant`) — `share card dismissed` against
     `share card opened`. A variant that is opened and never shared is a card problem, not a
     placement problem

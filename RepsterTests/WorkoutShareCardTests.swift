@@ -4,7 +4,6 @@
 
 import XCTest
 import SwiftUI
-import UniformTypeIdentifiers
 @testable import Repster
 
 @MainActor
@@ -140,85 +139,6 @@ final class WorkoutShareCardTests: XCTestCase {
 
         // PNG magic number, so this fails loudly if the encoder ever changes under us.
         XCTAssertEqual(Array(png.prefix(4)), [0x89, 0x50, 0x4E, 0x47])
-    }
-
-    // MARK: - Exported file
-
-    func testWritesANamedPNGFile() throws {
-        let image = try XCTUnwrap(
-            WorkoutShareCardRenderer.render(data: data(), hidesExerciseList: false, hidesWeights: false)
-        )
-
-        let url = try WorkoutShareCardRenderer.writePNG(
-            image, title: "Push Day A", dateLabel: "Sat, Aug 30"
-        )
-        addTeardownBlock { try? FileManager.default.removeItem(at: url) }
-
-        XCTAssertEqual(url.pathExtension, "png")
-        XCTAssertEqual(url.lastPathComponent, "Repster-Push-Day-A-Sat-Aug-30.png")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
-
-        let written = try Data(contentsOf: url)
-        XCTAssertEqual(Array(written.prefix(4)), [0x89, 0x50, 0x4E, 0x47])
-    }
-
-    /// The title is user content and becomes a path component, so it has to be defanged.
-    func testFileNameSanitisesTheWorkoutTitle() {
-        let hostile = WorkoutShareCardRenderer.fileName(
-            title: "../../etc/passwd\nLeg: Day?",
-            dateLabel: "Sat, Aug 30"
-        )
-        XCTAssertFalse(hostile.contains("/"))
-        XCTAssertFalse(hostile.contains(".."))
-        XCTAssertFalse(hostile.contains(":"))
-        XCTAssertFalse(hostile.contains("?"))
-        XCTAssertFalse(hostile.contains("\n"))
-        XCTAssertTrue(hostile.hasPrefix("Repster-"))
-        XCTAssertTrue(hostile.hasSuffix(".png"))
-    }
-
-    func testFileNameSurvivesAnEmptyTitle() {
-        XCTAssertEqual(
-            WorkoutShareCardRenderer.fileName(title: "   ", dateLabel: ""),
-            "Repster.png"
-        )
-    }
-
-    /// A very long title must not produce a path component the file system rejects.
-    func testFileNameIsCapped() {
-        let name = WorkoutShareCardRenderer.fileName(
-            title: String(repeating: "Bench", count: 60),
-            dateLabel: "Sat, Aug 30"
-        )
-        XCTAssertLessThanOrEqual(name.count, 84)
-        XCTAssertTrue(name.hasSuffix(".png"))
-    }
-
-    // MARK: - Share sheet destinations
-
-    /// The card must advertise an *image* type, not a URL type.
-    ///
-    /// Sharing the file URL directly advertised only `public.url` / `public.file-url`, which
-    /// silently removed Photos and every app target from the share sheet and left "Save to
-    /// Files" as the only option. This is the assertion that would have caught it.
-    func testAdvertisesAnImageTypeSoPhotosAndAppsAppear() throws {
-        guard #available(iOS 18.2, *) else {
-            throw XCTSkip("exportedContentTypes() needs iOS 18.2")
-        }
-
-        let types = WorkoutShareCardFile.exportedContentTypes()
-        XCTAssertTrue(types.contains(.png), "Expected public.png, got \(types.map(\.identifier))")
-
-        // The point of declaring PNG: it conforms to public.image, which is what Photos,
-        // Instagram and the Messages image path filter on.
-        XCTAssertTrue(
-            types.contains { $0.conforms(to: .image) },
-            "Nothing offered conforms to public.image — image destinations will not appear"
-        )
-        XCTAssertFalse(
-            types.contains { $0.conforms(to: .url) },
-            "A URL type here is what caused the Files-only regression"
-        )
     }
 
     // MARK: - Save to Photos

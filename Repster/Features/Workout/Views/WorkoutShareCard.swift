@@ -10,7 +10,6 @@
 
 import Photos
 import SwiftUI
-import UniformTypeIdentifiers
 
 // MARK: - Style
 
@@ -663,25 +662,8 @@ private struct Diamond: Shape {
 
 // MARK: - Renderer
 
-/// The card as shareable PNG *content* that happens to be backed by a file.
-///
-/// Sharing a bare `URL` advertises `public.url` and `public.file-url` and nothing else, so every
-/// image destination — Photos, Instagram, Messages' image path — drops out of the share sheet and
-/// "Save to Files" is all that is left. Declaring `.png` puts them back, while `suggestedFileName`
-/// keeps the readable filename that sharing a raw `Image` would have thrown away.
-struct WorkoutShareCardFile: Transferable {
-    let url: URL
-
-    static var transferRepresentation: some TransferRepresentation {
-        FileRepresentation(exportedContentType: .png) { file in
-            SentTransferredFile(file.url)
-        }
-        .suggestedFileName { $0.url.lastPathComponent }
-    }
-}
-
-/// Saving the card straight to Photos, so the common destination is one tap rather than a
-/// share sheet and a scroll.
+/// Saving the card straight to Photos — the one way it leaves the app. From the camera roll it
+/// goes wherever the user posts it.
 ///
 /// Deliberately `.addOnly`: the app never reads the library, and add-only is the lighter of the
 /// two Photos prompts — it does not ask for access to existing photos, which is a claim we
@@ -719,10 +701,6 @@ enum WorkoutShareCardPhotoSaver {
     }
 }
 
-enum WorkoutShareCardRenderError: Error {
-    case pngEncodingFailed
-}
-
 enum WorkoutShareCardRenderer {
 
     /// Renders the card at `scale: 3`, giving the specced 1080 × 1920.
@@ -747,56 +725,6 @@ enum WorkoutShareCardRenderer {
         renderer.scale = 3
         renderer.isOpaque = true
         return renderer.uiImage
-    }
-
-    /// Writes the card as a PNG the recipient can actually read the name of.
-    ///
-    /// Sharing an in-memory `Image` works, but it arrives anonymous: saved to Files or attached
-    /// to Mail it lands as a generic name, and a few share extensions are fussier about a
-    /// SwiftUI `Image` than about a file URL. A real file costs one write and fixes both.
-    ///
-    /// PNG rather than JPEG on purpose — the card is flat colour and type, so it encodes
-    /// *smaller* than JPEG and stays lossless, which matters when the destination is going to
-    /// recompress it anyway.
-    static func writePNG(_ image: UIImage, title: String, dateLabel: String) throws -> URL {
-        guard let data = image.pngData() else {
-            throw WorkoutShareCardRenderError.pngEncodingFailed
-        }
-
-        let directory = scratchDirectory
-        // One export at a time: the previous file is dead the moment a new card is rendered,
-        // and the share sheet that might still hold it is already gone.
-        try? FileManager.default.removeItem(at: directory)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-
-        let url = directory.appendingPathComponent(fileName(title: title, dateLabel: dateLabel))
-        try data.write(to: url, options: .atomic)
-        return url
-    }
-
-    /// "Repster-Push-Day-A-Sat-Aug-30.png".
-    ///
-    /// The title is user content, so it is stripped of anything that has meaning in a path and
-    /// capped before it becomes one. An empty or hostile title degrades to plain "Repster".
-    static func fileName(title: String, dateLabel: String) -> String {
-        func slug(_ value: String) -> String {
-            let forbidden = CharacterSet(charactersIn: "/\\:*?\"<>|,.")
-                .union(.newlines)
-                .union(.controlCharacters)
-                .union(.whitespaces)
-            return value
-                .components(separatedBy: forbidden)
-                .filter { !$0.isEmpty }
-                .joined(separator: "-")
-        }
-
-        let parts = ["Repster", slug(title), slug(dateLabel)].filter { !$0.isEmpty }
-        return String(parts.joined(separator: "-").prefix(80)) + ".png"
-    }
-
-    private static var scratchDirectory: URL {
-        FileManager.default.temporaryDirectory
-            .appendingPathComponent("ShareCards", isDirectory: true)
     }
 }
 
@@ -833,7 +761,7 @@ extension WorkoutShareCardData {
 
 // MARK: - Preview sheet
 
-/// The share flow: see the card, decide what it shows, then hand it to the system sheet.
+/// The share flow: see the card, decide what it shows, then save it to Photos.
 ///
 /// The two toggles are B4's, and they persist — this is the audience that will notice their
 /// squat number is on the card and quietly not post it, and the choice should be made once.
@@ -890,8 +818,7 @@ final class ShareCardInstrumentation {
         )
     }
 
-    /// Only ever called from a confirmed completion — `UIActivityViewController` saying the
-    /// share happened, or Photos saying the write landed.
+    /// Only ever called from a confirmed completion — Photos saying the write landed.
     func shared(variant: WorkoutShareCardStyle, destination: String) {
         hasShared = true
         analyticsService.shareCardShared(
@@ -912,41 +839,6 @@ final class ShareCardInstrumentation {
         guard reportedFailures.insert(errorType).inserted else { return }
         analyticsService.shareCardFailed(entryPoint: entryPoint, errorType: errorType)
     }
-}
-
-/// `UIActivityViewController` rather than `ShareLink`, for one reason: `ShareLink` has no
-/// completion handler. With it, "shared" could only ever mean "tapped Share" — which would
-/// make the design doc's >= 50% completion bar a comparison of taps against taps — and
-/// `destination`, the property that says whether this is an Instagram feature or an iMessage
-/// feature, could not be captured at all.
-///
-/// Deliberately its own type rather than a promotion of the private `ActivityShareSheet` in
-/// `ExportView`: that one and `TemplateShareSheet` need no completion handler, and
-/// [TemplateSharing.swift:6](Repster/Features/Templates/Views/TemplateSharing.swift:6) already
-/// records that consolidating the copies is a separate job. This is the one that would host
-/// it when someone does that job.
-private struct WorkoutShareCardActivitySheet: UIViewControllerRepresentable {
-
-    let activityItems: [Any]
-    /// Called only when the share completed. `activityType` is nil when the sheet reports
-    /// success without naming an activity.
-    let onComplete: (UIActivity.ActivityType?) -> Void
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        let controller = UIActivityViewController(
-            activityItems: activityItems,
-            applicationActivities: nil
-        )
-        controller.completionWithItemsHandler = { activityType, completed, _, _ in
-            // A cancel is a user decision, not a share and not a failure. It stays silent:
-            // the card sheet is still open behind it and they may yet share or close.
-            guard completed else { return }
-            onComplete(activityType)
-        }
-        return controller
-    }
-
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 struct WorkoutSharePreviewSheet: View {
@@ -977,11 +869,9 @@ struct WorkoutSharePreviewSheet: View {
     @State private var hidesExerciseList = WorkoutShareCardPreferences.hidesExerciseList
     @State private var hidesWeights = WorkoutShareCardPreferences.hidesWeights
     @State private var rendered: UIImage?
-    @State private var fileURL: URL?
     @State private var style: WorkoutShareCardStyle = WorkoutShareCardPreferences.style
     @State private var saveState: SaveState = .idle
     @State private var showPhotosDeniedAlert = false
-    @State private var showActivitySheet = false
 
     private enum SaveState: Equatable {
         case idle, saving, saved
@@ -1027,6 +917,10 @@ struct WorkoutSharePreviewSheet: View {
             shareBar
         }
         .background(Color.bg.ignoresSafeArea())
+        // Short of full height so the sheet it was raised from (the workout summary, or the
+        // workout it came from in history) stays visible behind it, rather than being pushed
+        // back out of sight. The card scales to whatever height is left.
+        .presentationDetents([.fraction(0.85)])
         .task(id: RenderKey(style: style, list: hidesExerciseList, weights: hidesWeights)) {
             await refreshRender()
         }
@@ -1215,49 +1109,27 @@ struct WorkoutSharePreviewSheet: View {
         VStack(spacing: 0) {
             Rectangle().fill(Color.border).frame(height: 1)
 
-            VStack(spacing: 10) {
-                // Photos is where most of these end up, so it gets its own tap rather than
-                // living three rows down someone else's share sheet.
-                Button {
-                    Task { await saveToPhotos() }
-                } label: {
-                    saveToPhotosLabel
-                }
-                .buttonStyle(.plain)
-                .disabled(rendered == nil || saveState != .idle)
-
-                Group {
-                    if fileURL != nil {
-                        Button { showActivitySheet = true } label: {
-                            shareLabel(enabled: true)
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        shareLabel(enabled: false)
-                    }
-                }
+            // The only action. The system Share button that sat under it was removed in 1.6:
+            // nobody outside the team used it, and Photos is where cards end up anyway.
+            Button {
+                Task { await saveToPhotos() }
+            } label: {
+                saveToPhotosLabel
             }
+            .buttonStyle(.plain)
+            .disabled(rendered == nil || saveState != .idle)
+            .opacity(rendered == nil ? 0.5 : 1)
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
         .background(Color.bg)
-        .sheet(isPresented: $showActivitySheet) {
-            if let fileURL {
-                WorkoutShareCardActivitySheet(activityItems: [fileURL]) { activityType in
-                    instrumentation.shared(
-                        variant: style,
-                        destination: activityType?.rawValue ?? ShareCardDestination.unknown
-                    )
-                }
-            }
-        }
         .alert("Photos access is off", isPresented: $showPhotosDeniedAlert) {
             Button("Not now", role: .cancel) { }
             if let settings = URL(string: UIApplication.openSettingsURLString) {
                 Button("Open Settings") { UIApplication.shared.open(settings) }
             }
         } message: {
-            Text("Repster needs permission to add images to your photo library. You can still use Share to send the card anywhere else.")
+            Text("Repster needs permission to add images to your photo library. Turn it on in Settings to save your card.")
         }
     }
 
@@ -1270,7 +1142,7 @@ struct WorkoutSharePreviewSheet: View {
                 Text("Save to Photos")
                     .font(.system(size: 16, weight: .semibold))
             case .saving:
-                ProgressView().tint(.accent)
+                ProgressView().tint(.white)
                 Text("Saving…")
                     .font(.system(size: 16, weight: .semibold))
             case .saved:
@@ -1280,14 +1152,16 @@ struct WorkoutSharePreviewSheet: View {
                     .font(.system(size: 16, weight: .semibold))
             }
         }
-        .foregroundColor(saveState == .saved ? .success : .accent)
+        .foregroundColor(saveState == .saved ? .success : .white)
         .frame(maxWidth: .infinity)
         .frame(height: 52)
-        .background(saveState == .saved ? Color.successSoft : Color.accentSoft)
+        .background(saveState == .saved ? Color.successSoft : Color.accent)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke((saveState == .saved ? Color.success : Color.accent).opacity(0.30), lineWidth: 1)
+            if saveState == .saved {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.success.opacity(0.30), lineWidth: 1)
+            }
         }
         .animation(.easeInOut(duration: 0.18), value: saveState)
     }
@@ -1299,9 +1173,7 @@ struct WorkoutSharePreviewSheet: View {
         switch await WorkoutShareCardPhotoSaver.save(rendered) {
         case .saved:
             saveState = .saved
-            // A card in the camera roll has left the app as surely as one sent to Messages,
-            // so it counts as a share — with its own destination, since it never touches a
-            // `UIActivityViewController`.
+            // A card in the camera roll has left the app, so it counts as a share.
             instrumentation.shared(variant: style, destination: ShareCardDestination.saveToPhotos)
             // Settle back so a second save is possible without reopening the sheet.
             try? await Task.sleep(for: .seconds(2))
@@ -1320,21 +1192,6 @@ struct WorkoutSharePreviewSheet: View {
         }
     }
 
-    private func shareLabel(enabled: Bool) -> some View {
-        HStack(spacing: 8) {
-            if !enabled {
-                ProgressView().tint(.white)
-            }
-            Text(enabled ? "Share" : "Preparing…")
-                .font(.system(size: 16, weight: .semibold))
-        }
-        .foregroundColor(.white)
-        .frame(maxWidth: .infinity)
-        .frame(height: 52)
-        .background(enabled ? Color.accent : Color.accent.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
     @MainActor
     private func refreshRender() async {
         let image = WorkoutShareCardRenderer.render(
@@ -1345,18 +1202,10 @@ struct WorkoutSharePreviewSheet: View {
         )
         rendered = image
 
-        guard let image else {
-            fileURL = nil
-            // The Share button never enables and the sheet shows nothing. Without this event
+        if image == nil {
+            // Save to Photos never enables and the sheet shows nothing. Without this event
             // that is invisible — exactly the "the button does nothing" bug D1 calls out.
             instrumentation.failed(.renderFailed)
-            return
         }
-
-        fileURL = try? WorkoutShareCardRenderer.writePNG(
-            image,
-            title: data.title,
-            dateLabel: data.dateLabel
-        )
     }
 }
