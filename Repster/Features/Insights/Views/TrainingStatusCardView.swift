@@ -19,7 +19,9 @@ struct TrainingStatusCardView: View {
             // "8-week avg 0" reading under copy that says the baseline is still
             // being built. Band is nil in exactly the cases with nothing to
             // compare against.
-            if status.band != nil {
+            if !status.hasData {
+                preview
+            } else if status.band != nil {
                 comparison
             } else {
                 coldStartFigure
@@ -58,7 +60,7 @@ struct TrainingStatusCardView: View {
     }
 
     private var headline: String {
-        guard status.hasData else { return "No sets logged yet" }
+        guard status.hasData else { return "What you'll see here" }
         return status.band?.headline ?? "Your first weeks"
     }
 
@@ -68,7 +70,7 @@ struct TrainingStatusCardView: View {
     /// from two numbers sitting at opposite ends of the card.
     private var subtitle: String {
         guard status.hasData else {
-            return "Your training status builds as you log workouts"
+            return "Built from your own workouts as you log them"
         }
         guard status.band != nil else {
             return "Building your usual week — comparisons start in a few weeks"
@@ -131,6 +133,49 @@ struct TrainingStatusCardView: View {
             Spacer(minLength: 0)
         }
     }
+
+    // MARK: - Preview
+
+    /// Someone who hasn't logged a set has nothing to be told about, and most
+    /// people who open this screen are in exactly that state (usually on day
+    /// one). So the card says what the screen will show and when, rather than
+    /// "0 sets". Each line has to stay true to what the screen really renders
+    /// at that stage — change it when a stage gains or loses content.
+    private var preview: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(Self.previewStages, id: \.when) { stage in
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: stage.symbol)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.textTertiary)
+                        .frame(width: 34)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(stage.when)
+                            .font(.system(size: 11, weight: .semibold))
+                            .kerning(0.5)
+                            .foregroundStyle(Color.textTertiary)
+                        Text(stage.what)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color.textPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+    }
+
+    /// "Four weeks" is `minimumBaselineWeeks` (3) counted back from the start
+    /// of the trailing 7-day window, so the first comparison lands 28 days
+    /// after the first logged set.
+    private static let previewStages: [(symbol: String, when: String, what: String)] = [
+        ("chart.bar", "AFTER YOUR FIRST WORKOUT", "Your sets for the week, split by muscle"),
+        ("circle.righthalf.filled", "AFTER ABOUT FOUR WEEKS", "How each week compares with your usual"),
+        ("lightbulb", "ONCE A PATTERN HOLDS", "Findings on your strength, consistency and volume")
+    ]
 }
 
 // MARK: - Previews
@@ -158,5 +203,16 @@ struct TrainingStatusCardView: View {
         }
         .padding(16)
     }
+    .background(Color.bg)
+}
+
+#Preview("Status card — nothing logged") {
+    TrainingStatusCardView(status: TrainingStatus(
+        currentSets: 0,
+        baselineSets: nil,
+        muscles: [],
+        hasData: false
+    ))
+    .padding(16)
     .background(Color.bg)
 }

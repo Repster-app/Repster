@@ -89,9 +89,12 @@ struct TrainingInsightsHookView: View {
     /// Both figures moved into the bars below, so the subtitle carries the one
     /// thing they can't state on their own: the size of the gap.
     private var subtitle: String {
-        guard let status, status.hasData else {
-            return "Builds as you log workouts"
-        }
+        // Nil is a load in flight or a failed fetch, not evidence of a new user,
+        // so it keeps the neutral line rather than inviting a preview.
+        guard let status else { return "Builds as you log workouts" }
+        // Most taps on this card come from people who haven't logged a set yet,
+        // and the screen behind it now tells them what it will show.
+        guard status.hasData else { return "See what your workouts will show" }
         let sets = "\(status.currentSets) set\(status.currentSets == 1 ? "" : "s") this week"
         guard let baseline = status.baselineSets, baseline > 0,
               let relation = WeekComparisonGeometry.relationText(
