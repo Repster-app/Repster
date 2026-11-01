@@ -145,8 +145,8 @@ struct SmartSuggestionsAdvancedSections: View {
         } footer: {
             Text(
                 isAdminModeEnabled
-                    ? "When enabled, suggested weights decrease across sets to account for accumulated fatigue. Uses your rest timer duration to model recovery between sets.\n\nCapacity Guards: hold suggestions above a weight you completed with reps to spare, ignore drop sets when judging capacity, and limit how far one set can lower the estimate. Turning it off restores the older behaviour."
-                    : "When enabled, suggested weights decrease across sets to account for accumulated fatigue. Turn on Admin Mode to access troubleshooting diagnostics."
+                    ? "When enabled, suggested weights decrease across sets to account for accumulated fatigue. Uses your rest timer duration to model recovery between sets.\n\nCapacity Guards: hold suggestions above a weight you completed with reps to spare, ignore drop sets when judging capacity, and limit how far one set can lower the estimate. Turning it off restores the older behaviour while Admin Mode is on."
+                    : "When enabled, suggested weights decrease across sets to account for accumulated fatigue."
             )
                 .foregroundColor(.textTertiary)
         }

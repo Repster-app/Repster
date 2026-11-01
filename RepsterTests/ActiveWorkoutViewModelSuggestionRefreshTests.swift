@@ -3939,6 +3939,34 @@ final class SmartSuggestionSettingsTests: XCTestCase {
         XCTAssertEqual(profile.prescriptionDefaultTargetRIR, 2)
         XCTAssertEqual(profile.prescriptionAdminModeEnabled, false)
     }
+
+    /// Admin Mode lost its visible switch, so anyone who had it on would be stuck in it. The reset
+    /// turns it off once — and only once, or the developer's hold would be undone every launch.
+    func testAdminModeResetTurnsItOffOnlyOnce() throws {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: HealthProfile.self, configurations: config)
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "admin-reset-\(UUID().uuidString)"))
+        let seedContext = ModelContext(container)
+        seedContext.insert(HealthProfile(prescriptionAdminModeEnabled: true))
+        try seedContext.save()
+
+        func storedAdminMode() throws -> Bool? {
+            try ModelContext(container).fetch(FetchDescriptor<HealthProfile>()).first?
+                .prescriptionAdminModeEnabled
+        }
+
+        AdminModeResetMigration.runIfNeeded(modelContext: ModelContext(container), userDefaults: defaults)
+        XCTAssertEqual(try storedAdminMode(), false, "left on from the old switch: reset")
+
+        // Turned back on with the hold, then the app relaunches.
+        let holdContext = ModelContext(container)
+        try XCTUnwrap(holdContext.fetch(FetchDescriptor<HealthProfile>()).first)
+            .prescriptionAdminModeEnabled = true
+        try holdContext.save()
+
+        AdminModeResetMigration.runIfNeeded(modelContext: ModelContext(container), userDefaults: defaults)
+        XCTAssertEqual(try storedAdminMode(), true, "turned on after the reset: kept")
+    }
 }
 
 /// Regression coverage for rebuild detection on exercise metadata edits (FR-006,

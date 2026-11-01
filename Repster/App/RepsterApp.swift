@@ -34,6 +34,9 @@ struct RepsterApp: App {
             // Repair exercise workout counts left wrong by the old row-count rule (one-shot).
             ExerciseWorkoutCountBackfillMigration.runIfNeeded(modelContext: seedContext)
 
+            // Turn off Admin Mode left on from when it had a visible switch (one-shot).
+            AdminModeResetMigration.runIfNeeded(modelContext: seedContext)
+
             let repoContainer = RepositoryContainer(modelContainer: container)
             self.repositories = repoContainer
             let analyticsService = AnalyticsServiceFactory.makeService()

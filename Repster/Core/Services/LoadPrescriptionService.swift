@@ -91,6 +91,12 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
         let fatigueEnabled = profile.prescriptionFatigueModelingEnabled ?? true
         let freshnessEnabled = profile.prescriptionFreshnessBonus ?? false
         let freshnessPercent = profile.prescriptionFreshnessBonusPercent ?? 0.03
+        // The Capacity Guards switch only shows in Admin Mode, so outside it the guards stay on
+        // whatever was saved: switching them off and then leaving Admin Mode must not leave
+        // suggestions changed with no visible way back.
+        let capacityGuardsEnabled = profile.prescriptionAdminModeEnabled == true
+            ? (profile.prescriptionCapacityGuardsEnabled ?? true)
+            : true
         let formula = E1RMFormula(rawValue: profile.e1RMFormula) ?? .epley
         let baseFatigueRate = FatigueLearningService.appliedFatigueRateInfo(for: exercise, profile: profile).rate
         let recoveryConstant = exercise.recoveryConstant ?? profile.prescriptionDefaultRecoveryConstant ?? 180.0
@@ -125,7 +131,7 @@ actor LoadPrescriptionService: LoadPrescriptionServiceProtocol {
                 baseFatigueRate: baseFatigueRate,
                 recoveryConstant: recoveryConstant,
                 sessionCapabilityPolicy: .observed,
-                capacityGuardsEnabled: profile.prescriptionCapacityGuardsEnabled ?? true
+                capacityGuardsEnabled: capacityGuardsEnabled
             ),
             calibrationAdjustment: calibrationAdjustment
         )

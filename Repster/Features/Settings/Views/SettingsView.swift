@@ -48,6 +48,7 @@ struct SettingsView: View {
     @State private var pendingMuscleAssignmentCount: Int = 0
     @State private var showWhatsNew = false
     @State private var showHowItWorks = false
+    @State private var showAdminModePrompt = false
     @Environment(ServiceContainer.self) private var services
 
     // Read only for the On/Off summary on the row; the integration itself is managed in
@@ -143,6 +144,20 @@ struct SettingsView: View {
                 Button("OK") {}
             } message: {
                 Text(viewModel.errorMessage)
+            }
+            // Raised by holding the Version row. Asks rather than flipping straight away, so an
+            // accidental hold can't change anything.
+            .alert(
+                viewModel.smartSuggestionsAdminModeEnabled ? "Turn off Admin Mode?" : "Turn on Admin Mode?",
+                isPresented: $showAdminModePrompt
+            ) {
+                Button("Cancel", role: .cancel) {}
+                Button(viewModel.smartSuggestionsAdminModeEnabled ? "Turn Off" : "Turn On") {
+                    let enabled = !viewModel.smartSuggestionsAdminModeEnabled
+                    Task { await viewModel.updatePrescriptionAdminModeEnabled(enabled) }
+                }
+            } message: {
+                Text("Admin Mode shows Smart Suggestions and Insights diagnostics.")
             }
             // No `whats new shown` event here: opening it deliberately is a different
             // intent from meeting it on launch, and mixing the two would make the
@@ -375,6 +390,12 @@ struct SettingsView: View {
                 Spacer()
                 Text(viewModel.appVersion)
                     .foregroundStyle(Color.textSecondary)
+            }
+            // The only way in or out of Admin Mode, and deliberately unlabelled: as a visible
+            // switch in Smart Suggestions, App Store users found it and turned it on.
+            .contentShape(Rectangle())
+            .onLongPressGesture(minimumDuration: 2) {
+                showAdminModePrompt = true
             }
 
             // The permanent home for the walkthrough. Unconditional, unlike What's New —
@@ -936,22 +957,12 @@ private struct SmartSuggestionsSettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                     }
-
-                    Toggle(isOn: Binding(
-                        get: { viewModel.smartSuggestionsAdminModeEnabled },
-                        set: { newValue in
-                            Task { await viewModel.updatePrescriptionAdminModeEnabled(newValue) }
-                        }
-                    )) {
-                        Label("Admin Mode", systemImage: "wrench.and.screwdriver")
-                            .foregroundStyle(Color.textPrimary)
-                    }
                 }
 
             } footer: {
                 Text(
                     viewModel.smartSuggestionsEnabled
-                        ? "Default increment controls how suggested weights are rounded before they appear in your workout. Admin Mode exposes Smart Suggestions diagnostics and troubleshooting screens."
+                        ? "Default increment controls how suggested weights are rounded before they appear in your workout."
                         : "Enable Smart Suggestions to show recommendations during workouts."
                 )
                     .foregroundStyle(Color.textTertiary)

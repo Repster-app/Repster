@@ -1625,6 +1625,49 @@ extension WorkoutJourneyTests {
         )
     }
 
+    /// The Capacity Guards switch only shows in Admin Mode, so a saved "off" may only reach the
+    /// engine while Admin Mode is on. Otherwise leaving Admin Mode would leave suggestions changed
+    /// with no visible way back.
+    func testCapacityGuardsOnlySwitchOffInAdminMode() async throws {
+        let stack = try Stack()
+        let exercise = Fixture.barbell()
+        let viewModel = try await startWorkout(stack, with: [exercise])
+
+        try await completeNextSet(viewModel, weight: 60, reps: 8, rir: 2)
+
+        func guardsApplied() async throws -> Bool {
+            let evaluation = try await stack.loadPrescriptionService.evaluateSuggestions(
+                exerciseId: exercise.id,
+                pendingSets: [
+                    SuggestionPendingSetInput(
+                        setId: UUID(),
+                        setIndex: 0,
+                        setNumber: 1,
+                        target: SuggestionTarget(
+                            reps: 8,
+                            rir: 2,
+                            repRange: nil,
+                            repsSource: .explicitSet,
+                            rirSource: .explicitSet
+                        ),
+                        setType: .working
+                    )
+                ],
+                completedSessionSets: []
+            )
+            return try XCTUnwrap(evaluation.input).settings.capacityGuardsEnabled
+        }
+
+        _ = try await stack.settingsService.updatePrescriptionCapacityGuardsEnabled(false)
+        _ = try await stack.settingsService.updatePrescriptionAdminModeEnabled(true)
+        let inAdminMode = try await guardsApplied()
+        XCTAssertFalse(inAdminMode, "in Admin Mode the saved setting applies")
+
+        _ = try await stack.settingsService.updatePrescriptionAdminModeEnabled(false)
+        let outsideAdminMode = try await guardsApplied()
+        XCTAssertTrue(outsideAdminMode, "outside it the guards stay on, whatever was saved")
+    }
+
     /// A history with no RIR must be completely unaffected — the fallback is the stored value,
     /// which is the same number as before, so imported Strong/Hevy data does not shift.
     func testHistoryWithoutRIRIsUnchanged() async throws {
