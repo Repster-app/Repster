@@ -15,6 +15,9 @@ struct CalendarWorkoutDetailView: View {
     /// Drawn as an icon beside the menu, not inside it, and only for a workout that can be
     /// shared (`WorkoutShareCardBuilder.canShare`).
     let onShare: ((WorkoutSnapshot) -> Void)?
+    /// "Export Workout" in the menu, only for a workout that can be exported
+    /// (`WorkoutExportBuilder.canExport`).
+    let onExport: ((WorkoutSnapshot) -> Void)?
     /// Tapping the "not counted toward PRs" banner. Nil hides the banner's affordance but not
     /// the banner — the fact is worth stating even where the caller offers no way to change it.
     let onEditProgression: ((WorkoutSnapshot) -> Void)?
@@ -28,6 +31,7 @@ struct CalendarWorkoutDetailView: View {
         onEditWorkout: ((WorkoutSnapshot) -> Void)?,
         onDeleteWorkout: ((WorkoutSnapshot) -> Void)? = nil,
         onShare: ((WorkoutSnapshot) -> Void)? = nil,
+        onExport: ((WorkoutSnapshot) -> Void)? = nil,
         onEditProgression: ((WorkoutSnapshot) -> Void)? = nil,
         onExerciseTapped: @escaping (UUID) -> Void
     ) {
@@ -38,6 +42,7 @@ struct CalendarWorkoutDetailView: View {
         self.onEditWorkout = onEditWorkout
         self.onDeleteWorkout = onDeleteWorkout
         self.onShare = onShare
+        self.onExport = onExport
         self.onEditProgression = onEditProgression
         self.onExerciseTapped = onExerciseTapped
     }
@@ -66,13 +71,15 @@ struct CalendarWorkoutDetailView: View {
     @ViewBuilder
     private func workoutSection(_ detail: WorkoutDetail) -> some View {
         VStack(spacing: 12) {
-            if onSaveAsTemplate != nil || onEditWorkout != nil || onDeleteWorkout != nil || onShare != nil {
+            if onSaveAsTemplate != nil || onEditWorkout != nil || onDeleteWorkout != nil || onShare != nil
+                || onExport != nil {
                 workoutHeader(
                     detail.workout,
                     onSaveAsTemplate: onSaveAsTemplate,
                     onEditWorkout: onEditWorkout,
                     onDeleteWorkout: onDeleteWorkout,
-                    onShare: WorkoutShareCardBuilder.canShare(detail) ? onShare : nil
+                    onShare: WorkoutShareCardBuilder.canShare(detail) ? onShare : nil,
+                    onExport: WorkoutExportBuilder.canExport(detail) ? onExport : nil
                 )
             } else if workoutDetails.count > 1 {
                 sessionLabel(detail.workout)
@@ -166,7 +173,8 @@ struct CalendarWorkoutDetailView: View {
         onSaveAsTemplate: ((WorkoutSnapshot) -> Void)?,
         onEditWorkout: ((WorkoutSnapshot) -> Void)?,
         onDeleteWorkout: ((WorkoutSnapshot) -> Void)?,
-        onShare: ((WorkoutSnapshot) -> Void)?
+        onShare: ((WorkoutSnapshot) -> Void)?,
+        onExport: ((WorkoutSnapshot) -> Void)?
     ) -> some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
@@ -208,6 +216,14 @@ struct CalendarWorkoutDetailView: View {
                         onSaveAsTemplate(workout)
                     } label: {
                         Label("Save as Template", systemImage: "doc.on.doc")
+                    }
+                }
+
+                if let onExport {
+                    Button {
+                        onExport(workout)
+                    } label: {
+                        Label("Export Workout", systemImage: "arrow.up.doc")
                     }
                 }
 

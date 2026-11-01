@@ -231,6 +231,7 @@ Every event carries `rule_id`, one of: `strengthTrend`, `consistency`,
 | `import started` | `source_type`, `unit_system` | |
 | `import completed` | `result`, `source_type`, `row_count_bucket`, `set_count_bucket`, `workout_count_bucket`, `error_type` | `result` is `success` or a failure. Import failure is a churn cliff — a user who can't get their history in leaves. |
 | `backup exported` / `backup imported` | — | |
+| `workout exported` | `entry_point` (`calendar` / `workout_detail`), `destination` (`UIActivity.ActivityType` raw value, or `unknown`) | One saved workout's JSON export left the app (WORKOUT_EXPORT_SCOPING.md). Fires only on a completed share sheet, never on the menu tap. `destination` says which outside systems people send workouts to. Added 2026-10-22 for 1.6, so it counts forward only. |
 | `unit system toggled` | `unit_system` | |
 | `analytics opt-out toggled` | `enabled` | Fires in both directions (deliberately sent *before* the opt-out takes effect). |
 | `review prompt requested` | `trigger`, `completed_workout_count` | |

@@ -13,6 +13,7 @@ final class AnalyticsServiceTests: XCTestCase {
         XCTAssertEqual(AnalyticsEvent.shareCardDismissed.rawValue, "share card dismissed")
         XCTAssertEqual(AnalyticsEvent.shareCardFailed.rawValue, "share card failed")
         XCTAssertEqual(AnalyticsScreen.shareCard.rawValue, "Share Card")
+        XCTAssertEqual(AnalyticsEvent.workoutExported.rawValue, "workout exported")
     }
 
     func testDurationBucketsCoverFinerRanges() {
@@ -637,6 +638,7 @@ final class AnalyticsServiceTests: XCTestCase {
         XCTAssertEqual(AnalyticsErrorContext.backupExport.rawValue, "backup_export")
         XCTAssertEqual(AnalyticsErrorContext.backupPreview.rawValue, "backup_preview")
         XCTAssertEqual(AnalyticsErrorContext.backupRestore.rawValue, "backup_restore")
+        XCTAssertEqual(AnalyticsErrorContext.workoutExport.rawValue, "workout_export")
     }
 
     func testMissingConfigurationFailsClosed() {
@@ -711,6 +713,24 @@ final class AnalyticsServiceTests: XCTestCase {
             "com.apple.UIKit.activity.Message"
         )
         XCTAssertEqual(client.captures.last?.properties["prs_hit"] as? Int, 1)
+    }
+
+    /// Same entry-point values as the share card, so the two history events break down alike.
+    func testWorkoutExportedCarriesEntryPointAndDestination() {
+        let (service, client, _) = makeService()
+
+        service.workoutExported(entryPoint: .workoutDetail, destination: "com.apple.UIKit.activity.SaveToFiles")
+        XCTAssertEqual(client.captures.last?.event, "workout exported")
+        XCTAssertEqual(client.captures.last?.properties["entry_point"] as? String, "workout_detail")
+        XCTAssertEqual(
+            client.captures.last?.properties["destination"] as? String,
+            "com.apple.UIKit.activity.SaveToFiles"
+        )
+
+        service.workoutExported(entryPoint: .calendar, destination: ShareCardDestination.unknown)
+        XCTAssertEqual(client.captures.last?.properties["entry_point"] as? String, "calendar")
+        XCTAssertEqual(WorkoutExportEntryPoint.calendar.rawValue, ShareCardEntryPoint.calendar.rawValue)
+        XCTAssertEqual(WorkoutExportEntryPoint.workoutDetail.rawValue, ShareCardEntryPoint.workoutDetail.rawValue)
     }
 
     func testShareCardDismissedAndFailedCarryTheirProperties() {

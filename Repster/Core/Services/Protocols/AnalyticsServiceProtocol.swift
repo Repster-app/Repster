@@ -84,6 +84,8 @@ enum AnalyticsErrorContext: String {
     case backupExport = "backup_export"
     case backupPreview = "backup_preview"
     case backupRestore = "backup_restore"
+    /// Encoding or writing a single-workout export failed (WORKOUT_EXPORT_SCOPING.md).
+    case workoutExport = "workout_export"
     /// Writing a chosen starter program's templates failed. Swallowed so onboarding can still
     /// complete, which is exactly the class of failure this enum exists to make visible.
     case programMaterialisation = "program_materialisation"
@@ -531,6 +533,16 @@ extension AnalyticsServiceProtocol {
 
     func backupExported() {
         track(.backupExported)
+    }
+
+    /// One workout's JSON export left the app. Fired only on a completed share sheet, never on
+    /// the menu tap, for the same reason as `share card shared`. `destination` is the point of
+    /// the event: which outside systems people send a workout to (WORKOUT_EXPORT_SCOPING.md §7).
+    func workoutExported(entryPoint: WorkoutExportEntryPoint, destination: String) {
+        track(.workoutExported, properties: [
+            .entryPoint: .string(entryPoint.rawValue),
+            .destination: .string(destination)
+        ])
     }
 
     // Settings
@@ -1085,6 +1097,7 @@ enum AnalyticsEvent: String, CaseIterable {
     case importStarted = "import started"
     case importCompleted = "import completed"
     case backupExported = "backup exported"
+    case workoutExported = "workout exported"
     case backupImported = "backup imported"
     case paywallShown = "paywall shown"
     case paywallDismissed = "paywall dismissed"

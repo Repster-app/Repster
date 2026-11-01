@@ -24,6 +24,7 @@ struct WorkoutDetailFromHomeView: View {
     @State private var saveAsTemplateController = SaveWorkoutAsTemplateController()
     @State private var templateFeedback: TemplateSaveFeedback? = nil
     @State private var detailToShare: WorkoutDetail?
+    @State private var detailToExport: WorkoutDetail?
     @Environment(\.dismiss) private var dismiss
     @Environment(ServiceContainer.self) private var services
 
@@ -99,6 +100,14 @@ struct WorkoutDetailFromHomeView: View {
                         Label("Save as Template", systemImage: "doc.on.doc")
                     }
 
+                    if let detail = workoutDetails.first, WorkoutExportBuilder.canExport(detail) {
+                        Button {
+                            detailToExport = detail
+                        } label: {
+                            Label("Export Workout", systemImage: "arrow.up.doc")
+                        }
+                    }
+
                     Divider()
 
                     // Delete Workout — functional
@@ -145,6 +154,7 @@ struct WorkoutDetailFromHomeView: View {
             await loadDetail()
         }
         .shareWorkoutCard(item: $detailToShare, entryPoint: .workoutDetail)
+        .exportWorkout(item: $detailToExport, entryPoint: .workoutDetail)
         .saveWorkoutAsTemplatePrompt(
             controller: saveAsTemplateController,
             workoutId: workoutDetails.first?.workout.id,

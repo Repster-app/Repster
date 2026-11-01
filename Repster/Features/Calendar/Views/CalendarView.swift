@@ -19,6 +19,7 @@ struct CalendarView: View {
     @State private var saveAsTemplateController = SaveWorkoutAsTemplateController()
     @State private var templateFeedback: TemplateSaveFeedback? = nil
     @State private var detailToShare: WorkoutDetail?
+    @State private var detailToExport: WorkoutDetail?
     @Binding var initialDate: Date?
 
     init(
@@ -196,6 +197,7 @@ struct CalendarView: View {
                 Task { await viewModel.selectDate(selectedDate) }
             }
             .shareWorkoutCard(item: $detailToShare, entryPoint: .calendar)
+            .exportWorkout(item: $detailToExport, entryPoint: .calendar)
             .confirmationDialog(
                 "Delete Workout",
                 isPresented: Binding(
@@ -331,6 +333,9 @@ struct CalendarView: View {
                     },
                     onShare: { workout in
                         detailToShare = viewModel.workoutDetails[workout.id]
+                    },
+                    onExport: { workout in
+                        detailToExport = viewModel.workoutDetails[workout.id]
                     },
                     onEditProgression: { workout in
                         workoutToEditProgression = workout
