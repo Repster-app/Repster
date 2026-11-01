@@ -163,6 +163,26 @@ struct ContentView: View {
     /// Set by the sheet's buttons. Still nil at dismissal means it was swiped away.
     @State private var freeLimitSheetResult: FreeLimitSheetResult?
 
+    /// The subscription as of the last monetization refresh. The free-month offer and the
+    /// subscriber thank-you both need more than `accessSnapshot` carries.
+    @State private var subscription = SubscriptionSnapshot.unknown(
+        entitlementIdentifier: RevenueCatConfiguration.entitlementIdentifier
+    )
+
+    /// The free-month questions or the subscriber questions, full screen.
+    @State private var feedbackFlow: FeedbackFlowRequest?
+
+    /// Read on launch and when the app returns from the background, never live: a thank-you
+    /// earned by the workout that just finished waits for the next visit instead of crowding the
+    /// moment the Apple Health offer and the rating prompt already compete for.
+    @State private var subscriberThanksEarned = false
+    @State private var hasBeenInBackground = false
+    @AppStorage(SubscriberThanksPreferences.dismissedKey) private var subscriberThanksDismissed = false
+
+    /// Two asks in one session is one too many, so the thank-you stands down once the App Store
+    /// rating prompt has been requested.
+    @State private var reviewPromptRequestedThisSession = false
+
     /// Whether the What's New sheet is presented.
     @State private var showWhatsNew = false
 
@@ -209,7 +229,11 @@ struct ContentView: View {
                     onDayTapped: { date in
                         calendarInitialDate = date
                         selectedTab = .calendar
-                    }
+                    },
+                    showsSubscriberThanks: showsSubscriberThanks,
+                    onSubscriberThanksQuestions: { closeSubscriberThanks(.questions) },
+                    onSubscriberThanksEmail: { closeSubscriberThanks(.email) },
+                    onSubscriberThanksDismiss: { closeSubscriberThanks(.dismissed) }
                 )
                     .tabItem {
                         Label("Home", systemImage: "house")
@@ -278,8 +302,13 @@ struct ContentView: View {
             let result = freeLimitSheetResult ?? .swiped
             freeLimitSheetResult = nil
             services.analyticsService.freeLimitSheetClosed(result: result)
-            if result == .seePlans {
+            switch result {
+            case .seePlans:
                 showPaywall = true
+            case .answerQuestions, .claimFreeMonth:
+                Task { await presentFreeMonthFlow(entry: .sheet) }
+            case .notNow, .swiped:
+                break
             }
         }) {
             FreeLimitSheet(
@@ -289,6 +318,9 @@ struct ContentView: View {
                     services.analyticsService.freeLimitSheetShown(
                         freeWorkoutLimit: accessSnapshot.freeWorkoutLimit
                     )
+                    if case .available(let customerType) = services.freeMonthOffer.availability {
+                        services.analyticsService.freeMonthOfferShown(entry: .sheet, customerType: customerType)
+                    }
                     // Same reasoning as the paywall below: this is the first half of the ask.
                     reviewPrompt.suppressForThisSession()
                 },
@@ -299,8 +331,48 @@ struct ContentView: View {
                 onNotNow: {
                     freeLimitSheetResult = .notNow
                     showFreeLimitSheet = false
+                },
+                offer: freeLimitOffer,
+                onAnswerQuestions: {
+                    freeLimitSheetResult = .answerQuestions
+                    showFreeLimitSheet = false
+                },
+                onClaimFreeMonth: {
+                    freeLimitSheetResult = .claimFreeMonth
+                    showFreeLimitSheet = false
                 }
             )
+        }
+        .fullScreenCover(item: $feedbackFlow) { request in
+            FeedbackFlowView(
+                kind: request.kind,
+                startsAtEnd: request.startsAtEnd,
+                onAnswer: { question, option in
+                    handleFeedbackAnswer(question, option, kind: request.kind)
+                },
+                onQuestionsFinished: {
+                    services.analyticsService.questionsCompleted(questionSet: request.kind.questionSet)
+                    if case .freeMonth = request.kind {
+                        services.freeMonthOffer.questionsCompleted()
+                    }
+                },
+                onClosedEarly: { question in
+                    services.analyticsService.questionsClosed(
+                        questionSet: request.kind.questionSet,
+                        lastQuestionId: question.id
+                    )
+                    feedbackFlow = nil
+                },
+                onClaim: { claimFreeMonth(kind: request.kind) },
+                onDone: { feedbackFlow = nil }
+            )
+        }
+        // A tap on the free-month notification while Repster is running. A tap that launched the
+        // app is picked up by the launch `.task` instead, after its first monetization refresh.
+        .onChange(of: NotificationOpenRouter.shared.pendingIdentifier) { _, identifier in
+            guard identifier == FreeMonthOfferService.notificationIdentifier,
+                  NotificationOpenRouter.shared.consume(FreeMonthOfferService.notificationIdentifier) else { return }
+            Task { await openFreeMonthFromNotification() }
         }
         .sheet(isPresented: $showPaywall, onDismiss: {
             services.analyticsService.paywallDismissed(source: .paywall)
@@ -354,7 +426,17 @@ struct ContentView: View {
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .background {
+                hasBeenInBackground = true
+            }
             guard newPhase == .active else { return }
+            // Only after a real trip to the background. A system sheet (the Health permission
+            // prompt after a workout) also passes through `.inactive`, and must not count as the
+            // next visit.
+            if hasBeenInBackground {
+                hasBeenInBackground = false
+                subscriberThanksEarned = SubscriberThanksPreferences.isEarned()
+            }
             Task {
                 await services.refreshUnitPreference()
                 await refreshMonetizationState(forceSubscriptionRefresh: true)
@@ -384,12 +466,22 @@ struct ContentView: View {
             await services.refreshUnitPreference()
             await refreshActiveWorkoutState()
             await refreshMonetizationState(forceSubscriptionRefresh: true)
+            subscriberThanksEarned = SubscriberThanksPreferences.isEarned()
+            #if DEBUG
+            // The preview argument shows the card on every launch, dismissed or not.
+            if SubscriberThanksPreferences.isDebugPreviewEnabled {
+                subscriberThanksDismissed = false
+            }
+            #endif
             // Read before reporting abandonment, which clears the marker.
             let inFlightSetCount = ActiveWorkoutSessionMarker.setCount()
             reportAbandonedWorkoutIfNeeded()
             if hasActiveWorkout {
                 services.analyticsService.workoutResumed(setCount: inFlightSetCount)
                 showActiveWorkout = true
+            } else if NotificationOpenRouter.shared.consume(FreeMonthOfferService.notificationIdentifier) {
+                // The app was launched by a tap on the free-month notification.
+                await openFreeMonthFromNotification()
             } else if WhatsNewPreferences.shouldPresent(), let release = WhatsNewRelease.current {
                 // Only when nothing else is claiming the screen. A resumed workout takes
                 // the fullScreenCover, and two modals racing on launch is how one of them
@@ -527,10 +619,120 @@ struct ContentView: View {
 
     @MainActor
     private func refreshMonetizationState(forceSubscriptionRefresh: Bool) async {
-        if forceSubscriptionRefresh {
-            _ = await services.subscriptionService.refreshSubscriptionStatus()
-        }
+        let subscription = forceSubscriptionRefresh
+            ? await services.subscriptionService.refreshSubscriptionStatus()
+            : await services.subscriptionService.currentSubscriptionSnapshot()
         accessSnapshot = await services.accessControlService.currentAccessSnapshot()
+        self.subscription = subscription
+        // Runs on every refresh, so whichever one first sees the user eligible — the workout that
+        // used the last free slot, the first launch of this build, or a lapse — decides the
+        // free-month notification.
+        await services.freeMonthOffer.refresh(subscription: subscription, access: accessSnapshot)
+    }
+
+    private var freeLimitOffer: FreeLimitOffer? {
+        switch services.freeMonthOffer.availability {
+        case .none:
+            return nil
+        case .available:
+            return .answerQuestions
+        case .answered:
+            return .claim
+        }
+    }
+
+    /// Prices are loaded before presenting, like the free-limit recap, so the plan question opens
+    /// with them rather than filling in.
+    @MainActor
+    private func presentFreeMonthFlow(entry: FreeMonthOfferEntry) async {
+        let availability = services.freeMonthOffer.availability
+        guard let customerType = availability.customerType else { return }
+        let prices = await services.subscriptionService.planPrices()
+
+        let alreadyAnswered: Bool
+        if case .answered = availability {
+            alreadyAnswered = true
+        } else {
+            alreadyAnswered = false
+            services.freeMonthOffer.questionsOpened()
+            // The sheet reports its own `offer shown` as it appears.
+            if entry == .notification {
+                services.analyticsService.freeMonthOfferShown(entry: .notification, customerType: customerType)
+            }
+        }
+        feedbackFlow = FeedbackFlowRequest(
+            kind: .freeMonth(customerType, prices),
+            startsAtEnd: alreadyAnswered
+        )
+    }
+
+    /// By the time the notification is tapped the user may have subscribed or already answered,
+    /// so availability decides what opens, if anything. It is refreshed first when it hasn't been
+    /// computed yet — a tap can arrive before the launch refresh has finished.
+    @MainActor
+    private func openFreeMonthFromNotification() async {
+        if services.freeMonthOffer.availability == .none {
+            await refreshMonetizationState(forceSubscriptionRefresh: false)
+        }
+        guard let customerType = services.freeMonthOffer.availability.customerType else { return }
+        services.analyticsService.freeMonthNotificationOpened(customerType: customerType)
+        await presentFreeMonthFlow(entry: .notification)
+    }
+
+    private func handleFeedbackAnswer(_ question: FeedbackQuestion, _ option: FeedbackOption, kind: FeedbackFlowKind) {
+        services.analyticsService.questionsAnswered(
+            questionSet: kind.questionSet,
+            questionId: question.id,
+            answer: option.id
+        )
+        if question.id == FeedbackQuestions.emailFollowUpId,
+           option.id == FeedbackQuestions.emailFollowUpYesId,
+           let url = SupportEmailComposer.subscriberFeedbackURL() {
+            UIApplication.shared.open(url)
+        }
+    }
+
+    /// The redeem link opens the App Store, so the flow closes behind it. Back in Repster, the
+    /// foreground refresh picks up the new entitlement; if the user didn't confirm, the free-limit
+    /// sheet keeps a Claim button.
+    private func claimFreeMonth(kind: FeedbackFlowKind) {
+        guard case .freeMonth(let customerType, _) = kind else { return }
+        services.analyticsService.freeMonthClaimTapped(customerType: customerType)
+        services.freeMonthOffer.claimTapped()
+        feedbackFlow = nil
+        if let url = FreeMonthOfferService.redeemURL {
+            UIApplication.shared.open(url)
+        }
+    }
+
+    private var showsSubscriberThanks: Bool {
+        #if DEBUG
+        if SubscriberThanksPreferences.isDebugPreviewEnabled {
+            return !subscriberThanksDismissed
+        }
+        #endif
+        return SubscriberThanksPolicy.shouldShow(
+            subscription: subscription,
+            earnedBeforeThisForeground: subscriberThanksEarned,
+            dismissed: subscriberThanksDismissed,
+            reviewPromptRequestedThisSession: reviewPromptRequestedThisSession
+        )
+    }
+
+    /// Any of the card's buttons closes it for good.
+    private func closeSubscriberThanks(_ result: SubscriberCardResult) {
+        subscriberThanksDismissed = true
+        services.analyticsService.subscriberCardClosed(result: result)
+        switch result {
+        case .questions:
+            feedbackFlow = FeedbackFlowRequest(kind: .subscriber)
+        case .email:
+            if let url = SupportEmailComposer.subscriberFeedbackURL() {
+                UIApplication.shared.open(url)
+            }
+        case .dismissed:
+            break
+        }
     }
 
     private var workoutAccessMessage: String? {
@@ -870,6 +1072,7 @@ struct ContentView: View {
             completedWorkoutCount: reviewPrompt.completedWorkoutCount
         )
         reviewPrompt.markReviewRequested()
+        reviewPromptRequestedThisSession = true
         requestReview()
     }
 
@@ -923,4 +1126,11 @@ struct ContentView: View {
             countTowardProgression: options.countTowardProgressionHistory
         )
     }
+}
+
+/// One presentation of `FeedbackFlowView`.
+private struct FeedbackFlowRequest: Identifiable {
+    let id = UUID()
+    let kind: FeedbackFlowKind
+    var startsAtEnd = false
 }

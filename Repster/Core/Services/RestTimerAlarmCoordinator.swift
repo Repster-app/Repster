@@ -16,6 +16,9 @@
 //   2. Hold the notification identifier somewhere reachable, so teardown paths that run
 //      outside the ViewModel (`ContentView.discardActiveAndCopy`, `SettingsService`) can
 //      cancel a pending alarm instead of letting it fire for a workout that is gone.
+//
+// Being the delegate also means hearing about taps on every other notification. Those are
+// handed to `NotificationOpenRouter` untouched — today that's the free-month offer.
 
 import Foundation
 import UserNotifications
@@ -294,5 +297,17 @@ extension RestTimerAlarmCoordinator: UNUserNotificationCenterDelegate {
             return [.banner, .sound, .list]
         }
         return currentPresentationOptions()
+    }
+
+    /// A tap. The rest alarm needs nothing beyond the app opening; any other notification is
+    /// passed to `NotificationOpenRouter`, for the same reason as above.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        let identifier = response.notification.request.identifier
+        guard identifier != Self.notificationId,
+              response.actionIdentifier == UNNotificationDefaultActionIdentifier else { return }
+        NotificationOpenRouter.shared.opened(identifier)
     }
 }

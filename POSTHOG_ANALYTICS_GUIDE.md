@@ -209,6 +209,25 @@ break.
 Free limit is **5 workouts** (`RevenueCatConfiguration.freeWorkoutLimit`), so
 `remaining_free_workouts` on `workout completed` counts down 4→0.
 
+### Free month for feedback and subscriber thanks (1.6)
+Scoping: `FREE_MONTH_AND_SUBSCRIBER_FEEDBACK_SCOPING.md`. Expect tiny numbers: about 2 people a
+month reach the free limit, and there are about 6 active subscribers. Read people, not rates.
+
+| Event | Key properties | Meaning |
+|---|---|---|
+| `free month notification scheduled` | `notification_permission`, `customer_type` | Once per install, when the one notification is decided. Fires with `denied` / `not_determined` too, when nothing was scheduled, so this event *is* the notification's reach. |
+| `free month notification opened` | `customer_type` | The notification was tapped. |
+| `free month offer shown` | `entry_point` (`sheet` / `notification`), `customer_type` | The offer card on the free-limit sheet, or the questions opened from the notification. |
+| `free month claim tapped` | `customer_type` | Claim opened Apple's redeem link. The redemption itself is invisible to the app: count it in App Store Connect (Offer Codes) and RevenueCat. |
+| `questions answered` | `question_set`, `question_id`, `answer` | One per tap. Back-and-answer-again sends a second one, so take the **last** answer per person and question. |
+| `questions completed` | `question_set` | All three answered. For `free_month`, this is the reward moment. |
+| `questions closed` | `question_set`, `last_question_id` | Left before the end. |
+| `subscriber card shown` / `closed` | `result` (`questions` / `email` / `dismissed`) | The one-time thank-you card on Home. Every result closes it for good. |
+
+`customer_type` is `new` (never subscribed) or `lapsed` (subscription ended). Lapsed people get
+a different first question, `why_cancelled`, instead of `why_not_upgraded`. `free limit sheet
+closed` gains two `result` values: `answer_questions` and `claim_free_month`.
+
 ### Training Insights
 Every event carries `rule_id`, one of: `strengthTrend`, `consistency`,
 `droppedExercise`, `volumeRamp`, `restSweetSpot`, `targetAdherence`,

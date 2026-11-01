@@ -22,6 +22,7 @@ struct HomeView: View {
     @AppStorage(WalkthroughPreferences.bannerDismissedKey) private var walkthroughBannerDismissed = false
     @State private var showWalkthrough = false
     @State private var hasReportedBannerShown = false
+    @State private var hasReportedSubscriberThanksShown = false
 
     let refreshTrigger: UUID
     let popToRootTrigger: UUID
@@ -30,6 +31,12 @@ struct HomeView: View {
     let onShowStartWorkoutSheet: () -> Void
     let onShowExerciseList: () -> Void
     var onDayTapped: ((Date) -> Void)? = nil
+    /// The one-time subscriber thank-you. `ContentView` decides when it shows
+    /// (`SubscriberThanksPolicy`) and handles its buttons.
+    var showsSubscriberThanks = false
+    var onSubscriberThanksQuestions: () -> Void = {}
+    var onSubscriberThanksEmail: () -> Void = {}
+    var onSubscriberThanksDismiss: () -> Void = {}
 
     init(
         workoutService: any WorkoutServiceProtocol,
@@ -44,7 +51,11 @@ struct HomeView: View {
         onStartWorkout: @escaping () -> Void,
         onShowStartWorkoutSheet: @escaping () -> Void,
         onShowExerciseList: @escaping () -> Void,
-        onDayTapped: ((Date) -> Void)? = nil
+        onDayTapped: ((Date) -> Void)? = nil,
+        showsSubscriberThanks: Bool = false,
+        onSubscriberThanksQuestions: @escaping () -> Void = {},
+        onSubscriberThanksEmail: @escaping () -> Void = {},
+        onSubscriberThanksDismiss: @escaping () -> Void = {}
     ) {
         _viewModel = State(initialValue: HomeViewModel(
             workoutService: workoutService,
@@ -61,6 +72,10 @@ struct HomeView: View {
         self.onShowStartWorkoutSheet = onShowStartWorkoutSheet
         self.onShowExerciseList = onShowExerciseList
         self.onDayTapped = onDayTapped
+        self.showsSubscriberThanks = showsSubscriberThanks
+        self.onSubscriberThanksQuestions = onSubscriberThanksQuestions
+        self.onSubscriberThanksEmail = onSubscriberThanksEmail
+        self.onSubscriberThanksDismiss = onSubscriberThanksDismiss
     }
 
     var body: some View {
@@ -85,6 +100,21 @@ struct HomeView: View {
                             guard !hasReportedBannerShown else { return }
                             hasReportedBannerShown = true
                             services.analyticsService.walkthroughBannerShown()
+                        }
+                    }
+
+                    // Same reasoning as the walkthrough banner: it removes itself for good, so it
+                    // isn't something to arrange in Customize Home.
+                    if showsSubscriberThanks {
+                        SubscriberThanksCard(
+                            onAnswerQuestions: onSubscriberThanksQuestions,
+                            onEmail: onSubscriberThanksEmail,
+                            onDismiss: onSubscriberThanksDismiss
+                        )
+                        .onAppear {
+                            guard !hasReportedSubscriberThanksShown else { return }
+                            hasReportedSubscriberThanksShown = true
+                            services.analyticsService.subscriberCardShown()
                         }
                     }
 

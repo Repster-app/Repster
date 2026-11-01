@@ -33,6 +33,7 @@ final class ServiceContainer {
     let insightsService: any InsightsServiceProtocol
     let healthKitService: any HealthKitServiceProtocol
     let trainingDataSharing: any TrainingDataSharingServiceProtocol
+    let freeMonthOffer: FreeMonthOfferService
     let healthProfileRepo: any HealthProfileRepositoryProtocol
     var unitPreference: UnitPreference = .metric
 
@@ -209,6 +210,7 @@ final class ServiceContainer {
         self.insightsService = insightsService
         self.healthKitService = healthKitService
         self.trainingDataSharing = trainingDataSharing
+        self.freeMonthOffer = FreeMonthOfferService(analytics: analyticsService)
         self.healthProfileRepo = repositoryContainer.healthProfileRepository
     }
 

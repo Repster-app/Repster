@@ -29,6 +29,36 @@ enum RevenueCatConfiguration {
     }()
     static let entitlementIdentifier = "Repster"
     static let freeWorkoutLimit = 10
+    /// The numeric Apple ID from App Store Connect (App Information). The offer code's redeem
+    /// link needs it; the App Store links in docs/ use the same number.
+    static let appStoreAppID = "6766094305"
+    /// The custom offer code behind the free month for feedback
+    /// (FREE_MONTH_AND_SUBSCRIBER_FEEDBACK_SCOPING.md §2.5). It must exist in App Store Connect on
+    /// the Monthly subscription — 1 month free, new and expired subscribers — or Apple refuses the
+    /// redemption. Changing it needs a release.
+    static let freeMonthOfferCode = "REPSTERMONTH"
+}
+
+/// Whether someone has subscribed before. Only meaningful while they aren't paying: it picks the
+/// free-month offer's first question and notification copy, the same split Apple's offer code
+/// eligibility makes.
+enum CustomerType: String, Equatable, Sendable {
+    /// Never held the entitlement.
+    case new
+    /// Held it once, and it has since ended.
+    case lapsed
+
+    static func from(entitlementKnown: Bool, isActive: Bool) -> CustomerType {
+        entitlementKnown && !isActive ? .lapsed : .new
+    }
+}
+
+/// The store's localized prices, for copy that quotes them. Any of them is nil when the offering
+/// hasn't loaded, and callers drop the price rather than guess one: regional prices differ.
+struct PlanPrices: Equatable, Sendable {
+    var monthly: String?
+    var yearly: String?
+    var lifetime: String?
 }
 
 enum SubscriptionStatus: Equatable {
@@ -68,6 +98,13 @@ struct SubscriptionSnapshot: Equatable {
     let expirationDate: Date?
     let accessSource: SubscriptionAccessSource
     let managementURL: URL?
+    /// `var` with a default so the memberwise call sites that predate it keep compiling;
+    /// `makeSnapshot` is the one place that sets it from RevenueCat.
+    var customerType: CustomerType = .new
+    /// Active, but in a free or discounted period (RevenueCat's trial or intro period type)
+    /// rather than paying full price. Best effort: how RevenueCat reports an offer code's free
+    /// month hasn't been checked yet, so this can read false during one.
+    var isInFreePeriod: Bool = false
 
     var hasFullAccess: Bool {
         status == .active
@@ -154,6 +191,14 @@ protocol SubscriptionServiceProtocol: Sendable {
     func purchaseLifetime() async throws -> SubscriptionSnapshot
     func restorePurchases() async throws -> SubscriptionSnapshot
     func openManageSubscriptions() async
+    func planPrices() async -> PlanPrices
+}
+
+extension SubscriptionServiceProtocol {
+    /// Stubs and previews have no store to ask.
+    func planPrices() async -> PlanPrices {
+        PlanPrices()
+    }
 }
 
 protocol AccessControlServiceProtocol: Sendable {
@@ -339,6 +384,20 @@ actor SubscriptionService: SubscriptionServiceProtocol {
         }
     }
 
+    func planPrices() async -> PlanPrices {
+        guard let offering = try? await Purchases.shared.offerings().current else {
+            return PlanPrices()
+        }
+        func price(_ type: PackageType) -> String? {
+            offering.availablePackages.first(where: { $0.packageType == type })?.localizedPriceString
+        }
+        return PlanPrices(
+            monthly: price(.monthly),
+            yearly: price(.annual),
+            lifetime: price(.lifetime)
+        )
+    }
+
     private func snapshot(from customerInfo: CustomerInfo) -> SubscriptionSnapshot {
         Self.makeSnapshot(from: customerInfo, entitlementIdentifier: entitlementIdentifier)
     }
@@ -384,12 +443,17 @@ actor SubscriptionService: SubscriptionServiceProtocol {
             accessSource = .none
         }
 
+        let periodType = entitlement?.periodType
         return SubscriptionSnapshot(
             status: hasFullAccess ? .active : .inactive,
             entitlementIdentifier: entitlementIdentifier,
             expirationDate: entitlement?.expirationDate,
             accessSource: accessSource,
-            managementURL: customerInfo.managementURL
+            managementURL: customerInfo.managementURL,
+            // `entitlements.all` keeps expired entitlements, which is what makes a lapsed
+            // subscriber distinguishable from someone who never paid.
+            customerType: .from(entitlementKnown: entitlement != nil, isActive: hasFullAccess),
+            isInFreePeriod: hasFullAccess && (periodType == .trial || periodType == .intro)
         )
     }
 }

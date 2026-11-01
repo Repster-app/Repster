@@ -2539,6 +2539,9 @@ final class ActiveWorkoutViewModel {
             )
             WorkoutStartContextStore.clear()
             ReviewPromptService.recordCompletedWorkout()
+            SubscriberThanksPreferences.noteWorkoutFinished(
+                subscribed: accessSnapshot.hasFullAccess && completedSetCount > 0
+            )
 
             // Run adaptive fatigue learning before clearing local state
             await fatigueLearningService.processSessionEnd(workoutId: workout.id)

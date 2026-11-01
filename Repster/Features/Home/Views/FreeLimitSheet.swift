@@ -8,6 +8,10 @@
 // Presented by `ContentView.ensureWorkoutCreationAccess`, the one gate every start path goes
 // through. The host owns the paywall — "See plans" only reports the answer, and the host
 // opens the paywall once this sheet has finished dismissing.
+//
+// It also carries the free month for feedback (FREE_MONTH_AND_SUBSCRIBER_FEEDBACK_SCOPING.md §2)
+// while the user is eligible. The offer then takes the prominent button and "See plans" steps
+// down to a text button; the host opens the questions the same way it opens the paywall.
 
 import SwiftUI
 
@@ -37,6 +41,14 @@ struct FreeLimitRecap: Equatable {
     }
 }
 
+/// The free-month offer as the sheet shows it.
+enum FreeLimitOffer: Equatable {
+    /// Answer three questions for a free month.
+    case answerQuestions
+    /// Already answered: the free month is waiting in the App Store.
+    case claim
+}
+
 struct FreeLimitSheet: View {
     /// The quota that ran out. Read from the access snapshot, not a literal — it has
     /// changed once already (5 → 10).
@@ -48,6 +60,10 @@ struct FreeLimitSheet: View {
     let onShown: () -> Void
     let onSeePlans: () -> Void
     let onNotNow: () -> Void
+    /// Nil leaves the sheet exactly as it was before the offer existed.
+    var offer: FreeLimitOffer? = nil
+    var onAnswerQuestions: () -> Void = {}
+    var onClaimFreeMonth: () -> Void = {}
 
     @State private var measuredHeight: CGFloat = 420
     @State private var hasReportedShown = false
@@ -87,6 +103,10 @@ struct FreeLimitSheet: View {
                         .foregroundStyle(Color.textSecondary)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
+
+                    if let offer {
+                        offerCard(offer)
+                    }
                 }
                 .padding(.horizontal, 32)
                 .padding(.top, 28)
@@ -96,12 +116,24 @@ struct FreeLimitSheet: View {
             .scrollBounceBehavior(.basedOnSize)
 
             VStack(spacing: 12) {
-                Button(action: onSeePlans) {
-                    Text("See plans")
-                        .frame(maxWidth: .infinity)
+                if let offer {
+                    Button(action: offer == .claim ? onClaimFreeMonth : onAnswerQuestions) {
+                        Text(offer == .claim ? "Claim free month" : "Answer 3 questions")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+
+                    Button("See plans", action: onSeePlans)
+                        .foregroundStyle(Color.accent)
+                } else {
+                    Button(action: onSeePlans) {
+                        Text("See plans")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
 
                 Button("Not now", action: onNotNow)
                     .foregroundStyle(Color.textSecondary)
@@ -123,6 +155,32 @@ struct FreeLimitSheet: View {
             hasReportedShown = true
             onShown()
         }
+    }
+
+    private func offerCard(_ offer: FreeLimitOffer) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "gift")
+                .font(.system(size: 22))
+                .foregroundStyle(Color.accent)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(offer == .claim ? "Your free month is ready" : "Get a month free")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.textPrimary)
+                Text(offer == .claim
+                     ? "Claim it in the App Store whenever you like."
+                     : "Answer 3 quick questions about Repster.")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.textSecondary)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(Color.accentSoft, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.accent, lineWidth: 1.5))
     }
 
     private func recapTile(value: Int, label: String) -> some View {
@@ -152,6 +210,30 @@ struct FreeLimitSheet: View {
                 freeWorkoutLimit: 10,
                 recap: FreeLimitRecap(workouts: 12, sets: 184),
                 onShown: {}, onSeePlans: {}, onNotNow: {}
+            )
+        }
+}
+
+#Preview("Free-month offer") {
+    Color.bg
+        .sheet(isPresented: .constant(true)) {
+            FreeLimitSheet(
+                freeWorkoutLimit: 10,
+                recap: FreeLimitRecap(workouts: 10, sets: 184),
+                onShown: {}, onSeePlans: {}, onNotNow: {},
+                offer: .answerQuestions
+            )
+        }
+}
+
+#Preview("Free month answered") {
+    Color.bg
+        .sheet(isPresented: .constant(true)) {
+            FreeLimitSheet(
+                freeWorkoutLimit: 10,
+                recap: FreeLimitRecap(workouts: 10, sets: 184),
+                onShown: {}, onSeePlans: {}, onNotNow: {},
+                offer: .claim
             )
         }
 }

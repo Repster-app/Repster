@@ -138,6 +138,39 @@ enum FreeLimitSheetResult: String {
     /// Pulled down without answering. Kept apart from `notNow` because a swipe is the
     /// user leaving, not choosing.
     case swiped
+    /// Chose the free-month questions over the paywall.
+    case answerQuestions = "answer_questions"
+    /// Already answered the questions; went to claim the free month.
+    case claimFreeMonth = "claim_free_month"
+}
+
+/// Which set of quick questions an event belongs to. Keep the raw values stable — they split
+/// every `questions …` event. The lapsed variant of the free month's first question is told
+/// apart by its question id (`why_cancelled`), not by a third set.
+enum FeedbackQuestionSet: String {
+    case freeMonth = "free_month"
+    case subscriber
+}
+
+/// How the subscriber thank-you card was closed. Every one of them closes it for good.
+enum SubscriberCardResult: String {
+    case questions
+    case email
+    case dismissed
+}
+
+extension RestTimerAlarmAuthorization {
+    /// Snake case like every other property value; the raw values are UserDefaults storage.
+    var analyticsValue: String {
+        switch self {
+        case .authorized:
+            return "authorized"
+        case .denied:
+            return "denied"
+        case .notDetermined:
+            return "not_determined"
+        }
+    }
 }
 
 enum WorkoutStartSource: String {
@@ -422,6 +455,80 @@ extension AnalyticsServiceProtocol {
 
     func freeLimitSheetClosed(result: FreeLimitSheetResult) {
         track(.freeLimitSheetClosed, properties: [
+            .result: .string(result.rawValue)
+        ])
+    }
+
+    // Free month for feedback (FREE_MONTH_AND_SUBSCRIBER_FEEDBACK_SCOPING.md §4)
+    //
+    // The redemption itself happens in the App Store, out of the app's sight: count those in App
+    // Store Connect (Offer Codes) and RevenueCat. `free month claim tapped` is as far as the app
+    // can follow.
+
+    /// Once per install, when the one notification is decided — including when permission is
+    /// missing and nothing is scheduled, which is what makes the notification's reach measurable.
+    func freeMonthNotificationScheduled(
+        permission: RestTimerAlarmAuthorization,
+        customerType: CustomerType
+    ) {
+        track(.freeMonthNotificationScheduled, properties: [
+            .notificationPermission: .string(permission.analyticsValue),
+            .customerType: .string(customerType.rawValue)
+        ])
+    }
+
+    func freeMonthNotificationOpened(customerType: CustomerType) {
+        track(.freeMonthNotificationOpened, properties: [
+            .customerType: .string(customerType.rawValue)
+        ])
+    }
+
+    func freeMonthOfferShown(entry: FreeMonthOfferEntry, customerType: CustomerType) {
+        track(.freeMonthOfferShown, properties: [
+            .entryPoint: .string(entry.rawValue),
+            .customerType: .string(customerType.rawValue)
+        ])
+    }
+
+    func freeMonthClaimTapped(customerType: CustomerType) {
+        track(.freeMonthClaimTapped, properties: [
+            .customerType: .string(customerType.rawValue)
+        ])
+    }
+
+    // Quick questions, shared by the free month and the subscriber card. Fixed option ids, never
+    // free text: the privacy policy promises multiple choice only. Going Back and answering again
+    // sends a second `questions answered`, so read the last answer per person and question.
+
+    func questionsAnswered(questionSet: FeedbackQuestionSet, questionId: String, answer: String) {
+        track(.questionsAnswered, properties: [
+            .questionSet: .string(questionSet.rawValue),
+            .questionId: .string(questionId),
+            .answer: .string(answer)
+        ])
+    }
+
+    func questionsCompleted(questionSet: FeedbackQuestionSet) {
+        track(.questionsCompleted, properties: [
+            .questionSet: .string(questionSet.rawValue)
+        ])
+    }
+
+    func questionsClosed(questionSet: FeedbackQuestionSet, lastQuestionId: String) {
+        track(.questionsClosed, properties: [
+            .questionSet: .string(questionSet.rawValue),
+            .lastQuestionId: .string(lastQuestionId)
+        ])
+    }
+
+    // Subscriber thank-you card
+
+    func subscriberCardShown() {
+        track(.subscriberCardShown)
+    }
+
+    func subscriberCardClosed(result: SubscriberCardResult) {
+        track(.subscriberCardClosed, properties: [
             .result: .string(result.rawValue)
         ])
     }
@@ -1133,6 +1240,15 @@ enum AnalyticsEvent: String, CaseIterable {
     case restorePurchasesTapped = "restore purchases tapped"
     case freeLimitSheetShown = "free limit sheet shown"
     case freeLimitSheetClosed = "free limit sheet closed"
+    case freeMonthNotificationScheduled = "free month notification scheduled"
+    case freeMonthNotificationOpened = "free month notification opened"
+    case freeMonthOfferShown = "free month offer shown"
+    case freeMonthClaimTapped = "free month claim tapped"
+    case questionsAnswered = "questions answered"
+    case questionsCompleted = "questions completed"
+    case questionsClosed = "questions closed"
+    case subscriberCardShown = "subscriber card shown"
+    case subscriberCardClosed = "subscriber card closed"
     case unitSystemToggled = "unit system toggled"
     case analyticsOptOutToggled = "analytics opt-out toggled"
     case trainingDataSharingToggled = "training data sharing toggled"
@@ -1206,6 +1322,14 @@ enum AnalyticsPropertyKey: String, CaseIterable {
     case accessTier = "access_tier"
     case remainingFreeWorkouts = "remaining_free_workouts"
     case freeWorkoutLimit = "free_workout_limit"
+    // Free month for feedback and the subscriber thank-you card. The free month's entry point
+    // reuses `entry_point` below rather than adding an `entry` key.
+    case notificationPermission = "notification_permission"
+    case customerType = "customer_type"
+    case questionSet = "question_set"
+    case questionId = "question_id"
+    case answer
+    case lastQuestionId = "last_question_id"
     /// How many sets in the workout had both a suggestion and a logged weight.
     case suggestionSetsComparedBucket = "suggestion_sets_compared_bucket"
     /// Share of those logged at the suggested weight. The headline quality signal for Smart

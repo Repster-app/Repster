@@ -29,6 +29,21 @@ enum SupportEmailComposer {
         )
     }
 
+    /// From the subscriber thank-you card. Its own subject line, so these replies are easy to
+    /// find among general feedback.
+    static func subscriberFeedbackURL(
+        appVersion: String? = nil,
+        build: String? = nil,
+        systemVersion: String = UIDevice.current.systemVersion
+    ) -> URL? {
+        makeURL(
+            subject: "\(BrandingConfiguration.appName) subscriber feedback",
+            appVersion: appVersion,
+            build: build,
+            systemVersion: systemVersion
+        )
+    }
+
     static func importSupportURL(
         appVersion: String? = nil,
         build: String? = nil,

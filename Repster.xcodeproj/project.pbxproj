@@ -332,6 +332,13 @@
 		ZA0021 /* StartWorkoutSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZB0021 /* StartWorkoutSheet.swift */; };
 		FLS001 /* FreeLimitSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FLS101 /* FreeLimitSheet.swift */; };
 		FLS002 /* FreeLimitSheetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FLS102 /* FreeLimitSheetTests.swift */; };
+		FMO001 /* FreeMonthOfferService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FMO101 /* FreeMonthOfferService.swift */; };
+		FMO002 /* NotificationOpenRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FMO102 /* NotificationOpenRouter.swift */; };
+		FMO003 /* SubscriberThanks.swift in Sources */ = {isa = PBXBuildFile; fileRef = FMO103 /* SubscriberThanks.swift */; };
+		FMO004 /* FeedbackQuestionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FMO104 /* FeedbackQuestionsView.swift */; };
+		FMO005 /* FeedbackFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FMO105 /* FeedbackFlowView.swift */; };
+		FMO006 /* SubscriberThanksCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FMO106 /* SubscriberThanksCard.swift */; };
+		FMO007 /* FreeMonthOfferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FMO107 /* FreeMonthOfferTests.swift */; };
 		ZA0030 /* EmbeddedExerciseChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZB0030 /* EmbeddedExerciseChartView.swift */; };
 /* End PBXBuildFile section */
 
@@ -690,6 +697,13 @@
 		ZB0021 /* StartWorkoutSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartWorkoutSheet.swift; sourceTree = "<group>"; };
 		FLS101 /* FreeLimitSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FreeLimitSheet.swift; sourceTree = "<group>"; };
 		FLS102 /* FreeLimitSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FreeLimitSheetTests.swift; sourceTree = "<group>"; };
+		FMO101 /* FreeMonthOfferService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FreeMonthOfferService.swift; sourceTree = "<group>"; };
+		FMO102 /* NotificationOpenRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationOpenRouter.swift; sourceTree = "<group>"; };
+		FMO103 /* SubscriberThanks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriberThanks.swift; sourceTree = "<group>"; };
+		FMO104 /* FeedbackQuestionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackQuestionsView.swift; sourceTree = "<group>"; };
+		FMO105 /* FeedbackFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackFlowView.swift; sourceTree = "<group>"; };
+		FMO106 /* SubscriberThanksCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriberThanksCard.swift; sourceTree = "<group>"; };
+		FMO107 /* FreeMonthOfferTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FreeMonthOfferTests.swift; sourceTree = "<group>"; };
 		ZB0030 /* EmbeddedExerciseChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddedExerciseChartView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -1176,6 +1190,9 @@
 				BN0014 /* CustomizeHomeSheet.swift */,
 				ZB0021 /* StartWorkoutSheet.swift */,
 				FLS101 /* FreeLimitSheet.swift */,
+				FMO104 /* FeedbackQuestionsView.swift */,
+				FMO105 /* FeedbackFlowView.swift */,
+				FMO106 /* SubscriberThanksCard.swift */,
 				IN1008 /* TrainingInsightsHookView.swift */,
 			);
 			path = Views;
@@ -1211,6 +1228,9 @@
 				BIM001 /* ImportService.swift */,
 				BL0004 /* ExportService.swift */,
 				TDS101 /* TrainingDataSharingService.swift */,
+				FMO101 /* FreeMonthOfferService.swift */,
+				FMO102 /* NotificationOpenRouter.swift */,
+				FMO103 /* SubscriberThanks.swift */,
 				B70003 /* ServiceContainer.swift */,
 				BM0004 /* SeedService.swift */,
 				BM0005 /* GhostSetRepsBackfillMigration.swift */,
@@ -1591,6 +1611,7 @@
 				SDR1001 /* SwiftDataLiveModelBoundaryRatchetTests.swift */,
 				OBC1001 /* OnboardingCompletionTests.swift */,
 				FLS102 /* FreeLimitSheetTests.swift */,
+				FMO107 /* FreeMonthOfferTests.swift */,
 				AHO011 /* AppleHealthOfferTests.swift */,
 			);
 			path = RepsterTests;
@@ -1939,6 +1960,12 @@
 				ZA0020 /* ExerciseSelectionSheet.swift in Sources */,
 				ZA0021 /* StartWorkoutSheet.swift in Sources */,
 				FLS001 /* FreeLimitSheet.swift in Sources */,
+				FMO001 /* FreeMonthOfferService.swift in Sources */,
+				FMO002 /* NotificationOpenRouter.swift in Sources */,
+				FMO003 /* SubscriberThanks.swift in Sources */,
+				FMO004 /* FeedbackQuestionsView.swift in Sources */,
+				FMO005 /* FeedbackFlowView.swift in Sources */,
+				FMO006 /* SubscriberThanksCard.swift in Sources */,
 				PH0001 /* AnalyticsServiceProtocol.swift in Sources */,
 				PH0002 /* AnalyticsService.swift in Sources */,
 				AI0003 /* ChartSetData.swift in Sources */,
@@ -2080,6 +2107,7 @@
 				SDR0001 /* SwiftDataLiveModelBoundaryRatchetTests.swift in Sources */,
 				OBC0001 /* OnboardingCompletionTests.swift in Sources */,
 				FLS002 /* FreeLimitSheetTests.swift in Sources */,
+				FMO007 /* FreeMonthOfferTests.swift in Sources */,
 				AHO001 /* AppleHealthOfferTests.swift in Sources */,
 				TT0003 /* ChartDataServiceTests.swift in Sources */,
 				TT0004 /* WorkoutHistoryBackupTests.swift in Sources */,
