@@ -105,7 +105,11 @@ Lightweight SwiftData migration.
 
 Shape depends on §3.3.
 
-### 2.4 Muscle group coverage · **nothing built**
+### 2.4 Muscle group coverage · **Phase 1 built 2026-10-29** (uncommitted)
+
+Phase 1 is in: the leg rollup (kept out of `normalizedValue`), `MuscleAttribution`, the secondary
+line on exercise detail, and the secondary picker in the editor. Phases 2 and 3 are not built.
+The details and the seed-tag audit are in the scoping doc. The 2026-09-06 note below is history.
 
 Scoped in [SECONDARY_MUSCLES_SCOPING.md](SECONDARY_MUSCLES_SCOPING.md). Verified
 2026-09-06: no `MuscleAttribution` type exists anywhere in the tree, and

@@ -142,6 +142,16 @@ struct CreateEditExerciseSheet: View {
                 focusedField = nil
             })
 
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Secondary Muscles")
+                WrappingHStack(spacing: 6, lineSpacing: 6) {
+                    ForEach(viewModel.secondaryMuscleOptions, id: \.self) { muscle in
+                        secondaryMusclePill(muscle)
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+
             Picker("Movement Pattern", selection: $viewModel.movementPattern) {
                 Text("None").tag(Optional<MovementPattern>.none)
                 ForEach(MovementPattern.allCases, id: \.self) { pattern in
@@ -149,6 +159,26 @@ struct CreateEditExerciseSheet: View {
                 }
             }
         }
+    }
+
+    /// Plain button style keeps each pill its own tap target inside the Form row.
+    private func secondaryMusclePill(_ muscle: String) -> some View {
+        let isSelected = viewModel.isSecondaryMuscleSelected(muscle)
+
+        return Button {
+            focusedField = nil
+            viewModel.toggleSecondaryMuscle(muscle)
+        } label: {
+            Text(ExercisePrimaryGroup.displayName(for: muscle))
+                .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? .white : Color.textSecondary)
+                .padding(.vertical, 6)
+                .padding(.horizontal, 10)
+                .background(isSelected ? Color.accent : Color.bgSubtle)
+                .cornerRadius(8)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: - Advanced Section

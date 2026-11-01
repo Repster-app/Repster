@@ -24,7 +24,8 @@ final class CreateEditExerciseViewModel {
     var equipmentType: EquipmentType = .barbell
     var trackingType: TrackingType = .weightReps
     var primaryMuscle: String = ""
-    /// Hidden from the current form, but preserved for existing exercises.
+    /// Stored tags, edited a group at a time through `toggleSecondaryMuscle`, so a library
+    /// exercise keeps tags like "glutes" unless its whole legs group is removed.
     var secondaryMuscles: [String] = []
     var movementPattern: MovementPattern? = nil
     var unilateral: Bool = false
@@ -65,6 +66,20 @@ final class CreateEditExerciseViewModel {
         }
 
         return ExercisePrimaryGroup.displayName(for: primaryMuscle)
+    }
+
+    var secondaryMuscleOptions: [String] {
+        MuscleAttribution.secondaryOptions(primaryMuscle: primaryMuscle, secondaryMuscles: secondaryMuscles)
+    }
+
+    func isSecondaryMuscleSelected(_ group: String) -> Bool {
+        MuscleAttribution(primaryMuscle: primaryMuscle, secondaryMuscles: secondaryMuscles)
+            .secondary
+            .contains(group)
+    }
+
+    func toggleSecondaryMuscle(_ group: String) {
+        secondaryMuscles = MuscleAttribution.toggling(group, in: secondaryMuscles)
     }
 
     var supportsUnilateral: Bool {

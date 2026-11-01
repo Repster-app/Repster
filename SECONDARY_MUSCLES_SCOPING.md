@@ -1,6 +1,6 @@
 # Muscle Group Coverage — Scoping
 
-**Status:** scoping only, nothing built
+**Status:** Phase 1 built 2026-10-29 for 1.6 (uncommitted, device pass outstanding). Phases 2 and 3 not built
 **Date:** 2026-08-16
 **Supersedes:** the insights-attribution framing in this doc's first draft
 
@@ -27,7 +27,7 @@ From [COMPETITIVE_FEATURE_ANALYSIS.md](COMPETITIVE_FEATURE_ANALYSIS.md):
 | When | Surface | Today |
 |---|---|---|
 | **Planning** a routine | `CreateEditTemplateView` | **Nothing.** No muscle overview while editing |
-| **Finishing** a workout | `WorkoutSummarySheet` | **Nothing.** No muscle display at all |
+| **Finishing** a workout | `WorkoutSummarySheet` | **Nothing** when this was written. Since 2026-09-02 the share card has a Muscles page, a primary-only volume donut ([WorkoutShareCardBuilder.swift](Repster/Features/Workout/Views/WorkoutShareCardBuilder.swift)). Keep it primary-only, for the same reason as the Charts donut below |
 | **Over time** | Insights muscle panel, Charts breakdown | Exists, primary-only |
 
 Two of the three don't exist. The one that does is the one I over-scoped last time.
@@ -54,6 +54,8 @@ The seed data's secondary tags use a finer-grained leg vocabulary that isn't in 
 
 **Recommendation: roll up to the existing taxonomy.** Add `glutes | quads | hamstrings | calves → legs` to `normalizedValue`. Zero migration, zero UI churn.
 
+**As built (2026-10-29), the rollup is not in `normalizedValue`.** It lives in a separate `ExerciseMuscleGroupCatalog.coverageGroup(for:)` that only the secondary path uses. `normalizedValue` feeds every primary-muscle surface (Insights, charts, Home and Calendar dots, filters, share card, analytics), and real exercises carry off-catalog primaries. The editor keeps a legacy `"arms"` primary selectable for exactly that reason, and the colour table has cases for "quads", "lats" and "delts". Rolling a "quads" primary up there would regroup numbers users have already seen. A test pins `normalizedValue("quads") == "quads"`.
+
 Measured yield: **59 of 96 tags survive** rollup + dedupe; **41 of 69 exercises gain at least one secondary group**. The 37 that collapse were leg sub-muscles under a `legs` primary, which was never new information. What survives is what users notice:
 
 | Exercise | Primary | Gains |
@@ -67,6 +69,8 @@ Measured yield: **59 of 96 tags survive** rollup + dedupe; **41 of 69 exercises 
 The alternative — promoting glutes/quads/hamstrings/calves to first-class groups — changes the **primary** taxonomy too: migration, seed re-tag, new pills, new colors, a visible shift in existing baselines. The Hevy thread's front/side/rear delt request is the same idea one level deeper. Real demand, but a separate project. Ship the rollup first.
 
 `MuscleGroupColors` already handles glutes, hamstrings, and quads ([MuscleGroupColors.swift:31](Repster/Core/Extensions/MuscleGroupColors.swift:31)). Only **calves** needs a case added.
+
+As built, no calves case was added. Secondaries are rolled up before anything shows them, so a raw "calves" never reaches the colour table. A new case would only recolour a legacy "calves" primary, which today gets a stable fallback colour.
 
 ---
 
@@ -123,6 +127,14 @@ Worth deferring until the panel work in Phase 3.
 
 Users can now see and edit secondary muscles. Nothing recalculates.
 
+**Built 2026-10-29 (uncommitted):**
+
+- `coverageGroup(for:)` and `MuscleAttribution` in [ExerciseMuscleGroupCatalog.swift](Repster/Features/Exercise/Models/ExerciseMuscleGroupCatalog.swift). `MuscleAttribution` applies Decision 2's four rules. It also owns the editor's option list and toggle, so the rules sit in one file.
+- **Exercise detail** shows one line, primary in accent with the secondaries muted after it: "Chest · Shoulders · Triceps". It wraps for long lists. It is plain text rather than pills, because the primary was never a pill. VoiceOver reads "Chest, also works Shoulders, Triceps".
+- **Editor**: a "Secondary Muscles" row of toggle pills under Primary Muscle. It offers the catalog minus cardio, full body and the primary's group. Any off-catalog group the exercise already carries is added so it can still be removed. Toggling works a group at a time, and other groups keep their stored spelling. So Deadlift's `hamstrings, glutes` stays as stored unless legs is turned off, and the fine-grained tags survive for a later taxonomy project.
+- Tests: `MuscleAttributionTests` (rollup, dedupe, options, toggling), a seed-wide check that every seeded secondary lands on a catalog group, and two editor view-model tests (create with picks, edit without flattening).
+- **Yield on the library:** 41 of 69 exercises now show at least one secondary group.
+
 ### Phase 2 — the two missing surfaces (the actual feature)
 
 **Routine planning overview.** A summary in `CreateEditTemplateView` showing muscles covered by the exercises added so far — primary solid, secondary muted, updating live. `CreateEditTemplateViewModel` already carries `primaryMuscle` per exercise row ([:15](Repster/Features/Templates/ViewModels/CreateEditTemplateViewModel.swift:15)), so it needs secondary alongside it and a coverage strip in the view.
@@ -163,6 +175,7 @@ No migration. No stats rebuild. Numbers change on update.
 1. **Does the routine overview show coverage or volume?** Coverage ("hits chest, shoulders, triceps") is simpler, needs no weighting, and matches the request. Volume-per-muscle-in-this-routine is the richer version and drags the credit constant into Phase 2. Recommend coverage.
 2. **Is 0.5 right?** Phase 3 only. Not blocking.
 3. **Re-tag the seed set?** Nobody has audited those 96 tags since they were written. Worth a pass before they drive visible numbers — but Phase 1 and 2 surface the tags as-is, which is itself a cheap way to find the wrong ones.
+   **Audited 2026-10-29: nothing visible is wrong.** Two grip exercises are missing forearms: Farmer's Walk (abs | shoulders, back) and Dead Hang (back | shoulders). Two tags are debatable: Barbell Row's core, which Pendlay Row doesn't have, and Kettlebell Swing's shoulders. Hip Adductor Machine's `glutes` is wrong, but it rolls into its own legs primary and never shows. Not changed: `SeedService` only seeds an empty store, so a seed edit reaches new installs only and splits the library between old and new users. Users can now fix tags themselves in the editor.
 4. **Fine-grained taxonomy** (front/side/rear delts, glutes vs quads). Real demand in the thread. Separate project.
 
 ---

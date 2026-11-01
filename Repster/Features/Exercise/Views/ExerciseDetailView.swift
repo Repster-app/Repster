@@ -124,11 +124,7 @@ struct ExerciseDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    if let muscle = exercise.primaryMuscle {
-                        Text(ExercisePrimaryGroup.displayName(for: muscle))
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Color.accent)
-                    }
+                    musclesLine(exercise)
                     Text(exercise.equipmentType.displayName)
                         .font(.system(size: 13))
                         .foregroundStyle(Color.textTertiary)
@@ -150,6 +146,36 @@ struct ExerciseDetailView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
+    }
+
+    /// The primary in accent with the secondary groups muted after it, as one line that
+    /// wraps: "Chest · Shoulders · Triceps".
+    @ViewBuilder
+    private func musclesLine(_ exercise: Exercise) -> some View {
+        let primary = exercise.primaryMuscle.map { ExercisePrimaryGroup.displayName(for: $0) }
+        let secondary = MuscleAttribution(
+            primaryMuscle: exercise.primaryMuscle,
+            secondaryMuscles: exercise.secondaryMuscles
+        ).secondary.map { ExercisePrimaryGroup.displayName(for: $0) }
+
+        if primary != nil || !secondary.isEmpty {
+            let separator = primary == nil || secondary.isEmpty ? "" : " · "
+            (
+                Text(primary ?? "")
+                    .foregroundStyle(Color.accent)
+                + Text(separator + secondary.joined(separator: " · "))
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.textSecondary)
+            )
+            .font(.system(size: 13, weight: .medium))
+            .accessibilityLabel(
+                secondary.isEmpty
+                    ? (primary ?? "")
+                    : [primary, "also works " + secondary.joined(separator: ", ")]
+                        .compactMap { $0 }
+                        .joined(separator: ", ")
+            )
+        }
     }
 
     private func statItem(label: String, value: String) -> some View {

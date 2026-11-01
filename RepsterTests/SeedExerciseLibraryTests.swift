@@ -43,6 +43,22 @@ final class SeedExerciseLibraryTests: XCTestCase {
         XCTAssertEqual(exercisesByName["Plank"]?.trackingType, .duration)
     }
 
+    /// Exercise detail shows seeded secondaries through `MuscleAttribution`. A tag that
+    /// doesn't land on a catalog group would show raw, with no colour or filter behind it.
+    func testEverySeededSecondaryResolvesToACatalogGroup() throws {
+        let catalogGroups = Set(ExerciseMuscleGroupCatalog.supportedEntries.map(\.value))
+
+        for exercise in try loadSeedExerciseFile().exercises {
+            let attribution = MuscleAttribution(
+                primaryMuscle: exercise.primaryMuscle,
+                secondaryMuscles: exercise.secondaryMuscles
+            )
+            for group in attribution.secondary {
+                XCTAssertTrue(catalogGroups.contains(group), "\(exercise.name): \(group)")
+            }
+        }
+    }
+
     private func loadSeedExerciseFile() throws -> SeedExerciseFile {
         let fileURL = URL(fileURLWithPath: #filePath)
         let repositoryRootURL = fileURL

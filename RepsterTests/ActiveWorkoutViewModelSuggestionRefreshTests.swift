@@ -1999,6 +1999,53 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         XCTAssertEqual(viewModel.primaryMuscleDisplayName, "Arms")
     }
 
+    func testCreateEditExerciseViewModelSavesPickedSecondaryGroupsOnCreate() async throws {
+        let exerciseService = ExerciseServiceStub()
+        let viewModel = CreateEditExerciseViewModel(
+            exercise: nil,
+            exerciseService: exerciseService,
+            settingsService: SettingsServiceStub(profile: HealthProfile())
+        )
+
+        viewModel.name = "Landmine Press"
+        viewModel.primaryMuscle = "shoulders"
+        XCTAssertFalse(viewModel.secondaryMuscleOptions.contains("shoulders"))
+
+        viewModel.toggleSecondaryMuscle("triceps")
+        viewModel.toggleSecondaryMuscle("chest")
+        XCTAssertTrue(viewModel.isSecondaryMuscleSelected("chest"))
+
+        try await viewModel.save()
+
+        let createdExercise = try XCTUnwrap(exerciseService.createdExerciseFields.last)
+        XCTAssertEqual(createdExercise.secondaryMuscles, ["triceps", "chest"])
+    }
+
+    func testCreateEditExerciseViewModelEditsSecondaryGroupsWithoutFlatteningStoredTags() async throws {
+        let exerciseService = ExerciseServiceStub()
+        let viewModel = CreateEditExerciseViewModel(
+            exercise: ChartExerciseData(from: Exercise(
+                name: "Conventional Deadlift",
+                equipmentType: .barbell,
+                trackingType: .weightReps,
+                primaryMuscle: "back",
+                secondaryMuscles: ["hamstrings", "glutes", "core"]
+            )),
+            exerciseService: exerciseService,
+            settingsService: SettingsServiceStub(profile: HealthProfile())
+        )
+
+        XCTAssertTrue(viewModel.isSecondaryMuscleSelected("legs"))
+        XCTAssertTrue(viewModel.isSecondaryMuscleSelected("abs"))
+
+        viewModel.toggleSecondaryMuscle("abs")
+        viewModel.toggleSecondaryMuscle("forearms")
+        try await viewModel.save()
+
+        let updatedExercise = try XCTUnwrap(exerciseService.updatedExerciseFields.last?.fields)
+        XCTAssertEqual(updatedExercise.secondaryMuscles, ["hamstrings", "glutes", "forearms"])
+    }
+
     func testCreateEditExerciseViewModelDoesNotLockTrackingTypeForPlaceholderSets() async {
         let exerciseService = ExerciseServiceStub()
         exerciseService.hasSets = true
