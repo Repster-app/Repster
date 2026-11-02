@@ -10,6 +10,10 @@ from a diff.
 The launch mechanics are [PRE_1.5_CHECKLIST.md](PRE_1.5_CHECKLIST.md).
 Why things were *not* done, feature by feature, is [1_5_DECISION_RECORD.md](1_5_DECISION_RECORD.md).
 
+**Updated 2026-11-02:** what is in the 1.6 build is now [RELEASE_1_6_PLAN.md](RELEASE_1_6_PLAN.md),
+and the launch mechanics are [PRE_1.6_CHECKLIST.md](PRE_1.6_CHECKLIST.md). This file stays the list
+of what is not in the build.
+
 Every item below was verified against the tree on 2026-09-06, not copied forward
 from a plan. Where an item was previously described as unbuilt and turned out to be
 built, it has been removed from this list and named in §7.
@@ -69,6 +73,10 @@ it was a two-place change when it was deferred from 1.4.
 
 ### 2.1 `equipmentType` on `exerciseCreated` · **size XS — do this first**
 
+**Partly overtaken 2026-11-02:** with Share Training Data on, `training exercises created` already
+sends each custom exercise's name and equipment (`4fef2c0`). `exerciseCreated` itself is unchanged,
+so only people sharing are counted.
+
 Verified 2026-09-06: [AnalyticsServiceProtocol.swift:569](Repster/Core/Services/Protocols/AnalyticsServiceProtocol.swift:569)
 still reads `exerciseCreated(source:)` and tracks `source` alone.
 
@@ -105,10 +113,11 @@ Lightweight SwiftData migration.
 
 Shape depends on §3.3.
 
-### 2.4 Muscle group coverage · **Phase 1 built 2026-10-29** (uncommitted)
+### 2.4 Muscle group coverage · **Phase 1 built 2026-10-29** (committed acf4c39); editor reworked 2026-11-01 (committed 219b49b)
 
-Phase 1 is in: the leg rollup (kept out of `normalizedValue`), `MuscleAttribution`, the secondary
-line on exercise detail, and the secondary picker in the editor. Phases 2 and 3 are not built.
+Phase 1 is in: the rollup (kept out of `normalizedValue`), `MuscleAttribution`, the secondary line
+on exercise detail, and a 19-muscle grouped picker in the editor. The library re-tag, the update
+for existing users and Phases 2 and 3 are not built.
 The details and the seed-tag audit are in the scoping doc. The 2026-09-06 note below is history.
 
 Scoped in [SECONDARY_MUSCLES_SCOPING.md](SECONDARY_MUSCLES_SCOPING.md). Verified
@@ -153,6 +162,13 @@ tree does not have should be re-audited against
 that document still carries `Status: scoped, not started`, which is no longer true and
 makes it an unreliable gap list until it is re-baselined.
 
+### 2.7 Left vs Right rethink · **built 2026-11-02** (committed 728a462), now in the build
+
+A tile, one list and a line-chart exercise page, from
+[SIDES_RETHINK_SCOPING.md](SIDES_RETHINK_SCOPING.md). What stays out is the by-weight best-set
+table: its code is kept with no call site, and the page shows the best set from the last 3
+sessions instead.
+
 ---
 
 ## 3. Open decisions that block the above
@@ -180,7 +196,9 @@ Recommendation on file: ship the field off by default, let users opt in per exer
 One is simpler. Two allows a short cue in the workout versus a longer how-to on the
 detail screen.
 
-### 3.4 Free vs. paid entitlement · **overdue, and now more so**
+### 3.4 Free vs. paid entitlement · **answered 2026-09-11: free by default**
+
+The paywall only gates new workouts once the free quota runs out. What follows is history.
 
 Reads as core logging correctness and should probably be free: `bilateralLoadFactor`,
 `Exercise.notes`.
@@ -281,6 +299,12 @@ Open design docs, listed so they are not forgotten. None are commitments.
   `Features/Programs/Views/` now holds `ProgramPickerView` and nothing else
 - Supersets on the Live Activity — the one line of the superset scope not built, and
   it is an open question rather than pending work
+- [SAMPLE_HISTORY_SCOPING.md](SAMPLE_HISTORY_SCOPING.md),
+  [DEFAULT_REP_RANGE_SCOPING.md](DEFAULT_REP_RANGE_SCOPING.md),
+  [BODYWEIGHT_SUGGESTIONS_SCOPING.md](BODYWEIGHT_SUGGESTIONS_SCOPING.md) and
+  [PROGRESSION_LADDER_SCOPING.md](PROGRESSION_LADDER_SCOPING.md) — scoped since 1.5, not built
+- [INSIGHTS_NEW_USER_SCOPING.md](INSIGHTS_NEW_USER_SCOPING.md) option B — "since you started" e1RM
+- Program picker redesign and performance vs expected — design canvases only, nothing built
 
 ---
 
