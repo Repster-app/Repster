@@ -18,13 +18,13 @@ enum ActiveWorkoutBottomAccessoryLayout {
     /// redundant mid-entry — you are already logging the next set — and a bar appearing
     /// underneath would shift the keypad while a thumb is on it.
     static func shouldShowRestTimer(
-        for state: RestTimerState,
+        for presence: RestTimerPresence,
         isKeyboardVisible: Bool
     ) -> Bool {
-        switch state {
+        switch presence {
         case .idle:
             return false
-        case .running, .paused:
+        case .counting:
             return true
         case .finished:
             return !isKeyboardVisible
@@ -43,7 +43,6 @@ enum ActiveWorkoutBottomAccessoryLayout {
     /// thumb is on it.
     static func shouldShowSupersetPrompt(
         hasPrompt: Bool,
-        restTimerState: RestTimerState,
         isKeyboardVisible: Bool
     ) -> Bool {
         hasPrompt && !isKeyboardVisible
@@ -107,6 +106,9 @@ struct ActiveWorkoutView: View {
 
     // MARK: - Body
 
+    // Nothing read here may change every second. A re-run of this body reaches the sheets it
+    // presents, and UIKit then replaces every row of a menu open in one of them. The two ticking
+    // values are read by `WorkoutClock` and `WorkoutRestBand`; layout goes by `restTimerPresence`.
     var body: some View {
         VStack(spacing: 0) {
             // Header bar (T023)
@@ -337,7 +339,7 @@ struct ActiveWorkoutView: View {
 
     private var isRestTimerVisible: Bool {
         ActiveWorkoutBottomAccessoryLayout.shouldShowRestTimer(
-            for: viewModel.restTimer,
+            for: viewModel.restTimerPresence,
             isKeyboardVisible: isSetKeyboardVisible
         )
     }
@@ -345,7 +347,6 @@ struct ActiveWorkoutView: View {
     private var isSupersetPromptVisible: Bool {
         ActiveWorkoutBottomAccessoryLayout.shouldShowSupersetPrompt(
             hasPrompt: viewModel.supersetPrompt != nil,
-            restTimerState: viewModel.restTimer,
             isKeyboardVisible: isSetKeyboardVisible
         )
     }
@@ -372,30 +373,8 @@ struct ActiveWorkoutView: View {
             }
 
             if isRestTimerVisible {
-                RestTimerView(
-                    state: viewModel.restTimer,
-                    onAddTime: {
-                        services.analyticsService.recordWorkoutInteraction(.restTimerAdjusts)
-                        viewModel.addTime($0)
-                    },
-                    onSubtractTime: {
-                        services.analyticsService.recordWorkoutInteraction(.restTimerAdjusts)
-                        viewModel.subtractTime($0)
-                    },
-                    onSetDuration: {
-                        services.analyticsService.recordWorkoutInteraction(.restTimerAdjusts)
-                        viewModel.setTimerDuration($0)
-                    },
-                    onTogglePause: { viewModel.toggleRestTimerPause() },
-                    // Counted here rather than in `dismissTimer()`, which is also the
-                    // internal cleanup path for finish, discard and set completion —
-                    // that would add a phantom skip to every workout.
-                    onDismiss: {
-                        services.analyticsService.recordWorkoutInteraction(.restTimerSkips)
-                        viewModel.dismissTimer()
-                    }
-                )
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                WorkoutRestBand(viewModel: viewModel, services: services)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
             if selectedSubTab == .sets {
@@ -444,11 +423,7 @@ struct ActiveWorkoutView: View {
             Spacer()
 
             // Elapsed timer (T024)
-            ElapsedTimerView(
-                elapsedTime: viewModel.workout == nil ? nil : viewModel.elapsedTime,
-                isPaused: viewModel.isWorkoutPaused,
-                onTap: { viewModel.toggleWorkoutPause() }
-            )
+            WorkoutClock(viewModel: viewModel)
 
             Spacer()
 
@@ -510,6 +485,57 @@ struct ActiveWorkoutView: View {
         .frame(maxWidth: .infinity)
     }
 
+}
+
+/// The workout clock, in a view of its own so that only this view ticks.
+///
+/// `elapsedTime` changes every second, and `ActiveWorkoutView.body` must not read it. See the note
+/// on that body and WORKOUT_TICK_RERENDER_SCOPING.md.
+private struct WorkoutClock: View {
+    let viewModel: ActiveWorkoutViewModel
+
+    var body: some View {
+        ElapsedTimerView(
+            elapsedTime: viewModel.workout == nil ? nil : viewModel.elapsedTime,
+            isPaused: viewModel.isWorkoutPaused,
+            onTap: { viewModel.toggleWorkoutPause() }
+        )
+    }
+}
+
+/// The rest bar's contents, in a view of its own for the same reason as `WorkoutClock`.
+///
+/// Whether the bar shows at all stays with `ActiveWorkoutView`, which decides it from
+/// `restTimerPresence`, so this is only ever on screen while there is something to show.
+private struct WorkoutRestBand: View {
+    let viewModel: ActiveWorkoutViewModel
+    let services: ServiceContainer
+
+    var body: some View {
+        RestTimerView(
+            state: viewModel.restTimer,
+            onAddTime: {
+                services.analyticsService.recordWorkoutInteraction(.restTimerAdjusts)
+                viewModel.addTime($0)
+            },
+            onSubtractTime: {
+                services.analyticsService.recordWorkoutInteraction(.restTimerAdjusts)
+                viewModel.subtractTime($0)
+            },
+            onSetDuration: {
+                services.analyticsService.recordWorkoutInteraction(.restTimerAdjusts)
+                viewModel.setTimerDuration($0)
+            },
+            onTogglePause: { viewModel.toggleRestTimerPause() },
+            // Counted here rather than in `dismissTimer()`, which is also the
+            // internal cleanup path for finish, discard and set completion —
+            // that would add a phantom skip to every workout.
+            onDismiss: {
+                services.analyticsService.recordWorkoutInteraction(.restTimerSkips)
+                viewModel.dismissTimer()
+            }
+        )
+    }
 }
 
 private struct WorkoutSubTabBar: View {

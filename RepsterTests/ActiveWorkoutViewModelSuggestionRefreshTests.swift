@@ -1,4 +1,5 @@
 import XCTest
+import Observation
 import SwiftData
 import UserNotifications
 @testable import Repster
@@ -23,7 +24,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
     func testRunningTimerIsVisibleWhenKeyboardHidden() {
         XCTAssertTrue(
             ActiveWorkoutBottomAccessoryLayout.shouldShowRestTimer(
-                for: .running(remaining: 90, total: 120),
+                for: RestTimerState.running(remaining: 90, total: 120).presence,
                 isKeyboardVisible: false
             )
         )
@@ -32,7 +33,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
     func testRunningTimerStaysVisibleWhenKeyboardVisible() {
         XCTAssertTrue(
             ActiveWorkoutBottomAccessoryLayout.shouldShowRestTimer(
-                for: .running(remaining: 90, total: 120),
+                for: RestTimerState.running(remaining: 90, total: 120).presence,
                 isKeyboardVisible: true
             )
         )
@@ -41,7 +42,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
     func testPausedTimerIsVisibleWhenKeyboardHidden() {
         XCTAssertTrue(
             ActiveWorkoutBottomAccessoryLayout.shouldShowRestTimer(
-                for: .paused(remaining: 90, total: 120, source: .manual),
+                for: RestTimerState.paused(remaining: 90, total: 120, source: .manual).presence,
                 isKeyboardVisible: false
             )
         )
@@ -50,7 +51,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
     func testPausedTimerStaysVisibleWhenKeyboardVisible() {
         XCTAssertTrue(
             ActiveWorkoutBottomAccessoryLayout.shouldShowRestTimer(
-                for: .paused(remaining: 90, total: 120, source: .manual),
+                for: RestTimerState.paused(remaining: 90, total: 120, source: .manual).presence,
                 isKeyboardVisible: true
             )
         )
@@ -59,7 +60,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
     func testIdleTimerIsHidden() {
         XCTAssertFalse(
             ActiveWorkoutBottomAccessoryLayout.shouldShowRestTimer(
-                for: .idle,
+                for: RestTimerState.idle.presence,
                 isKeyboardVisible: false
             )
         )
@@ -68,7 +69,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
     func testFinishedTimerIsVisibleWhenKeyboardHidden() {
         XCTAssertTrue(
             ActiveWorkoutBottomAccessoryLayout.shouldShowRestTimer(
-                for: .finished,
+                for: RestTimerState.finished.presence,
                 isKeyboardVisible: false
             )
         )
@@ -79,7 +80,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
     func testFinishedTimerIsHiddenWhenKeyboardVisible() {
         XCTAssertFalse(
             ActiveWorkoutBottomAccessoryLayout.shouldShowRestTimer(
-                for: .finished,
+                for: RestTimerState.finished.presence,
                 isKeyboardVisible: true
             )
         )
@@ -213,8 +214,10 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             "and the prompt wraps back so the next round is one tap, not a hunt"
         )
         XCTAssertTrue(
-            ActiveWorkoutBottomAccessoryLayout.shouldShowSupersetPrompt(
-                hasPrompt: true, restTimerState: timer, isKeyboardVisible: false
+            ActiveWorkoutBottomAccessoryLayout.shouldShowRestTimer(
+                for: viewModel.restTimerPresence, isKeyboardVisible: false
+            ) && ActiveWorkoutBottomAccessoryLayout.shouldShowSupersetPrompt(
+                hasPrompt: viewModel.supersetPrompt != nil, isKeyboardVisible: false
             ),
             "the two stack — the timer says how long, the prompt says where"
         )
@@ -696,12 +699,12 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
     func testSupersetPromptIsSuppressedWhileTheKeypadIsOpen() {
         XCTAssertTrue(
             ActiveWorkoutBottomAccessoryLayout.shouldShowSupersetPrompt(
-                hasPrompt: true, restTimerState: .idle, isKeyboardVisible: false
+                hasPrompt: true, isKeyboardVisible: false
             )
         )
         XCTAssertFalse(
             ActiveWorkoutBottomAccessoryLayout.shouldShowSupersetPrompt(
-                hasPrompt: true, restTimerState: .idle, isKeyboardVisible: true
+                hasPrompt: true, isKeyboardVisible: true
             ),
             "same rule as a finished rest — a bar appearing under a thumb mid-entry shifts the keypad"
         )
@@ -709,16 +712,18 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
 
     func testThePromptStacksAboveARunningRestTimer() {
         XCTAssertTrue(
-            ActiveWorkoutBottomAccessoryLayout.shouldShowSupersetPrompt(
+            ActiveWorkoutBottomAccessoryLayout.shouldShowRestTimer(
+                for: RestTimerState.running(remaining: 60, total: 120).presence,
+                isKeyboardVisible: false
+            ) && ActiveWorkoutBottomAccessoryLayout.shouldShowSupersetPrompt(
                 hasPrompt: true,
-                restTimerState: .running(remaining: 60, total: 120),
                 isKeyboardVisible: false
             ),
             "closing a round makes both answers live at once"
         )
         XCTAssertFalse(
             ActiveWorkoutBottomAccessoryLayout.shouldShowSupersetPrompt(
-                hasPrompt: false, restTimerState: .idle, isKeyboardVisible: false
+                hasPrompt: false, isKeyboardVisible: false
             )
         )
     }
@@ -1102,6 +1107,96 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         // total - elapsed is what `recalculateTimerAfterBackground` recomputes from. With
         // elapsed ~0 immediately after starting, it has to land on the displayed remaining.
         XCTAssertEqual(total, remaining, "total must equal elapsed + remaining, and elapsed is ~0")
+    }
+
+    // MARK: - Rest timer presence
+    //
+    // `ActiveWorkoutView` lays out the bar from `restTimerPresence` rather than `restTimer`, so the
+    // seconds do not re-render it. That holds only if presence follows every real change and none
+    // of the ticks.
+
+    private func makeRestTimerViewModel() -> ActiveWorkoutViewModel {
+        let profile = HealthProfile()
+        let viewModel = ActiveWorkoutViewModel(
+            workoutService: WorkoutServiceStub(),
+            setService: SetServiceStub(),
+            exerciseService: ExerciseServiceStub(),
+            statsService: StatsServiceStub(),
+            prService: PRServiceStub(),
+            healthProfileRepo: HealthProfileRepositoryStub(profile: profile),
+            settingsService: SettingsServiceStub(profile: profile),
+            loadPrescriptionService: LoadPrescriptionServiceSpy(),
+            fatigueLearningService: makeStubFatigueLearningService()
+        )
+        viewModel.workout = Workout(
+            id: UUID(),
+            date: Date(),
+            startTime: Date().addingTimeInterval(-30),
+            status: .inProgress
+        ).testSnapshot
+        return viewModel
+    }
+
+    func testPresenceLeavesTheSecondsOut() {
+        XCTAssertEqual(RestTimerState.idle.presence, .idle)
+        XCTAssertEqual(RestTimerState.running(remaining: 90, total: 120).presence, .counting)
+        XCTAssertEqual(RestTimerState.paused(remaining: 90, total: 120, source: .manual).presence, .counting)
+        XCTAssertEqual(RestTimerState.paused(remaining: 90, total: 120, source: .workout).presence, .counting)
+        XCTAssertEqual(RestTimerState.finished.presence, .finished)
+    }
+
+    /// Nothing else would notice this breaking. The visibility tests above hand
+    /// `shouldShowRestTimer` its input directly, so a presence stuck on `.idle` would mean a rest
+    /// bar that never appears and a green suite.
+    func testRestTimerPresenceFollowsTheTimerThroughARest() {
+        clearActiveWorkoutSessionDefaults()
+        defer { clearActiveWorkoutSessionDefaults() }
+
+        let viewModel = makeRestTimerViewModel()
+        XCTAssertEqual(viewModel.restTimerPresence, .idle)
+
+        viewModel.startRestTimer(duration: 30)
+        XCTAssertEqual(viewModel.restTimerPresence, .counting, "running")
+
+        viewModel.toggleRestTimerPause()
+        XCTAssertEqual(viewModel.restTimerPresence, .counting, "paused still shows the band")
+
+        viewModel.dismissTimer()
+        XCTAssertEqual(viewModel.restTimerPresence, .idle, "dismissed mid-rest")
+
+        viewModel.restTimer = .finished
+        XCTAssertEqual(viewModel.restTimerPresence, .finished, "ran out")
+
+        viewModel.dismissTimer()
+        XCTAssertEqual(viewModel.restTimerPresence, .idle, "dismissed from \"Rest complete\"")
+    }
+
+    /// The point of `restTimerPresence`. `ActiveWorkoutView` re-renders on a change here, so it has
+    /// to stay silent while only the seconds move. `addTime` stands in for a tick: both replace
+    /// `.running` with another `.running`.
+    func testRestTimerPresenceStaysQuietWhileOnlyTheSecondsChange() {
+        final class Flag: @unchecked Sendable {
+            var didFire = false
+        }
+
+        clearActiveWorkoutSessionDefaults()
+        defer { clearActiveWorkoutSessionDefaults() }
+
+        let viewModel = makeRestTimerViewModel()
+        viewModel.startRestTimer(duration: 30)
+
+        let change = Flag()
+        withObservationTracking {
+            _ = viewModel.restTimerPresence
+        } onChange: {
+            change.didFire = true
+        }
+
+        viewModel.addTime(15)
+        XCTAssertFalse(change.didFire, "the seconds changed and the bar did not")
+
+        viewModel.dismissTimer()
+        XCTAssertTrue(change.didFire, "a real change has to get through, or the silence proves nothing")
     }
 
     // MARK: - Rest alarm authorization

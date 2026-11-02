@@ -221,8 +221,13 @@ struct WorkoutSummarySheet: View {
     /// discard deletes the rows out from under this view, and the finish has the repository actor
     /// saving them while the main actor reads. Both writes that start the actions — `isSaving`,
     /// `isDiscarding` — are read by this body, so a re-render inside that window is guaranteed.
+    ///
+    /// Time comes from the wall clock inside `computeSummary()`, which nothing observes, so the
+    /// `elapsedTime` read is what keeps it current while this sheet sits open. Past the early
+    /// return on purpose: the closing window stays frozen.
     private var displaySummary: WorkoutSummaryData? {
         if isSaving || isDiscarding { return frozenSummary }
+        _ = viewModel.elapsedTime
         return viewModel.computeSummary() ?? frozenSummary
     }
 

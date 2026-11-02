@@ -51,6 +51,32 @@ enum RestTimerState: Equatable {
     case paused(remaining: Int, total: Int, source: RestTimerPauseSource)
     /// Timer has reached zero.
     case finished
+
+    /// This state with the seconds left out.
+    var presence: RestTimerPresence {
+        switch self {
+        case .idle:
+            return .idle
+        case .running, .paused:
+            return .counting
+        case .finished:
+            return .finished
+        }
+    }
+}
+
+/// What the rest bar has to show, without the seconds that change while it shows it.
+///
+/// `ActiveWorkoutView` needs this to lay out the bottom accessory and must not read `restTimer` to
+/// get it: anything its body reads re-runs that body on change, a re-run reaches the sheets it
+/// presents, and UIKit then replaces every row of a menu open in one of them, once a second.
+/// See WORKOUT_TICK_RERENDER_SCOPING.md.
+enum RestTimerPresence: Equatable {
+    case idle
+    /// Running or paused: the countdown band.
+    case counting
+    /// "Rest complete".
+    case finished
 }
 
 /// What the bottom accessory shows instead of a countdown, mid-superset.
@@ -170,7 +196,20 @@ final class ActiveWorkoutViewModel {
     var showAddExerciseSheet: Bool = false
 
     /// Rest timer state between sets.
-    var restTimer: RestTimerState = .idle
+    var restTimer: RestTimerState = .idle {
+        didSet {
+            let presence = restTimer.presence
+            guard presence != restTimerPresence else { return }
+            restTimerPresence = presence
+        }
+    }
+
+    /// `restTimer` for views that must not re-render on every tick. See `RestTimerPresence`.
+    ///
+    /// Stored rather than computed, because observation tracks stored properties: a computed
+    /// version would read `restTimer` and tick along with it. Written only by `restTimer`'s
+    /// `didSet`, and only on a change, so the two cannot drift.
+    private(set) var restTimerPresence: RestTimerPresence = .idle
 
     /// The next lift in the current superset, when the last completed set suppressed its rest.
     ///
