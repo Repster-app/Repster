@@ -24,24 +24,11 @@ struct InsightsView: View {
     var body: some View {
         ScrollView {
             // Ordered weakest claim to strongest: status describes, the panel
-            // ranks, findings interpret. The first two always render, so the
-            // screen is never empty even when no rule fires.
+            // ranks, left vs right compares, findings interpret. The first two
+            // always render, so the screen is never empty even when no rule fires.
             VStack(alignment: .leading, spacing: 20) {
                 if let status = viewModel.status {
                     TrainingStatusCardView(status: status)
-
-                    // Left against right on unilateral lifts. Absent, not empty,
-                    // when nothing has both sides logged (D10).
-                    if let sides = viewModel.sides, sides.state != .hidden {
-                        SidesCardView(status: sides) { group in
-                            services.analyticsService.sidesGroupOpened(
-                                group: group.id,
-                                status: group.status,
-                                exerciseCount: group.exercises.count
-                            )
-                            viewModel.selectedSideGroup = group
-                        }
-                    }
 
                     if !status.muscles.isEmpty {
                         MuscleVolumePanelView(
@@ -58,6 +45,14 @@ struct InsightsView: View {
                             }
                         }
                     }
+
+                    // Left against right on unilateral lifts. Absent, not empty, when nothing
+                    // has both sides logged (D10). Under the panel because status and panel are
+                    // both the last 7 days, and above Findings because that list has no fixed
+                    // length and this is the only way in (D25).
+                    if let sides = viewModel.sides, sides.state != .hidden {
+                        SidesTileView(status: sides)
+                    }
                 }
 
                 findingsSection
@@ -69,19 +64,14 @@ struct InsightsView: View {
         .background(Color.bg)
         .navigationTitle("Training Insights")
         .navigationBarTitleDisplayMode(.large)
-        .sheet(item: $viewModel.selectedSideGroup) { group in
-            SideGroupDetailSheet(
-                group: group,
-                unitPreference: services.unitPreference,
-                onExerciseOpened: { exercise in
-                    services.analyticsService.sidesExerciseOpened(status: exercise.status)
-                },
-                // Marking an exercise Unilateral changes who is in the comparison, so the panel
-                // behind the sheet has to be rebuilt rather than left on stale groups.
-                onExerciseEdited: { Task { await viewModel.load() } }
-            )
+        .navigationDestination(for: SidesRoute.self) { route in
+            SidesDestination(route: route, viewModel: viewModel)
         }
         .task {
+            // Pushing the Left vs Right pages makes this view disappear and come back, and `.task`
+            // runs again each time. One open is one load and one screen event; marking an exercise
+            // Unilateral reloads on its own.
+            guard !viewModel.hasLoaded else { return }
             await viewModel.load()
             // Reported after load so the empty state reflects "no findings yet"
             // rather than "hasn't finished loading". One event per open: the

@@ -163,6 +163,12 @@ extension Color {
     /// #456AB5 — A group checked and found even.
     static let sidesEven = Color(red: 0.271, green: 0.416, blue: 0.710)
 
+    /// #6F93DD — The same call on a line or a glyph, where ``sidesEven`` is too dim to read.
+    static let sidesEvenBright = Color(red: 0.435, green: 0.576, blue: 0.867)
+
+    /// #A9C4F6 — RIR labels, on ``sidesStronger`` at low opacity.
+    static let sidesRIR = Color(red: 0.663, green: 0.769, blue: 0.965)
+
     /// #353D53 — A group still collecting sessions.
     static let sidesCollecting = Color(red: 0.208, green: 0.239, blue: 0.325)
 

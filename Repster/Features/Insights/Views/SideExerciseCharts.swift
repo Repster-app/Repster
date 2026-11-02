@@ -1,317 +1,382 @@
 // SideExerciseCharts.swift
-// The three visual blocks of the Sides exercise deep dive: the balance beam (how far apart the
-// sides are on average), the session ladder (how far each side actually got, session by session),
-// and the best set at each weight with the reserve that decided it.
+// The blocks of the Sides exercise page: one chart of both sides over the sessions, and the best
+// set from the most recent of them. Scoping: SIDES_RETHINK_SCOPING.md, D27, D30, D31.
 //
-// Replaces the C2 difference columns of D18. Those drew `SideDegree` — three quantised steps — so
-// the chart could not express the rep the headline names, and it reserved half its height for a
-// side that by definition never leads once an exercise has a verdict.
-// Scoping: SIDES_DETAIL_REDESIGN_SCOPING.md.
+// The chart plots session medians, because that is what the verdict runs on, and prints none of
+// them. Nobody lifted 8.5, and a figure like that beside the real sets in the table reads as a
+// contradiction, so every number on the page is a set the lifter logged.
 //
-// Every track is a `Canvas`: the fills are fractions of a width that varies by device, and a
-// Canvas is handed its size without a GeometryReader or a layout pass of its own.
+// The chart is a `Canvas`: the points are fractions of a width that varies by device, and a Canvas
+// is handed its size without a GeometryReader or a layout pass of its own.
+//
+// `SideEffortTable` has no call site for now (D28). `SideSession.bestSet` reuses its row type.
 
 import SwiftUI
 
-// MARK: - Balance beam
+// MARK: - Scale
 
-/// The average gap on one reps scale, with the tie threshold drawn rather than explained: the
-/// shaded middle IS `SidesAnalysis.tieBelow`, so "why doesn't that count?" answers itself.
-struct SideBalanceBeam: View {
-    let averageGap: Double
-    let status: SideStatus
+/// The chart's reps axis, apart from the drawing so it can be pinned without rendering.
+struct SideChartScale: Equatable {
+    /// Reps from top to bottom, at least. Without a floor a half-rep gap fills the chart and
+    /// looks as large as a five-rep one.
+    static let minimumSpan = 3.5
+    /// End labels closer together than this overlap.
+    static let minimumLabelGap: CGFloat = 15
 
-    private let gutter: CGFloat = 46
-    private let columnGap: CGFloat = 8
-    private let chipHeight: CGFloat = 18
-    private let trackHeight: CGFloat = 14
+    let domain: ClosedRange<Double>
+    /// Two whole numbers for the gridlines.
+    let ticks: [Double]
 
-    /// Reps either side of centre. Adaptive with a floor of three, so a five-rep gap widens the
-    /// beam instead of pinning at the end — which would read as "as bad as it gets" on every
-    /// exercise past three.
-    private var scale: Double { max(3, abs(averageGap).rounded(.up)) }
+    init(sessions: [SideSession]) {
+        let values = sessions.flatMap { [$0.left, $0.right] }
+        let low = values.min() ?? 0
+        let high = values.max() ?? 0
+        let span = max(Self.minimumSpan, (high - low) * 1.2)
+        let lower = max(0, (low + high - span) / 2)
+        domain = lower...(lower + span)
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center, spacing: columnGap) {
-                Text("Average")
-                    .font(.system(size: 10.5, weight: .semibold))
-                    .foregroundStyle(Color.sidesCaption)
-                    .frame(width: gutter, alignment: .leading)
-
-                Canvas { context, size in draw(&context, size) }
-                    .frame(height: chipHeight + trackHeight)
-            }
-
-            HStack(spacing: columnGap) {
-                Color.clear.frame(width: gutter, height: 0)
-                ZStack {
-                    HStack(spacing: 0) {
-                        edgeLabel("Left")
-                        Spacer(minLength: 0)
-                        edgeLabel("Right")
-                    }
-                    edgeLabel("Even")
-                }
-                .frame(height: 13)
-            }
-
-            Text("The shaded middle is where a difference is too small to count.")
-                .font(.system(size: 11.5, weight: .medium))
-                .foregroundStyle(Color.sidesCaption)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 2)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilitySummary)
-    }
-
-    private func edgeLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(Color.sidesCaption)
-    }
-
-    private func draw(_ context: inout GraphicsContext, _ size: CGSize) {
-        let top = chipHeight
-        let centre = size.width / 2
-        let perRep = centre / scale
-        let radius = trackHeight / 2
-
-        context.fill(
-            Path(roundedRect: CGRect(x: 0, y: top, width: size.width, height: trackHeight), cornerRadius: radius),
-            with: .color(.bgInput)
-        )
-
-        let tie = SidesAnalysis.tieBelow * perRep
-        context.fill(
-            Path(CGRect(x: centre - tie, y: top, width: tie * 2, height: trackHeight)),
-            with: .color(.bgSubtle)
-        )
-
-        drawVerdict(&context, size: size, top: top, centre: centre, perRep: perRep, radius: radius)
-
-        context.fill(
-            Path(CGRect(x: centre - 0.5, y: top - 5, width: 1, height: trackHeight + 10)),
-            with: .color(.sidesTrail)
-        )
-
-        drawChip(&context, size: size, centre: centre, perRep: perRep)
-    }
-
-    private func drawVerdict(
-        _ context: inout GraphicsContext,
-        size: CGSize,
-        top: CGFloat,
-        centre: CGFloat,
-        perRep: CGFloat,
-        radius: CGFloat
-    ) {
-        let reach = CGFloat(abs(averageGap)) * perRep
-        let leadsRight = averageGap > 0
-        let fill = CGRect(
-            x: leadsRight ? centre : centre - reach,
-            y: top,
-            width: max(reach, 1),
-            height: trackHeight
-        )
-        let rounded = Path(roundedRect: fill, cornerRadius: min(radius, fill.width / 2))
-
-        switch status {
-        case .stronger:
-            context.fill(rounded, with: .color(.sidesStronger))
-        case .possible:
-            // D24: a lean on too few differing sessions gets no solid mark anywhere in the feature.
-            context.fill(rounded, with: .color(.sidesStronger.opacity(0.12)))
-            context.stroke(rounded, with: .color(.sidesStronger), style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
-        case .even:
-            context.fill(
-                Path(ellipseIn: CGRect(x: centre - 5, y: top + radius - 5, width: 10, height: 10)),
-                with: .color(.sidesEven)
-            )
-        case .collecting, .notTracked:
-            break
+        let lowTick = low.rounded(.up)
+        let highTick = high.rounded(.down)
+        if highTick > lowTick {
+            ticks = [lowTick, highTick]
+        } else {
+            let tick = ((low + high) / 2).rounded(.down)
+            ticks = [tick, tick + 1]
         }
     }
 
-    private func drawChip(_ context: inout GraphicsContext, size: CGSize, centre: CGFloat, perRep: CGFloat) {
-        guard let label = chipLabel else { return }
-        let text = Text(label)
-            .font(.system(size: 11.5, weight: .bold))
-            .foregroundStyle(chipColour)
-        let resolved = context.resolve(text)
-        let measured = resolved.measure(in: CGSize(width: size.width, height: chipHeight))
-        let half = measured.width / 2
-        let wanted = centre + CGFloat(averageGap) * perRep
-        let x = min(max(wanted, half), size.width - half)
-        context.draw(resolved, at: CGPoint(x: x, y: chipHeight / 2), anchor: .center)
+    /// `plot` runs top to bottom, so a higher value lands nearer its top.
+    func y(_ value: Double, in plot: CGRect) -> CGFloat {
+        let span = domain.upperBound - domain.lowerBound
+        return plot.minY + plot.height * CGFloat((domain.upperBound - value) / span)
     }
 
-    private var chipLabel: String? {
-        switch status {
-        case .stronger:
-            let size = abs(averageGap)
-            let unit = size == 1 ? "rep" : "reps"
-            return String(format: "+%.1f %@", size, unit)
-        case .possible:
-            return "not confirmed"
-        case .even:
-            return "Even"
-        case .collecting, .notTracked:
-            return nil
-        }
-    }
-
-    private var chipColour: Color {
-        switch status {
-        case .stronger: return .sidesStronger
-        case .possible, .even: return .sidesCaption
-        case .collecting, .notTracked: return .sidesCaption
-        }
-    }
-
-    private var accessibilitySummary: String {
-        let size = abs(averageGap)
-        let unit = size == 1 ? "rep" : "reps"
-        let amount = String(format: "%.1f %@", size, unit)
-        switch status {
-        case let .stronger(lean, _):
-            return "On average your \(lean.rawValue) side is ahead by \(amount). Differences under half a rep count as even."
-        case let .possible(lean):
-            return "Your \(lean.rawValue) side is ahead by \(amount) so far, not confirmed. Differences under half a rep count as even."
-        case .even:
-            return "Your sides are even: the average difference is under half a rep."
-        case .collecting, .notTracked:
-            return "Not enough sessions yet to measure a difference."
-        }
+    /// How far to nudge the end labels when the last two points nearly touch. The higher point's
+    /// label goes up; on an exact tie `leftOnTop` decides.
+    static func labelOffsets(leftY: CGFloat, rightY: CGFloat, leftOnTop: Bool) -> (left: CGFloat, right: CGFloat) {
+        let distance = abs(leftY - rightY)
+        guard distance < minimumLabelGap else { return (0, 0) }
+        let push = (minimumLabelGap - distance) / 2
+        let leftIsHigher = leftY == rightY ? leftOnTop : leftY < rightY
+        return leftIsHigher ? (-push, push) : (push, -push)
     }
 }
 
-// MARK: - Session ladder
+// MARK: - Lines
 
-/// One row per session: both sides on a shared capacity scale, with the leading side's length
-/// *beyond* the trailing side picked out. The dotted rule at the trailing length makes the reading
-/// literal — same up to here, then extra.
-struct SideSessionLadder: View {
+/// Left and right over the sessions, with the gap between them shaded. Right is always a filled
+/// point and left a hollow one, so the sides differ by more than colour. The leading side is
+/// bright and the other dim; an unconfirmed leader is dashed (D24), and with no leader both sides
+/// share the even blue and nothing is shaded.
+struct SideLinesChart: View {
     let sessions: [SideSession]
+    let status: SideStatus
+    let coverage: SideRIRCoverage
 
-    private let dateColumn: CGFloat = 52
-    private let letterColumn: CGFloat = 12
-    private let gapColumn: CGFloat = 40
-    private let rowHeight: CGFloat = 24
-    private let barHeight: CGFloat = 9
-
-    /// One scale for every row, so a session where both sides did more stands taller than one
-    /// where both did less. The headroom matters at one session: without it the leading bar fills
-    /// the track and a first session reads as maxed out rather than as a starting point.
-    private var ceiling: Double {
-        max(1, (sessions.flatMap { [$0.left, $0.right] }.max() ?? 1) * 1.15)
-    }
+    private let height: CGFloat = 164
+    /// Where the first point sits, clear of the gridline labels.
+    private let firstX: CGFloat = 30
+    /// Room after the last point for the end labels.
+    private let endRoom: CGFloat = 32
+    private let plotTop: CGFloat = 10
+    /// Room under the plot for the dates.
+    private let plotBottom: CGFloat = 26
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 15) {
-                ForEach(sessions) { session in
-                    row(session)
+            HStack(spacing: 14) {
+                legendItem(.left)
+                legendItem(.right)
+                Spacer(minLength: 8)
+                SideRIRMarker(coverage: coverage)
+            }
+
+            Canvas { context, size in draw(&context, size) }
+                .frame(height: height)
+                .accessibilityLabel("Left and right over your last \(sessions.count) sessions")
+                .accessibilityChildren {
+                    VStack {
+                        ForEach(sessions) { session in
+                            Text(spokenLabel(session))
+                        }
+                    }
+                }
+        }
+    }
+
+    // MARK: Style
+
+    private var leader: SideLean? { status.lean }
+
+    /// The leader goes last, so it sits on top where the lines meet.
+    private var drawOrder: [SideLean] {
+        leader == .left ? [.right, .left] : [.left, .right]
+    }
+
+    private var bandOpacity: Double? {
+        switch status {
+        case .stronger: return 0.14
+        case .possible: return 0.08
+        case .even, .collecting, .notTracked: return nil
+        }
+    }
+
+    private func colour(_ side: SideLean) -> Color {
+        guard let leader else { return .sidesEvenBright }
+        return side == leader ? .sidesStronger : .sidesNeutralMark
+    }
+
+    private func stroke(_ side: SideLean) -> StrokeStyle {
+        let isUnconfirmed = status.isPossible && side == leader
+        return StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round, dash: isUnconfirmed ? [5, 5] : [])
+    }
+
+    private func labelColour(_ side: SideLean) -> Color {
+        side == leader ? .textPrimary : .textSecondary
+    }
+
+    private func legendItem(_ side: SideLean) -> some View {
+        HStack(spacing: 6) {
+            Group {
+                if side == .right {
+                    Circle().fill(colour(side))
+                } else {
+                    Circle().strokeBorder(colour(side), lineWidth: 2)
                 }
             }
+            .frame(width: 10, height: 10)
+            .accessibilityHidden(true)
 
-            Text("Each row is one session: how far each side got, and in blue how much further the leading side went.")
-                .font(.system(size: 11.5, weight: .medium))
-                .foregroundStyle(Color.sidesCaption)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(side.word)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(labelColour(side))
         }
     }
 
-    private func row(_ session: SideSession) -> some View {
-        HStack(alignment: .center, spacing: 6) {
-            Text(session.date.formatted(.dateTime.month(.abbreviated).day()))
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Color.sidesCaption)
-                .frame(width: dateColumn, alignment: .leading)
+    // MARK: Drawing
 
-            VStack(alignment: .leading, spacing: 0) {
-                sideLetter("L")
-                Spacer(minLength: 0)
-                sideLetter("R")
+    private func draw(_ context: inout GraphicsContext, _ size: CGSize) {
+        guard let last = sessions.indices.last else { return }
+        let scale = SideChartScale(sessions: sessions)
+        let plot = CGRect(x: 0, y: plotTop, width: size.width, height: size.height - plotTop - plotBottom)
+        let step = last > 0 ? (size.width - firstX - endRoom) / CGFloat(last) : 0
+
+        func point(_ index: Int, _ value: Double) -> CGPoint {
+            CGPoint(x: firstX + step * CGFloat(index), y: scale.y(value, in: plot))
+        }
+        let leftPoints = sessions.enumerated().map { point($0.offset, $0.element.left) }
+        let rightPoints = sessions.enumerated().map { point($0.offset, $0.element.right) }
+        func points(_ side: SideLean) -> [CGPoint] { side == .left ? leftPoints : rightPoints }
+
+        drawGrid(&context, size, scale: scale, plot: plot)
+
+        if let bandOpacity {
+            var band = Path()
+            band.addLines(rightPoints + leftPoints.reversed())
+            band.closeSubpath()
+            context.fill(band, with: .color(.sidesStronger.opacity(bandOpacity)))
+        }
+
+        for side in drawOrder {
+            var line = Path()
+            line.addLines(points(side))
+            context.stroke(line, with: .color(colour(side)), style: stroke(side))
+        }
+        for side in drawOrder {
+            for point in points(side) {
+                drawPoint(&context, at: point, side: side)
             }
-            .frame(width: letterColumn, height: rowHeight)
-
-            Canvas { context, size in draw(&context, size, session: session) }
-                .frame(height: rowHeight)
-
-            Text(gapLabel(session))
-                .font(.system(size: 12.5, weight: .bold))
-                .monospacedDigit()
-                .foregroundStyle(session.lean == nil ? Color.sidesCaption : Color.sidesStronger)
-                .frame(width: gapColumn, alignment: .trailing)
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel(session))
+
+        drawEndLabels(&context, left: leftPoints[last], right: rightPoints[last])
+        drawDates(&context, size, x: leftPoints.map(\.x))
     }
 
-    private func sideLetter(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 9, weight: .bold))
-            .foregroundStyle(Color.sidesNeutralMark)
-    }
-
-    private func draw(_ context: inout GraphicsContext, _ size: CGSize, session: SideSession) {
-        let leftWidth = size.width * CGFloat(session.left / ceiling)
-        let rightWidth = size.width * CGFloat(session.right / ceiling)
-        let trailing = min(leftWidth, rightWidth)
-        let radius = barHeight / 2
-
-        bar(&context, y: 1, width: leftWidth, leads: leftWidth > rightWidth, trailing: trailing, radius: radius)
-        bar(&context, y: rowHeight - barHeight - 1, width: rightWidth, leads: rightWidth > leftWidth, trailing: trailing, radius: radius)
-
-        guard session.lean != nil else { return }
-        context.fill(
-            Path(CGRect(x: trailing - 0.5, y: 0, width: 1, height: rowHeight)),
-            with: .color(.white.opacity(0.18))
-        )
-    }
-
-    private func bar(
-        _ context: inout GraphicsContext,
-        y: CGFloat,
-        width: CGFloat,
-        leads: Bool,
-        trailing: CGFloat,
-        radius: CGFloat
-    ) {
-        let rect = CGRect(x: 0, y: y, width: max(width, barHeight), height: barHeight)
-        let shape = Path(roundedRect: rect, cornerRadius: radius)
-        guard leads else {
-            context.fill(shape, with: .color(.sidesTrail))
-            return
-        }
-        // Two flat fills inside the rounded bar: the shared length, then the excess.
-        context.drawLayer { layer in
-            layer.clip(to: shape)
-            layer.fill(Path(CGRect(x: 0, y: y, width: trailing, height: barHeight)), with: .color(.sidesTrail))
-            layer.fill(
-                Path(CGRect(x: trailing, y: y, width: rect.width - trailing, height: barHeight)),
-                with: .color(.sidesStronger)
+    private func drawGrid(_ context: inout GraphicsContext, _ size: CGSize, scale: SideChartScale, plot: CGRect) {
+        for tick in scale.ticks {
+            let y = scale.y(tick, in: plot)
+            context.fill(
+                Path(CGRect(x: 20, y: y - 0.5, width: size.width - 20 - endRoom + 6, height: 1)),
+                with: .color(.border)
             )
+            let label = Text(String(Int(tick)))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Color.sidesCaption)
+            context.draw(context.resolve(label), at: CGPoint(x: 14, y: y), anchor: .trailing)
         }
     }
 
-    private func gapLabel(_ session: SideSession) -> String {
-        guard session.lean != nil else { return "even" }
-        return String(format: "+%.1f", abs(session.gap))
+    private func drawPoint(_ context: inout GraphicsContext, at point: CGPoint, side: SideLean) {
+        func circle(_ radius: CGFloat) -> Path {
+            Path(ellipseIn: CGRect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2))
+        }
+        switch side {
+        case .right:
+            context.fill(circle(6), with: .color(.bgCard))
+            context.fill(circle(4), with: .color(colour(side)))
+        case .left:
+            context.fill(circle(5), with: .color(.bgCard))
+            context.stroke(circle(4), with: .color(colour(side)), lineWidth: 2)
+        }
     }
 
-    private func accessibilityLabel(_ session: SideSession) -> String {
+    private func drawEndLabels(_ context: inout GraphicsContext, left: CGPoint, right: CGPoint) {
+        let offsets = SideChartScale.labelOffsets(leftY: left.y, rightY: right.y, leftOnTop: leader != .right)
+        let x = left.x + 14
+
+        for (side, y) in [(SideLean.left, left.y + offsets.left), (.right, right.y + offsets.right)] {
+            let label = Text(side == .left ? "L" : "R")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(labelColour(side))
+            context.draw(context.resolve(label), at: CGPoint(x: x, y: y), anchor: .leading)
+        }
+    }
+
+    private func drawDates(_ context: inout GraphicsContext, _ size: CGSize, x: [CGFloat]) {
+        for (session, x) in zip(sessions, x) {
+            let label = Text(session.date.formatted(.dateTime.month(.abbreviated).day()))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Color.sidesCaption)
+            context.draw(context.resolve(label), at: CGPoint(x: x, y: size.height - 9), anchor: .center)
+        }
+    }
+
+    private func spokenLabel(_ session: SideSession) -> String {
         let date = session.date.formatted(.dateTime.month(.wide).day())
         guard let lean = session.lean else { return "\(date): both sides even." }
-        let size = abs(session.gap)
-        let unit = size == 1 ? "rep" : "reps"
-        return String(format: "%@: %@ ahead by %.1f %@.", date, lean.rawValue, size, unit)
+        return "\(date): \(lean.rawValue) ahead."
     }
 }
 
-// MARK: - Best set
+// MARK: - RIR
+
+/// Says whether the numbers include RIR. The same blue marks it on each row of the table (D31).
+struct SideRIRMarker: View {
+    let coverage: SideRIRCoverage
+
+    var body: some View {
+        SideRIRPill(text: SidesCopy.rirMarker(for: coverage), isCounted: coverage != .repsOnly)
+    }
+}
+
+struct SideRIRPill: View {
+    let text: String
+    var isCounted = true
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(isCounted ? Color.sidesRIR : Color.textSecondary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(isCounted ? Color.sidesStronger.opacity(0.16) : Color.bgSubtle)
+            .cornerRadius(6)
+    }
+}
+
+// MARK: - Best set each session
+
+/// The best set from the latest sessions, as logged: the part of the page a lifter can check
+/// against their own history. A side with no pill was compared on reps alone.
+struct SideBestSetTable: View {
+    let sessions: [SideSession]
+    let unitPreference: UnitPreference
+
+    static let rowLimit = 3
+
+    private let sideColumn: CGFloat = 104
+
+    /// Newest first.
+    private var rows: [(session: SideSession, set: SideBestRow)] {
+        sessions.suffix(Self.rowLimit).reversed().compactMap { session in
+            session.bestSet.map { (session, $0) }
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                columnTitle("LEFT")
+                columnTitle("RIGHT")
+            }
+            .frame(minHeight: 26)
+            .accessibilityHidden(true)
+
+            ForEach(rows, id: \.session.id) { row in
+                Rectangle()
+                    .fill(Color.border)
+                    .frame(height: 1)
+                rowView(row.session, set: row.set)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 6)
+        .padding(.bottom, 4)
+        .frame(maxWidth: .infinity)
+        .background(Color.bgCard)
+        .cornerRadius(14)
+    }
+
+    private func columnTitle(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 10.5, weight: .semibold))
+            .kerning(0.6)
+            .foregroundStyle(Color.sidesCaption)
+            .frame(width: sideColumn, alignment: .trailing)
+    }
+
+    private func rowView(_ session: SideSession, set: SideBestRow) -> some View {
+        let left = Double(set.left) + (set.leftRIR ?? 0)
+        let right = Double(set.right) + (set.rightRIR ?? 0)
+
+        return HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(session.date.formatted(.dateTime.month(.abbreviated).day()))
+                    .font(.system(size: 13.5, weight: .medium))
+                    .foregroundStyle(Color.textPrimary)
+                Text(weightLabel(set.weight))
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Color.sidesCaption)
+            }
+            Spacer(minLength: 0)
+            sideCell(reps: set.left, reserve: set.leftRIR, leads: left > right)
+            sideCell(reps: set.right, reserve: set.rightRIR, leads: right > left)
+        }
+        .frame(minHeight: 50)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spokenLabel(session, set: set))
+    }
+
+    private func sideCell(reps: Int, reserve: Double?, leads: Bool) -> some View {
+        HStack(spacing: 6) {
+            Text("\(reps)")
+                .font(.system(size: 15, weight: leads ? .bold : .semibold))
+                .monospacedDigit()
+                .foregroundStyle(leads ? Color.textPrimary : Color.textSecondary)
+            if let reserve {
+                SideRIRPill(text: SidesCopy.reserveText(reserve))
+            }
+        }
+        .frame(width: sideColumn, alignment: .trailing)
+    }
+
+    private func weightLabel(_ kg: Double?) -> String {
+        guard let kg else { return "Bodyweight" }
+        return UnitConversion.formatWeightLabel(kg, unitPreference: unitPreference)
+    }
+
+    private func spokenLabel(_ session: SideSession, set: SideBestRow) -> String {
+        func side(_ reps: Int, _ reserve: Double?) -> String {
+            let count = "\(reps) \(reps == 1 ? "rep" : "reps")"
+            return reserve.map { "\(count) with \(SidesCopy.reserveText($0))" } ?? count
+        }
+        let date = session.date.formatted(.dateTime.month(.wide).day())
+        return "\(date), \(weightLabel(set.weight)): left \(side(set.left, set.leftRIR)), right \(side(set.right, set.rightRIR))."
+    }
+}
+
+// MARK: - Best set at each weight
 
 /// The best single set at each weight, reps and reserve together. Without the reserve this table
 /// prints "6 and 6" under a verdict that says one side is stronger, and reads as a contradiction.
@@ -453,67 +518,5 @@ struct SideEffortTable: View {
         let right = effortLabel(reps: row.right, reserve: row.rightRIR)
         return "\(weightLabel(row.weight)): left \(left); right \(right)."
             .replacingOccurrences(of: " · ", with: ", ")
-    }
-}
-
-
-// MARK: - Group row beam
-
-/// The balance beam shrunk to a list row. The scale comes from the caller so every exercise in a
-/// muscle group is drawn against the same ruler — the one thing the group screen can show that the
-/// exercise screen cannot.
-struct SideMiniBeam: View {
-    let averageGap: Double
-    let status: SideStatus
-    /// Reps either side of centre, shared across the group.
-    let scale: Double
-
-    static let width: CGFloat = 120
-    private let height: CGFloat = 10
-
-    var body: some View {
-        Canvas { context, size in draw(&context, size) }
-            .frame(width: Self.width, height: height)
-            .accessibilityHidden(true)
-    }
-
-    private func draw(_ context: inout GraphicsContext, _ size: CGSize) {
-        let centre = size.width / 2
-        let perRep = centre / max(scale, 1)
-        let radius = size.height / 2
-
-        context.fill(
-            Path(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: radius),
-            with: .color(.bgInput)
-        )
-        let tie = SidesAnalysis.tieBelow * perRep
-        context.fill(
-            Path(CGRect(x: centre - tie, y: 0, width: tie * 2, height: size.height)),
-            with: .color(.bgSubtle)
-        )
-
-        let reach = CGFloat(abs(averageGap)) * perRep
-        let fill = CGRect(
-            x: averageGap > 0 ? centre : centre - reach,
-            y: 0,
-            width: max(reach, 1),
-            height: size.height
-        )
-        let rounded = Path(roundedRect: fill, cornerRadius: min(radius, fill.width / 2))
-
-        switch status {
-        case .stronger:
-            context.fill(rounded, with: .color(.sidesStronger))
-        case .possible:
-            context.fill(rounded, with: .color(.sidesStronger.opacity(0.12)))
-            context.stroke(rounded, with: .color(.sidesStronger), style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
-        case .even, .collecting, .notTracked:
-            break
-        }
-
-        context.fill(
-            Path(CGRect(x: centre - 0.5, y: -2, width: 1, height: size.height + 4)),
-            with: .color(status.isClassified ? .sidesTrail : .bodyOutline)
-        )
     }
 }

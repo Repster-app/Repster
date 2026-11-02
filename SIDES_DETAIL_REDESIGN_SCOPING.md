@@ -1,7 +1,7 @@
 # Sides Exercise Detail — Redesign Scoping
 
 **Date:** 2026-09-19
-**Status:** Scoped, not built
+**Status:** Built 2026-09-19, then replaced by `SIDES_RETHINK_SCOPING.md` on 2026-11-02
 **Target release:** 1.6
 **Feature area:** Insights → Sides (unilateral imbalance)
 **Design:** "Side Imbalance Visuals" canvas, board **Redesigned** — https://claude.ai/artifact/W3eqgXm6XoEVFjZ8D3tT47

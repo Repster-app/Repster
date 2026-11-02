@@ -16,8 +16,6 @@ final class InsightsViewModel {
     var musclePanelExpanded = false
     /// Left against right on unilateral lifts. Nil until loaded; `.hidden` draws nothing.
     var sides: SidesStatus?
-    /// The group whose deep dive is open.
-    var selectedSideGroup: SideGroupSummary?
 
     private let insightsService: any InsightsServiceProtocol
 

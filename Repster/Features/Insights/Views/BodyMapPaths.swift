@@ -29,6 +29,11 @@
 // Paths are absolute M / L / C / Q / Z commands, so `BodyMapGeometry.path(from:)` is the
 // whole parser. `side` is the LIBRARY's — the viewer's left, in both views. Never read it
 // directly: go through `BodyMapGeometry.anatomicalSide(forLibrarySide:in:)`.
+//
+// Compiled only under REPSTER_BODY_MAP, which no build configuration defines. The map isn't
+// drawn anywhere, and artwork in the binary would owe the notice above inside the app.
+
+#if REPSTER_BODY_MAP
 
 import CoreGraphics
 
@@ -210,3 +215,5 @@ enum BodyMapPaths {
         BodyMapRawPath(region: "hair", side: "common", d: "M 1138.4 168.4 Q 1137.9 173.1 1135 176.9 Q 1134.7 177.3 1134.2 177.5 C 1124.3 180.6 1118.2 187.2 1113.9 196.4 C 1111.7 201.2 1108.7 208.8 1102.4 208.7 Q 1084 208.5 1065.5 209 Q 1060.2 209.1 1058.1 205.5 C 1051.3 193.5 1047.6 182.9 1034.6 178 C 1029.5 176.1 1029.2 171.5 1028.1 166.5 Q 1021.5 140.3 1032.6 117.6 C 1040.7 100.9 1067.2 96.2 1084.2 96.5 C 1089 96.6 1093.8 96.4 1098.6 97.4 C 1117.4 101.2 1131.7 105.9 1137.9 126 Q 1144.3 146.9 1138.4 168.4 Z"),
     ]
 }
+
+#endif

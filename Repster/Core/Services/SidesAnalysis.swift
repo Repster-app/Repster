@@ -66,7 +66,7 @@ enum SideStatus: Sendable, Hashable {
         case let .stronger(lean, degree):
             return "\(lean.word) is \(degree.word) stronger"
         case let .possible(lean):
-            return "\(lean.word) seems stronger — needs more sessions to confirm"
+            return "\(lean.word) seems stronger — needs more sessions"
         case .even:
             return "Even"
         case let .collecting(sessions):
@@ -75,6 +75,16 @@ enum SideStatus: Sendable, Hashable {
             return "Not tracked by side"
         case .notTracked(.neverBothSides):
             return "No sets with both sides logged"
+        }
+    }
+
+    /// The side the verdict points at, confirmed or not.
+    var lean: SideLean? {
+        switch self {
+        case let .stronger(lean, _), let .possible(lean):
+            return lean
+        case .even, .collecting, .notTracked:
+            return nil
         }
     }
 
@@ -138,19 +148,6 @@ enum SideGroupStatus: Sendable, Hashable {
     /// No exercise in the group has enough sessions yet; carries the closest one's count.
     case collecting(sessions: Int)
 
-    var sentence: String {
-        switch self {
-        case let .imbalance(count):
-            return count == 1 ? "Imbalance in 1 exercise" : "Imbalance in \(count) exercises"
-        case let .possible(count):
-            return count == 1 ? "Possible imbalance in 1 exercise" : "Possible imbalance in \(count) exercises"
-        case .even:
-            return "Even"
-        case let .collecting(sessions):
-            return SidesAnalysis.needsMoreSessions(after: sessions)
-        }
-    }
-
     var isImbalance: Bool {
         if case .imbalance = self { return true }
         return false
@@ -192,6 +189,12 @@ struct SideSession: Sendable, Equatable, Identifiable {
     let date: Date
     let left: Double
     let right: Double
+    /// The session's heaviest best set. The medians above are what the verdict runs on, but
+    /// nobody lifted 8.5, so the page prints this and plots the medians unlabelled (D30).
+    let bestSet: SideBestRow?
+    /// Sets behind the medians, and how many of them compared on RIR as well as reps.
+    let setCount: Int
+    let rirSetCount: Int
 
     /// Positive when the right side is ahead.
     var gap: Double { right - left }
@@ -208,7 +211,7 @@ struct SideSession: Sendable, Equatable, Identifiable {
     }
 }
 
-/// The best single set at one weight — both sides as they were logged together.
+/// The best single set at one weight or in one session — both sides as they were logged together.
 ///
 /// Never two sides from two different sets: the whole comparison rests on both sides sharing a
 /// weight inside one set, and a row that mixed two sets would invite the reader to compare
@@ -224,6 +227,13 @@ struct SideBestRow: Sendable, Equatable, Identifiable {
     let rightRIR: Double?
 
     var id: String { weight.map { String(format: "%.3f", $0) } ?? "bodyweight" }
+}
+
+/// How much of an exercise's comparison counted RIR, so the page can say which it is (D31).
+enum SideRIRCoverage: Sendable, Equatable {
+    case all
+    case partial
+    case repsOnly
 }
 
 struct SideExerciseSummary: Sendable, Equatable, Identifiable {
@@ -247,6 +257,13 @@ struct SideExerciseSummary: Sendable, Equatable, Identifiable {
     /// Whether the tracking type could log sides at all. False means marking it Unilateral would
     /// change nothing, so the "not tracked" list offers it as a reason rather than an action.
     let canTrackSides: Bool
+
+    var rirCoverage: SideRIRCoverage {
+        let sets = sessions.map(\.setCount).reduce(0, +)
+        let counted = sessions.map(\.rirSetCount).reduce(0, +)
+        if counted == 0 { return .repsOnly }
+        return counted == sets ? .all : .partial
+    }
 }
 
 struct SideGroupSummary: Sendable, Equatable, Identifiable {
@@ -257,11 +274,11 @@ struct SideGroupSummary: Sendable, Equatable, Identifiable {
     /// Every exercise with this primary group done in the lookback, tracked or not, in list order.
     let exercises: [SideExerciseSummary]
 
-    var trackedExerciseCount: Int { exercises.filter(\.status.isTracked).count }
+    var trackedExercises: [SideExerciseSummary] { exercises.filter(\.status.isTracked) }
 }
 
 enum SidesCardState: String, Sendable {
-    /// Nothing has both sides logged in the lookback. The card isn't drawn (D10).
+    /// Nothing has both sides logged in the lookback. The tile isn't drawn (D10).
     case hidden
     /// Tracked groups exist, none with enough sessions yet (S1).
     case building
@@ -275,13 +292,15 @@ enum SidesCardState: String, Sendable {
 struct SidesStatus: Sendable, Equatable {
     /// Groups with at least one both-sides session, in list order.
     let groups: [SideGroupSummary]
-    /// Groups trained in the lookback that nothing tracks by side — the coverage note.
-    let untrackedGroupNames: [String]
+    /// Everything trained in the lookback that isn't compared by side, across every group
+    /// including those nothing tracks, by name. The line at the foot of the list.
+    let untrackedExercises: [SideExerciseSummary]
 
-    static let empty = SidesStatus(groups: [], untrackedGroupNames: [])
+    static let empty = SidesStatus(groups: [], untrackedExercises: [])
 
-    var imbalancedGroupCount: Int { groups.filter(\.status.isImbalance).count }
-    var possibleGroupCount: Int { groups.filter(\.status.isPossible).count }
+    func exercise(id: UUID) -> SideExerciseSummary? {
+        groups.flatMap(\.exercises).first { $0.id == id }
+    }
 
     var state: SidesCardState {
         if groups.isEmpty { return .hidden }
@@ -436,6 +455,7 @@ enum SidesAnalysis {
         let date: Date
         let left: Double
         let right: Double
+        let set: BestAccumulator
     }
 
     /// Ranked by the same capacity the verdict uses, then by reps, then by recency — so the row a
@@ -451,20 +471,40 @@ enum SidesAnalysis {
 
         var totalReps: Int { left + right }
 
+        /// `comparableRIR` gives both sides or neither, so one side settles it.
+        var countsRIR: Bool { leftRIR != nil }
+
+        var row: SideBestRow {
+            SideBestRow(weight: weight, left: left, right: right, leftRIR: leftRIR, rightRIR: rightRIR)
+        }
+
         func isBeaten(by other: BestAccumulator) -> Bool {
             if other.capacity != capacity { return other.capacity > capacity }
             if other.totalReps != totalReps { return other.totalReps > totalReps }
             return other.date > date
         }
+
+        /// A session can mix weights, and the most capacity is usually the lightest set, which
+        /// isn't the one a lifter calls their best. Heaviest first, then the order above.
+        func isBeatenInSession(by other: BestAccumulator) -> Bool {
+            if other.weight != weight { return (other.weight ?? 0) > (weight ?? 0) }
+            return isBeaten(by: other)
+        }
     }
 
     private static func sessions(from samples: [Sample]) -> [SideSession] {
         Dictionary(grouping: samples, by: \.workoutId).map { workoutId, list in
-            SideSession(
+            let best = list.dropFirst().reduce(list[0].set) { best, sample in
+                best.isBeatenInSession(by: sample.set) ? sample.set : best
+            }
+            return SideSession(
                 id: workoutId,
                 date: list.map(\.date).min() ?? .distantPast,
                 left: median(list.map(\.left)),
-                right: median(list.map(\.right))
+                right: median(list.map(\.right)),
+                bestSet: best.row,
+                setCount: list.count,
+                rirSetCount: list.filter(\.set.countsRIR).count
             )
         }
         .sorted { $0.date < $1.date }
@@ -504,12 +544,7 @@ enum SidesAnalysis {
             }
 
             let cap = capacity(leftReps: left, rightReps: right, leftRIR: set.leftRIR, rightRIR: set.rightRIR)
-            samples[exercise.id, default: []].append(
-                Sample(workoutId: set.workoutId, date: set.date, left: cap.left, right: cap.right)
-            )
-
             let weight = set.weight.flatMap { $0 > 0 ? $0 : nil }
-            let key = weight.map { String(format: "%.3f", $0) } ?? "bodyweight"
             let reserve = comparableRIR(set.leftRIR, set.rightRIR)
             let candidate = BestAccumulator(
                 weight: weight,
@@ -520,13 +555,18 @@ enum SidesAnalysis {
                 capacity: cap.left + cap.right,
                 date: set.date
             )
+            samples[exercise.id, default: []].append(
+                Sample(workoutId: set.workoutId, date: set.date, left: cap.left, right: cap.right, set: candidate)
+            )
+
+            let key = weight.map { String(format: "%.3f", $0) } ?? "bodyweight"
             if bests[exercise.id]?[key]?.isBeaten(by: candidate) ?? true {
                 bests[exercise.id, default: [:]][key] = candidate
             }
         }
 
         var groups: [SideGroupSummary] = []
-        var untracked: [String] = []
+        var untracked: [SideExerciseSummary] = []
 
         for (group, exerciseIds) in exercisesByGroup {
             var summaries: [SideExerciseSummary] = []
@@ -543,15 +583,7 @@ enum SidesAnalysis {
                     classification = classify(recent)
                 }
                 let bestRows = (bests[id] ?? [:]).values
-                    .map {
-                        SideBestRow(
-                            weight: $0.weight,
-                            left: $0.left,
-                            right: $0.right,
-                            leftRIR: $0.leftRIR,
-                            rightRIR: $0.rightRIR
-                        )
-                    }
+                    .map(\.row)
                     .sorted { ($0.weight ?? -1) > ($1.weight ?? -1) }
                 summaries.append(SideExerciseSummary(
                     id: id,
@@ -570,10 +602,8 @@ enum SidesAnalysis {
 
             let displayName = ExercisePrimaryGroup.displayName(for: group)
             let tracked = summaries.filter(\.status.isTracked)
-            guard !tracked.isEmpty else {
-                untracked.append(displayName)
-                continue
-            }
+            untracked += summaries.filter { !$0.status.isTracked }
+            guard !tracked.isEmpty else { continue }
 
             let imbalanced = tracked.filter(\.status.isStronger).count
             let possible = tracked.filter(\.status.isPossible).count
@@ -596,6 +626,11 @@ enum SidesAnalysis {
             ))
         }
 
-        return SidesStatus(groups: groups.sorted(by: groupOrder), untrackedGroupNames: untracked.sorted())
+        return SidesStatus(
+            groups: groups.sorted(by: groupOrder),
+            untrackedExercises: untracked.sorted {
+                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+        )
     }
 }

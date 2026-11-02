@@ -1,7 +1,11 @@
 // BodyMapView.swift
-// Front and back body figures for the Sides card, shaded per muscle region and side.
+// Front and back body figures, shaded per muscle region and side. Archived: nothing draws them.
 //
-// Artwork: react-native-body-highlighter (MIT) — see BodyMapPaths.swift.
+// Artwork: react-native-body-highlighter (MIT) — see BodyMapPaths.swift. Everything that touches
+// it compiles only under REPSTER_BODY_MAP, which no build configuration defines, so the artwork
+// stays out of the app and the app owes no notice (D32). Define the flag to bring the map back,
+// and give the notice a home in the app when you do. The mapping and the fills below carry none
+// of the artwork, so they stay compiled and tested.
 //
 // THE MIRROR TRAP: the library's "left" and "right" are the VIEWER's, in both
 // views. On the front view its "left" paths are the figure's RIGHT side. Every
@@ -18,6 +22,7 @@ enum BodyView: Sendable {
 
 /// Parsed once, then shared. Immutable after init, hence the unchecked conformance.
 struct BodyMapGeometry: @unchecked Sendable {
+    #if REPSTER_BODY_MAP
     struct Region {
         let region: String
         /// The figure's side. Nil for parts drawn once across the midline (head, hair).
@@ -48,6 +53,7 @@ struct BodyMapGeometry: @unchecked Sendable {
             )
         }
     }
+    #endif
 
     /// The library side that draws a figure's anatomical side.
     static func librarySide(for side: SideLean, in view: BodyView) -> String {
@@ -161,6 +167,7 @@ enum SidesBodyFill {
     }
 }
 
+#if REPSTER_BODY_MAP
 /// One figure, sized to its width. `fill` colours every region per anatomical side.
 struct BodyFigure: View {
     let view: BodyView
@@ -186,3 +193,4 @@ struct BodyFigure: View {
         .accessibilityHidden(true)
     }
 }
+#endif

@@ -192,6 +192,11 @@ def main():
         "// Paths are absolute M / L / C / Q / Z commands, so `BodyMapGeometry.path(from:)` is the",
         "// whole parser. `side` is the LIBRARY's — the viewer's left, in both views. Never read it",
         "// directly: go through `BodyMapGeometry.anatomicalSide(forLibrarySide:in:)`.",
+        "//",
+        "// Compiled only under REPSTER_BODY_MAP, which no build configuration defines. The map isn't",
+        "// drawn anywhere, and artwork in the binary would owe the notice above inside the app.",
+        "",
+        "#if REPSTER_BODY_MAP",
         "",
         "import CoreGraphics",
         "",
@@ -226,6 +231,8 @@ def main():
         out.append("    ]")
         print(view, count, "paths")
     out.append("}")
+    out.append("")
+    out.append("#endif")
     OUT.write_text("\n".join(out) + "\n")
     print("wrote", OUT.relative_to(ROOT), OUT.stat().st_size, "bytes")
 

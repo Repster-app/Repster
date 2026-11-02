@@ -133,7 +133,6 @@ final class SidesAnalysisTests: XCTestCase {
 
         let legs = try XCTUnwrap(status.groups.first)
         XCTAssertEqual(legs.status, .imbalance(exercises: 2))
-        XCTAssertEqual(legs.status.sentence, "Imbalance in 2 exercises")
         XCTAssertEqual(status.state, .imbalanced)
         XCTAssertEqual(SidesBodyFill.color(region: "quadriceps", statuses: [legs.id: legs.status]), .sidesImbalance)
     }
@@ -215,7 +214,7 @@ final class SidesAnalysisTests: XCTestCase {
         XCTAssertEqual(legs.status, .possible(exercises: 1))
         XCTAssertEqual(status.state, .possible)
         XCTAssertEqual(SidesBodyFill.color(region: "gluteal", statuses: [legs.id: legs.status]), .sidesCollecting)
-        XCTAssertEqual(SidesCopy.gapLine(for: try exercise("1 Legged Hip Thrust", in: status)), "About 1 more rep on your left so far, at the same weight")
+        XCTAssertEqual(SidesCopy.verdictSubtitle(for: try exercise("1 Legged Hip Thrust", in: status)), "About 1 more rep so far, needs more sessions")
 
         try session(hipThrust.id, daysAgo: 3, [rir(9, left: 1, right: 0)])
         status = try await sides()
@@ -273,14 +272,11 @@ final class SidesAnalysisTests: XCTestCase {
 
     func testSentencesArePlainWords() {
         XCTAssertEqual(SideStatus.stronger(.right, .clearly).sentence, "Right is clearly stronger")
-        XCTAssertEqual(SideStatus.possible(.left).sentence, "Left seems stronger — needs more sessions to confirm")
+        XCTAssertEqual(SideStatus.possible(.left).sentence, "Left seems stronger — needs more sessions")
         XCTAssertEqual(SideStatus.even.sentence, "Even")
-        XCTAssertEqual(SideGroupStatus.possible(exercises: 1).sentence, "Possible imbalance in 1 exercise")
         XCTAssertEqual(SideStatus.collecting(sessions: 1).sentence, "Needs 2 more sessions")
         XCTAssertEqual(SideStatus.collecting(sessions: 2).sentence, "Needs 1 more session")
         XCTAssertEqual(SideStatus.notTracked(.notUnilateral).sentence, "Not tracked by side")
-        XCTAssertEqual(SideGroupStatus.imbalance(exercises: 1).sentence, "Imbalance in 1 exercise")
-        XCTAssertEqual(SideGroupStatus.imbalance(exercises: 3).sentence, "Imbalance in 3 exercises")
     }
 
     @MainActor
@@ -377,6 +373,155 @@ final class SidesAnalysisTests: XCTestCase {
         XCTAssertEqual(summary.status, .stronger(.right, .much))
         XCTAssertEqual(summary.bestReps.count, 1)
         XCTAssertNil(summary.bestReps[0].weight)
+    }
+
+    // MARK: - Best set each session (D30)
+
+    /// Medians are what the verdict runs on, but nobody lifted 8.5. The row under the chart has to
+    /// be something the lifter can find in their own history.
+    @MainActor
+    func testEachSessionKeepsItsOwnBestSetAsLogged() async throws {
+        let curl = unilateral("One Legged Leg Curl")
+        try seed([curl])
+        try history(curl.id, [
+            [rir(8, left: 1, right: 2)],
+            [Side(left: 9, right: 8, leftRIR: 0, rightRIR: 1), rir(6, left: 2, right: 2)],
+        ])
+
+        let summary = try exercise("One Legged Leg Curl", in: try await sides())
+        XCTAssertEqual(summary.sessions.first?.bestSet?.left, 8, "oldest first")
+        XCTAssertEqual(summary.sessions.first?.bestSet?.rightRIR, 2)
+        XCTAssertEqual(summary.sessions.last?.bestSet?.left, 9)
+        XCTAssertEqual(summary.sessions.last?.bestSet?.right, 8)
+        XCTAssertEqual(summary.sessions.last?.left, 8.5, "the chart still plots the median")
+    }
+
+    /// The most reps in a session is usually the lightest set, which nobody calls their best.
+    @MainActor
+    func testASessionsBestSetIsTheHeaviestNotTheMostReps() async throws {
+        let curl = unilateral("One Legged Leg Curl")
+        try seed([curl])
+        try session(curl.id, daysAgo: 3, [
+            Side(left: 14, right: 14, leftRIR: 0, rightRIR: 0, weight: 15),
+            Side(left: 6, right: 7, leftRIR: 1, rightRIR: 1, weight: 25),
+            Side(left: 20, right: 20, leftRIR: 0, rightRIR: 0, weight: nil),
+        ])
+
+        let summary = try exercise("One Legged Leg Curl", in: try await sides())
+        let best = try XCTUnwrap(summary.sessions.first?.bestSet)
+        XCTAssertEqual(best.weight, 25)
+        XCTAssertEqual(best.left, 6)
+    }
+
+    @MainActor
+    func testAtOneWeightASessionsBestSetFollowsCapacity() async throws {
+        let curl = unilateral("One Legged Leg Curl")
+        try seed([curl])
+        try session(curl.id, daysAgo: 3, [
+            rir(6, left: 1, right: 1),
+            rir(6, left: 3, right: 3),
+            rir(7, left: 1, right: 1),
+        ])
+
+        let summary = try exercise("One Legged Leg Curl", in: try await sides())
+        let best = try XCTUnwrap(summary.sessions.first?.bestSet)
+        XCTAssertEqual(best.left, 6)
+        XCTAssertEqual(best.leftRIR, 3)
+    }
+
+    /// The marker says what the comparison really did, so it has to follow `capacity` exactly: both
+    /// sides or neither, and two "5+" sides compare on reps alone (D31).
+    @MainActor
+    func testRIRCoverageFollowsWhatTheComparisonCounted() async throws {
+        let all = unilateral("All")
+        let some = unilateral("Some")
+        let none = unilateral("None")
+        let oneSided = unilateral("One Sided")
+        let censored = unilateral("Censored")
+        try seed([all, some, none, oneSided, censored])
+        try session(all.id, daysAgo: 3, [rir(8, left: 1, right: 2), rir(8, left: 1, right: 1)])
+        try session(some.id, daysAgo: 3, [rir(8, left: 1, right: 2), Side(left: 8, right: 8)])
+        try session(none.id, daysAgo: 3, [Side(left: 8, right: 8), Side(left: 9, right: 8)])
+        try session(oneSided.id, daysAgo: 3, [Side(left: 8, right: 8, leftRIR: 1, rightRIR: nil)])
+        try session(censored.id, daysAgo: 3, [Side(left: 8, right: 8, leftRIR: 5, rightRIR: 5)])
+
+        let result = try await sides()
+        XCTAssertEqual(try exercise("All", in: result).rirCoverage, .all)
+        XCTAssertEqual(try exercise("Some", in: result).rirCoverage, .partial)
+        XCTAssertEqual(try exercise("None", in: result).rirCoverage, .repsOnly)
+        XCTAssertEqual(try exercise("One Sided", in: result).rirCoverage, .repsOnly)
+        XCTAssertEqual(try exercise("Censored", in: result).rirCoverage, .repsOnly)
+    }
+
+    func testRIRWording() {
+        XCTAssertEqual(SidesCopy.rirMarker(for: .all), "Reps + RIR")
+        XCTAssertEqual(SidesCopy.rirMarker(for: .partial), "Reps + RIR where logged")
+        XCTAssertEqual(SidesCopy.rirMarker(for: .repsOnly), "Reps only")
+        XCTAssertEqual(SidesCopy.reserveText(0), "0 RIR")
+        XCTAssertEqual(SidesCopy.reserveText(2), "2 RIR")
+        XCTAssertEqual(SidesCopy.reserveText(1.5), "1.5 RIR")
+        XCTAssertEqual(SidesCopy.reserveText(SidesAnalysis.censoredRIR), "5+ RIR")
+    }
+
+    // MARK: - Chart scale
+
+    private func chartSessions(_ pairs: [(Double, Double)]) -> [SideSession] {
+        pairs.map {
+            SideSession(id: UUID(), date: reference, left: $0.0, right: $0.1, bestSet: nil, setCount: 1, rirSetCount: 0)
+        }
+    }
+
+    func testAHalfRepGapDoesNotFillTheChart() {
+        let scale = SideChartScale(sessions: chartSessions([(9, 9.5), (9.5, 10)]))
+        XCTAssertEqual(scale.domain.upperBound - scale.domain.lowerBound, SideChartScale.minimumSpan, accuracy: 0.001)
+        XCTAssertLessThan(scale.domain.lowerBound, 9)
+        XCTAssertGreaterThan(scale.domain.upperBound, 10)
+    }
+
+    func testAWideGapWidensTheChartWithRoomAtBothEnds() {
+        let scale = SideChartScale(sessions: chartSessions([(5, 15), (6, 14)]))
+        XCTAssertLessThan(scale.domain.lowerBound, 5)
+        XCTAssertGreaterThan(scale.domain.upperBound, 15)
+    }
+
+    func testTheScaleNeverGoesBelowZero() {
+        let scale = SideChartScale(sessions: chartSessions([(1, 1), (1, 2)]))
+        XCTAssertEqual(scale.domain.lowerBound, 0)
+        XCTAssertGreaterThan(scale.domain.upperBound, 2)
+    }
+
+    func testGridlinesAreTwoWholeNumbersInsideTheChart() {
+        for pairs in [[(8.0, 10.5), (9.0, 9.5)], [(10.0, 10.0)], [(9.2, 9.8)], [(20.0, 31.5)]] {
+            let scale = SideChartScale(sessions: chartSessions(pairs))
+            XCTAssertEqual(scale.ticks.count, 2)
+            for tick in scale.ticks {
+                XCTAssertEqual(tick, tick.rounded())
+                XCTAssertTrue(scale.domain.contains(tick), "\(tick) outside \(scale.domain)")
+            }
+            XCTAssertLessThan(scale.ticks[0], scale.ticks[1])
+        }
+    }
+
+    func testAHigherValueSitsHigherInThePlot() {
+        let scale = SideChartScale(sessions: chartSessions([(8, 10)]))
+        let plot = CGRect(x: 0, y: 10, width: 300, height: 128)
+        XCTAssertLessThan(scale.y(10, in: plot), scale.y(8, in: plot))
+        XCTAssertEqual(scale.y(scale.domain.upperBound, in: plot), plot.minY, accuracy: 0.001)
+        XCTAssertEqual(scale.y(scale.domain.lowerBound, in: plot), plot.maxY, accuracy: 0.001)
+    }
+
+    func testEndLabelsOnlyMoveWhenTheyWouldOverlap() {
+        let apart = SideChartScale.labelOffsets(leftY: 40, rightY: 90, leftOnTop: true)
+        XCTAssertEqual(apart.left, 0)
+        XCTAssertEqual(apart.right, 0)
+
+        let close = SideChartScale.labelOffsets(leftY: 50, rightY: 45, leftOnTop: true)
+        XCTAssertEqual(abs((50 + close.left) - (45 + close.right)), SideChartScale.minimumLabelGap, accuracy: 0.001)
+        XCTAssertGreaterThan(close.left, 0, "right is higher, so left moves down")
+
+        let tied = SideChartScale.labelOffsets(leftY: 50, rightY: 50, leftOnTop: false)
+        XCTAssertGreaterThan(tied.left, 0)
+        XCTAssertLessThan(tied.right, 0)
     }
 
     // MARK: - Best set at each weight (SIDES_DETAIL_REDESIGN_SCOPING.md §4)
@@ -538,19 +683,51 @@ final class SidesAnalysisTests: XCTestCase {
         let legs = try XCTUnwrap(result.groups.first)
         XCTAssertEqual(legs.exercises.map(\.name), ["Bulgarian Split Squat", "Barbell Back Squat"])
         XCTAssertEqual(legs.exercises.last?.status, .notTracked(.notUnilateral))
-        XCTAssertEqual(legs.trackedExerciseCount, 1)
+        XCTAssertEqual(legs.trackedExercises.map(\.name), ["Bulgarian Split Squat"])
     }
 
     @MainActor
-    func testGroupsNothingTracksFeedTheCoverageNoteAndHideTheCard() async throws {
+    func testGroupsNothingTracksStayOffTheListAndHideTheTile() async throws {
         let bench = Exercise(name: "Bench Press", equipmentType: .barbell, trackingType: .weightReps, primaryMuscle: "chest")
         try seed([bench])
         try session(bench.id, daysAgo: 2, [Side(left: nil, right: nil, weight: 80, reps: 8)])
 
         let status = try await sides()
         XCTAssertTrue(status.groups.isEmpty)
-        XCTAssertEqual(status.untrackedGroupNames, ["Chest"])
+        XCTAssertEqual(status.untrackedExercises.map(\.name), ["Bench Press"])
         XCTAssertEqual(status.state, .hidden)
+    }
+
+    /// The line at the foot of the list counts across every group, including those nothing tracks.
+    /// The analysis used to drop those exercises and keep only the group's name.
+    @MainActor
+    func testUntrackedExercisesComeFromEveryGroupInNameOrder() async throws {
+        let split = unilateral("Bulgarian Split Squat")
+        let squat = Exercise(name: "Barbell Back Squat", equipmentType: .barbell, trackingType: .weightReps, primaryMuscle: "legs")
+        let bench = Exercise(name: "Bench Press", equipmentType: .barbell, trackingType: .weightReps, primaryMuscle: "chest")
+        let pushdown = Exercise(name: "Arm Pushdown", equipmentType: .cable, trackingType: .weightReps, primaryMuscle: "triceps")
+        try seed([split, squat, bench, pushdown])
+        try history(split.id, Array(repeating: [Side(left: 8, right: 10, leftRIR: 0, rightRIR: 0)], count: 3))
+        for exercise in [squat, bench, pushdown] {
+            try session(exercise.id, daysAgo: 5, [Side(left: nil, right: nil, weight: 60, reps: 5)])
+        }
+
+        let status = try await sides()
+        XCTAssertEqual(status.untrackedExercises.map(\.name), ["Arm Pushdown", "Barbell Back Squat", "Bench Press"])
+        XCTAssertEqual(status.groups.map(\.id), ["legs"])
+        XCTAssertEqual(SidesCopy.untrackedLine(count: 3), "3 other exercises aren\u{2019}t tracked by side")
+        XCTAssertEqual(SidesCopy.untrackedLine(count: 1), "1 other exercise isn\u{2019}t tracked by side")
+    }
+
+    @MainActor
+    func testAnExerciseIsFoundByIdForItsPage() async throws {
+        let split = unilateral("Bulgarian Split Squat")
+        try seed([split])
+        try session(split.id, daysAgo: 3, [rir(8, left: 1, right: 1)])
+
+        let status = try await sides()
+        XCTAssertEqual(status.exercise(id: split.id)?.name, "Bulgarian Split Squat")
+        XCTAssertNil(status.exercise(id: UUID()))
     }
 
     @MainActor
@@ -568,9 +745,113 @@ final class SidesAnalysisTests: XCTestCase {
     }
 
     @MainActor
-    func testAnEmptyStoreHidesTheCard() async throws {
+    func testAnEmptyStoreHidesTheTile() async throws {
         let result = try await sides()
         XCTAssertEqual(result.state, .hidden)
+    }
+
+    // MARK: - Tile (D25)
+
+    private func group(_ name: String, _ status: SideGroupStatus) -> SideGroupSummary {
+        SideGroupSummary(id: name.lowercased(), displayName: name, status: status, exercises: [])
+    }
+
+    private func tile(_ groups: SideGroupSummary...) -> (headline: String, subtitle: String) {
+        let status = SidesStatus(groups: groups, untrackedExercises: [])
+        return (SidesCopy.tileHeadline(for: status), SidesCopy.tileSubtitle(for: status))
+    }
+
+    func testTheTileNamesUpToTwoGroupsThenCounts() {
+        let legs = group("Legs", .imbalance(exercises: 2))
+        let shoulders = group("Shoulders", .imbalance(exercises: 1))
+        let back = group("Back", .imbalance(exercises: 1))
+
+        XCTAssertEqual(tile(legs).headline, "Imbalance in Legs")
+        XCTAssertEqual(tile(legs, shoulders).headline, "Imbalances in Legs and Shoulders")
+        XCTAssertEqual(tile(legs, shoulders, back).headline, "Imbalances in 3 muscle groups")
+        XCTAssertEqual(tile(legs).subtitle, "Last \(SidesAnalysis.sessionsConsidered) sessions of each exercise")
+    }
+
+    func testTheTileNamesOnlyTheGroupsItIsTalkingAbout() {
+        XCTAssertEqual(
+            tile(group("Legs", .imbalance(exercises: 1)), group("Back", .possible(exercises: 1)), group("Biceps", .even)).headline,
+            "Imbalance in Legs"
+        )
+    }
+
+    func testTheTileSaysPossibleEvenAndBuildingPlainly() {
+        let possible = tile(group("Legs", .possible(exercises: 1)), group("Biceps", .even))
+        XCTAssertEqual(possible.headline, "Possible imbalance in Legs")
+        XCTAssertEqual(possible.subtitle, "It needs a few more sessions to confirm")
+        XCTAssertEqual(
+            tile(group("Legs", .possible(exercises: 1)), group("Back", .possible(exercises: 2))).headline,
+            "Possible imbalances in 2 muscle groups"
+        )
+
+        XCTAssertEqual(tile(group("Biceps", .even)).headline, "Both sides are even")
+
+        let building = tile(group("Back", .collecting(sessions: 1)))
+        XCTAssertEqual(building.headline, "Building your baseline")
+        XCTAssertEqual(building.subtitle, "Each exercise needs \(SidesAnalysis.minSessions) sessions")
+    }
+
+    /// An unconfirmed lean gets no solid mark anywhere in the feature (D24).
+    func testOnlyAnUnconfirmedClaimGetsADashedMark() {
+        XCTAssertTrue(SidesTileMark(state: .possible).isDashed)
+        XCTAssertFalse(SidesTileMark(state: .imbalanced).isDashed)
+        XCTAssertTrue(SidesTileMark(status: .possible(.left)).isDashed)
+        XCTAssertFalse(SidesTileMark(status: .stronger(.left, .slightly)).isDashed)
+        XCTAssertFalse(SidesTileMark(status: .even).isDashed)
+
+        XCTAssertEqual(SidesTileMark(status: .stronger(.right, .clearly)).glyph, .side(.right))
+        XCTAssertEqual(SidesTileMark(status: .possible(.left)).glyph, .side(.left))
+        XCTAssertEqual(SidesTileMark(status: .even).glyph, .equal)
+        XCTAssertEqual(SidesTileMark(status: .collecting(sessions: 1)).glyph, .collecting)
+    }
+
+    // MARK: - Exercise verdict
+
+    private func summary(
+        _ status: SideStatus,
+        gap: Double = 1.2,
+        leadCount: Int = 0,
+        differingCount: Int = 0
+    ) -> SideExerciseSummary {
+        SideExerciseSummary(
+            id: UUID(), name: "Bulgarian Split Squat", status: status, sessions: [],
+            averageGap: gap, leadCount: leadCount, differingCount: differingCount, bestReps: [],
+            oneSideOnlySets: 0, rirOnOneSideSets: 0, canTrackSides: true
+        )
+    }
+
+    func testTheVerdictReadsPlainlyInEveryState() {
+        let stronger = summary(.stronger(.right, .clearly), leadCount: 5, differingCount: 5)
+        XCTAssertEqual(SidesCopy.verdictTitle(for: stronger), "Right is clearly stronger")
+        XCTAssertEqual(SidesCopy.verdictSubtitle(for: stronger), "About 1 more rep at the same weight")
+        XCTAssertEqual(SidesCopy.leadLine(for: stronger), "RIGHT AHEAD IN 5")
+
+        let possible = summary(.possible(.left), gap: -2.2, leadCount: 2, differingCount: 2)
+        XCTAssertEqual(SidesCopy.verdictTitle(for: possible), "Left seems stronger")
+        XCTAssertEqual(SidesCopy.verdictSubtitle(for: possible), "About 2 more reps so far, needs more sessions")
+        XCTAssertEqual(SidesCopy.leadLine(for: possible), "LEFT AHEAD IN 2")
+
+        let even = summary(.even, gap: 0.2, differingCount: 2)
+        XCTAssertEqual(SidesCopy.verdictTitle(for: even), "Both sides are even")
+        XCTAssertEqual(SidesCopy.verdictSubtitle(for: even), "Within a rep of each other, at the same weight")
+        XCTAssertEqual(SidesCopy.leadLine(for: even), "NO CONSISTENT GAP")
+        XCTAssertEqual(SidesCopy.leadLine(for: summary(.even, gap: 0)), "SIDES MATCHED")
+
+        let collecting = summary(.collecting(sessions: 1), gap: 0)
+        XCTAssertEqual(SidesCopy.verdictTitle(for: collecting), "Needs 2 more sessions")
+        XCTAssertEqual(SidesCopy.verdictSubtitle(for: collecting), "With both sides logged")
+        XCTAssertNil(SidesCopy.leadLine(for: collecting))
+    }
+
+    func testAGapUnderOneRepStillSaysAboutOne() {
+        XCTAssertEqual(
+            SidesCopy.verdictSubtitle(for: summary(.stronger(.left, .slightly), gap: -0.6)),
+            "About 1 more rep at the same weight"
+        )
     }
 
     // MARK: - Body map
@@ -590,6 +871,9 @@ final class SidesAnalysisTests: XCTestCase {
         XCTAssertNil(BodyMapGeometry.anatomicalSide(forLibrarySide: "common", in: .front))
     }
 
+    // These read the artwork itself, which compiles only under REPSTER_BODY_MAP (D32). Everything
+    // around them uses the mapping, which holds none of it.
+    #if REPSTER_BODY_MAP
     /// The mirror trap, checked against the artwork itself rather than the mapping table.
     func testTheFiguresLeftArmIsOnTheViewersRightInTheFrontViewOnly() throws {
         func midX(_ geometry: BodyMapGeometry, _ region: String, _ side: SideLean) throws -> CGFloat {
@@ -619,6 +903,7 @@ final class SidesAnalysisTests: XCTestCase {
             }
         }
     }
+    #endif
 
     /// The map says where, never which side (D21).
     func testFillsShowWhereNotWhichSide() {
@@ -636,7 +921,7 @@ final class SidesAnalysisTests: XCTestCase {
     // MARK: - Analytics
 
     func testSidesEventsHaveStableNames() {
-        XCTAssertEqual(AnalyticsEvent.sidesGroupOpened.rawValue, "sides group opened")
+        XCTAssertEqual(AnalyticsEvent.sidesOpened.rawValue, "sides opened")
         XCTAssertEqual(AnalyticsEvent.sidesExerciseOpened.rawValue, "sides exercise opened")
         XCTAssertEqual(AnalyticsPropertyKey.sidesState.rawValue, "sides_state")
         XCTAssertEqual(SidesCardState.imbalanced.rawValue, "imbalanced")

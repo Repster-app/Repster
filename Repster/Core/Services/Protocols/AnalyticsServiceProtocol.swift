@@ -857,7 +857,7 @@ extension AnalyticsServiceProtocol {
             .hasNew: .bool(hasNew),
             .hasBaseline: .bool(hasBaseline)
         ]
-        // Reach for the Sides card: `hidden` is everyone it has nothing to show.
+        // Reach for the Left vs Right tile: `hidden` is everyone it has nothing to show.
         if let sidesState {
             properties[.sidesState] = .string(sidesState)
         }
@@ -904,16 +904,9 @@ extension AnalyticsServiceProtocol {
         track(.musclePanelExpanded, properties: [.groupCount: .int(groupCount)])
     }
 
-    /// A muscle group opened from the Sides card. `muscle_group` is only ever a
-    /// catalog value: a custom group is text the user typed, so it's sent as
-    /// "custom" rather than as itself.
-    func sidesGroupOpened(group: String, status: SideGroupStatus, exerciseCount: Int) {
-        let isCatalogGroup = ExerciseMuscleGroupCatalog.supportedEntries.contains { $0.value == group }
-        track(.sidesGroupOpened, properties: [
-            .muscleGroup: .string(isCatalogGroup ? group : "custom"),
-            .sideStatus: .string(status.analyticsValue),
-            .exerciseCountBucket: .string(AnalyticsBuckets.count(exerciseCount))
-        ])
+    /// The Left vs Right tile opened, with what it was showing.
+    func sidesOpened(state: SidesCardState) {
+        track(.sidesOpened, properties: [.sidesState: .string(state.rawValue)])
     }
 
     func sidesExerciseOpened(status: SideStatus) {
@@ -1257,7 +1250,7 @@ enum AnalyticsEvent: String, CaseIterable {
     case insightRatingReason = "insight rating reason"
     case insightSnoozed = "insight snoozed"
     case musclePanelExpanded = "muscle panel expanded"
-    case sidesGroupOpened = "sides group opened"
+    case sidesOpened = "sides opened"
     case sidesExerciseOpened = "sides exercise opened"
     case appleHealthPromptShown = "apple health prompt shown"
     case appleHealthPromptAnswered = "apple health prompt answered"
@@ -1305,7 +1298,6 @@ enum AnalyticsPropertyKey: String, CaseIterable {
     case groupCount = "group_count"
     case sidesState = "sides_state"
     case sideStatus = "side_status"
-    case muscleGroup = "muscle_group"
     case notesEntered = "notes_entered"
     case excludedFromProgression = "excluded_from_progression"
     case prsHit = "prs_hit"
