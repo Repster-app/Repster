@@ -116,41 +116,57 @@ struct CreateEditExerciseSheet: View {
         Section("Muscles") {
             Menu {
                 ForEach(viewModel.primaryMuscleOptions, id: \.self) { muscle in
-                    Button {
-                        viewModel.primaryMuscle = muscle
-                    } label: {
-                        if viewModel.primaryMuscle == muscle {
-                            Label(ExercisePrimaryGroup.displayName(for: muscle), systemImage: "checkmark")
-                        } else {
+                    Toggle(isOn: primaryMuscleSelection(muscle)) {
+                        Label {
                             Text(ExercisePrimaryGroup.displayName(for: muscle))
+                        } icon: {
+                            Image(uiImage: MuscleGroupColors.dotImage(for: muscle))
+                                .renderingMode(.original)
                         }
                     }
                 }
             } label: {
+                // Fixed Colors, not `.primary` and `.secondary`: a menu label draws in the tint.
                 HStack {
                     Text("Primary Muscle")
+                        .foregroundStyle(Color.primary)
                     Spacer()
+                    if !viewModel.primaryMuscle.isEmpty {
+                        Circle()
+                            .fill(MuscleGroupColors.color(for: viewModel.primaryMuscle))
+                            .frame(width: 8, height: 8)
+                    }
                     Text(viewModel.primaryMuscleDisplayName)
                         .foregroundStyle(
                             viewModel.primaryMuscle.isEmpty
                             ? Color.textTertiary
-                            : Color.textSecondary
+                            : Color.secondary
                         )
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.secondary)
                 }
             }
             .simultaneousGesture(TapGesture().onEnded { _ in
                 focusedField = nil
             })
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Secondary Muscles")
-                WrappingHStack(spacing: 6, lineSpacing: 6) {
-                    ForEach(viewModel.secondaryMuscleOptions, id: \.self) { muscle in
-                        secondaryMusclePill(muscle)
-                    }
+            NavigationLink {
+                // Cleared here, not with a tap gesture on the link: that swallows quick taps,
+                // so the row only opens on a long press.
+                SecondaryMusclesScreen(viewModel: viewModel)
+                    .onAppear { focusedField = nil }
+            } label: {
+                HStack {
+                    Text("Secondary Muscles")
+                        .lineLimit(1)
+                        .layoutPriority(1)
+                    Spacer()
+                    Text(viewModel.secondaryMusclesSummary)
+                        .foregroundStyle(Color.secondary)
+                        .lineLimit(1)
                 }
             }
-            .padding(.vertical, 4)
 
             Picker("Movement Pattern", selection: $viewModel.movementPattern) {
                 Text("None").tag(Optional<MovementPattern>.none)
@@ -161,24 +177,16 @@ struct CreateEditExerciseSheet: View {
         }
     }
 
-    /// Plain button style keeps each pill its own tap target inside the Form row.
-    private func secondaryMusclePill(_ muscle: String) -> some View {
-        let isSelected = viewModel.isSecondaryMuscleSelected(muscle)
-
-        return Button {
-            focusedField = nil
-            viewModel.toggleSecondaryMuscle(muscle)
-        } label: {
-            Text(ExercisePrimaryGroup.displayName(for: muscle))
-                .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? .white : Color.textSecondary)
-                .padding(.vertical, 6)
-                .padding(.horizontal, 10)
-                .background(isSelected ? Color.accent : Color.bgSubtle)
-                .cornerRadius(8)
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    /// A Toggle gives the menu's own checkmark and leaves the icon slot free for the dot.
+    private func primaryMuscleSelection(_ muscle: String) -> Binding<Bool> {
+        Binding(
+            get: { viewModel.primaryMuscle == muscle },
+            set: { isSelected in
+                if isSelected {
+                    viewModel.primaryMuscle = muscle
+                }
+            }
+        )
     }
 
     // MARK: - Advanced Section
@@ -307,5 +315,53 @@ struct CreateEditExerciseSheet: View {
                 viewModel.showError = true
             }
         }
+    }
+}
+
+// MARK: - Secondary Muscles Screen
+
+/// The full muscle list by area, pushed from the form's Secondary Muscles row. Picks land on
+/// the form's view model straight away, so Back keeps them and Cancel still discards them.
+private struct SecondaryMusclesScreen: View {
+    let viewModel: CreateEditExerciseViewModel
+
+    var body: some View {
+        Form {
+            ForEach(viewModel.secondaryMuscleAreas, id: \.title) { area in
+                Section(area.title) {
+                    ForEach(area.muscles, id: \.self) { muscle in
+                        muscleRow(muscle)
+                    }
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(Color.bg)
+        .navigationTitle("Secondary Muscles")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func muscleRow(_ muscle: String) -> some View {
+        let isSelected = viewModel.isSecondaryMuscleSelected(muscle)
+
+        return Button {
+            viewModel.toggleSecondaryMuscle(muscle)
+        } label: {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(MuscleGroupColors.groupColor(for: muscle))
+                    .frame(width: 8, height: 8)
+                Text(ExercisePrimaryGroup.displayName(for: muscle))
+                    .foregroundStyle(Color.primary)
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.accent)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }

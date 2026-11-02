@@ -1,6 +1,6 @@
 # Muscle Group Coverage — Scoping
 
-**Status:** Phase 1 built 2026-10-29 for 1.6 (uncommitted, device pass outstanding). Phases 2 and 3 not built
+**Status:** Phase 1 built 2026-10-29 for 1.6 (committed acf4c39). Editor reworked 2026-11-01 into a 19-muscle grouped picker. Device pass outstanding. Library re-tag and Phases 2 and 3 not built
 **Date:** 2026-08-16
 **Supersedes:** the insights-attribution framing in this doc's first draft
 
@@ -127,13 +127,28 @@ Worth deferring until the panel work in Phase 3.
 
 Users can now see and edit secondary muscles. Nothing recalculates.
 
-**Built 2026-10-29 (uncommitted):**
+**Built 2026-10-29 (committed acf4c39). The editor and yield bullets are superseded by the rework below:**
 
 - `coverageGroup(for:)` and `MuscleAttribution` in [ExerciseMuscleGroupCatalog.swift](Repster/Features/Exercise/Models/ExerciseMuscleGroupCatalog.swift). `MuscleAttribution` applies Decision 2's four rules. It also owns the editor's option list and toggle, so the rules sit in one file.
 - **Exercise detail** shows one line, primary in accent with the secondaries muted after it: "Chest · Shoulders · Triceps". It wraps for long lists. It is plain text rather than pills, because the primary was never a pill. VoiceOver reads "Chest, also works Shoulders, Triceps".
 - **Editor**: a "Secondary Muscles" row of toggle pills under Primary Muscle. It offers the catalog minus cardio, full body and the primary's group. Any off-catalog group the exercise already carries is added so it can still be removed. Toggling works a group at a time, and other groups keep their stored spelling. So Deadlift's `hamstrings, glutes` stays as stored unless legs is turned off, and the fine-grained tags survive for a later taxonomy project.
 - Tests: `MuscleAttributionTests` (rollup, dedupe, options, toggling), a seed-wide check that every seeded secondary lands on a catalog group, and two editor view-model tests (create with picks, edit without flattening).
 - **Yield on the library:** 41 of 69 exercises now show at least one secondary group.
+
+**Editor reworked 2026-11-01, after a look on a real phone:**
+
+- **Why:** the pills were the only custom row on the sheet, the selected one was louder than the primary, and the row took about three rows of height for an optional field.
+- **Form:** Primary Muscle and Secondary Muscles now look like Equipment. Primary is a menu with a colour dot on each option. Secondary shows a short summary ("Shoulders, Triceps +2") and pushes a screen grouped by area.
+- **The list is 19 muscles**, in `ExerciseMuscleGroupCatalog.secondaryMuscleAreas`: the eight general groups minus Legs, plus front, side and rear delts, lats, traps, lower back, obliques, quads, glutes, hamstrings, calves and adductors. Plain Legs is off the list so nobody has to choose between Legs and Quads. Barbell Thruster and Running carry it, so they show it under an Other area where it can be removed.
+- **The list is not contextual.** It's the same everywhere, minus what the primary covers. Filtering by primary would hide Hamstrings and Glutes on Deadlift, whose primary is Back.
+- **Detail now shows stored muscles, not rolled-up groups:** "Back · Hamstrings · Glutes · Abs". 54 of 69 library exercises show a secondary, up from 41. This makes Hip Adductor Machine's wrong `glutes` tag visible until the library is re-tagged.
+- **`coverageGroup` holds the rollup** for anything that counts: rear delts are shoulders, traps are back, obliques are abs. Dots use the group's colour, so no new colours were needed. Primaries, Insights and filters stay on the ten groups, which is why the migration in Decision 1's alternative doesn't apply.
+
+**Agreed next steps, not built:**
+
+- **Library re-tag:** 30 tags say only Shoulders, Back or Abs, and 15 exercises have no tags. Claude drafts all 69 as one table for review.
+- **Once-only update for existing users:** seed edits only reach new installs. Follow the `GhostSetRepsBackfillMigration` pattern, match library exercises by name as `TrainingDataSharingService.isBuiltIn` does, and only replace tags that are still the originals, so user edits survive. It rewrites data on users' phones, so it needs real care.
+- **Coverage strip:** it needs tags, not set counting, so it can come before Phase 3. "This routine hits no rear delts" is the payoff for the longer list. On a push day, "Not hit" will always list Back and Legs, so that line needs another look before it's built.
 
 ### Phase 2 — the two missing surfaces (the actual feature)
 
@@ -176,7 +191,7 @@ No migration. No stats rebuild. Numbers change on update.
 2. **Is 0.5 right?** Phase 3 only. Not blocking.
 3. **Re-tag the seed set?** Nobody has audited those 96 tags since they were written. Worth a pass before they drive visible numbers — but Phase 1 and 2 surface the tags as-is, which is itself a cheap way to find the wrong ones.
    **Audited 2026-10-29: nothing visible is wrong.** Two grip exercises are missing forearms: Farmer's Walk (abs | shoulders, back) and Dead Hang (back | shoulders). Two tags are debatable: Barbell Row's core, which Pendlay Row doesn't have, and Kettlebell Swing's shoulders. Hip Adductor Machine's `glutes` is wrong, but it rolls into its own legs primary and never shows. Not changed: `SeedService` only seeds an empty store, so a seed edit reaches new installs only and splits the library between old and new users. Users can now fix tags themselves in the editor.
-4. **Fine-grained taxonomy** (front/side/rear delts, glutes vs quads). Real demand in the thread. Separate project.
+4. **Fine-grained taxonomy** (front/side/rear delts, glutes vs quads). Real demand in the thread. Separate project. Secondaries went fine-grained on 2026-11-01; primaries stay on the ten groups.
 
 ---
 

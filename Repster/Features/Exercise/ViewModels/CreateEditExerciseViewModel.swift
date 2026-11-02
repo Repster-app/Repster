@@ -24,8 +24,8 @@ final class CreateEditExerciseViewModel {
     var equipmentType: EquipmentType = .barbell
     var trackingType: TrackingType = .weightReps
     var primaryMuscle: String = ""
-    /// Stored tags, edited a group at a time through `toggleSecondaryMuscle`, so a library
-    /// exercise keeps tags like "glutes" unless its whole legs group is removed.
+    /// Stored tags, edited one muscle at a time through `toggleSecondaryMuscle`, so the
+    /// others keep their stored spelling and order.
     var secondaryMuscles: [String] = []
     var movementPattern: MovementPattern? = nil
     var unilateral: Bool = false
@@ -68,18 +68,29 @@ final class CreateEditExerciseViewModel {
         return ExercisePrimaryGroup.displayName(for: primaryMuscle)
     }
 
-    var secondaryMuscleOptions: [String] {
-        MuscleAttribution.secondaryOptions(primaryMuscle: primaryMuscle, secondaryMuscles: secondaryMuscles)
+    var secondaryMuscleAreas: [ExerciseMuscleGroupCatalog.MuscleArea] {
+        MuscleAttribution.secondaryAreas(primaryMuscle: primaryMuscle, secondaryMuscles: secondaryMuscles)
     }
 
-    func isSecondaryMuscleSelected(_ group: String) -> Bool {
-        MuscleAttribution(primaryMuscle: primaryMuscle, secondaryMuscles: secondaryMuscles)
-            .secondary
-            .contains(group)
+    /// Short enough for the form row: "Shoulders, Triceps", then "Shoulders, Triceps +2".
+    var secondaryMusclesSummary: String {
+        let names = selectedSecondaryMuscles.map { ExercisePrimaryGroup.displayName(for: $0) }
+        guard !names.isEmpty else { return "None" }
+
+        let shown = names.prefix(2).joined(separator: ", ")
+        return names.count > 2 ? "\(shown) +\(names.count - 2)" : shown
     }
 
-    func toggleSecondaryMuscle(_ group: String) {
-        secondaryMuscles = MuscleAttribution.toggling(group, in: secondaryMuscles)
+    func isSecondaryMuscleSelected(_ muscle: String) -> Bool {
+        selectedSecondaryMuscles.contains(muscle)
+    }
+
+    func toggleSecondaryMuscle(_ muscle: String) {
+        secondaryMuscles = MuscleAttribution.toggling(muscle, in: secondaryMuscles)
+    }
+
+    private var selectedSecondaryMuscles: [String] {
+        MuscleAttribution(primaryMuscle: primaryMuscle, secondaryMuscles: secondaryMuscles).secondary
     }
 
     var supportsUnilateral: Bool {

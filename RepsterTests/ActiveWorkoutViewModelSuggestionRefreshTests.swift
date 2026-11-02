@@ -2094,7 +2094,7 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
         XCTAssertEqual(viewModel.primaryMuscleDisplayName, "Arms")
     }
 
-    func testCreateEditExerciseViewModelSavesPickedSecondaryGroupsOnCreate() async throws {
+    func testCreateEditExerciseViewModelSavesPickedSecondaryMusclesOnCreate() async throws {
         let exerciseService = ExerciseServiceStub()
         let viewModel = CreateEditExerciseViewModel(
             exercise: nil,
@@ -2104,19 +2104,24 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
 
         viewModel.name = "Landmine Press"
         viewModel.primaryMuscle = "shoulders"
-        XCTAssertFalse(viewModel.secondaryMuscleOptions.contains("shoulders"))
+        XCTAssertFalse(viewModel.secondaryMuscleAreas.flatMap(\.muscles).contains("shoulders"))
+        XCTAssertEqual(viewModel.secondaryMusclesSummary, "None")
 
         viewModel.toggleSecondaryMuscle("triceps")
         viewModel.toggleSecondaryMuscle("chest")
-        XCTAssertTrue(viewModel.isSecondaryMuscleSelected("chest"))
+        XCTAssertEqual(viewModel.secondaryMusclesSummary, "Triceps, Chest")
+
+        viewModel.toggleSecondaryMuscle("front delts")
+        XCTAssertTrue(viewModel.isSecondaryMuscleSelected("front delts"))
+        XCTAssertEqual(viewModel.secondaryMusclesSummary, "Triceps, Chest +1")
 
         try await viewModel.save()
 
         let createdExercise = try XCTUnwrap(exerciseService.createdExerciseFields.last)
-        XCTAssertEqual(createdExercise.secondaryMuscles, ["triceps", "chest"])
+        XCTAssertEqual(createdExercise.secondaryMuscles, ["triceps", "chest", "front delts"])
     }
 
-    func testCreateEditExerciseViewModelEditsSecondaryGroupsWithoutFlatteningStoredTags() async throws {
+    func testCreateEditExerciseViewModelEditsOneSecondaryMuscleWithoutTouchingTheRest() async throws {
         let exerciseService = ExerciseServiceStub()
         let viewModel = CreateEditExerciseViewModel(
             exercise: ChartExerciseData(from: Exercise(
@@ -2130,15 +2135,16 @@ final class ActiveWorkoutViewModelSuggestionRefreshTests: XCTestCase {
             settingsService: SettingsServiceStub(profile: HealthProfile())
         )
 
-        XCTAssertTrue(viewModel.isSecondaryMuscleSelected("legs"))
+        XCTAssertTrue(viewModel.isSecondaryMuscleSelected("hamstrings"))
+        XCTAssertTrue(viewModel.isSecondaryMuscleSelected("glutes"))
         XCTAssertTrue(viewModel.isSecondaryMuscleSelected("abs"))
 
-        viewModel.toggleSecondaryMuscle("abs")
+        viewModel.toggleSecondaryMuscle("glutes")
         viewModel.toggleSecondaryMuscle("forearms")
         try await viewModel.save()
 
         let updatedExercise = try XCTUnwrap(exerciseService.updatedExerciseFields.last?.fields)
-        XCTAssertEqual(updatedExercise.secondaryMuscles, ["hamstrings", "glutes", "forearms"])
+        XCTAssertEqual(updatedExercise.secondaryMuscles, ["hamstrings", "core", "forearms"])
     }
 
     func testCreateEditExerciseViewModelDoesNotLockTrackingTypeForPlaceholderSets() async {

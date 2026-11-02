@@ -44,8 +44,8 @@ final class SeedExerciseLibraryTests: XCTestCase {
     }
 
     /// Exercise detail shows seeded secondaries through `MuscleAttribution`. A tag that
-    /// doesn't land on a catalog group would show raw, with no colour or filter behind it.
-    func testEverySeededSecondaryResolvesToACatalogGroup() throws {
+    /// doesn't count towards a catalog group would have no colour or rollup behind it.
+    func testEverySeededSecondaryCountsTowardsACatalogGroup() throws {
         let catalogGroups = Set(ExerciseMuscleGroupCatalog.supportedEntries.map(\.value))
 
         for exercise in try loadSeedExerciseFile().exercises {
@@ -53,8 +53,9 @@ final class SeedExerciseLibraryTests: XCTestCase {
                 primaryMuscle: exercise.primaryMuscle,
                 secondaryMuscles: exercise.secondaryMuscles
             )
-            for group in attribution.secondary {
-                XCTAssertTrue(catalogGroups.contains(group), "\(exercise.name): \(group)")
+            for muscle in attribution.secondary {
+                let group = try XCTUnwrap(ExerciseMuscleGroupCatalog.coverageGroup(for: muscle))
+                XCTAssertTrue(catalogGroups.contains(group), "\(exercise.name): \(muscle)")
             }
         }
     }

@@ -47,6 +47,24 @@ struct MuscleGroupColors {
         }
     }
 
+    /// The colour of the group a muscle counts towards: every delt shares Shoulders' gold,
+    /// every leg muscle shares Legs' red.
+    static func groupColor(for muscle: String) -> Color {
+        color(for: ExerciseMuscleGroupCatalog.coverageGroup(for: muscle) ?? muscle)
+    }
+
+    /// `color(for:)` as a small dot, for a menu item. Menus redraw an icon as a flat
+    /// template and drop any SwiftUI colour, so the dot has to be a bitmap that keeps its own.
+    static func dotImage(for muscleGroup: String) -> UIImage {
+        let size = CGSize(width: 10, height: 10)
+        let dot = UIGraphicsImageRenderer(size: size).image { context in
+            UIColor(color(for: muscleGroup)).setFill()
+            context.cgContext.fillEllipse(in: CGRect(origin: .zero, size: size))
+        }
+
+        return dot.withRenderingMode(.alwaysOriginal)
+    }
+
     private static func fallbackColor(for rawValue: String) -> Color {
         let normalized = ExercisePrimaryGroup.normalizedValue(rawValue) ?? rawValue
         let hash = normalized.unicodeScalars.reduce(into: 0) { partialResult, scalar in
