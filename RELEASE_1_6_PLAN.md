@@ -22,10 +22,10 @@ everything after the 1.5 commit is unreleased and rolls into 1.6.
 
 | | |
 |---|---|
-| Since the 1.5 commit (`ac67d7f`, 2026-09-07) | 42 commits. 31 change the app or tests; 11 are docs, tooling or the 1.5.1 bump |
+| Since the 1.5 commit (`ac67d7f`, 2026-09-07) | 43 commits. 31 change the app or tests; 12 are docs, tooling or the 1.5.1 bump |
 | App code | 87 files, +7,758 / −848. 21 new files, none removed |
 | Uncommitted | Nothing, apart from the files kept out of git on purpose (Part 5) |
-| Unpushed | 6 commits: `e12b5a6`, `219b49b`, `728a462`, the 2026-11-02 docs commit, `ad3cacf` (version 1.6 and What's New) and the pages and review-note commit on top |
+| Pushed | Everything up to and including this record, on 2026-11-04. Pages serves `NewMain:/docs`, so the corrected support and terms pages went live with it |
 | Test suite | 1,040 run, 14 skipped, 0 failed, no crashes. iPhone 17 Pro, iOS 26.3.1, re-run 2026-11-04 on `ad3cacf`. The built app and the Live Activity extension both report 1.6 |
 | Release-config build | Succeeds with 0 errors, unsigned, generic iOS device, 2026-11-04. The body-map artwork is absent from the built app, checked by searching it for a path string, while a known app string is found |
 | Upgrade risk | No SwiftData model change, no backup format change, no new permission string, no entitlement, privacy manifest or package change since 1.5 |

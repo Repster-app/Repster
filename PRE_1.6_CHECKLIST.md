@@ -2,7 +2,7 @@
 
 **Currently live:** 1.5 (build 2). 1.5.1 was TestFlight only.
 **This release:** **1.6 build 1**, set 2026-11-04 (§1.1).
-**Branch:** `NewMain`, 6 commits ahead of `origin/NewMain` on 2026-11-04.
+**Branch:** `NewMain`, pushed to `origin` on 2026-11-04.
 
 What 1.6 contains is [RELEASE_1_6_PLAN.md](RELEASE_1_6_PLAN.md). What it leaves out is
 [RELEASE_1_6_CONSIDERATIONS.md](RELEASE_1_6_CONSIDERATIONS.md). Recurring setup that is already
@@ -65,8 +65,8 @@ training data and the free month. These two were missed:
 - [x] [docs/terms.html:85](docs/terms.html:85) said workout data stays local unless exported or
       shared. Since 2026-11-04 it names the training data and says that copy is not a backup.
       Last updated November 4, 2026
-- [ ] Push `NewMain`, which is the deploy, before 1.6 reaches users. Both pages say "From
-      Repster 1.6", so they're accurate before and after the release
+- [x] Pushed `NewMain`, which is the deploy, on 2026-11-04. Both pages say "From Repster 1.6",
+      so they're accurate before and after the release
 
 ### 1.5 App Review note
 
