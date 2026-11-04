@@ -1,10 +1,11 @@
 # 1.6 Release Plan
 
 **Written:** 2026-11-02, from git, the tree and PostHog, not copied from older plans.
+**Re-checked:** 2026-11-04, against the same sources.
 **Live:** 1.5 (build 2), public since 2026-09-07.
 **1.5.1 never shipped.** It only reached TestFlight (builds 1 to 7, two team iPhones), so
 everything after the 1.5 commit is unreleased and rolls into 1.6.
-**In the project right now:** `MARKETING_VERSION = 1.5.1`, build 1.
+**In the project right now:** `MARKETING_VERSION = 1.6`, build 1 (set 2026-11-04).
 **Status:** rounded up, scope not locked. The open scope calls are in
 [PRE_1.6_CHECKLIST.md §0](PRE_1.6_CHECKLIST.md).
 
@@ -21,14 +22,14 @@ everything after the 1.5 commit is unreleased and rolls into 1.6.
 
 | | |
 |---|---|
-| Since the 1.5 commit (`ac67d7f`, 2026-09-07) | 37 commits. 28 change the app or tests; 9 are docs, tooling or the 1.5.1 bump |
-| App code | 85 files, +7,552 / −839. 21 new files, none removed |
+| Since the 1.5 commit (`ac67d7f`, 2026-09-07) | 42 commits. 31 change the app or tests; 11 are docs, tooling or the 1.5.1 bump |
+| App code | 87 files, +7,758 / −848. 21 new files, none removed |
 | Uncommitted | Nothing, apart from the files kept out of git on purpose (Part 5) |
-| Unpushed | 4 commits: `e12b5a6`, `219b49b`, `728a462` and the docs commit on top |
-| Test suite | 1,040 run, 14 skipped, 0 failed, no crashes. iPhone 17 Pro, iOS 26.3.1, 2026-11-02 |
-| Release-config build | Succeeds with 0 errors, unsigned, generic iOS Simulator, 2026-11-02 |
+| Unpushed | 6 commits: `e12b5a6`, `219b49b`, `728a462`, the 2026-11-02 docs commit, `ad3cacf` (version 1.6 and What's New) and the pages and review-note commit on top |
+| Test suite | 1,040 run, 14 skipped, 0 failed, no crashes. iPhone 17 Pro, iOS 26.3.1, re-run 2026-11-04 on `ad3cacf`. The built app and the Live Activity extension both report 1.6 |
+| Release-config build | Succeeds with 0 errors, unsigned, generic iOS device, 2026-11-04. The body-map artwork is absent from the built app, checked by searching it for a path string, while a known app string is found |
 | Upgrade risk | No SwiftData model change, no backup format change, no new permission string, no entitlement, privacy manifest or package change since 1.5 |
-| TestFlight | Newest is 1.5.1 build 7, 2026-11-01, on iOS 26.6. `e12b5a6` came after it |
+| TestFlight | Newest is still 1.5.1 build 7 (2026-11-01, iOS 26.6), last used 2026-11-04. `e12b5a6`, the final secondary-muscle rework and the Left vs Right rebuild all came after it |
 | Phone sign-off | None recorded. The last column of each table says what PostHog can prove |
 
 **The last column:**
@@ -36,6 +37,7 @@ everything after the 1.5 commit is unreleased and rolls into 1.6.
 - **Ran:** PostHog shows it firing on a TestFlight iPhone. It has been used, not signed off
 - **Never fired:** it reports an event, and none has ever arrived from a real phone
 - **No signal:** it reports no event of its own, so PostHog can't say
+- **Not on TestFlight yet:** committed after build 7, so no phone has run this version
 
 ---
 
@@ -43,11 +45,11 @@ everything after the 1.5 commit is unreleased and rolls into 1.6.
 
 | Feature | What it does | Commits | Doc | Real phone |
 |---|---|---|---|---|
-| **Left vs Right** | One tile on Insights, a list of exercises under their muscle groups, and an exercise page with a line chart and the best set from the last 3 sessions, marked with whether RIR counted. Rebuilt 2026-11-02. Hidden until both sides have been logged; 6 of 69 library exercises are unilateral | `23240ee` `b40bf34` `331db42` `728a462` | [UNILATERAL_IMBALANCE_EXPLORATION.md](UNILATERAL_IMBALANCE_EXPLORATION.md), [SIDES_RETHINK_SCOPING.md](SIDES_RETHINK_SCOPING.md) | **Not yet** |
+| **Left vs Right** | One tile on Insights, a list of exercises under their muscle groups, and an exercise page with a line chart and the best set from the last 3 sessions, marked with whether RIR counted. Rebuilt 2026-11-02. Hidden until both sides have been logged; 6 of 69 library exercises are unilateral | `23240ee` `b40bf34` `331db42` `728a462` | [UNILATERAL_IMBALANCE_EXPLORATION.md](UNILATERAL_IMBALANCE_EXPLORATION.md), [SIDES_RETHINK_SCOPING.md](SIDES_RETHINK_SCOPING.md) | **Not on TestFlight yet** |
 | **Share any saved workout** | The share card now opens from Calendar and the Home workout screen, not just the summary | `dad017f` | [SHARE_FROM_HISTORY_SCOPING.md](SHARE_FROM_HISTORY_SCOPING.md) | Ran |
 | **Export one workout** | "Export Workout" in the "…" menu writes a JSON file and opens the share sheet. It can never be restored as a backup | `dd2256b` | [WORKOUT_EXPORT_SCOPING.md](WORKOUT_EXPORT_SCOPING.md) | **Never fired** |
 | **Set notes in history** | Tap a noted set to read its note, in exercise history and Calendar. Masked in replay | `a4d7567` | [SET_NOTES_IN_HISTORY_SCOPING.md](SET_NOTES_IN_HISTORY_SCOPING.md) | No signal |
-| **Secondary muscles** | Exercise detail lists them. The editor gains a 19-muscle grouped picker, and Primary Muscle becomes a menu with colour dots. Nothing recalculates | `acf4c39` `219b49b` | [SECONDARY_MUSCLES_SCOPING.md](SECONDARY_MUSCLES_SCOPING.md) | No signal; colour dots unverified |
+| **Secondary muscles** | Exercise detail lists them. The editor gains a 19-muscle grouped picker, and Primary Muscle becomes a menu with colour dots. Nothing recalculates | `acf4c39` `219b49b` | [SECONDARY_MUSCLES_SCOPING.md](SECONDARY_MUSCLES_SCOPING.md) | **Not on TestFlight yet** (final rework); colour dots unverified |
 | **Supersets past a pair** | Picking a partner already in a superset joins that group, so trios work. The partner picker shows existing groups | `96de8f2` | [SUPERSETS_SCOPING.md](SUPERSETS_SCOPING.md) | No signal |
 | **Insights preview for new users** | Someone with no sets sees what will appear and when, instead of an empty screen | `188e5ff` | [INSIGHTS_NEW_USER_SCOPING.md](INSIGHTS_NEW_USER_SCOPING.md) | No signal |
 | **Free-limit sheet** | Running out of free workouts now explains itself before the paywall: what was logged, and that history, charts and insights stay open | `9cbf4d6` | [PAYWALL_BRIDGE_SCOPING.md](PAYWALL_BRIDGE_SCOPING.md) | **Never fired** |

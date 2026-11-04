@@ -1,6 +1,13 @@
 # App Privacy and Review Checklist
 
-Last checked: September 6, 2026
+Last checked: November 4, 2026
+
+> **Changed for 1.6 (November 4, 2026):** the App Review Notes below now name the training
+> data in the opening lines as well as in its own paragraph, describe the free-limit sheet and
+> the free-month offer, and mention the one free-month notification. The Photos paragraph no
+> longer offers the share sheet as a fallback, because 1.6 removed the card's Share button
+> (`917b2d0`), and it says the card also opens from saved workouts. The App Privacy answers
+> are unchanged; see `Fitness` below.
 
 > **Changed for 1.5 (September 6, 2026):** two corrections to the App Review Notes
 > below. The free-tier limit was stated as 5 completed workouts; the code has said
@@ -215,9 +222,9 @@ The three commitments that must stay literally true in the app:
 
 Use this in the App Review Notes field:
 
-> Repster is a workout logging app and does not require account creation. Workout history, exercises, templates, bodyweight entries, and settings are stored locally on device unless the user exports or shares them.
+> Repster is a workout logging app and does not require account creation. Workout history, exercises, templates, bodyweight entries, and settings are stored locally on device unless the user exports or shares them. The one exception is the anonymous training data described below, which is on by default and can be switched off.
 >
-> The app uses anonymous PostHog EU product analytics for aggregate usage statistics only. It does not use IDFA, advertising, tracking, autocapture, or heatmaps. Users can turn all analytics off in Settings -> Data & Backups -> Share Anonymous Analytics, which disables events, session recordings, surveys, crash and error diagnostics, and Apple Search Ads attribution together.
+> The app uses anonymous PostHog EU product analytics for usage statistics, and for the training data described below. It does not use IDFA, advertising, tracking, autocapture, or heatmaps. Users can turn all analytics off in Settings -> Data & Backups -> Share Anonymous Analytics, which disables events, session recordings, surveys, crash and error diagnostics, training data sharing, and Apple Search Ads attribution together.
 >
 > The app captures anonymous session recordings to diagnose usability problems, and users can turn them off with everything else under Settings -> Data & Backups -> Share Anonymous Analytics. Recordings show the app's own interface text and the training content on screen — exercise names, workout and template names, and the sets, reps and weights of a workout — which is what makes them useful for finding where people get stuck. The app has no photo picker and no user-supplied imagery, so every image in a recording is one the app ships. Three things are masked on device before any recording is uploaded and are never received: workout, set and template notes; the user's bodyweight wherever it is displayed, including the bodyweight log; and the preview of a training file being imported. Text typed inside a pop-up dialogue cannot be masked that way, so recording stops entirely while such a dialogue is open. Recordings are not linked to any account, name or email address, because the app has no accounts. Product analytics events carry only bucketed counts and never exact figures, notes, CSV contents or bodyweight values. Separately, a "Share Training Data" setting (Settings -> Data & Backups, on by default, and switched off together with analytics) sends the training content of each finished workout to the same analytics provider under the same anonymous identifier: exercise names, sets, weights, reps, reps in reserve, rest time and targets. It never includes notes, workout titles, bodyweight, CSV contents or Health data, and workouts logged before 1.6 are only sent if the user switches the setting on themselves.
 >
@@ -229,11 +236,11 @@ Use this in the App Review Notes field:
 >
 > ATTRIBUTION: Repster uses Apple's own AdServices framework (`AAAttribution`) for first-party Apple Search Ads attribution only, once per install. No App Tracking Transparency prompt is shown because no IDFA is requested, no advertising profile is built, and no data is shared with third parties for tracking or ad targeting. The corresponding App Privacy answer is Identifiers -> Advertising Data, with purpose Analytics, not linked to the user, and not used for tracking. It is covered by the same Share Anonymous Analytics toggle: with analytics off, no request to Apple's attribution endpoint is made at all.
 >
-> PHOTOS: After finishing a workout, the user can open a shareable summary card and tap Save to Photos. That is the only thing that writes to the photo library, and it writes only the card image the user just asked to save. Repster requests add-only access (`NSPhotoLibraryAddUsageDescription`); it never requests read access, has no photo picker, and never reads or imports the user's photos. If the user declines, the card can still be shared through the standard share sheet.
+> PHOTOS: After finishing a workout, or from any saved workout in Calendar or on Home, the user can open a shareable summary card and tap Save to Photos. That is the only thing that writes to the photo library, and it writes only the card image the user just asked to save. Repster requests add-only access (`NSPhotoLibraryAddUsageDescription`); it never requests read access, has no photo picker, and never reads or imports the user's photos. If the user declines, nothing is saved, and the app explains that access can be turned on in Settings.
 >
-> The free tier allows up to 10 completed workouts. After that limit, the app presents the RevenueCat/App Store paywall to unlock unlimited workout logging. Restore Purchases and Manage Subscription are available in Settings -> Membership. Privacy Policy and Terms of Use are available in Settings -> About.
+> The free tier allows up to 10 completed workouts. After that limit, starting a workout first shows a short sheet saying the free workouts are used and that history, charts and insights stay open; See plans then opens the RevenueCat/App Store paywall to unlock unlimited workout logging. The same sheet offers a free month of the monthly subscription for answering three optional multiple-choice questions, and people whose subscription has ended get the same offer. The reward is the same whatever the answers, is still given with analytics off, and is never tied to ratings or reviews. It is redeemed through an Apple offer code on the App Store's own redeem screen; the app grants nothing itself. Restore Purchases and Manage Subscription are available in Settings -> Membership. Privacy Policy and Terms of Use are available in Settings -> About.
 >
-> Local notifications are used for rest timer alerts. Live Activities are used to show the active workout/rest timer state while a workout is in progress.
+> Local notifications are used for rest timer alerts, and for one notification about the free-month offer, sent at most once, 48 hours after the app first finds the user out of free workouts and not subscribed. Notification permission is only ever requested from the rest timer's alarm prompt; without it, nothing is scheduled and the offer stays on the sheet. Live Activities are used to show the active workout/rest timer state while a workout is in progress.
 
 ## Repo Files To Keep In Sync
 

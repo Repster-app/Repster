@@ -1,8 +1,8 @@
 # Pre-1.6 Launch Checklist
 
 **Currently live:** 1.5 (build 2). 1.5.1 was TestFlight only.
-**This release:** numbered **1.5.1 build 1** in the project right now, see §1.1.
-**Branch:** `NewMain`, 4 commits ahead of `origin/NewMain`.
+**This release:** **1.6 build 1**, set 2026-11-04 (§1.1).
+**Branch:** `NewMain`, 6 commits ahead of `origin/NewMain` on 2026-11-04.
 
 What 1.6 contains is [RELEASE_1_6_PLAN.md](RELEASE_1_6_PLAN.md). What it leaves out is
 [RELEASE_1_6_CONSIDERATIONS.md](RELEASE_1_6_CONSIDERATIONS.md). Recurring setup that is already
@@ -20,11 +20,11 @@ These change what gets built or tested, so they come before everything else.
       doc is still to do
 - [ ] **Lock the rest of the scope.** Recommendation: nothing else goes in. Part 6 of the plan
       stays out, and new ideas go to the considerations list
-- [ ] **Tell upgraders that Share Training Data is on?** Nothing in the app says so today, only
-      the Settings row and the policy. Apple's 5.1.1(ii) asks for consent to collection "even if
-      such data is considered to be anonymous". Default-on analytics has already passed review, so
-      this is a judgement rather than a known rejection.
-      **Recommendation: keep default-on as decided, and give it a What's New tile (§5)**
+- [x] **Tell upgraders that Share Training Data is on?** Decided 2026-11-04: yes, through What's
+      New, and default-on stays. It's the third tile in §5.1, now in the app. Apple's 5.1.1(ii)
+      asks for consent to collection "even if such data is considered to be anonymous", and
+      default-on analytics has already passed review, so this was a judgement rather than a
+      known rejection
 - [ ] **Close the open training-data questions** from
       [TRAINING_DATA_SHARING_DESIGN.md](TRAINING_DATA_SHARING_DESIGN.md): the EU read on
       default-on, whether to promise deleting already-shared data, and whether custom exercise
@@ -36,16 +36,16 @@ These change what gets built or tested, so they come before everything else.
 
 ### 1.1 Version
 
-- [ ] `MARKETING_VERSION` 1.5.1 → **1.6** on the app target and `WorkoutLiveActivity`, Debug and
-      Release, four values. `RepsterTests` stays at 1.0
-- [ ] Do it by hand. `scripts/bump_release.sh` only accepts `0.x` and stops with an error
-- [ ] It has to be exactly 1.6: `docs/privacy.html` and the review note both promise that
-      workouts from "before 1.6" aren't sent
+- [x] `MARKETING_VERSION` 1.5.1 → **1.6** on the app target and `WorkoutLiveActivity`, Debug and
+      Release, four values, done by hand on 2026-11-04. `RepsterTests` stays at 1.0.
+      `scripts/bump_release.sh` can't do it: it only accepts `0.x`
+- [x] It has to stay exactly 1.6: `docs/privacy.html`, the support and terms pages and the review
+      note all name 1.6
 
 ### 1.2 What's New
 
-- [ ] Add a `"1.6"` entry to `WhatsNewRelease.all`. It has none, and the match is exact, so
-      today **no sheet appears at all, with no error**. Draft in §5
+- [x] Added the `"1.6"` entry to `WhatsNewRelease.all` on 2026-11-04, with the three tiles in
+      §5.1. The match is exact, so the version and this entry have to change together
 
 ### 1.3 MIT notice for the body artwork
 
@@ -59,29 +59,34 @@ These change what gets built or tested, so they come before everything else.
 The privacy policy is fine: the live page matches `docs/privacy.html` exactly and already covers
 training data and the free month. These two were missed:
 
-- [ ] [docs/support.html:85](docs/support.html:85): "Is my workout data stored in the cloud?
-      No… unless you explicitly export or share them." Default-on sharing makes that untrue
-- [ ] [docs/terms.html:85](docs/terms.html:85): "stores workout data locally on your device
-      unless you choose to export or share it." Same problem; bump its Last updated too
-- [ ] Push `NewMain`, which is the deploy, before 1.6 reaches users
+- [x] [docs/support.html:85](docs/support.html:85) answered "Is my workout data stored in the
+      cloud?" with "No". Since 2026-11-04 it says the full history isn't, that from 1.6 an
+      anonymous copy of each finished workout is shared, and where to turn that off
+- [x] [docs/terms.html:85](docs/terms.html:85) said workout data stays local unless exported or
+      shared. Since 2026-11-04 it names the training data and says that copy is not a backup.
+      Last updated November 4, 2026
+- [ ] Push `NewMain`, which is the deploy, before 1.6 reaches users. Both pages say "From
+      Repster 1.6", so they're accurate before and after the release
 
 ### 1.5 App Review note
 
 In [privacy-review-checklist.md](marketing/app-store/privacy-review-checklist.md). It's a
 statement to Apple, and four lines are out of date:
 
-- [ ] **PHOTOS:** "the card can still be shared through the standard share sheet" is false since
+- [x] **PHOTOS:** "the card can still be shared through the standard share sheet" is false since
       `917b2d0`. Delete it, and say the card also opens from saved workouts
-- [ ] **Notifications:** "Local notifications are used for rest timer alerts" leaves out the one
+- [x] **Notifications:** "Local notifications are used for rest timer alerts" leaves out the one
       free-month notification. Add it. Guideline 4.5.4 limits promotional *push* notifications
       without opt-in; this one is local and uses the permission asked for rest alerts, so state
       it plainly rather than leaving a reviewer to find it
-- [ ] **Free tier:** "After that limit, the app presents the… paywall." The free-limit sheet and
+- [x] **Free tier:** "After that limit, the app presents the… paywall." The free-limit sheet and
       the free-month offer now come first. Say the reward is the same whatever the answers, and
       that it's redeemed through an Apple offer code
-- [ ] **Opening lines:** "stored locally on device unless the user exports or shares them" and
+- [x] **Opening lines:** "stored locally on device unless the user exports or shares them" and
       "aggregate usage statistics only" both contradict the training-data paragraph further down
-- [ ] Update "Last checked", then paste it into App Store Connect
+- [x] All four fixed on 2026-11-04. "Last checked" is November 4, 2026, with a "Changed for
+      1.6" note at the top
+- [ ] Paste the note into App Store Connect for 1.6
 
 ### 1.6 App Privacy
 
@@ -124,11 +129,12 @@ to build 7 on 2026-11-01, so much of it has at least run on a real phone (the pl
 says what). Run the pass on the first 1.6 TestFlight build, because:
 
 - **Four things have never fired on a real phone:** Export Workout, the free-limit sheet, the
-  free month and the Share Training Data switch. Start there
-- **`e12b5a6` came after build 7,** and it moved the clock and rest bar, the most-used code in
-  the app
-- **About 1 in 5 recent users is on iOS 27,** and neither team phone is. There's no simulator for
-  it here (Xcode 26.3), so one phone has to update
+  free month and the Share Training Data switch. Still true on 2026-11-04: none of their events
+  exists in PostHog at all. Start there
+- **Three changes came after build 7:** `e12b5a6`, which moved the clock and rest bar (the
+  most-used code in the app), the final secondary-muscle rework, and the Left vs Right rebuild
+- **About 3 in 10 public users are on iOS 27** (14 of 46 in the 14 days to 2026-11-04), and
+  neither team phone is. There's no simulator for it here (Xcode 26.3), so one phone has to update
 
 **Workout**
 
@@ -207,7 +213,7 @@ says what). Run the pass on the first 1.6 TestFlight build, because:
 ### 5.1 The in-app sheet
 
 Three items at most, each something an upgrader can go and see in ten seconds, with no
-before-and-after.
+before-and-after. **In the app since 2026-11-04,** as drafted, in `WhatsNewRelease.swift`.
 
 | # | Title | Body |
 |---|---|---|
