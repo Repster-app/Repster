@@ -61,6 +61,43 @@ struct WhatsNewRelease {
 
     static let all: [WhatsNewRelease] = [
         WhatsNewRelease(
+            version: "1.6",
+            items: [
+                WhatsNewItem(
+                    id: "past_workouts",
+                    systemImage: "clock.arrow.circlepath",
+                    tint: .accent,
+                    // Three small features in one row, because they live on the same screens:
+                    // a saved workout's share card, its export, and the set notes in history.
+                    // Any past workout passes the ten-second test for all three.
+                    title: "Your past workouts",
+                    body: "Save any workout as a card or export it as a file, and open set notes right in your history."
+                ),
+                WhatsNewItem(
+                    id: "secondary_muscles",
+                    systemImage: "figure.strengthtraining.traditional",
+                    tint: .green,
+                    // Any exercise's detail screen shows them. Left vs Right is deliberately not
+                    // a row: it stays hidden until both sides have been logged, so most people
+                    // couldn't go and look at it.
+                    title: "Secondary muscles",
+                    body: "See what else each exercise works, and change it to suit how you train."
+                ),
+                WhatsNewItem(
+                    id: "training_data",
+                    // The same symbol as the Settings row it points to.
+                    systemImage: "dumbbell",
+                    // Gold for the same reason as 1.5's suggestions row: this is the one item
+                    // about something that changed on the user's behalf. Share Training Data is
+                    // on by default from this version, and this sheet is the only place an
+                    // upgrader is told. Don't cut it to make room. See PRE_1.6_CHECKLIST.md §0.
+                    tint: .gold,
+                    title: "Training data",
+                    body: "Workouts you finish are now shared anonymously to help improve Repster. Turn it off in Settings → Data & Backups."
+                )
+            ]
+        ),
+        WhatsNewRelease(
             version: "1.5",
             items: [
                 WhatsNewItem(
