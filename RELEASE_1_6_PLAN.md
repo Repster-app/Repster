@@ -55,7 +55,7 @@ everything after the 1.5 commit is unreleased and rolls into 1.6.
 | **Free-limit sheet** | Running out of free workouts now explains itself before the paywall: what was logged, and that history, charts and insights stay open | `9cbf4d6` | [PAYWALL_BRIDGE_SCOPING.md](PAYWALL_BRIDGE_SCOPING.md) | **Never fired** |
 | **Free month for feedback** | At the free limit, or after a subscription ends: one notification, an offer card, 3 questions, then the App Store redeem link with `REPSTERMONTH` | `881af48` | [FREE_MONTH_AND_SUBSCRIBER_FEEDBACK_SCOPING.md](FREE_MONTH_AND_SUBSCRIBER_FEEDBACK_SCOPING.md) | **Never fired**, and required before submission |
 | **Subscriber thank-you** | A one-time card on Home offering 3 questions or an email | `881af48` | Same doc | Ran |
-| **Share Training Data** | Sends each finished workout, set by set, to PostHog under the anonymous id. **On by default.** Turning analytics off stops it too | `4fef2c0` | [TRAINING_DATA_SHARING_DESIGN.md](TRAINING_DATA_SHARING_DESIGN.md) | Sending ran. The on/off switch **never fired**, so the history upload hasn't run |
+| **Share Training Data** | Sends each finished workout, set by set, to PostHog under the anonymous id. **On by default.** Turning analytics off stops it too. Since 2026-11-06 each ticked set also carries what Smart Suggestions had for it (schema 2), for calibrating suggestions across users | `4fef2c0` | [TRAINING_DATA_SHARING_DESIGN.md](TRAINING_DATA_SHARING_DESIGN.md) | Sending ran. The on/off switch **never fired**, so the history upload hasn't run. The suggestion fields have never run on a phone |
 
 # Part 2 — Changes to existing screens
 

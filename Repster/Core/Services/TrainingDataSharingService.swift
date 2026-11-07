@@ -118,8 +118,11 @@ struct NoopTrainingDataSharingService: TrainingDataSharingServiceProtocol {
 /// - `effectiveWeight` and stored `e1RM`, which fold in bodyweight on bodyweight exercises, so a
 ///   reader could subtract their way back to it. e1RM is also computed with whichever formula the
 ///   user picked; recompute it from `weight_kg` and `reps` with one formula when analysing.
+/// - Smart Suggestions' figures on an exercise that adds bodyweight, for the same reason. Where
+///   they are sent, the envelope names the formula they were computed with.
 actor TrainingDataSharingService: TrainingDataSharingServiceProtocol {
-    static let schemaVersion = 1
+    /// 2 (1.6, 2026-11-06): adds `e1rm_formula` and each ticked set's `suggestion`.
+    static let schemaVersion = 2
     /// Keeps a history share well inside the SDK's 1,000-event queue, which evicts the oldest
     /// events when full, and each event to a few hundred KB.
     static let historyWorkoutsPerEvent = 20
@@ -174,12 +177,18 @@ actor TrainingDataSharingService: TrainingDataSharingServiceProtocol {
             )
             let exercises = try context.fetch(FetchDescriptor<Exercise>())
             let exercisesById = Dictionary(exercises.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            // Suggestions are the extra, not the point: failing to read them sends the workouts
+            // without them rather than not at all.
+            let auditsBySetId = Self.latestAuditBySetId(
+                (try? context.fetch(FetchDescriptor<FatigueLearningSetAudit>())) ?? []
+            )
 
             let payloads = workouts.map { workout in
                 makeWorkoutPayload(
                     workout,
                     sets: setsByWorkout[workout.id] ?? [],
-                    exercisesById: exercisesById
+                    exercisesById: exercisesById,
+                    auditsBySetId: auditsBySetId
                 )
             }
             for chunk in payloads.chunked(into: Self.historyWorkoutsPerEvent) {
@@ -235,8 +244,16 @@ actor TrainingDataSharingService: TrainingDataSharingServiceProtocol {
             FetchDescriptor<Exercise>(predicate: #Predicate { exerciseIds.contains($0.id) })
         )) ?? []
         let exercisesById = Dictionary(exercises.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let audits = (try? context.fetch(
+            FetchDescriptor<FatigueLearningSetAudit>(predicate: #Predicate { $0.workoutId == id })
+        )) ?? []
 
-        return makeWorkoutPayload(workout, sets: sets, exercisesById: exercisesById)
+        return makeWorkoutPayload(
+            workout,
+            sets: sets,
+            exercisesById: exercisesById,
+            auditsBySetId: Self.latestAuditBySetId(audits)
+        )
     }
 
     private func isEligible(_ workoutDate: Date) -> Bool {
@@ -249,7 +266,8 @@ actor TrainingDataSharingService: TrainingDataSharingServiceProtocol {
     private func makeWorkoutPayload(
         _ workout: Workout,
         sets: [WorkoutSet],
-        exercisesById: [UUID: Exercise]
+        exercisesById: [UUID: Exercise],
+        auditsBySetId: [UUID: FatigueLearningSetAudit]
     ) -> TrainingWorkoutPayload {
         let orderedSets = sets.sorted {
             if $0.orderInWorkout != $1.orderInWorkout { return $0.orderInWorkout < $1.orderInWorkout }
@@ -310,7 +328,13 @@ actor TrainingDataSharingService: TrainingDataSharingServiceProtocol {
                         targetWeightKg: set.targetWeight.map(Self.roundedKg),
                         targetRepMin: set.targetRepMin,
                         targetRepMax: set.targetRepMax,
-                        targetRir: set.targetRIR
+                        targetRir: set.targetRIR,
+                        // Un-ticking deletes a set's row, so one left on an unticked set is stale.
+                        suggestion: set.completed
+                            ? auditsBySetId[set.id].map {
+                                Self.makeSuggestionPayload($0, set: set, exercise: exercise)
+                            }
+                            : nil
                     )
                 }
             )
@@ -324,6 +348,54 @@ actor TrainingDataSharingService: TrainingDataSharingServiceProtocol {
             fromProgram: workout.programId != nil,
             excludedFromProgression: workout.excludesEntireWorkoutFromProgressionHistory,
             exercises: exercises
+        )
+    }
+
+    /// The engine works in effective weight, so on an exercise that adds bodyweight every figure
+    /// on the row has bodyweight folded in, and the policy promises no such figure leaves the
+    /// device. Those rows keep only what carries no weight.
+    ///
+    /// The exercise's factor says how it adds bodyweight today. The second test covers a row
+    /// captured before the factor was changed: the row stored the effective weight it saw, and
+    /// that only differs from the set's own weight when bodyweight was in it.
+    private static func makeSuggestionPayload(
+        _ audit: FatigueLearningSetAudit,
+        set: WorkoutSet,
+        exercise: Exercise
+    ) -> TrainingSetSuggestionPayload {
+        let foldsInBodyweight = exercise.bodyweightFactor > 0
+            || !sameWeight(audit.actualWeight, set.weight)
+
+        return TrainingSetSuggestionPayload(
+            status: audit.status.rawValue,
+            unavailableReason: audit.suggestionUnavailableReasonRawValue,
+            suggestedWeightKg: foldsInBodyweight ? nil : audit.prescribedWeight.map(roundedKg),
+            e1rmPredictedKg: foldsInBodyweight ? nil : audit.predictedEffectiveE1RM.map(roundedKg),
+            e1rmBaseKg: foldsInBodyweight ? nil : audit.baseE1RM.map(roundedKg),
+            modelEpoch: SuggestionModelEpoch.resolved(audit.modelEpoch),
+            capturedAt: audit.createdAt
+        )
+    }
+
+    private static func sameWeight(_ lhs: Double?, _ rhs: Double?) -> Bool {
+        switch (lhs, rhs) {
+        case (nil, nil):
+            return true
+        case let (lhs?, rhs?):
+            return abs(lhs - rhs) < 0.0005
+        default:
+            return false
+        }
+    }
+
+    /// `upsert` keeps one row per set; if there were ever two, the latest is the capture that
+    /// matches the set as it stands.
+    private static func latestAuditBySetId(
+        _ audits: [FatigueLearningSetAudit]
+    ) -> [UUID: FatigueLearningSetAudit] {
+        Dictionary(
+            audits.map { ($0.setId, $0) },
+            uniquingKeysWith: { first, second in first.createdAt >= second.createdAt ? first : second }
         )
     }
 
@@ -354,10 +426,21 @@ actor TrainingDataSharingService: TrainingDataSharingServiceProtocol {
             schemaVersion: Self.schemaVersion,
             reason: reason,
             workoutCount: workouts.count,
+            e1rmFormula: currentE1RMFormula(),
             workouts: workouts
         )
         guard let properties = Self.properties(from: envelope) else { return }
         sink.capture(.workoutsShared, properties: properties)
+    }
+
+    /// The formula the suggestion figures were computed with, resolved the way the engine does it.
+    /// Read at send time, so a history share labels older workouts with today's formula; switching
+    /// formula is rare enough to accept that.
+    private func currentE1RMFormula() -> String {
+        var descriptor = FetchDescriptor<HealthProfile>()
+        descriptor.fetchLimit = 1
+        let stored = (try? ModelContext(modelContainer).fetch(descriptor))?.first?.e1RMFormula
+        return (stored.flatMap(E1RMFormula.init(rawValue:)) ?? .epley).rawValue
     }
 
     private func sendExercises(_ exercises: [TrainingExerciseCreatedPayload], source: TrainingExerciseSource) {
@@ -417,6 +500,8 @@ struct TrainingWorkoutsEnvelope: Encodable {
     let schemaVersion: Int
     let reason: TrainingWorkoutShareReason
     let workoutCount: Int
+    /// `epley`, `brzycki` or `lombardi`: the formula behind every e1RM figure in `workouts`.
+    let e1rmFormula: String
     let workouts: [TrainingWorkoutPayload]
 }
 
@@ -467,6 +552,30 @@ struct TrainingSetPayload: Encodable, Equatable {
     let targetRepMin: Int?
     let targetRepMax: Int?
     let targetRir: Int?
+    let suggestion: TrainingSetSuggestionPayload?
+}
+
+/// What Smart Suggestions had for a set when it was ticked, from the set's
+/// `FatigueLearningSetAudit` row. Absent when the set was never ticked or has no row.
+///
+/// - `e1rmPredictedKg` is the capacity the model expected for this set and `e1rmBaseKg` the
+///   baseline it started from. Comparing them with what `weight_kg`, `reps` and `rir`
+///   demonstrate, using the envelope's formula, is the calibration.
+///   Their names start with `e1rm`: `.convertToSnakeCase` turns `predictedE1rmKg` into
+///   `predicted_e_1rm_kg`, because it splits a capital followed by a digit.
+/// - `suggestedWeightKg` is the suggestion as it stood at the tick. Typing reps re-prices it to
+///   those reps, so it is not what the lifter saw first and does not measure adherence.
+/// - `capturedAt` orders the captures. A set re-ticked after a later set was predicted with that
+///   later set in view, so its prediction is no longer a forecast.
+/// - Rows on an exercise that adds bodyweight carry no figures (see `makeSuggestionPayload`).
+struct TrainingSetSuggestionPayload: Encodable, Equatable {
+    let status: String
+    let unavailableReason: String?
+    let suggestedWeightKg: Double?
+    let e1rmPredictedKg: Double?
+    let e1rmBaseKg: Double?
+    let modelEpoch: Int
+    let capturedAt: Date
 }
 
 struct TrainingExercisesEnvelope: Encodable {

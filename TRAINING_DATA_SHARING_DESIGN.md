@@ -1,6 +1,8 @@
 # Training Data Sharing — Design
 
-**Status:** Built 2026-10-22 for 1.6 (uncommitted). Not device-tested.
+**Status:** Built 2026-10-22 for 1.6 (`4fef2c0`). Smart Suggestion data added 2026-11-06
+(schema 2, see [below](#smart-suggestion-data-schema-2)). Sending has run on TestFlight builds.
+The manual history upload had not run on a phone as of 2026-11-04.
 **Code:** `Repster/Core/Services/TrainingDataSharingService.swift`. Tests are in
 `RepsterTests/TrainingDataSharingTests.swift`.
 
@@ -45,11 +47,13 @@ unless `-analyticsDebugCaptureEnabled YES` is set.
 
 ## Events
 
-All events carry `schema_version: 1`. Keys are snake_case and dates are ISO 8601.
+All events carry `schema_version`, which is now 2. Version 2 (2026-11-06) added `e1rm_formula` and
+each set's `suggestion`. Only TestFlight builds ever sent version 1. Keys are snake_case and dates
+are ISO 8601.
 
 | Event | When | Properties |
 |---|---|---|
-| `training workouts shared` | finish; edit (only if shared content changed); progression-exclusion change; history share in chunks of 20 | `reason` (`finished`/`edited`/`history`), `workout_count`, `workouts[]` |
+| `training workouts shared` | finish; edit (only if shared content changed); progression-exclusion change; history share in chunks of 20 | `reason` (`finished`/`edited`/`history`), `workout_count`, `e1rm_formula`, `workouts[]` |
 | `training workout deleted` | a shared, completed workout is deleted | `workout_id` |
 | `training exercises created` | form create, CSV import, history share, in chunks of 50 | `source` (`manual`/`csv_import`/`history`), `exercise_count`, `exercises[]` |
 | `training data sharing toggled` | Settings toggle (a normal analytics event) | `enabled` |
@@ -62,17 +66,71 @@ All events carry `schema_version: 1`. Keys are snake_case and dates are ISO 8601
 - `sets[]`: `order`, `type`, `completed`, `weight_kg`, `reps`, `left_reps`, `right_reps`,
   `side`, `rir`, `left_rir`, `right_rir`, `rpe`, `duration_seconds`, `distance_meters`,
   `rest_seconds`, `superset_group` (1…n per workout), `excluded_from_prs`,
-  `target_weight_kg`, `target_rep_min`, `target_rep_max`, `target_rir`
+  `target_weight_kg`, `target_rep_min`, `target_rep_max`, `target_rir`, `suggestion`
+  (ticked sets only, see below)
 
 **Never sent** (a test asserts the free-text ones):
 - Notes and workout titles.
 - `effective_weight` and the stored `e1RM`. Both fold bodyweight in on bodyweight
   exercises, so you could work backwards to the user's bodyweight. Stored e1RM also
   depends on which formula each user picked, so recompute it from `weight_kg` and `reps`.
+- Smart Suggestions' figures on an exercise that adds bodyweight, for the same reason.
 
 **Unticked sets are sent with `completed: false`, not dropped.** Copy Previous rows that
 were never ticked carry real weight and reps (`UNPERFORMED_SETS_SCOPING.md`). Filter on
 `completed` in every query.
+
+## Smart Suggestion data (schema 2)
+
+Added 2026-11-06 so Smart Suggestions can be calibrated across users instead of one phone at a
+time. Nothing new is tracked: every ticked set already gets a `FatigueLearningSetAudit` row at
+the tick, and the payload copies it.
+
+`e1rm_formula` is on the event: `epley`, `brzycki` or `lombardi`, resolved the way the engine
+does it (Epley when unset). Every e1RM figure in the event was computed with it. It's read at
+send time, so a history share labels old workouts with today's formula.
+
+`suggestion` is on each ticked set that has a row:
+
+| Field | Audit field | Meaning |
+|---|---|---|
+| `status` | `status` | `used`, `baselineFirstWorkingSet`, `suggestionUnavailable`, `missingRIR`, `weightDeviationOver20Percent`, `invalidPerformance`, `warmupNotTracked`, `nonCapacitySetType` |
+| `unavailable_reason` | `suggestionUnavailableReason` | Why there was no suggestion: `noStrengthData`, `featureDisabled`, `bodyweightHistoryOnly` and so on. Missing on `suggestionUnavailable` when no suggestion had loaded for that set, after a fast tick for example |
+| `suggested_weight_kg` | `prescribedWeight` | The suggestion as it stood at the tick |
+| `e1rm_predicted_kg` | `predictedEffectiveE1RM` | The capacity the model expected for this set, after fatigue |
+| `e1rm_base_kg` | `baseE1RM` | The baseline it started from: the peak of the last 3 workouts in the recency window, or else the most recent workout |
+| `model_epoch` | `modelEpoch` | 1 = before 1.5 (stored as nil), 2 = current |
+| `captured_at` | `createdAt` | When the prediction was recorded |
+
+**What keeps it within the policy:**
+- **Bodyweight.** The engine works in effective weight, so on an exercise with
+  `bodyweightFactor > 0` every figure has bodyweight folded in. Those sets send only
+  `status`, `unavailable_reason`, `model_epoch` and `captured_at`. The same happens when the
+  row's stored weight differs from the set's weight, which catches a factor changed after the
+  tick.
+- **Ticked sets only.** Un-ticking deletes the row, so a row left on an unticked set is stale
+  and isn't sent.
+
+**Reading it:**
+- **Take suggestions from the `finished` event, not the latest one.** Editing a set in history
+  deletes its row, and nothing writes it again, so an `edited` event can lack a suggestion that
+  was there at finish. Weights and reps still come from the latest event.
+- **Drop re-ticked sets.** A set ticked again after a later set was predicted with that later
+  set already done, so it isn't a forecast. Simplest filter: drop a set whose `captured_at` is
+  later than that of a set with a higher `order` in the same exercise. Un-ticks are common: 85
+  of 143 public 1.5 workouts had at least one.
+- **Accuracy needs RIR.** With `rir`, actual capacity is `formula(weight_kg, reps + rir)` (the
+  phone rounds `rir` down to a whole number), and the error is `(predicted − actual) / base`.
+  That's the phone's own `normalizedError`, and negative means the lifter was stronger than
+  predicted. Without RIR, `formula(weight_kg, reps)` is only a lower bound. In public 1.5, 54 of
+  143 workouts had any RIR.
+- **`suggested_weight_kg` doesn't measure adherence.** Typing reps re-prices the suggestion to
+  those reps before the tick, so it's usually the price of what was logged. Nothing records
+  what the lifter saw first.
+- **Calibrate on epoch 2 only.** Epoch 1 rows came from a reps-only baseline.
+- **Not sent, and not stored on the phone either:** the rep and RIR target the suggestion
+  aimed at, the fatigue rate it applied and where that came from, and the rest it assumed.
+  Capturing them needs new stored fields, so that's a 1.7 question.
 
 ## Querying (HogQL)
 

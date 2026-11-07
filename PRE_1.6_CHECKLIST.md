@@ -67,6 +67,9 @@ training data and the free month. These two were missed:
       Last updated November 4, 2026
 - [x] Pushed `NewMain`, which is the deploy, on 2026-11-04. Both pages say "From Repster 1.6",
       so they're accurate before and after the release
+- [ ] Push `NewMain` again. On 2026-11-06 [docs/privacy.html](docs/privacy.html) gained a sentence
+      on the Smart Suggestion data each ticked set now carries, so the live policy is behind
+      until then, and it has to be live before 1.6 reaches anyone
 
 ### 1.5 App Review note
 
@@ -188,6 +191,10 @@ says what). Run the pass on the first 1.6 TestFlight build, because:
       workouts go up once, in chunks. Use a phone with a real history. This path has never run
 - [ ] A finished workout's `training workouts shared` event carries no notes, title or bodyweight.
       Turn analytics off: Share Training Data goes off and disabled
+- [ ] The same event says `schema_version` 2 and has `e1rm_formula`, and its ticked sets carry a
+      `suggestion` with figures. A set on an exercise that adds bodyweight (Pull-up, Chin-up, Dip,
+      Push-up, Inverted Row) carries no figures: only `status`, `model_epoch`, `captured_at` and
+      sometimes `unavailable_reason`
 - [ ] Watch one recording: an opened set note is masked
 - [ ] Update from the live 1.5 build, not a clean install: history intact, no crash, What's New
       shows once and doesn't come back
