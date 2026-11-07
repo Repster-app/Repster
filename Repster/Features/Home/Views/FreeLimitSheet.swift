@@ -41,6 +41,31 @@ struct FreeLimitRecap: Equatable {
     }
 }
 
+/// The sheet's title and message.
+///
+/// Lapsed subscribers reach this sheet too, once any free workouts they had left are used, and
+/// "You've used your 10 free workouts" reads wrong after months of paying. They get the words of
+/// their free-month notification instead (`FreeMonthOfferPolicy.notificationBody`).
+enum FreeLimitCopy {
+    static func title(for customerType: CustomerType, freeWorkoutLimit: Int) -> String {
+        switch customerType {
+        case .new:
+            return "You've used your \(freeWorkoutLimit) free workouts"
+        case .lapsed:
+            return "Your subscription has ended"
+        }
+    }
+
+    static func message(for customerType: CustomerType) -> String {
+        switch customerType {
+        case .new:
+            return "Your history, charts and insights stay open. Unlock Repster to keep logging new workouts."
+        case .lapsed:
+            return "Your history, charts and insights stay open. Subscribe again to keep logging new workouts."
+        }
+    }
+}
+
 /// The free-month offer as the sheet shows it.
 enum FreeLimitOffer: Equatable {
     /// Answer three questions for a free month.
@@ -53,6 +78,8 @@ struct FreeLimitSheet: View {
     /// The quota that ran out. Read from the access snapshot, not a literal — it has
     /// changed once already (5 → 10).
     let freeWorkoutLimit: Int
+    /// Picks the title and message. `.new` unless the subscription status says it has ended.
+    var customerType: CustomerType = .new
     /// Loaded by the host before presenting, so the sheet opens at its final height instead
     /// of growing when the numbers land. Nil hides the row.
     let recap: FreeLimitRecap?
@@ -82,7 +109,7 @@ struct FreeLimitSheet: View {
                             .font(.system(size: 44))
                             .foregroundStyle(Color.success)
 
-                        Text("You've used your \(freeWorkoutLimit) free workouts")
+                        Text(FreeLimitCopy.title(for: customerType, freeWorkoutLimit: freeWorkoutLimit))
                             .font(.title3)
                             .fontWeight(.bold)
                             .foregroundStyle(Color.textPrimary)
@@ -98,7 +125,7 @@ struct FreeLimitSheet: View {
                         }
                     }
 
-                    Text("Your history, charts and insights stay open. Unlock Repster to keep logging new workouts.")
+                    Text(FreeLimitCopy.message(for: customerType))
                         .font(.subheadline)
                         .foregroundStyle(Color.textSecondary)
                         .multilineTextAlignment(.center)
@@ -234,6 +261,19 @@ struct FreeLimitSheet: View {
                 recap: FreeLimitRecap(workouts: 10, sets: 184),
                 onShown: {}, onSeePlans: {}, onNotNow: {},
                 offer: .claim
+            )
+        }
+}
+
+#Preview("Lapsed subscriber") {
+    Color.bg
+        .sheet(isPresented: .constant(true)) {
+            FreeLimitSheet(
+                freeWorkoutLimit: 10,
+                customerType: .lapsed,
+                recap: FreeLimitRecap(workouts: 86, sets: 1240),
+                onShown: {}, onSeePlans: {}, onNotNow: {},
+                offer: .answerQuestions
             )
         }
 }

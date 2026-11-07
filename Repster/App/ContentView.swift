@@ -313,6 +313,9 @@ struct ContentView: View {
         }) {
             FreeLimitSheet(
                 freeWorkoutLimit: accessSnapshot.freeWorkoutLimit,
+                // Through the free month's DEBUG override, so `-RepsterFreeMonthCustomerType lapsed`
+                // shows this sheet's lapsed copy too. A no-op in release builds.
+                customerType: FreeMonthOfferService.applyingDebugCustomerType(to: subscription).customerType,
                 recap: freeLimitRecap,
                 onShown: {
                     services.analyticsService.freeLimitSheetShown(

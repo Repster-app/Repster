@@ -37,4 +37,22 @@ final class FreeLimitSheetTests: XCTestCase {
         XCTAssertEqual(FreeLimitRecap.value(184, locale: locale), "184")
         XCTAssertEqual(FreeLimitRecap.value(4210, locale: locale), "4,210")
     }
+
+    func testNewUsersKeepTheFreeWorkoutCopy() {
+        XCTAssertEqual(FreeLimitCopy.title(for: .new, freeWorkoutLimit: 10), "You've used your 10 free workouts")
+        XCTAssertTrue(FreeLimitCopy.message(for: .new).contains("Unlock Repster"))
+    }
+
+    /// Lapsed subscribers reach the sheet too, and months of paying aren't "your 10 free workouts".
+    func testLapsedSubscribersAreToldTheirSubscriptionEnded() {
+        XCTAssertEqual(FreeLimitCopy.title(for: .lapsed, freeWorkoutLimit: 10), "Your subscription has ended")
+        XCTAssertTrue(FreeLimitCopy.message(for: .lapsed).contains("Subscribe again"))
+        XCTAssertFalse(FreeLimitCopy.message(for: .lapsed).contains("free workouts"))
+    }
+
+    /// The sheet and the free-month notification a lapsed subscriber gets say the same thing.
+    func testLapsedTitleMatchesTheirNotification() {
+        let title = FreeLimitCopy.title(for: .lapsed, freeWorkoutLimit: 10)
+        XCTAssertTrue(FreeMonthOfferPolicy.notificationBody(for: .lapsed, freeWorkoutLimit: 10).hasPrefix(title))
+    }
 }
