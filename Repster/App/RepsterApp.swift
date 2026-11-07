@@ -38,6 +38,9 @@ struct RepsterApp: App {
             // Turn off Admin Mode left on from when it had a visible switch (one-shot).
             AdminModeResetMigration.runIfNeeded(modelContext: seedContext)
 
+            // Correct three library exercises' secondary muscles on existing installs (one-shot).
+            SecondaryMuscleTagFixMigration.runIfNeeded(modelContext: seedContext)
+
             let repoContainer = RepositoryContainer(modelContainer: container)
             self.repositories = repoContainer
             let analyticsService = AnalyticsServiceFactory.makeService()

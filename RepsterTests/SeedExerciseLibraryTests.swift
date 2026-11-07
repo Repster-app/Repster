@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import XCTest
 @testable import Repster
 
@@ -58,6 +59,58 @@ final class SeedExerciseLibraryTests: XCTestCase {
                 XCTAssertTrue(catalogGroups.contains(group), "\(exercise.name): \(muscle)")
             }
         }
+    }
+
+    /// New installs get the seed and existing ones get the one-time fix, so the two must agree.
+    func testSeedFileCarriesTheCorrectedSecondaryMuscles() throws {
+        let seeded = Dictionary(
+            uniqueKeysWithValues: try loadSeedExerciseFile().exercises.map { ($0.name, $0.secondaryMuscles) }
+        )
+        for correction in SecondaryMuscleTagFixMigration.corrections {
+            XCTAssertEqual(seeded[correction.name], correction.corrected, correction.name)
+        }
+    }
+
+    /// Existing installs keep the tags they were seeded with. The fix replaces only untouched
+    /// originals, and only once, so anything chosen by hand survives it.
+    func testSecondaryMuscleTagFixReplacesOnlyUntouchedOriginalsOnce() throws {
+        let container = try ModelContainer(
+            for: Schema(ModelContainerSetup.modelTypes),
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "muscle-tag-fix-\(UUID().uuidString)"))
+
+        func exercise(_ name: String, _ secondary: [String]) -> Exercise {
+            Exercise(name: name, equipmentType: .machinePin, trackingType: .weightReps, primaryMuscle: "legs", secondaryMuscles: secondary)
+        }
+        let setup = ModelContext(container)
+        setup.insert(exercise("Hip Adductor Machine", ["glutes"]))
+        setup.insert(exercise("Dead Hang", ["shoulders"]))
+        setup.insert(exercise("Hip Abductor Machine", ["glutes"]))
+        setup.insert(exercise("Farmer's Walk", ["traps"]))
+        setup.insert(exercise("Dead Hang (towel)", ["shoulders"]))
+        try setup.save()
+
+        func stored(_ name: String) throws -> [String]? {
+            try ModelContext(container).fetch(FetchDescriptor<Exercise>()).first { $0.name == name }?.secondaryMuscles
+        }
+
+        SecondaryMuscleTagFixMigration.runIfNeeded(modelContext: ModelContext(container), userDefaults: defaults)
+
+        XCTAssertEqual(try stored("Hip Adductor Machine"), ["adductors"])
+        XCTAssertEqual(try stored("Dead Hang"), ["forearms", "shoulders"])
+        XCTAssertEqual(try stored("Hip Abductor Machine"), ["glutes"], "not one of the three: kept")
+        XCTAssertEqual(try stored("Farmer's Walk"), ["traps"], "edited by hand: kept")
+        XCTAssertEqual(try stored("Dead Hang (towel)"), ["shoulders"], "renamed: kept")
+
+        // Set back by hand after the fix, then the app relaunches.
+        let edit = ModelContext(container)
+        try XCTUnwrap(edit.fetch(FetchDescriptor<Exercise>()).first { $0.name == "Hip Adductor Machine" })
+            .secondaryMuscles = ["glutes"]
+        try edit.save()
+
+        SecondaryMuscleTagFixMigration.runIfNeeded(modelContext: ModelContext(container), userDefaults: defaults)
+        XCTAssertEqual(try stored("Hip Adductor Machine"), ["glutes"], "runs once")
     }
 
     private func loadSeedExerciseFile() throws -> SeedExerciseFile {

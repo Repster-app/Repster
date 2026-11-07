@@ -178,6 +178,7 @@
 		AM0005 /* GhostSetRepsBackfillMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BM0005 /* GhostSetRepsBackfillMigration.swift */; };
 		AM0006 /* ExerciseWorkoutCountBackfillMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BM0006 /* ExerciseWorkoutCountBackfillMigration.swift */; };
 		ADM001 /* AdminModeResetMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADM101 /* AdminModeResetMigration.swift */; };
+		SMT001 /* SecondaryMuscleTagFixMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = SMT101 /* SecondaryMuscleTagFixMigration.swift */; };
 		AN0001 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0001 /* HomeViewModel.swift */; };
 		AN0002 /* WeekStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0002 /* WeekStripView.swift */; };
 		AN0003 /* StartWorkoutCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BN0003 /* StartWorkoutCardView.swift */; };
@@ -548,6 +549,7 @@
 		BM0005 /* GhostSetRepsBackfillMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhostSetRepsBackfillMigration.swift; sourceTree = "<group>"; };
 		BM0006 /* ExerciseWorkoutCountBackfillMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseWorkoutCountBackfillMigration.swift; sourceTree = "<group>"; };
 		ADM101 /* AdminModeResetMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminModeResetMigration.swift; sourceTree = "<group>"; };
+		SMT101 /* SecondaryMuscleTagFixMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondaryMuscleTagFixMigration.swift; sourceTree = "<group>"; };
 		BN0001 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
 		BN0002 /* WeekStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekStripView.swift; sourceTree = "<group>"; };
 		BN0003 /* StartWorkoutCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartWorkoutCardView.swift; sourceTree = "<group>"; };
@@ -1236,6 +1238,7 @@
 				BM0005 /* GhostSetRepsBackfillMigration.swift */,
 				BM0006 /* ExerciseWorkoutCountBackfillMigration.swift */,
 				ADM101 /* AdminModeResetMigration.swift */,
+				SMT101 /* SecondaryMuscleTagFixMigration.swift */,
 				WN1003 /* InsightsSectionPromotionMigration.swift */,
 				BT0007 /* TemplateService.swift */,
 				BM0010 /* ProgramCatalogService.swift */,
@@ -2026,6 +2029,7 @@
 				AM0005 /* GhostSetRepsBackfillMigration.swift in Sources */,
 				AM0006 /* ExerciseWorkoutCountBackfillMigration.swift in Sources */,
 				ADM001 /* AdminModeResetMigration.swift in Sources */,
+				SMT001 /* SecondaryMuscleTagFixMigration.swift in Sources */,
 				WN0001 /* WhatsNewRelease.swift in Sources */,
 				WN0002 /* WhatsNewSheet.swift in Sources */,
 				WN0003 /* InsightsSectionPromotionMigration.swift in Sources */,
