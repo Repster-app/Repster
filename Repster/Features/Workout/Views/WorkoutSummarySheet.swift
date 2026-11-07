@@ -39,12 +39,6 @@ struct WorkoutSummarySheet: View {
         case title
     }
 
-    private enum FatigueFeedbackSelection: Equatable {
-        case lessAggressive
-        case aboutRight
-        case moreAggressive
-    }
-
     // MARK: - Dependencies
 
     /// The ViewModel providing workout data and finish action.
@@ -73,9 +67,6 @@ struct WorkoutSummarySheet: View {
     /// Optional session effort value on a 1-10 scale.
     @State private var selectedEffort: Double? = nil
 
-    /// Per-exercise fatigue feedback selections.
-    @State private var fatigueSelections: [UUID: FatigueFeedbackSelection] = [:]
-
     /// Whether the save operation is in progress.
     @State private var isSaving = false
 
@@ -93,9 +84,6 @@ struct WorkoutSummarySheet: View {
 
     /// Whether the inline title editor is expanded.
     @State private var isEditingTitle = false
-
-    /// Whether suggestion feedback is expanded.
-    @State private var isSuggestionFeedbackExpanded = false
 
     /// Whether the details screen is pushed.
     @State private var showDetails = false
@@ -595,128 +583,16 @@ struct WorkoutSummarySheet: View {
             .accessibilityHidden(!isVisible)
     }
 
-    // MARK: - Suggestion Feedback
-
-    private func suggestionFeedbackSection(summary: WorkoutSummaryData) -> some View {
-        let feedbackExercises = exercisesForFeedback(summary: summary)
-
-        return sectionCard {
-            VStack(alignment: .leading, spacing: 0) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        isSuggestionFeedbackExpanded.toggle()
-                    }
-                } label: {
-                    HStack(spacing: 12) {
-                    sectionHeading(
-                        title: "Suggestion feedback",
-                        subtitle: "Only adjust this if the weight changes felt noticeably off."
-                    )
-
-                        Spacer()
-
-                        Image(systemName: isSuggestionFeedbackExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.textSecondary)
-                    }
-                }
-                .buttonStyle(.plain)
-
-                if isSuggestionFeedbackExpanded {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Your feedback helps fine-tune how quickly future suggestions taper within a workout.")
-                            .font(.caption)
-                            .foregroundColor(.textSecondary)
-
-                        ForEach(feedbackExercises) { exercise in
-                            fatigueFeedbackRow(exercise: exercise)
-                        }
-                    }
-                    .padding(.top, 14)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
-            }
-        }
-    }
-
-    private func fatigueFeedbackRow(exercise: ExerciseSummary) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(exercise.exerciseName)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.textPrimary)
-
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) {
-                    fatigueFeedbackButtons(for: exercise)
-                }
-
-                VStack(spacing: 8) {
-                    fatigueFeedbackButtons(for: exercise)
-                }
-            }
-        }
-        .padding(14)
-        .background(Color.bgInput)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.border, lineWidth: 1)
-        }
-    }
-
-    @ViewBuilder
-    private func fatigueFeedbackButtons(for exercise: ExerciseSummary) -> some View {
-        feedbackButton(
-            title: "Too much drop",
-            isSelected: fatigueSelections[exercise.id] == .lessAggressive,
-            color: .success
-        ) {
-            fatigueSelections[exercise.id] = fatigueSelections[exercise.id] == .lessAggressive ? nil : .lessAggressive
-        }
-
-        feedbackButton(
-            title: "About right",
-            isSelected: fatigueSelections[exercise.id] == .aboutRight,
-            color: .accent
-        ) {
-            fatigueSelections[exercise.id] = fatigueSelections[exercise.id] == .aboutRight ? nil : .aboutRight
-        }
-
-        feedbackButton(
-            title: "Not enough drop",
-            isSelected: fatigueSelections[exercise.id] == .moreAggressive,
-            color: .orange
-        ) {
-            fatigueSelections[exercise.id] = fatigueSelections[exercise.id] == .moreAggressive ? nil : .moreAggressive
-        }
-    }
-
-    private func feedbackButton(title: String, isSelected: Bool, color: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.caption.weight(.medium))
-                .foregroundColor(isSelected ? .white : color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(isSelected ? color : Color.bg)
-                )
-        }
-        .buttonStyle(.plain)
-        .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(isSelected ? Color.clear : color.opacity(0.25), lineWidth: 1)
-        }
-    }
-
     // MARK: - Secondary Actions
 
     // MARK: - Details
 
-    /// Notes, effort, suggestion feedback and save-as-template, moved off the recap.
+    /// Notes, effort and save-as-template, moved off the recap.
+    ///
+    /// Suggestion feedback (Too much drop / About right / Not enough drop) was removed in 1.6.
+    /// Either of the two drop buttons pinned that exercise's fatigue rate for good, so learning
+    /// stopped, and the only undo was the Fatigue Learning screen behind Admin Mode, which 1.6
+    /// hides. "About right" never changed anything. The admin screen keeps its own nudges.
     ///
     /// Notes and effort were unreachable before this: `notesSection` and `effortSection`
     /// existed but were never placed in the body, while `finishWorkout` went on passing both.
@@ -731,11 +607,6 @@ struct WorkoutSummarySheet: View {
                     notesSection
 
                     effortSection
-
-                    if let summary = displaySummary,
-                       !exercisesForFeedback(summary: summary).isEmpty {
-                        suggestionFeedbackSection(summary: summary)
-                    }
 
                     saveAsTemplateRow
                 }
@@ -1007,25 +878,6 @@ struct WorkoutSummarySheet: View {
         frozenSummary = viewModel.computeSummary()
         frozenTitle = automaticWorkoutTitle
 
-        for (exerciseId, selection) in fatigueSelections {
-            let nudge: FatigueNudge?
-            switch selection {
-            case .lessAggressive:
-                nudge = .lessAggressive
-            case .aboutRight:
-                nudge = nil
-            case .moreAggressive:
-                nudge = .moreAggressive
-            }
-
-            if let nudge {
-                try? await viewModel.fatigueLearningService.applyManualNudge(
-                    exerciseId: exerciseId,
-                    nudge: nudge
-                )
-            }
-        }
-
         await viewModel.finishWorkout(
             title: normalizedWorkoutTitle,
             notes: normalizedNotes,
@@ -1123,10 +975,6 @@ struct WorkoutSummarySheet: View {
 
     private func summaryDateLabel(_ date: Date) -> String {
         WorkoutShareCardBuilder.dateLabel(date)
-    }
-
-    private func exercisesForFeedback(summary: WorkoutSummaryData) -> [ExerciseSummary] {
-        summary.exerciseSummaries.filter { viewModel.exerciseIdsWithPredictions.contains($0.id) }
     }
 
     private func sectionHeading(title: String, subtitle: String) -> some View {

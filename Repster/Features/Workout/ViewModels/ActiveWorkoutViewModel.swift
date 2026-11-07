@@ -143,10 +143,6 @@ final class ActiveWorkoutViewModel {
     private let analyticsService: any AnalyticsServiceProtocol
     let fatigueLearningService: FatigueLearningService
 
-    /// Exercise IDs that had at least one prediction snapshot recorded during this workout.
-    /// Used by WorkoutSummarySheet to show fatigue feedback options.
-    private(set) var exerciseIdsWithPredictions: Set<UUID> = []
-
     /// Live Activity manager for Lock Screen / Dynamic Island updates.
     private let liveActivityManager = LiveActivityManager()
 
@@ -503,7 +499,6 @@ final class ActiveWorkoutViewModel {
                     prescribedWeight: suggestion.suggestedWeight,
                     formula: E1RMFormula(rawValue: formulaRawValue) ?? .epley
                 )
-                exerciseIdsWithPredictions.insert(set.exerciseId)
 
                 // Also stash a display-layer snapshot for the done strip's
                 // "= suggested" / "+1 kg vs sug" comparison. Captured here for
