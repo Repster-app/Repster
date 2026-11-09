@@ -2,8 +2,8 @@
 
 **Currently live:** 1.5 (build 2). 1.5.1 was TestFlight only, up to build 8.
 **This release:** **1.6 build 1**, set 2026-11-04 (§1.1). No 1.6 build has reached TestFlight yet.
-**Branch:** `NewMain`, pushed on 2026-11-04. Committed on 2026-11-07 and not pushed yet: the
-suggestion data added to training data on 2026-11-06, and fixes for three known issues (§1.7).
+**Branch:** `NewMain`, pushed on 2026-11-07 (`a468deb`) with the suggestion data added to
+training data on 2026-11-06 and fixes for three known issues (§1.7).
 **Last checked:** 2026-11-07, against the tree. PostHog last on 2026-11-06.
 
 What 1.6 contains is [RELEASE_1_6_PLAN.md](RELEASE_1_6_PLAN.md). What it leaves out is
@@ -20,18 +20,24 @@ These change what gets built or tested, so they come before everything else.
       2026-11-02 ([SIDES_RETHINK_SCOPING.md](SIDES_RETHINK_SCOPING.md)): tile, one list, line-chart
       exercise page, committed as `728a462`. 1,040 tests, 0 failures. The device pass in §9 of that
       doc is still to do
-- [ ] **Lock the scope now.** It grew again on 2026-11-06, when Smart Suggestion data was added to
-      the training data. Recommendation: nothing else goes in. Part 6 of the plan stays out, and
-      new ideas go to the considerations list
+- [x] **Lock the scope.** Locked on 2026-11-07, after the suggestion data (2026-11-06) and three
+      known-issue fixes. Nothing else goes in: Part 6 of the plan stays out, and new ideas go to
+      the considerations list
 - [x] **Tell upgraders that Share Training Data is on?** Decided 2026-11-04: yes, through What's
       New, and default-on stays. It's the third tile in §5.1, now in the app. Apple's 5.1.1(ii)
       asks for consent to collection "even if such data is considered to be anonymous", and
       default-on analytics has already passed review, so this was a judgement rather than a
       known rejection
 - [ ] **Close the open training-data questions** from
-      [TRAINING_DATA_SHARING_DESIGN.md](TRAINING_DATA_SHARING_DESIGN.md): the EU read on
-      default-on, whether to promise deleting already-shared data, and whether custom exercise
-      names need `Other User Content` (leaning no)
+      [TRAINING_DATA_SHARING_DESIGN.md](TRAINING_DATA_SHARING_DESIGN.md):
+  - EU read on default-on: **option 1 chosen 2026-11-07.** Default-on stays, and the privacy
+    policy gets what it was missing (§1.4). A lawyer's view on two questions stays optional: is
+    set-level training data health data, and does default-on analytics need consent under the
+    EU's device-storage rule
+  - Deleting already-shared data: the 2026-11-07 policy draft promises it on request, found
+    through the workouts someone describes
+  - Custom exercise names and `Other User Content`: **no**, decided 2026-11-09. `Fitness` covers
+    them, and `PrivacyInfo.xcprivacy` needs no change
 
 ---
 
@@ -71,9 +77,20 @@ support and terms pages were the two that had been missed:
       Last updated November 4, 2026
 - [x] Pushed `NewMain`, which is the deploy, on 2026-11-04. Both pages say "From Repster 1.6",
       so they're accurate before and after the release
-- [ ] Push `NewMain` again. On 2026-11-06 [docs/privacy.html](docs/privacy.html) gained a sentence
-      on the Smart Suggestion data each ticked set now carries, so the live policy is behind
-      until then, and it has to be live before 1.6 reaches anyone
+- [x] Push `NewMain` again, for the sentence [docs/privacy.html](docs/privacy.html) gained on
+      2026-11-06 about the Smart Suggestion data each ticked set carries. Pushed 2026-11-07
+      (`468fb24..a468deb`), and the live policy showed it about 20 s later
+
+- [ ] **Privacy policy draft, 2026-11-07, uncommitted.** [docs/privacy.html](docs/privacy.html) now
+      names who runs Repster, states the legal basis, how long data is kept and people's rights,
+      and calls the data pseudonymous rather than anonymous. Before it can go live:
+  - ~~Fill in the name and country~~ Done 2026-11-09: "Magnus, an independent developer in Denmark"
+  - PostHog: turn on Settings > Project > IP data capture > **Discard client IP data**; keep
+    events at 2 years or less and recordings at 90 days or less (the free plan's 1 year and
+    30 days already fit)
+  - Accept PostHog's data processing agreement ([posthog.com/dpa](https://posthog.com/dpa)), and
+    RevenueCat's if it isn't in place
+  - Then commit and push `NewMain`, and set "Last updated" to the day it goes live
 
 ### 1.5 App Review note
 
@@ -98,15 +115,16 @@ statement to Apple, and four lines are out of date:
 ### 1.6 App Privacy
 
 - [ ] Confirm the `Fitness` answer still reads right: same type and purpose (Analytics, not
-      linked, not tracking), but no longer coarse. `PrivacyInfo.xcprivacy` needs no change unless
+      linked, not tracking), but no longer coarse. If PostHog adds a country or city to events
+      from the IP address, `Coarse Location` (Analytics, not linked) may need declaring too. `PrivacyInfo.xcprivacy` needs no change unless
       `Other User Content` comes back yes (§0)
 
 ### 1.7 Commit and push
 
 - [x] Commit the secondary-muscle rework as its own commit (`219b49b`), then Left vs Right
       (`728a462`) and these docs
-- [x] Commit the 2026-11-06 suggestion-data work as its own commit: `60f9e5e`, 2026-11-07. The
-      push is still to do (§1.4)
+- [x] Commit the 2026-11-06 suggestion-data work as its own commit: `60f9e5e`, 2026-11-07, and
+      pushed the same day (§1.4)
 - [x] Commit the three 2026-11-07 fixes, one commit each: muscle tags `1651d6f`, Suggestion
       feedback removed `052ab19`, lapsed subscribers' free-limit title `ec2f921`
 - [ ] Add by path, never `git add -A`: `marketing/growth-workspace/` and the two
@@ -236,16 +254,18 @@ column says what). Run the pass on the first 1.6 TestFlight build, because:
 ### 5.1 The in-app sheet
 
 Three items at most, each something an upgrader can go and see in ten seconds, with no
-before-and-after. **In the app since 2026-11-04,** as drafted, in `WhatsNewRelease.swift`.
+before-and-after. **In the app since 2026-11-04** in `WhatsNewRelease.swift`; rewritten on 2026-11-09
+(uncommitted) to the user's version below.
 
 | # | Title | Body |
 |---|---|---|
-| 1 | **Your past workouts** | Save any workout as a card or export it as a file, and open set notes right in your history. |
-| 2 | **Secondary muscles** | See what else each exercise works, and change it to suit how you train. |
-| 3 | **Training data** | Workouts you finish are now shared anonymously to help improve Repster. Turn it off in Settings → Data & Backups. |
+| 1 | **Various improvements** | Left vs Right on Insights shows if one side is stronger once you log exercises by side. Plus secondary muscles, visual updates and lots of smaller improvements. |
+| 2 | **Your past workouts** | Save any workout as a card or a file, and open set notes in your history. |
+| 3 | **Improving Smart Suggestions** | Workouts you finish, with what Smart Suggestions suggested, are now shared to help improve Repster and its suggestions, without notes or bodyweight and not linked to you. Turn it off in Settings → Data & Backups. |
 
-Left vs Right is deliberately not a tile. It stays hidden until both sides have been logged, so
-most people could not go and see it.
+Left vs Right leads the first card rather than getting its own: it stays hidden until both sides
+have been logged, so the sentence says when it appears. The third card is still the only place an
+upgrader learns that sharing is on, so it stays.
 
 ### 5.2 The App Store field
 

@@ -6,7 +6,7 @@
 **1.5.1 never shipped.** It only reached TestFlight (builds 1 to 7, two team iPhones), so
 everything after the 1.5 commit is unreleased and rolls into 1.6.
 **In the project right now:** `MARKETING_VERSION = 1.6`, build 1 (set 2026-11-04).
-**Status:** rounded up, scope not locked. The open scope calls are in
+**Status:** rounded up, scope locked on 2026-11-07. The decisions still open are in
 [PRE_1.6_CHECKLIST.md §0](PRE_1.6_CHECKLIST.md).
 
 ## What this document is
@@ -24,8 +24,8 @@ everything after the 1.5 commit is unreleased and rolls into 1.6.
 |---|---|
 | Since the 1.5 commit (`ac67d7f`, 2026-09-07) | 43 commits. 31 change the app or tests; 12 are docs, tooling or the 1.5.1 bump |
 | App code | 87 files, +7,758 / −848. 21 new files, none removed |
-| Uncommitted | Only the Part 5 files, which stay out of git on purpose. The suggestion data (`60f9e5e`) and the three 2026-11-07 fixes were committed on 2026-11-07 |
-| Pushed | Up to `468fb24`, on 2026-11-04. Pages serves `NewMain:/docs`, so the corrected support and terms pages went live with it. Nothing since is pushed, including the 2026-11-06 privacy policy |
+| Uncommitted | The Part 5 files, which stay out of git on purpose, and this record of the 2026-11-07 push |
+| Pushed | Up to `a468deb`, on 2026-11-07. Pages serves `NewMain:/docs`, so the 2026-11-06 privacy policy went live with it, about 20 s later |
 | Test suite | 1,048 run, 14 skipped, 0 failed, no crashes. iPhone 17 Pro simulator, re-run 2026-11-07 on the code committed as `ec2f921` (1,040 on `ad3cacf`, 2026-11-04). The built app and the Live Activity extension both report 1.6 |
 | Release-config build | Succeeds with 0 errors, unsigned, generic iOS device, 2026-11-04. The body-map artwork is absent from the built app, checked by searching it for a path string, while a known app string is found |
 | Upgrade risk | No SwiftData model change, no backup format change, no new permission string, no entitlement, privacy manifest or package change since 1.5 |
