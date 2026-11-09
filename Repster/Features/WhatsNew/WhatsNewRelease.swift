@@ -64,6 +64,16 @@ struct WhatsNewRelease {
             version: "1.6",
             items: [
                 WhatsNewItem(
+                    id: "improvements",
+                    systemImage: "sparkles",
+                    tint: .green,
+                    // Left vs Right leads this row rather than getting its own: it stays hidden
+                    // until both sides have been logged, so the sentence says when it appears.
+                    // Secondary muscles show on any exercise's detail screen.
+                    title: "Various improvements",
+                    body: "Left vs Right on Insights shows if one side is stronger once you log exercises by side. Plus secondary muscles, visual updates and lots of smaller improvements."
+                ),
+                WhatsNewItem(
                     id: "past_workouts",
                     systemImage: "clock.arrow.circlepath",
                     tint: .accent,
@@ -71,17 +81,7 @@ struct WhatsNewRelease {
                     // a saved workout's share card, its export, and the set notes in history.
                     // Any past workout passes the ten-second test for all three.
                     title: "Your past workouts",
-                    body: "Save any workout as a card or export it as a file, and open set notes right in your history."
-                ),
-                WhatsNewItem(
-                    id: "secondary_muscles",
-                    systemImage: "figure.strengthtraining.traditional",
-                    tint: .green,
-                    // Any exercise's detail screen shows them. Left vs Right is deliberately not
-                    // a row: it stays hidden until both sides have been logged, so most people
-                    // couldn't go and look at it.
-                    title: "Secondary muscles",
-                    body: "See what else each exercise works, and change it to suit how you train."
+                    body: "Save any workout as a card or a file, and open set notes in your history."
                 ),
                 WhatsNewItem(
                     id: "training_data",
@@ -91,9 +91,12 @@ struct WhatsNewRelease {
                     // about something that changed on the user's behalf. Share Training Data is
                     // on by default from this version, and this sheet is the only place an
                     // upgrader is told. Don't cut it to make room. See PRE_1.6_CHECKLIST.md §0.
+                    // "Not linked to you" rather than "anonymously", to match the privacy policy,
+                    // which calls the data pseudonymous. The suggestion half is schema 2's
+                    // per-set Smart Suggestion data.
                     tint: .gold,
-                    title: "Training data",
-                    body: "Workouts you finish are now shared anonymously to help improve Repster. Turn it off in Settings → Data & Backups."
+                    title: "Improving Smart Suggestions",
+                    body: "Workouts you finish, with what Smart Suggestions suggested, are now shared to help improve Repster and its suggestions, without notes or bodyweight and not linked to you. Turn it off in Settings → Data & Backups."
                 )
             ]
         ),
